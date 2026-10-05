@@ -1,0 +1,16 @@
+**/node_modules/
+.git/
+**/__pycache__/
+*.pyc
+.venv/
+*.log
+.env*
+*.key
+*.pem
+runner-artifacts/
+*.private.json
+*.private.*
+*.sqlite*
+tests/
+Dockerfile*
+.dockerignore

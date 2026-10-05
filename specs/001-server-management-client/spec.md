@@ -1,6 +1,6 @@
 # ServerDeck: server management desktop client
 
-Created2026-10-05. Status: initial requirements for review; design choices proposed.
+Created 2026-10-05. Status: refined for phased implementation; runtime evidence is separate.
 Owner: ServerDeck. Scope authorized by user: new public project and separate task.
 No installation on real hosts is authorized by this documentation.
 
@@ -23,6 +23,7 @@ may synchronize data, but ordinary use must not require one or provider APIs.
 | BR-L03 | Switch servers/screens without losing the bounded session buffer; pause display, resume and reconnect with explicit gap/duplicate handling | Logs; proposed extension |
 | BR-L04 | Search message text, filter selected service/severity/time, show timestamp/timezone and structured details; copy/export only on explicit action | Logs; proposed extension |
 | BR-L05 | Distinguish no logs, stopped service, permission denial, failed transport and malformed records; show stream freshness | Proposed correctness |
+| BR-L06 | Select desktop journal text and display newest entries first; copying remains an explicit local action | Logs; source ID retained |
 | BR-M01 | Host CPU/RAM/disk capacity+usage/uptime and basic network rates; service PID/CPU/RAM when available; timestamp/stale marker, unavailable is not zero | Human; Logs; proposed extension |
 | BR-J01 | Choose host, catalog application, supported exact version and parameters; inspect planned actions, submit installation job and follow status/output | Human |
 | BR-J02 | First recipes PostgreSQL and ClickHouse; fresh install and adoption are explicit; preserve existing data/config and deny implicit reset/downgrade | Human; proposed safety |
@@ -35,7 +36,33 @@ may synchronize data, but ordinary use must not require one or provider APIs.
 | BR-T01 | Use ready-made host-install tooling; do not implement another package manager or require cloud APIs | Human |
 | BR-P01 | Pin host keys, keep secrets in OS custody, escape commands, separate read and write capabilities, immutable job inputs+recipe hash; do not modify NetBird | Existing user constraints; proposed design |
 
-## Acceptance scenarios
+## User stories and success criteria
+
+- US1 (P1): inspect profiles, software, unit states and hardware freshness without
+  a backend. BR-S01/I01/I02/M01/C01/A01; AC01/AC02. M0 uses fixtures only.
+- US2 (P1): read bounded journal history and follow/search/filter without losing
+  session state during navigation. BR-L01..L06; AC03.
+- US3 (P2): review exact-version plans and durable jobs on disposable hosts.
+  BR-J01..J04/T01/P01; AC04/AC05/AC07. M0 previews cannot execute.
+- US4 (P2): explicitly authorized service operations with verified results.
+  BR-S02/P01; AC07 plus stopped/failed/instance service walkthrough.
+- US5 (P3): opt into non-secret metadata sync. BR-C01/C02; AC06.
+
+SC01: M0 opens on Windows at 1100x760 and 800x600 without layout exceptions;
+all five views are reachable, demo labels persist, and no remote-host network/write
+operation is reachable. Authenticated loopback storage IPC is allowed. Fixture
+widgets verify navigation, filtering and stale data.
+SC02: journals retain at most 500 records/server (each record <=64 KiB); history
+requests accept only 1..1000 (default 100). At most two transports are open; excess
+requests are explicitly refused. Overflow/parse/gap/duplicate counts are visible.
+SC03: metrics expire after 15 seconds and inventory after 5 minutes. Failed refresh
+keeps prior observations and marks them stale; unavailable values are null.
+SC04: unknown/changed host keys and untrusted identifiers deny execution; secrets
+remain in OS custody and never enter sync or non-secret persistence.
+SC05: real jobs need tested duplicate/crash/cancel/host-lock paths and post-install
+probes before AC04 passes. M2 gates must not be claimed by fixture tests.
+
+## Acceptance scenarios (stable IDs)
 
 - AC01: add two fixture servers; after refresh each has identity, freshness and
   observations; losing one connection marks it offline/unknown without erasing
@@ -63,5 +90,21 @@ M2: existing-tool job executor + two recipes on disposable fixtures.
 M3: optional synchronization service with conflict/authorization tests.
 No HA/SLO/backup rollout, cloud provisioning, central log platform or full Kubernetes
 management is part of the initial product. Inventory is not continuous monitoring.
-Limits for scans, log throughput, refresh cadence, job timeouts, recipe versions and
-sync retention must be chosen and measured during planning, not invented here.
+Initial budgets and release gates are in plan.md; these are design limits until
+measured. Catalog execution remains disabled until provenance, limited privileges
+and disposable installation compatibility are verified.
+
+## Architecture amendment — 2026-10-05
+
+User approved the Docs approach: Flutter -> authenticated Local API -> separate
+Dart locald -> Isar Community. Only locald owns non-secret persistence, profile
+CRUD and the durable job journal. Python is confined to the future Ansible
+execution container; it must not coordinate desktop jobs or own a second database.
+Credentials stay in OS custody. Profiles survive app/service restart; a failed
+write is displayed as a failure, never as a successful in-memory edit. Demo
+profiles are isolated from future enrolled production profiles and remain .invalid.
+Deleting a demo profile must survive subsequent seed initialization.
+This refines BR-S01/C01/J03/J04/A01/P01 and SC01/SC04/SC05 without changing IDs
+or authorizing remote actions. SSH ownership also moves to locald when connected
+repositories are implemented in T005..T008; current read-only adapters are not
+yet connected. Settings and cached inventory remain future T005/T006 work.

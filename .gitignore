@@ -1,5 +1,6 @@
 .dart_tool/
 build/
+output/dist/
 .flutter-plugins*
 .local/
 .env*
@@ -8,3 +9,19 @@ build/
 *.log
 runner-artifacts/
 inventory.private.*
+.idea/
+*.iml
+__pycache__/
+*.pyc
+.venv/
+work/
+android/key.properties
+*.jks
+*.keystore
+*.sqlite*
+*.isar
+*.isar.lock
+**/libisar.dll
+*.private.json
+.agents/*
+!.agents/skills/

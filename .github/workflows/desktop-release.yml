@@ -1,0 +1,112 @@
+name: Build installation packages
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      create_draft:
+        description: Create a draft desktop release (never publish automatically)
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: windows-x64
+          - os: macos-15-intel
+            platform: macos-x64
+          - os: macos-15
+            platform: macos-arm64
+          - os: ubuntu-24.04
+            platform: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install exact project Flutter SDK
+        shell: bash
+        run: |
+          git clone https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          git -C "$RUNNER_TEMP/flutter" checkout 4cf24164269a5ebf0c16a028a00727d0e77bbb05
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev dpkg-dev file
+      - if: runner.os == 'Windows'
+        run: dotnet tool install --global wix --version 4.0.6
+      - run: flutter pub get
+      - run: dart pub get
+        working-directory: packages/serverdeck_locald
+      - run: flutter analyze
+      - run: flutter test
+      - if: runner.os == 'Windows'
+        run: ./tools/package-windows.ps1
+      - if: runner.os == 'Windows'
+        run: ./tools/test-installer.ps1
+      - if: runner.os == 'macOS'
+        run: bash tools/package-macos.sh
+      - if: runner.os == 'macOS'
+        run: python3 tools/test_locald_bundle.py build/macos/Build/Products/Release/ServerDeck.app/Contents/MacOS/serverdeck_locald
+      - if: runner.os == 'Linux'
+        run: bash tools/package-linux.sh
+      - if: runner.os == 'Linux'
+        run: python3 tools/test_locald_bundle.py build/linux/x64/release/bundle/serverdeck_locald
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: output/dist/*
+          if-no-files-found: error
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - name: Flutter SDK
+        run: |
+          git clone https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          git -C "$RUNNER_TEMP/flutter" checkout 4cf24164269a5ebf0c16a028a00727d0e77bbb05
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Build review APK (unsigned; production requires persistent signing key)
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-unsigned-review
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+  draft:
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.create_draft
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          merge-multiple: true
+          path: output/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64
+          path: output/dist
+      - name: Manifest and draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(python3 tools/release_manifest.py --version)
+          tag="v$version"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "$tag" ]]; then echo 'Tag/version mismatch'; exit 1; fi
+          python3 tools/release_manifest.py --assets output/dist --output output/dist/serverdeck-update.json --require-all
+          gh release create "$tag" output/dist/* --draft --target "$GITHUB_SHA" --title "ServerDeck $version" --notes 'Draft packages: validate native installation, sign Windows, sign/notarize Mac and regenerate hashes before publishing. Android is distributed through RuStore separately.'

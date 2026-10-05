@@ -1,0 +1,14 @@
+name: serverdeck_locald
+description: Owner-local Dart service and Isar storage for ServerDeck.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+dependencies:
+  crypto: 3.0.7
+  isar_community: 3.3.2
+dev_dependencies:
+  build_runner: ^2.4.15
+  isar_community_generator: 3.3.2
+  lints: ^6.0.0
+  test: ^1.25.6
