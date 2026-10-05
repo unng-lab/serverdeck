@@ -46,6 +46,7 @@ govulncheck ./...
   may be stored outside this repository without additional permission.
 - Do not place tool installations or dependency caches inside this repository.
 - Other writes outside this repository require the user's explicit permission.
+
 ## Explicit Spec Kit Requests
 
 - If the user asks to work with Spec Kit, use the actual Spec Kit workflow and
@@ -57,27 +58,13 @@ govulncheck ./...
 - Read spec.md, plan.md and tasks.md before implementation; preserve requirement
   traceability and update task completion only after actual verification.
 
-## ServerDeck Project Rules
+## Flutter Checks
 
-The shared servicekit/AGENTS.md above is copied in full. The following rules
-add project-specific requirements and do not waive the shared required checks.
-# Working rules
+- After Flutter code changes, run dart format, flutter analyze and flutter test.
+- Verify desktop behavior on Windows when the change affects desktop behavior.
+- Report unperformed checks explicitly; do not claim they passed.
 
-- This is an independent application, not an Infrastructure or Logs rewrite.
-  Modify only this repository. Other repositories and live servers are read-only
-  unless the human explicitly authorizes a specific additional action.
-- Read spec/plan/tasks before implementation. Maintain requirement-to-task-to-test
-  traceability; configure and use Spec Kit. Never claim it ran if unavailable.
-- Do not copy Logs source: its licensing has not been established. Behavioral
-  research is recorded with an exact source commit.
-- Keep passwords, keys, real host inventories, private logs and runner artifacts
-  out of Git. Credentials belong in the OS credential store, not preferences.
-- NetBird and every NetBird client are protected: no stop, restart, update,
-  removal, enrollment, route, DNS, key or configuration changes.
-- Host inspection must be read-only. Testing installation uses disposable fixtures.
-  Do not treat a synchronized job or a UI mock as authorization for live writes.
-- Pin SSH host identity; changed/unknown keys require an explicit enrollment flow.
-- After Flutter code changes run dart format, flutter analyze and flutter test;
-  verify desktop behavior on Windows. Report unperformed checks explicitly.
-- Use conventional commits. No destructive cleanup of user data or automatic
-  downgrade/reset/uninstall. Partial jobs require reconciliation.
+## Secrets
+
+- Do not commit credentials, private keys or private runtime data.
+- Use the OS credential store for application credentials.
