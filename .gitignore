@@ -1,0 +1,10 @@
+.dart_tool/
+build/
+.flutter-plugins*
+.local/
+.env*
+*.key
+*.pem
+*.log
+runner-artifacts/
+inventory.private.*
