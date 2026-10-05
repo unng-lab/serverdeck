@@ -49,8 +49,12 @@ jobs:
         run: ./tools/test-installer.ps1
       - if: runner.os == 'macOS'
         run: bash tools/package-macos.sh
+      - if: runner.os == 'macOS'
+        run: python3 tools/test_locald_bundle.py build/macos/Build/Products/Release/ServerDeck.app/Contents/MacOS/serverdeck_locald
       - if: runner.os == 'Linux'
         run: bash tools/package-linux.sh
+      - if: runner.os == 'Linux'
+        run: python3 tools/test_locald_bundle.py build/linux/x64/release/bundle/serverdeck_locald
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
