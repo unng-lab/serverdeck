@@ -8,6 +8,8 @@ import 'package:serverdeck_locald/local_api.dart';
 import '../data/fixtures.dart';
 import '../data/local_profiles.dart';
 import '../domain/models.dart';
+import '../data/app_updates.dart';
+import 'app_updates.dart';
 
 const _bg = Color(0xFF0C121C);
 const _panel = Color(0xFF151E2B);
@@ -16,7 +18,8 @@ const _accent = Color(0xFF64DFC5);
 const _warning = Color(0xFFFFC47A);
 
 class ServerDeckApp extends StatelessWidget {
-  const ServerDeckApp({super.key, this.client, this.profiles});
+  const ServerDeckApp({super.key, this.client, this.profiles, this.updater});
+  final UpdateController? updater;
   final LocalApiClient? client;
   final List<ServerProfile>? profiles;
   @override
@@ -41,12 +44,13 @@ class ServerDeckApp extends StatelessWidget {
       ),
       dividerColor: const Color(0xFF253246),
     ),
-    home: DeckShell(client: client, profiles: profiles),
+    home: DeckShell(client: client, profiles: profiles, updater: updater),
   );
 }
 
 class DeckShell extends StatefulWidget {
-  const DeckShell({super.key, this.client, this.profiles});
+  const DeckShell({super.key, this.client, this.profiles, this.updater});
+  final UpdateController? updater;
   final LocalApiClient? client;
   final List<ServerProfile>? profiles;
   @override
@@ -74,6 +78,23 @@ class _DeckShellState extends State<DeckShell> {
     }
   }
 
+  Widget _updateControls() => UpdateControls(
+    updater: widget.updater!,
+    readPreference: widget.client == null
+        ? null
+        : () async {
+            final settings =
+                await widget.client!.call('settings/get') as JsonMap;
+            return settings['updateAutoCheck'] as bool? ?? true;
+          },
+    writePreference: widget.client == null
+        ? null
+        : (enabled) async {
+            await widget.client!.call('settings/set', {
+              'updateAutoCheck': enabled,
+            });
+          },
+  );
   Future<void> _loadJobs() async {
     try {
       final jobs = (await widget.client!.call('jobs/list') as List)
@@ -131,6 +152,32 @@ class _DeckShellState extends State<DeckShell> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      if (constraints.maxWidth < 700) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('ServerDeck'),
+            actions: [if (widget.updater != null) _updateControls()],
+          ),
+          body: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: 800,
+              height: constraints.maxHeight - 140,
+              child: DeckShell(
+                client: widget.client,
+                profiles: widget.profiles,
+              ),
+            ),
+          ),
+          bottomNavigationBar: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Рабочая область прокручивается горизонтально. Навигация слева.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
       final wide = constraints.maxWidth >= 1000;
       return Scaffold(
         body: Row(
@@ -255,6 +302,7 @@ class _DeckShellState extends State<DeckShell> {
                           ),
                         ),
                         const StatusBadge('ДЕМО · без подключений', _warning),
+                        if (widget.updater != null) _updateControls(),
                       ],
                     ),
                   ),

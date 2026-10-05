@@ -5,6 +5,16 @@ import 'client.dart';
 import 'models.dart';
 
 String defaultDataDirectory() {
+  if (Platform.isMacOS) {
+    final home = Platform.environment['HOME'];
+    if (home == null || home.isEmpty) {
+      throw const LocalApiException('DataDirectoryUnavailable');
+    }
+    final legacy = '$home/.local/share/ServerDeck/demo';
+    return Directory(legacy).existsSync()
+        ? legacy
+        : '$home/Library/Application Support/ServerDeck/demo';
+  }
   final base = Platform.isWindows
       ? Platform.environment['LOCALAPPDATA']
       : Platform.environment['XDG_DATA_HOME'] ??

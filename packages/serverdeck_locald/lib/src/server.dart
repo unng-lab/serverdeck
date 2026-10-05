@@ -7,6 +7,7 @@ import 'store.dart';
 
 Future<void> protectDirectory(Directory directory) async {
   await directory.create(recursive: true);
+  if (Platform.isAndroid) return; // Directory supplied by Android app sandbox.
   if (Platform.isWindows) {
     // Replace explicit grants too; protect existing files and refuse links.
     const script = r'''
@@ -70,6 +71,8 @@ final class LocaldServer {
   late final StreamSubscription<HttpRequest> _requests;
   final Set<Future<void>> _pending = {};
   bool _closed = false;
+  final _done = Completer<void>();
+  Future<void> get done => _done.future;
   int get port => _server.port;
 
   static Future<LocaldServer> start({
@@ -149,6 +152,9 @@ final class LocaldServer {
           'apiVersion': localApiVersion,
           'service': 'serverdeck',
         },
+        '/v1/settings/get' => await _store.desktopSettings(),
+        '/v1/settings/set' => await _settings(body),
+        '/v1/service/stop' => await _prepareStop(),
         '/v1/profiles/list' => await _store.profiles(),
         '/v1/profiles/initialize' => await _initialize(body),
         '/v1/profiles/save' => await _save(body),
@@ -234,6 +240,35 @@ final class LocaldServer {
     return true;
   }
 
+  Future<bool> _settings(JsonMap body) async {
+    if (body.isEmpty ||
+        body.keys.any((k) => !{'theme', 'updateAutoCheck'}.contains(k)) ||
+        (body.containsKey('theme') &&
+            !['light', 'dark'].contains(body['theme'])) ||
+        (body.containsKey('updateAutoCheck') &&
+            body['updateAutoCheck'] is! bool)) {
+      throw const LocalApiException('InvalidSettings');
+    }
+    await _store.patchDesktopSettings(body);
+    return true;
+  }
+
+  Future<bool> _prepareStop() async {
+    final jobs = await _store.jobs();
+    if (jobs.any(
+      (job) => {
+        'running',
+        'cancel-requested',
+        'unknown',
+        'reconciling',
+      }.contains(job['state']),
+    )) {
+      throw const LocalApiException('ActiveJobsPreventUpdate');
+    }
+    Timer(const Duration(milliseconds: 200), () => unawaited(close()));
+    return true;
+  }
+
   Future<void> close() async {
     if (_closed) {
       return;
@@ -249,5 +284,6 @@ final class LocaldServer {
     }
     await _lock.unlock();
     await _lock.close();
+    if (!_done.isCompleted) _done.complete();
   }
 }

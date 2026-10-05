@@ -5172,13 +5172,18 @@ const MetadataRecordSchema = CollectionSchema(
   name: r'MetadataRecord',
   id: -3803964822656917661,
   properties: {
-    r'profilesInitialized': PropertySchema(
+    r'desktopSettingsJson': PropertySchema(
       id: 0,
+      name: r'desktopSettingsJson',
+      type: IsarType.string,
+    ),
+    r'profilesInitialized': PropertySchema(
+      id: 1,
       name: r'profilesInitialized',
       type: IsarType.bool,
     ),
     r'schemaVersion': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'schemaVersion',
       type: IsarType.long,
     ),
@@ -5205,6 +5210,12 @@ int _metadataRecordEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.desktopSettingsJson;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -5214,8 +5225,9 @@ void _metadataRecordSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.profilesInitialized);
-  writer.writeLong(offsets[1], object.schemaVersion);
+  writer.writeString(offsets[0], object.desktopSettingsJson);
+  writer.writeBool(offsets[1], object.profilesInitialized);
+  writer.writeLong(offsets[2], object.schemaVersion);
 }
 
 MetadataRecord _metadataRecordDeserialize(
@@ -5225,9 +5237,10 @@ MetadataRecord _metadataRecordDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = MetadataRecord();
+  object.desktopSettingsJson = reader.readStringOrNull(offsets[0]);
   object.id = id;
-  object.profilesInitialized = reader.readBool(offsets[0]);
-  object.schemaVersion = reader.readLong(offsets[1]);
+  object.profilesInitialized = reader.readBool(offsets[1]);
+  object.schemaVersion = reader.readLong(offsets[2]);
   return object;
 }
 
@@ -5239,8 +5252,10 @@ P _metadataRecordDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
+      return (reader.readBool(offset)) as P;
+    case 2:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -5349,6 +5364,168 @@ extension MetadataRecordQueryWhere
 
 extension MetadataRecordQueryFilter
     on QueryBuilder<MetadataRecord, MetadataRecord, QFilterCondition> {
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'desktopSettingsJson'),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'desktopSettingsJson'),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'desktopSettingsJson',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'desktopSettingsJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'desktopSettingsJson',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'desktopSettingsJson', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition>
+  desktopSettingsJsonIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'desktopSettingsJson',
+          value: '',
+        ),
+      );
+    });
+  }
+
   QueryBuilder<MetadataRecord, MetadataRecord, QAfterFilterCondition> idEqualTo(
     Id value,
   ) {
@@ -5478,6 +5655,20 @@ extension MetadataRecordQueryLinks
 extension MetadataRecordQuerySortBy
     on QueryBuilder<MetadataRecord, MetadataRecord, QSortBy> {
   QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy>
+  sortByDesktopSettingsJson() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'desktopSettingsJson', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy>
+  sortByDesktopSettingsJsonDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'desktopSettingsJson', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy>
   sortByProfilesInitialized() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'profilesInitialized', Sort.asc);
@@ -5508,6 +5699,20 @@ extension MetadataRecordQuerySortBy
 
 extension MetadataRecordQuerySortThenBy
     on QueryBuilder<MetadataRecord, MetadataRecord, QSortThenBy> {
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy>
+  thenByDesktopSettingsJson() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'desktopSettingsJson', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy>
+  thenByDesktopSettingsJsonDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'desktopSettingsJson', Sort.desc);
+    });
+  }
+
   QueryBuilder<MetadataRecord, MetadataRecord, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -5552,6 +5757,16 @@ extension MetadataRecordQuerySortThenBy
 extension MetadataRecordQueryWhereDistinct
     on QueryBuilder<MetadataRecord, MetadataRecord, QDistinct> {
   QueryBuilder<MetadataRecord, MetadataRecord, QDistinct>
+  distinctByDesktopSettingsJson({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'desktopSettingsJson',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<MetadataRecord, MetadataRecord, QDistinct>
   distinctByProfilesInitialized() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'profilesInitialized');
@@ -5571,6 +5786,13 @@ extension MetadataRecordQueryProperty
   QueryBuilder<MetadataRecord, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<MetadataRecord, String?, QQueryOperations>
+  desktopSettingsJsonProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'desktopSettingsJson');
     });
   }
 

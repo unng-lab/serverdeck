@@ -51,4 +51,5 @@ class MetadataRecord {
   Id id = 1;
   int schemaVersion = 1;
   bool profilesInitialized = false;
+  String? desktopSettingsJson;
 }

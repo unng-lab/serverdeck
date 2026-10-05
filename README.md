@@ -88,3 +88,11 @@ Sync не должен выдавать разрешение на выполне
 a7bf7f8f0c4d5d37be6a54119eaf70a1248520b9: [источник](docs/logs-research.md).
 Код Logs не скопирован; лицензия не установлена. Собственная лицензия проекта ещё
 не выбрана. Наличие публичного репозитория не разрешает копировать сторонний код.
+
+## Installation packages and updates
+
+[Windows/macOS/Ubuntu packages and Android through RuStore](docs/distribution.md).
+The update control checks stable releases, offers verified downloads and explicit installation.
+[Spec Kit specification](specs/003-desktop-distribution/spec.md),
+[plan](specs/003-desktop-distribution/plan.md), [tasks](specs/003-desktop-distribution/tasks.md),
+[validation and release gates](specs/003-desktop-distribution/verification.md).

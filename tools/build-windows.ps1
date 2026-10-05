@@ -21,5 +21,15 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $bundleRoot 'libisar.dll'))) {
         throw 'Bundled Isar Core is missing'
     }
+    # App-local VC runtime avoids requiring an elevated redistributable install.
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path -LiteralPath $vswhere)) { throw 'Visual Studio locator missing' }
+    $vsRoot = & $vswhere -latest -products '*' -property installationPath
+    $crt = Get-ChildItem -LiteralPath (Join-Path $vsRoot 'VC\Redist\MSVC') -Directory |
+        Where-Object { $_.Name -match '^\d+\.' } | Sort-Object Name -Descending |
+        ForEach-Object { Join-Path $_.FullName 'x64\Microsoft.VC143.CRT' } |
+        Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $crt) { throw 'VC143 app-local redistributable missing' }
+    Get-ChildItem -LiteralPath $crt -Filter '*.dll' | Copy-Item -Destination $bundleRoot -Force
     Write-Output "Ready: $bundleRoot"
 } finally { Pop-Location }

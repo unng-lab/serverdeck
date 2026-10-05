@@ -28,8 +28,8 @@ Future<void> main(List<String> arguments) async {
           '${Platform.isWindows
               ? 'libisar.dll'
               : Platform.isLinux
-              ? 'libisar.so'
-              : 'libisar.dylib'}';
+              ? 'lib/libisar.so'
+              : '../Frameworks/libisar.dylib'}';
   LocaldServer server;
   try {
     server = await LocaldServer.start(
@@ -62,7 +62,7 @@ Future<void> main(List<String> arguments) async {
       /* Signal may be unavailable on this platform. */
     }
   }
-  await stop.future;
+  await Future.any([stop.future, server.done]);
   for (final subscription in subscriptions) {
     await subscription.cancel();
   }

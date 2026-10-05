@@ -50,6 +50,51 @@ Matcher code(String expected) =>
     isA<LocalApiException>().having((e) => e.code, 'code', expected);
 
 void main() {
+  test(
+    'atomic preferences survive reopen and authenticated stop closes storage',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'serverdeck-update-settings-',
+      );
+      var server = await LocaldServer.start(
+        directory: root.path,
+        nativeLibraryPath: library,
+      );
+      var client = LocalApiClient(port: server.port, proof: server.proof);
+      try {
+        await Future.wait([
+          client.call('settings/set', {'theme': 'light'}),
+          client.call('settings/set', {'updateAutoCheck': false}),
+        ]);
+        expect(await client.call('settings/get'), {
+          'theme': 'light',
+          'updateAutoCheck': false,
+        });
+        await expectLater(
+          client.call('settings/set', {'updateAutoCheck': 'false'}),
+          throwsA(isA<LocalApiException>()),
+        );
+        await client.call('service/stop');
+        await server.done.timeout(const Duration(seconds: 10));
+        expect(await File('${root.path}/endpoint.json').exists(), false);
+        client.close();
+        server = await LocaldServer.start(
+          directory: root.path,
+          nativeLibraryPath: library,
+        );
+        client = LocalApiClient(port: server.port, proof: server.proof);
+        expect(await client.call('settings/get'), {
+          'theme': 'light',
+          'updateAutoCheck': false,
+        });
+      } finally {
+        client.close();
+        await server.close();
+        await root.delete(recursive: true);
+      }
+    },
+  );
+
   group('Durable Isar application store', () {
     late Directory root;
     late LocalStore store;

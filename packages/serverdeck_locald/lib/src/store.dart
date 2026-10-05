@@ -41,11 +41,7 @@ final class LocalStore {
     String name = 'serverdeck',
   }) async {
     await Directory(directory).create(recursive: true);
-    final abi = Platform.isWindows
-        ? Abi.windowsX64
-        : Platform.isLinux
-        ? Abi.linuxX64
-        : Abi.macosArm64;
+    final abi = Abi.current();
     await Isar.initializeIsarCore(
       libraries: {abi: nativeLibraryPath},
       download: false,
@@ -83,6 +79,22 @@ final class LocalStore {
   Future<void> close() async {
     await _isar.close();
   }
+
+  Future<JsonMap> desktopSettings() async {
+    final metadata = (await _isar.metadataRecords.get(1))!;
+    return metadata.desktopSettingsJson == null
+        ? {'theme': 'dark', 'updateAutoCheck': true}
+        : jsonDecode(metadata.desktopSettingsJson!) as JsonMap;
+  }
+
+  Future<void> patchDesktopSettings(JsonMap patch) => _isar.writeTxn(() async {
+    final metadata = (await _isar.metadataRecords.get(1))!;
+    final previous = metadata.desktopSettingsJson == null
+        ? <String, dynamic>{'theme': 'dark', 'updateAutoCheck': true}
+        : jsonDecode(metadata.desktopSettingsJson!) as JsonMap;
+    metadata.desktopSettingsJson = jsonEncode({...previous, ...patch});
+    await _isar.metadataRecords.put(metadata);
+  });
 
   Future<List<JsonMap>> profiles() async =>
       (await _isar.profileRecords.where().findAll())
