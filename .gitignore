@@ -15,6 +15,9 @@ __pycache__/
 .venv/
 work/
 *.sqlite*
+*.isar
+*.isar.lock
+**/libisar.dll
 *.private.json
 .agents/*
 !.agents/skills/

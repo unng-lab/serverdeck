@@ -7,6 +7,28 @@ Rationale: real installed workflow/scripts, version repeatability; existing BR/A
 IDs authoritative. Alternative: hand-written lookalike scaffolding rejected.
 Source: https://github.github.com/spec-kit/installation.html
 
+## Local storage architecture amendment
+
+Decision: follow the local Docs project's Flutter -> Local API -> Dart locald ->
+Isar ownership pattern, with an independently written ServerDeck implementation.
+Isar Community and generator 3.3.2, pinned bundled Core from flutter_libs 3.3.2;
+runtime download:false, inspector:false, relaxedDurability:false. No Python
+desktop coordinator or SQLite job database remains in the active architecture.
+Rationale: one owner for non-secret data and job state, Dart domain/API, UI lifecycle
+separated from durable coordination. Alternatives: Python sqlite3 coordinator
+replaced by user instruction; direct UI Isar ownership would couple storage to
+window lifetime. Existing prototype SQLite files require a separately validated
+explicit importer, not automatic reset/import. Upgrade migrations, inventory cache,
+settings and real job executor are still future work.
+Research comparison checked Docs locald/discovery/store locally; no Docs source
+was copied. Windows DACL must replace explicit non-owner grants too. Test actual
+compiled-process death/restart and stale endpoint discovery separately from orderly
+reopen. Packaged service and Core are required; plain Flutter build is insufficient.
+Generator succeeded but warned analyzer language3.12 vs SDK3.13; no SDK changes or
+dependency overrides. Runtime compilation and analyzer checks remain required.
+Sources: https://pub.dev/packages/isar_community
+https://pub.dev/packages/isar_community_generator
+
 ## Windows executor
 
 Decision: Docker Desktop Linux container, Ansible Core 2.21.4 + Runner 2.4.3,

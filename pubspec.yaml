@@ -9,6 +9,9 @@ dependencies:
   ffi: 2.2.0
   flutter:
     sdk: flutter
+  isar_community_flutter_libs: 3.3.2
+  serverdeck_locald:
+    path: packages/serverdeck_locald
   win32: 6.4.0
 dev_dependencies:
   flutter_test:

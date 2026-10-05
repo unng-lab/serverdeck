@@ -2,38 +2,43 @@ import '../domain/models.dart';
 
 /// Entirely synthetic; no network, real inventory or copied Logs source.
 class FixtureRepository {
-  FixtureRepository({DateTime? now})
+  FixtureRepository({DateTime? now, List<ServerProfile>? profiles})
     : createdAt = now ?? DateTime.now().toUtc() {
-    servers = [
-      ServerProfile(
-        id: 'lab-a',
-        name: 'Ubuntu Lab',
-        endpoint: 'ubuntu-lab.invalid',
-        tags: ['lab', 'Ubuntu 24.04'],
-        observedAt: createdAt,
-      ),
-      ServerProfile(
-        id: 'lab-b',
-        name: 'Analytics Lab',
-        endpoint: 'analytics-lab.invalid',
-        tags: ['lab', 'ClickHouse'],
-        observedAt: createdAt.subtract(const Duration(minutes: 8)),
-        state: 'offline',
-      ),
-      ServerProfile(
-        id: 'lab-c',
-        name: 'New fixture',
-        endpoint: 'new-lab.invalid',
-        tags: ['не проверен'],
-        observedAt: createdAt,
-        state: 'unknown',
-      ),
-    ];
+    servers = profiles == null
+        ? [
+            ServerProfile(
+              id: 'lab-a',
+              name: 'Ubuntu Lab',
+              endpoint: 'ubuntu-lab.invalid',
+              tags: ['lab', 'Ubuntu 24.04'],
+              observedAt: createdAt,
+            ),
+            ServerProfile(
+              id: 'lab-b',
+              name: 'Analytics Lab',
+              endpoint: 'analytics-lab.invalid',
+              tags: ['lab', 'ClickHouse'],
+              observedAt: createdAt.subtract(const Duration(minutes: 8)),
+              state: 'offline',
+            ),
+            ServerProfile(
+              id: 'lab-c',
+              name: 'New fixture',
+              endpoint: 'new-lab.invalid',
+              tags: ['не проверен'],
+              observedAt: createdAt,
+              state: 'unknown',
+            ),
+          ]
+        : List.of(profiles);
     for (final server in servers) {
       sessions[server.id] = JournalSession();
     }
-    loadHistory('lab-a', 100);
-    loadHistory('lab-b', 100);
+    for (final id in ['lab-a', 'lab-b']) {
+      if (sessions.containsKey(id)) {
+        loadHistory(id, 100);
+      }
+    }
   }
   final DateTime createdAt;
   late final List<ServerProfile> servers;

@@ -5,14 +5,14 @@
 
 Первый проверяемый этап M0 реализован: пять экранов на синтетических данных —
 серверы, ПО/версии и systemd-состояния, журнал, ресурсы, план установки.
-Профили редактируются только в текущей demo-сессии. Журнал поддерживает поиск,
+Профили сохраняются локально через Dart locald и Isar. Журнал поддерживает поиск,
 службу/приоритет/период, поля, явное копирование, паузу и demo-поток с буфером 500.
 Неизвестные и устаревшие значения показаны отдельно.
 
 Начата основа M1: pinned read-only SSH, Windows Credential Manager, безопасные
 команды и парсеры пакетов/units/CPU/RAM. Транспорт проверен на одноразовом localhost
 SSH-контейнере; подключение к реальным серверам в интерфейс ещё не включено.
-Начата основа M2: SQLite журнал заданий/событий, idempotency, host lock и состояния
+Начата основа M2: Isar журнал заданий/событий в Dart locald, idempotency, host lock и состояния
 cancel/unknown/reconciling; Linux Ansible Core + Runner прошли localhost smoke.
 Запуск установок закрыт. Рецепты PostgreSQL/ClickHouse и ограниченный privilege
 helper ещё не реализованы и не проверены на systemd VM.
@@ -21,11 +21,18 @@ helper ещё не реализованы и не проверены на system
 
 Из checkout проекта:
 ```powershell
-flutter pub get
-flutter run -d windows
+& tools/build-windows.ps1
+& build/windows/x64/runner/Release/serverdeck.exe
 ```
 Release: build/windows/x64/runner/Release/serverdeck.exe. При переносе нужна вся
 папка Release, включая DLL и data; один exe не является portable-дистрибутивом.
+Сборка включает serverdeck_locald.exe и libisar.dll. Flutter работает через Local
+API, базой владеет только локальный Dart-сервис. Python нужен лишь внутри будущего
+Ansible-контейнера; управление заданиями приложения реализовано на Dart.
+Демо-профили: %LOCALAPPDATA%/ServerDeck/demo. Сервис продолжает работать при закрытии
+окна; после сбоя сервиса перезапустите приложение для повторного подключения.
+Для flutter run сначала соберите sidecar и задайте SERVERDECK_LOCALD_EXECUTABLE
+полным путём к serverdeck_locald.exe из Release.
 
 Проверено с Flutter 3.47.0/Dart 3.13.0 и Visual Studio 2022. SDK сообщает user-branch;
 точная ревизия и выполненные проверки в [verification](docs/verification.md).
@@ -34,13 +41,19 @@ Release: build/windows/x64/runner/Release/serverdeck.exe. При перенос�
 ## Проверки
 
 ```powershell
-dart format --output=none --set-exit-if-changed lib test integration_test tools/render_preview_test.dart
+dart format --output=none --set-exit-if-changed .
 flutter analyze
 flutter test
 flutter test integration_test/windows_smoke_test.dart -d windows
 & tools/test-ssh-fixture.ps1
-python -m unittest discover -s runner/tests -v
-flutter build windows --release
+flutter test integration_test/local_storage_test.dart -d windows
+Push-Location packages/serverdeck_locald
+dart test
+dart analyze
+Pop-Location
+lychee "specs/**/*.md"
+& tools/build-windows.ps1
+& tools/test-locald-process.ps1
 ```
 SSH fixture script создаёт собственный контейнер с портом только на 127.0.0.1 и
 удаляет его в finally. Он не обращается к существующим серверам. Образ fixture

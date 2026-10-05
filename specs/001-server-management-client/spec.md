@@ -49,8 +49,9 @@ may synchronize data, but ordinary use must not require one or provider APIs.
 - US5 (P3): opt into non-secret metadata sync. BR-C01/C02; AC06.
 
 SC01: M0 opens on Windows at 1100x760 and 800x600 without layout exceptions;
-all five views are reachable, demo labels persist, and no network/write operation
-is reachable. Fixture widgets verify navigation, filtering and stale data.
+all five views are reachable, demo labels persist, and no remote-host network/write
+operation is reachable. Authenticated loopback storage IPC is allowed. Fixture
+widgets verify navigation, filtering and stale data.
 SC02: journals retain at most 500 records/server (each record <=64 KiB); history
 requests accept only 1..1000 (default 100). At most two transports are open; excess
 requests are explicitly refused. Overflow/parse/gap/duplicate counts are visible.
@@ -92,3 +93,18 @@ management is part of the initial product. Inventory is not continuous monitorin
 Initial budgets and release gates are in plan.md; these are design limits until
 measured. Catalog execution remains disabled until provenance, limited privileges
 and disposable installation compatibility are verified.
+
+## Architecture amendment — 2026-10-05
+
+User approved the Docs approach: Flutter -> authenticated Local API -> separate
+Dart locald -> Isar Community. Only locald owns non-secret persistence, profile
+CRUD and the durable job journal. Python is confined to the future Ansible
+execution container; it must not coordinate desktop jobs or own a second database.
+Credentials stay in OS custody. Profiles survive app/service restart; a failed
+write is displayed as a failure, never as a successful in-memory edit. Demo
+profiles are isolated from future enrolled production profiles and remain .invalid.
+Deleting a demo profile must survive subsequent seed initialization.
+This refines BR-S01/C01/J03/J04/A01/P01 and SC01/SC04/SC05 without changing IDs
+or authorizing remote actions. SSH ownership also moves to locald when connected
+repositories are implemented in T005..T008; current read-only adapters are not
+yet connected. Settings and cached inventory remain future T005/T006 work.

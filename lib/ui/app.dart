@@ -3,8 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:serverdeck_locald/local_api.dart';
 
 import '../data/fixtures.dart';
+import '../data/local_profiles.dart';
 import '../domain/models.dart';
 
 const _bg = Color(0xFF0C121C);
@@ -14,7 +16,9 @@ const _accent = Color(0xFF64DFC5);
 const _warning = Color(0xFFFFC47A);
 
 class ServerDeckApp extends StatelessWidget {
-  const ServerDeckApp({super.key});
+  const ServerDeckApp({super.key, this.client, this.profiles});
+  final LocalApiClient? client;
+  final List<ServerProfile>? profiles;
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'ServerDeck',
@@ -37,18 +41,22 @@ class ServerDeckApp extends StatelessWidget {
       ),
       dividerColor: const Color(0xFF253246),
     ),
-    home: const DeckShell(),
+    home: DeckShell(client: client, profiles: profiles),
   );
 }
 
 class DeckShell extends StatefulWidget {
-  const DeckShell({super.key});
+  const DeckShell({super.key, this.client, this.profiles});
+  final LocalApiClient? client;
+  final List<ServerProfile>? profiles;
   @override
   State<DeckShell> createState() => _DeckShellState();
 }
 
 class _DeckShellState extends State<DeckShell> {
-  final repo = FixtureRepository();
+  late final FixtureRepository repo;
+  List<JsonMap> _storedJobs = [];
+  bool _jobReadFailed = false;
   String selectedId = 'lab-a',
       page = 'servers',
       softwareQuery = '',
@@ -56,6 +64,54 @@ class _DeckShellState extends State<DeckShell> {
   bool allSoftware = true;
   Timer? _live;
   String? _liveServer;
+  @override
+  void initState() {
+    super.initState();
+    repo = FixtureRepository(profiles: widget.profiles);
+    selectedId = repo.servers.first.id;
+    if (widget.client != null) {
+      unawaited(_loadJobs());
+    }
+  }
+
+  Future<void> _loadJobs() async {
+    try {
+      final jobs = (await widget.client!.call('jobs/list') as List)
+          .cast<JsonMap>();
+      if (mounted) {
+        setState(() {
+          _storedJobs = jobs;
+          _jobReadFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _jobReadFailed = true);
+      }
+    }
+  }
+
+  Future<void> _cancelJob(String id) async {
+    try {
+      await widget.client!.call('jobs/cancel', {'id': id});
+      await _loadJobs();
+    } catch (_) {
+      _storageError();
+    }
+  }
+
+  void _storageError() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Изменение не сохранено. Локальный сервис недоступен или отклонил запрос.',
+          ),
+        ),
+      );
+    }
+  }
+
   ServerProfile get selected =>
       repo.servers.firstWhere((s) => s.id == selectedId);
   JournalSession get session => repo.sessions[selectedId]!;
@@ -212,10 +268,12 @@ class _DeckShellState extends State<DeckShell> {
                           size: 18,
                         ),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Синтетические данные. Изменения живут только в этой сессии.',
-                            style: TextStyle(color: _muted, fontSize: 12),
+                            widget.client == null
+                                ? 'Синтетические данные. Изменения живут только в этой сессии.'
+                                : 'Демо-наблюдения. Профили сохраняются на этом устройстве.',
+                            style: const TextStyle(color: _muted, fontSize: 12),
                           ),
                         ),
                       ],
@@ -300,7 +358,11 @@ class _DeckShellState extends State<DeckShell> {
         spacing: 12,
         runSpacing: 12,
         children: [
-          SummaryTile('ПРОФИЛЕЙ', '${repo.servers.length}', 'локальная сессия'),
+          SummaryTile(
+            'ПРОФИЛЕЙ',
+            '${repo.servers.length}',
+            widget.client == null ? 'локальная сессия' : 'локальное хранилище',
+          ),
           SummaryTile(
             'ONLINE · DEMO',
             '${repo.servers.where((s) => s.state == 'online').length}',
@@ -946,6 +1008,47 @@ class _DeckShellState extends State<DeckShell> {
           ],
         ),
       ),
+      if (widget.client != null) ...[
+        const SizedBox(height: 20),
+        _heading(
+          'Сохранённые задания',
+          'История на этом устройстве',
+          action: TextButton(
+            onPressed: _loadJobs,
+            child: const Text('Обновить'),
+          ),
+        ),
+        if (_jobReadFailed)
+          const Text(
+            'История недоступна. Повторите обновление.',
+            style: TextStyle(color: _warning),
+          )
+        else if (_storedJobs.isEmpty)
+          const Text('Заданий пока нет.', style: TextStyle(color: _muted))
+        else
+          ..._storedJobs.map(
+            (job) => ListTile(
+              title: Text(
+                '${(job['plan'] as JsonMap)['recipe']} · ${job['phase']}',
+              ),
+              subtitle: Text(
+                '${(job['plan'] as JsonMap)['hostId']} · ${job['createdAt']}',
+              ),
+              trailing:
+                  {
+                    'queued',
+                    'preflight',
+                    'awaiting-approval',
+                    'running',
+                  }.contains(job['phase'])
+                  ? TextButton(
+                      onPressed: () => _cancelJob(job['id'] as String),
+                      child: const Text('Отменить'),
+                    )
+                  : null,
+            ),
+          ),
+      ],
     ],
   );
 
@@ -1043,6 +1146,7 @@ class _DeckShellState extends State<DeckShell> {
   }
 
   Future<void> _profileDialog({ServerProfile? existing}) async {
+    var saving = false;
     var name = existing?.name ?? 'Disposable Lab';
     var endpoint = existing?.endpoint ?? 'disposable.invalid';
     var port = '${existing?.port ?? 22}';
@@ -1060,9 +1164,11 @@ class _DeckShellState extends State<DeckShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Без сохранения на диск и без SSH-подключения.',
-                  style: TextStyle(color: _warning),
+                Text(
+                  widget.client == null
+                      ? 'Без сохранения на диск и без SSH-подключения.'
+                      : 'Профиль сохраняется локально. SSH-подключение отключено в демо.',
+                  style: const TextStyle(color: _warning),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -1111,38 +1217,64 @@ class _DeckShellState extends State<DeckShell> {
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
+              if (saving) {
+                return;
+              }
               if (!form.currentState!.validate()) {
                 return;
               }
-              setState(() {
-                final value = ServerProfile(
-                  id:
-                      existing?.id ??
-                      'fixture-${DateTime.now().microsecondsSinceEpoch}',
-                  name: name.trim(),
-                  endpoint: endpoint.trim(),
-                  port: int.parse(port),
-                  tags: existing?.tags ?? ['fixture'],
-                  observedAt: existing?.observedAt ?? DateTime.now().toUtc(),
-                  state: existing?.state ?? 'unknown',
-                );
-                if (existing == null) {
-                  repo.add(value);
-                } else {
-                  repo.servers[repo.servers.indexOf(existing)] = value;
+              final value = ServerProfile(
+                id:
+                    existing?.id ??
+                    'fixture-${DateTime.now().microsecondsSinceEpoch}',
+                name: name.trim(),
+                endpoint: endpoint.trim(),
+                port: int.parse(port),
+                user: existing?.user ?? 'observer',
+                tags: existing?.tags ?? ['fixture'],
+                observedAt: existing?.observedAt ?? DateTime.now().toUtc(),
+                state: existing?.state ?? 'unknown',
+              );
+              saving = true;
+              try {
+                await widget.client?.saveProfile(profileJson(value));
+                if (!mounted || !context.mounted) {
+                  return;
                 }
-              });
-              Navigator.pop(context);
+                setState(() {
+                  if (existing == null) {
+                    repo.add(value);
+                  } else {
+                    repo.servers[repo.servers.indexOf(existing)] = value;
+                  }
+                });
+                Navigator.pop(context);
+              } catch (_) {
+                _storageError();
+              } finally {
+                saving = false;
+              }
             },
-            child: const Text('Сохранить в сессии'),
+            child: Text(
+              widget.client == null ? 'Сохранить в сессии' : 'Сохранить',
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _removeProfile(ServerProfile server) {
+  Future<void> _removeProfile(ServerProfile server) async {
+    try {
+      await widget.client?.removeProfile(server.id);
+    } catch (_) {
+      _storageError();
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
     setState(() {
       if (_liveServer == server.id) {
         _live?.cancel();

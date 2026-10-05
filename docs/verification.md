@@ -4,6 +4,60 @@ Repository H:\projects\unng\serverdeck; initial HEAD
 5900f905677886a5147238cf065187097de64309 was confirmed clean before work.
 Only repository code changed; no Infrastructure/Logs/live server modifications.
 
+## Current architecture increment — Docs approach
+
+T014..T018 completed for Flutter -> authenticated Local API -> detached compiled
+Dart locald -> Isar Community 3.3.2. locald is the only database owner. Demo profile
+CRUD persists; deletion is not resurrected by initialization. UI writes wait for
+commit and show rejection without changing the profile. Durable job coordination
+is now Dart/Isar; Python jobs.py and its tests removed. Python remains only inside
+the future Ansible execution image. Secrets still use Windows Credential Manager.
+
+Spec Kit setup-plan/setup-tasks/check-prerequisites actually ran using the existing
+feature directory. Plan research included a read-only Docs architecture comparison
+by a research agent; no Docs implementation was copied. Artifact consistency
+analysis: 20 BR requirements, 18 tasks, no duplicate task IDs, all requirements
+mapped; no architecture/constitution contradictions after loopback IPC distinction
+and service-owned future SSH paths were corrected. No extension hooks or checklist
+directory exists. The migration implementation began before updating design;
+that workflow ordering error was acknowledged and the artifacts brought into
+agreement before final verification. T005..T013 remain pending overall.
+
+Actual successful checks for this increment:
+
+| Check | Result | Scope |
+|---|---|---|
+| `dart format --output=none --set-exit-if-changed .` | 27 files, 0 changed | Root and Dart package sources/tests |
+| `flutter analyze` | No issues | Root application and included sources |
+| `flutter test` | 20 passed | Existing domain/parser/security/widget regression suite |
+| locald `dart analyze` | No issues | Independent pure Dart package |
+| locald `dart test` | 16 passed | Real Isar profile/job/event/lock transactions, orderly reopen, rollback, identity alias lock, concurrent submissions, schema refusal, authenticated bounded API |
+| Native Windows `local_storage_test.dart` | 2 passed | UI edit/delete/reseed/service restart; rejected API write stays visible and unchanged |
+| `tools/build-windows.ps1` | Release Flutter build and AOT locald succeeded | Bundled sidecar and libisar.dll; locald recompiled after signal fix |
+| `tools/test-locald-process.ps1` | PASS | Copied exe+DLL outside source checkout, explicit permissive ACL removal on root/children, competing process refusal, forced process kill/restart, rotated proof, persisted queued job/event/lock/profile |
+| `lychee "specs/**/*.md"` | 18 unique links OK, 0 errors | Spec documents |
+
+Failures found and corrected: deleted demo profile caused constructor to request
+its missing journal session; initialization now loads history only for retained
+profiles. Compiled locald initially exited on asynchronously unsupported Windows
+SIGTERM; signal subscription errors are now handled. Directory ACL now replaces
+explicit permissions as well as inherited permissions, on existing children too.
+PowerShell ACL application uses .NET directly to avoid child-shell module lookup
+failure. All corresponding native/service/process checks then passed.
+
+Limits: production profile enrollment, settings/cache, SSH service ownership,
+automatic client reconnect, upgrade migrations, backup/restore, remote helper,
+actual executor bridge/recipes/probes/retention remain future tasks. Restart UI to
+rediscover after service failure; writes are never blindly retried. UI lists the
+latest 1000 job summaries; event pages are bounded. Isar profile budget is 250
+records at <=4096 UTF-8 bytes each. Historical-running probe/cancel tests use
+injected fixture state, not actual installations or remote reconciliation.
+Forced-process smoke covers a queued job, not a running Ansible container.
+Existing prototype SQLite files are not automatically imported or deleted.
+Generator warned SDK3.13 vs analyzer language3.12; generation, analysis, native
+tests and AOT compilation succeeded without SDK changes or overrides.
+The checks below are historical evidence of the earlier milestone, not reruns.
+
 ## Completed scope
 
 M0 fixture Windows UI complete: navigation, session profile add/edit/remove,
@@ -65,7 +119,7 @@ custody tests then passed. No plaintext fallback or shared Visual Studio install
 
 ## NOT performed / remaining gates
 
-AC01..AC03 not complete: no cached SQLite profiles, enrollment UI, read-only
+AC01..AC03 not complete: no enrolled production profiles, inventory cache, enrollment UI, read-only
 connected repositories, real journald history/follow/cursor/boot/denied tests,
 periodic disk/network/service sampling, load limits or reconnect transport.
 Fixture stale values are computed on rendering, not proof of periodic monitoring.
@@ -74,10 +128,11 @@ large PEM envelopes and cross-platform stores pending.
 
 AC04/AC05 not complete: no actual PostgreSQL/ClickHouse install/adopt/no-op on
 Ubuntu 24.04 systemd VM; no privilege helper/remote lock, detached actual executor,
-OS file ACL deployment, SSH credential handoff, event redaction/retention under
+SSH credential handoff, event redaction/retention under
 load, process-kill/network-loss container tests or real post-install probes.
 Job tests inject historical running fixture state and caller-supplied probe
-evidence, not real remote outcomes. Local job journal is separate from Flutter UI.
+evidence, not real remote outcomes. Local job history is now accessible through
+Flutter's Local API; actual execution remains disabled.
 Candidate version availability does not prove signed apt index/current installability.
 
 AC06 optional sync absent. AC07 has partial pin/injection/catalog/gate coverage;

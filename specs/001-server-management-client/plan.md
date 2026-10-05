@@ -4,9 +4,11 @@ Feature: 001-server-management-client | Date: 2026-10-05 | [Spec](spec.md)
 
 ## Summary
 
-Windows-first Flutter desktop, independent domain models and repositories. Deliver
-fixtures, then OS custody/pinned read-only SSH, then durable Linux Ansible Runner
-jobs on disposable Ubuntu 24.04 amd64 systemd hosts. Optional sync later.
+Windows-first Flutter desktop, independent domain models and repositories.
+Flutter talks to a separate Dart locald over authenticated loopback Local API;
+locald exclusively owns Isar and durable job coordination. Deliver fixtures,
+then OS custody/pinned read-only SSH through locald, then Linux Ansible Runner
+execution on disposable Ubuntu 24.04 amd64 systemd hosts. Optional sync later.
 
 ## Technical context
 
@@ -14,8 +16,11 @@ Installed Flutter 3.47.0 revision 4cf2416426, Dart 3.13.0. SDK reports user-bran
 record warning, do not change shared SDK. .flutter-version records the expected version. M0 uses Flutter
 SDK only, flutter_test and flutter_lints locked in pubspec.lock.
 M1: dartssh2 4.1.0, Win32 6.4.0 + ffi 2.2.0 direct Windows Credential Manager,
-SQLite for non-secret data. Native custody and disposable SSH smoke performed;
-profile persistence/enrollment UI and connected repositories remain pending.
+Isar Community 3.3.2 for non-secret data, matching the Docs architecture.
+Native custody and disposable SSH smoke performed; demo profile persistence is
+added in the architecture increment. Enrollment UI and connected repositories
+remain pending. locald is compiled with Dart; Isar Core is bundled from the
+version-pinned flutter_libs package, with no runtime binary downloads.
 Credential blobs are limited to 2560 encoded bytes; larger PEMs fail explicitly
 until a protected-envelope adapter exists. flutter_secure_storage 11.2.0 was
 evaluated but its native ATL prerequisite is absent; no shared VS change made.
@@ -47,9 +52,11 @@ are mandatory, not waived by M0. No unjustified complexity violations.
 
 ## Project structure
 
-lib/domain/ typed observations and bounded journals; lib/data/ fixture then SSH/
-SQLite repositories; lib/ui/ five views; test/ domain/widgets; integration_test/
-Windows smoke; runner/ container/executor; runner/tests/ fault injection.
+lib/domain/ typed observations and bounded journals; lib/data/ fixture and Local
+API mappings; lib/ui/ five views; test/ domain/widgets; integration_test/ Windows
+smoke; packages/serverdeck_locald/ pure Dart service, API client, Isar collections
+and fault tests; tools/build-windows.ps1 bundles compiled locald with Flutter.
+runner/ is only the future Ansible execution container, not a persistence owner.
 docs/verification.md records actual evidence. specs/001-server-management-client/
 contains research.md, data-model.md, contracts/local.md, quickstart.md, traceability.md.
 
@@ -62,10 +69,13 @@ M1 T005..T008: custody/pinned SSH before connected inventory/logs/metrics.
 T009 service writes depend on M2 authority/reconciliation.
 M2 T010..T011: durable executor before disposable installs.
 M3 T012: sync cannot authorize execution. T013 evidence at each increment.
+Architecture increment T014..T018 refines T005/T010 and does not complete their
+connected SSH or remote execution acceptance gates. Its scope is independent of
+future T006..T012: isolated local storage, profile UI and job-model parity.
 
 ## Runner and recovery
 
-SQLite stores immutable host fingerprint, version, recipe digest, parameters,
+Isar, owned only by Dart locald, stores immutable host fingerprint, version, recipe digest, parameters,
 approval, idempotency key, phase, event sequence and named container identity before
 launch. Transactions claim one durable active-host writer. Closing UI does not
 stop a job. Detached container persists and emits bounded private events; observers

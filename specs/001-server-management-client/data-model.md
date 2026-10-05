@@ -15,3 +15,15 @@ phase and sequenced events committed atomically. One active writer/host. Success
 requires version/unit/probe. Uncertain cancellation never claims rollback.
 SyncEnvelope: owner/device/revision/baseRevision/allowlisted non-secret payload;
 conflict retains both revisions. Remote metadata cannot grant execution approval.
+
+## Isar persistence ownership
+
+Dart locald owns ProfileRecord (unique profile ID, allowlisted JSON), JobRecord
+(unique random job ID and idempotency key, immutable JSON/hash/fingerprint, phase,
+container identity and event counter), HostLockRecord (unique enrolled fingerprint),
+EventRecord (unique job+sequence, allowlisted code/evidence/time) and MetadataRecord
+(schema version and one-time seed marker). Job/event/lock changes share one write
+transaction with strict durability. Unknown schema versions fail without reset.
+The current profile contract permits demo .invalid endpoints only, never credential
+fields. Future enrolled profiles/settings/cache belong to T005/T006. Journal rings
+stay in memory; Isar must not turn them into unlimited raw-log storage.
