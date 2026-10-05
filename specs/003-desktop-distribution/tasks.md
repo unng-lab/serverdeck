@@ -57,3 +57,11 @@ T001 -> T002 -> T003/T004 foundation. US1 packaging follows foundation. US2 foll
 - [x] T023 Build Android APK and test in-process storage in integration_test/android_storage_test.dart; record store-dependent checks in specs/003-desktop-distribution/verification.md (FR-014/016, SC-006).
 
 Android extension depends on T017/T018 foundation and T019 before T020; T021 follows updater control, T022 packaging, T023 verification. This extension is user-authorized and updates the planned scope before implementation.
+
+## Phase 8: Convergence
+
+Assessment: 16 functional requirements, 6 success criteria, 15 acceptance scenarios, 8 architecture decisions and 7 constitution principles reviewed. Two actionable findings; native clean-account/signing/store checks remain the already documented external release gates.
+
+- [ ] T024 Fix Android CI SDK setup to request supported platform-tools instead of removed tools; confirm unsigned review APK build per FR-010/013 (partial, HIGH). Evidence: first PR run failed in setup-android before compiling the application.
+- [x] T025 Align temporary-file lifecycle in data-model.md with deliberate installer handoff per FR-009 / plan: update-session model (partial, LOW). Verified packages remain available during installer use; only failed partial downloads and previous files on retry are removed by the updater.
+- [x] T026 Resolve nested locald development dependencies before root analyze on clean native CI runners per FR-010/012 (partial, HIGH). Evidence: first native run lacked package:test because only root pub get had run.

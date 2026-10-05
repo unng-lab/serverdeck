@@ -39,6 +39,8 @@ jobs:
       - if: runner.os == 'Windows'
         run: dotnet tool install --global wix --version 7.0.0
       - run: flutter pub get
+      - run: dart pub get
+        working-directory: packages/serverdeck_locald
       - run: flutter analyze
       - run: flutter test
       - if: runner.os == 'Windows'
@@ -63,6 +65,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Flutter SDK
         run: |
           git clone https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
