@@ -9,7 +9,7 @@ Package the existing local-first client and sidecar for Windows/macOS first and 
 ## Technical Context
 
 **Language/Version**: Flutter 3.47.0 / Dart 3.13.0; PowerShell, Bash, Python 3 for release tooling.
-**Primary Dependencies**: existing Flutter and Isar Community 3.3.2; crypto 3.0.7, path 1.9.1; WiX Toolset 7 on Windows; hdiutil on macOS; dpkg-deb on Ubuntu.
+**Primary Dependencies**: existing Flutter and Isar Community 3.3.2; crypto 3.0.7, path 1.9.1; WiX Toolset 4.0.6 in native CI (compatible existing WiX 7 locally) on Windows; hdiutil on macOS; dpkg-deb on Ubuntu.
 **Storage**: update preference in existing locald settings; temporary verified package outside installation/data folders.
 **Testing**: Flutter unit/widget/native Windows tests, locald tests, Python release-tool tests, isolated installer smoke, CI native packaging on each OS.
 **Target Platform**: Windows 10/11 x64, macOS 12+ x64/arm64, Ubuntu Desktop 24.04 amd64.

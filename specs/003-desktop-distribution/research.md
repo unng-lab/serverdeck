@@ -5,7 +5,7 @@
 Decision: WiX per-user MSI, two architecture-specific macOS DMGs, Ubuntu amd64 DEB.
 Rationale: established native installation UX, complete Flutter bundle plus native Dart sidecar, explicit upgrades and no package-manager implementation.
 Alternatives: Store-only MSIX/App Store requires accounts; a custom updater adds replacement and rollback complexity; AppImage adds desktop integration work.
-Sources: [Flutter Windows](https://docs.flutter.dev/deployment/windows), [Flutter macOS](https://docs.flutter.dev/deployment/macos), [WiX Toolset 7](https://docs.firegiant.com/wix/schema/wxs/package/), [Debian dependencies](https://www.debian.org/doc/debian-policy/ch-sharedlibs.html).
+Sources: [Flutter Windows](https://docs.flutter.dev/deployment/windows), [Flutter macOS](https://docs.flutter.dev/deployment/macos), [WiX package schema](https://docs.firegiant.com/wix/schema/wxs/package/), [Debian dependencies](https://www.debian.org/doc/debian-policy/ch-sharedlibs.html).
 
 ## Sidecar portability
 
@@ -35,3 +35,5 @@ Sources: [RuStore publication](https://www.rustore.ru/help/developers/publishing
 
 
 Packaging refinement: Windows uses the already available WiX 7 to produce MSI; attempted Inno compiler bootstrap was rejected, so no new compiler was installed. MSI Restart Manager handles files in use; updater stops locald through authenticated service/stop before invoking msiexec. AppVersion includes build; Windows direct installer must also raise major/minor/patch for public release upgrades because MSI comparison ignores the fourth field. No silent app-driven downgrade is offered. Android pins AGP 8.11.1 / Gradle 8.14.3 / Kotlin 2.2.20: official RuStore Flutter 10.5.3 plugin failed on template AGP 9.1 built-in Kotlin. [AGP compatibility](https://developer.android.com/build/releases/agp-8-11-0-release-notes).
+
+CI refinement: fresh WiX 7 installations require separate OSMF EULA acceptance. The CI tool is pinned to WiX 4.0.6, compatible with the generated v4 schema; it does not require that new acceptance command. Existing local WiX 7 packaging was independently exercised. [Official 4.0.6 release](https://www.firegiant.com/blog/2024/10/4/wix-v406-and-v502-have-been-released/).
