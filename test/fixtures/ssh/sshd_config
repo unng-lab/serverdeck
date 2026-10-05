@@ -1,0 +1,13 @@
+Port 22
+HostKey /tmp/fixture_host_ed25519_key
+PasswordAuthentication yes
+PubkeyAuthentication no
+PermitRootLogin no
+AllowUsers observer
+UsePAM no
+PermitEmptyPasswords no
+AllowTcpForwarding no
+X11Forwarding no
+PermitTunnel no
+PrintMotd no
+Subsystem sftp internal-sftp

@@ -8,3 +8,13 @@ build/
 *.log
 runner-artifacts/
 inventory.private.*
+.idea/
+*.iml
+__pycache__/
+*.pyc
+.venv/
+work/
+*.sqlite*
+*.private.json
+.agents/*
+!.agents/skills/
