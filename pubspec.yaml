@@ -1,0 +1,21 @@
+name: serverdeck
+description: Windows Credential Manager adapter for server access secrets.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+
+dependencies:
+  ffi: 2.2.0
+  meta: 1.18.3
+  flutter:
+    sdk: flutter
+  win32: 6.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
