@@ -1,19 +1,31 @@
-# ServerDeck
+# ServerDeck: Windows credentials
 
-Local-first Flutter desktop client for managing your Linux servers over SSH.
+Хранение паролей, приватных SSH-ключей и passphrase через Windows Credential
+Manager текущего пользователя.
 
-Product brief: [specification](specs/001-server-management-client/spec.md),
-[technical plan](specs/001-server-management-client/plan.md),
-[tasks](specs/001-server-management-client/tasks.md),
-[Logs research](docs/logs-research.md).
+- [Спецификация](specs/002-windows-credentials/spec.md)
+- [План](specs/002-windows-credentials/plan.md)
+- [Контракт](specs/002-windows-credentials/contracts/credentials.md)
+- [Проверки](specs/002-windows-credentials/quickstart.md)
+- [Результаты](docs/verification.md)
 
-The first target is Windows desktop: server inventory, installed-software inventory,
-systemd logs, basic hardware activity and reproducible installation jobs for
-PostgreSQL and ClickHouse. An optional backend synchronizes metadata; ordinary
-server access must work without it or a cloud-provider API.
+`lib/data/credentials.dart` предоставляет `OsCredentialStore.read/write/delete`.
+В приложении используется неприватная reference; payload хранится в системном
+credential blob. Лимит адаптера — 2560 UTF-8 bytes включая JSON. Превышение лимита
+отклоняется до изменения сохранённого доступа.
 
-Status: requirements and proposed design only. No application, runner, backend,
-host installation or runtime tests have been implemented. Tool versions and
-third-party recipe compatibility still need verification. No real server addresses,
-credentials or log contents are included. License selection is pending; public
-repository visibility does not grant permission to copy third-party code.
+```powershell
+flutter pub get
+flutter analyze
+flutter test
+New-Item -ItemType Directory .local -Force | Out-Null
+dart compile exe test/fixtures/credential_worker.dart -o .local/credential_worker.exe
+$worker = (Resolve-Path .local/credential_worker.exe).Path
+flutter test integration_test/credentials_windows_test.dart -d windows "--dart-define=CREDENTIAL_TEST_WORKER=$worker"
+```
+
+Windows runner используется для запуска native integration tests.
+
+Одна reference общая для текущей Windows account. Параллельные write/delete
+не имеют FIFO/CAS гарантии; write после delete может создать запись снова.
+Порядок и границы гарантий описаны в контракте.

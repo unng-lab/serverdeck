@@ -8,3 +8,6 @@ build/
 *.log
 runner-artifacts/
 inventory.private.*
+work/
+.specify-pre-implementation/
+.specify/feature.json
