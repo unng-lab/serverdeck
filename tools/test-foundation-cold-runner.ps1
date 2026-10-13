@@ -2,14 +2,13 @@
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
-. "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/native-artifact.ps1"
 
 # No cached artifact, active selection, approval, or activation is an input.
 $run=Join-Path $NativeIsarRepository ('.local/cold-runner-' + [Guid]::NewGuid().ToString('N'))
 Assert-NativeIsarPlainPath $run
 [void][IO.Directory]::CreateDirectory($run)
-$script:coldPhase='dependencies'
+$script:coldPhase='sdk'
 function Invoke-ColdRunnerStep {
     param([string]$Name,[scriptblock]$Action,[string]$ExpectedPrefix='')
     $script:coldPhase=$Name
@@ -29,6 +28,8 @@ function Invoke-ColdRunnerStep {
 }
 $hosted=$env:GITHUB_ACTIONS -ceq 'true'
 try {
+    . "$PSScriptRoot/foundation-sdk.ps1"
+    $script:coldPhase='dependencies'
     if ($hosted) {
         if ($env:GITHUB_SHA -cnotmatch '^[a-f0-9]{40}$' -or
             $env:GITHUB_RUN_ID -cnotmatch '^\d+$' -or $env:GITHUB_RUN_ATTEMPT -cnotmatch '^\d+$') {
