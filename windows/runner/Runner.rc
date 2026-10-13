@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "lab.unng" "\0"
+            VALUE "CompanyName", "dev.serverdeck" "\0"
             VALUE "FileDescription", "serverdeck" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "serverdeck" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 lab.unng. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 dev.serverdeck. All rights reserved." "\0"
             VALUE "OriginalFilename", "serverdeck.exe" "\0"
             VALUE "ProductName", "serverdeck" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

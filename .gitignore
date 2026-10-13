@@ -14,10 +14,17 @@ __pycache__/
 *.pyc
 .venv/
 work/
+android/key.properties
+*.jks
+*.keystore
 *.sqlite*
 *.isar
 *.isar.lock
 **/libisar.dll
 *.private.json
+foundation-evidence/
+*.discovery
+*.dpapi
+*.dump
 .agents/*
 !.agents/skills/

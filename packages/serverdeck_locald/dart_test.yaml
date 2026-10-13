@@ -1,0 +1,4 @@
+# Native discovery and compiled bootstrap fixtures share the canonical owner
+# namespace of the current SID. Their files must not race for that same mutex.
+# Each fixture still runs its own concurrent requester/process scenarios.
+concurrency: 1

@@ -1,0 +1,1402 @@
+{
+  "version": 4,
+  "date": "2026-10-10",
+  "baseline": "service foundation first; fresh implementation; hard cutover; Specify only",
+  "packages": [
+    {
+      "number": 1,
+      "directory": "001-service-foundation",
+      "title": "Основа сервиса: состав, жизненный цикл и первый рабочий сценарий",
+      "depends_on": [],
+      "requirements": [
+        "FR-001",
+        "FR-002",
+        "FR-007",
+        "FR-008",
+        "FR-009",
+        "FR-010",
+        "FR-012",
+        "FR-013",
+        "FR-014",
+        "FR-035",
+        "FR-036",
+        "FR-037",
+        "FR-038",
+        "FR-039",
+        "FR-040",
+        "FR-041",
+        "FR-042",
+        "FR-043",
+        "FR-044",
+        "FR-124",
+        "FR-121",
+        "FR-122",
+        "FR-123"
+      ],
+      "stages": [
+        {
+          "id": "001.1",
+          "title": "Исполняемый сервис и защищённые профили",
+          "requirements": [
+            "FR-001",
+            "FR-002",
+            "FR-007",
+            "FR-012",
+            "FR-014",
+            "FR-121",
+            "FR-122",
+            "FR-123"
+          ],
+          "local_requirements": [
+            "FR-002-LOCAL-01",
+            "FR-002-LOCAL-02",
+            "FR-002-LOCAL-03",
+            "FR-SVC-001",
+            "FR-SVC-002",
+            "FR-SVC-003",
+            "FR-SVC-004",
+            "FR-SVC-005",
+            "FR-SVC-006",
+            "FR-SVC-007",
+            "FR-SVC-015",
+            "FR-SVC-016",
+            "FR-SVC-017",
+            "FR-SVC-018",
+            "FR-SVC-019"
+          ],
+          "acceptance": [
+            "AC-SVC-1A",
+            "AC-SVC-1B",
+            "AC-SVC-1C",
+            "AC-002-1A",
+            "AC-002-1B",
+            "AC-002-1C",
+            "AC-SVC-BOOT"
+          ]
+        },
+        {
+          "id": "001.2",
+          "title": "Первый законченный read-only маршрут",
+          "requirements": [
+            "FR-008",
+            "FR-009",
+            "FR-010",
+            "FR-013",
+            "FR-124"
+          ],
+          "local_requirements": [
+            "FR-002-LOCAL-04",
+            "FR-002-LOCAL-05",
+            "FR-002-LOCAL-06",
+            "FR-002-LOCAL-07",
+            "FR-002-LOCAL-08",
+            "FR-SVC-008",
+            "FR-SVC-009",
+            "FR-SVC-010",
+            "FR-SVC-011",
+            "FR-SVC-020"
+          ],
+          "acceptance": [
+            "AC-SVC-2A",
+            "AC-SVC-2B",
+            "AC-SVC-2C",
+            "AC-002-2A",
+            "AC-002-2B",
+            "AC-002-2C",
+            "AC-SVC-READ"
+          ]
+        },
+        {
+          "id": "001.3",
+          "title": "Жизненный цикл, recovery и основа заданий",
+          "requirements": [
+            "FR-035",
+            "FR-036",
+            "FR-037",
+            "FR-038",
+            "FR-039",
+            "FR-040",
+            "FR-041",
+            "FR-042",
+            "FR-043",
+            "FR-044"
+          ],
+          "local_requirements": [
+            "FR-002-LOCAL-09",
+            "FR-002-LOCAL-10",
+            "FR-002-LOCAL-11",
+            "FR-002-LOCAL-12",
+            "FR-002-LOCAL-13",
+            "FR-002-LOCAL-14",
+            "FR-SVC-012",
+            "FR-SVC-013",
+            "FR-SVC-014"
+          ],
+          "acceptance": [
+            "AC-SVC-3A",
+            "AC-SVC-3B",
+            "AC-SVC-3C",
+            "AC-002-3A",
+            "AC-002-3B",
+            "AC-002-3C",
+            "AC-SVC-CLOSE"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "directory": "002-security-storage",
+      "title": "Аудит защиты секретов доступа и восстановление",
+      "depends_on": [
+        1
+      ],
+      "requirements": [],
+      "stages": [
+        {
+          "id": "002.1",
+          "title": "Аудит защиты секретов доступа",
+          "requirements": [],
+          "local_requirements": [
+            "FR-001-LOCAL-01",
+            "FR-001-LOCAL-02",
+            "FR-001-LOCAL-03",
+            "FR-001-LOCAL-04",
+            "FR-001-LOCAL-07",
+            "FR-001-LOCAL-10"
+          ],
+          "acceptance": [
+            "AC-001-1A",
+            "AC-001-1B",
+            "AC-001-1C"
+          ]
+        },
+        {
+          "id": "002.2",
+          "title": "Привязки, целостность и recovery секретов",
+          "requirements": [],
+          "local_requirements": [
+            "FR-001-LOCAL-05",
+            "FR-001-LOCAL-06",
+            "FR-001-LOCAL-08"
+          ],
+          "acceptance": [
+            "AC-001-2A",
+            "AC-001-2B",
+            "AC-001-2C"
+          ]
+        },
+        {
+          "id": "002.3",
+          "title": "Расширенная платформенная приёмка",
+          "requirements": [],
+          "local_requirements": [
+            "FR-001-LOCAL-09"
+          ],
+          "acceptance": [
+            "AC-001-3A",
+            "AC-001-3B",
+            "AC-001-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "directory": "003-design-system",
+      "title": "Дизайн и доступность",
+      "depends_on": [
+        1
+      ],
+      "requirements": [
+        "FR-125",
+        "FR-126"
+      ],
+      "stages": [
+        {
+          "id": "003.1",
+          "title": "Визуальная система и две темы",
+          "requirements": [
+            "FR-125"
+          ],
+          "local_requirements": [
+            "FR-003-LOCAL-01",
+            "FR-003-LOCAL-02",
+            "FR-003-LOCAL-03"
+          ],
+          "acceptance": [
+            "AC-003-1A",
+            "AC-003-1B",
+            "AC-003-1C"
+          ]
+        },
+        {
+          "id": "003.2",
+          "title": "Клавиатура и узкий экран",
+          "requirements": [
+            "FR-126"
+          ],
+          "local_requirements": [
+            "FR-003-LOCAL-04",
+            "FR-003-LOCAL-05"
+          ],
+          "acceptance": [
+            "AC-003-2A",
+            "AC-003-2B",
+            "AC-003-2C"
+          ]
+        },
+        {
+          "id": "003.3",
+          "title": "Применение ко всем основным состояниям",
+          "requirements": [],
+          "local_requirements": [
+            "FR-003-LOCAL-06",
+            "FR-003-LOCAL-07"
+          ],
+          "acceptance": [
+            "AC-003-3A",
+            "AC-003-3B",
+            "AC-003-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "directory": "004-server-workspace",
+      "title": "Подключение и рабочее пространство сервера",
+      "depends_on": [
+        1,
+        3
+      ],
+      "requirements": [
+        "FR-022",
+        "FR-023",
+        "FR-024"
+      ],
+      "stages": [
+        {
+          "id": "004.1",
+          "title": "Добавление и единое подключение",
+          "requirements": [
+            "FR-022"
+          ],
+          "local_requirements": [
+            "FR-004-LOCAL-01"
+          ],
+          "acceptance": [
+            "AC-004-1A",
+            "AC-004-1B",
+            "AC-004-1C"
+          ]
+        },
+        {
+          "id": "004.2",
+          "title": "Компактные карточки и метрики",
+          "requirements": [
+            "FR-023",
+            "FR-024"
+          ],
+          "local_requirements": [
+            "FR-004-LOCAL-02",
+            "FR-004-LOCAL-03",
+            "FR-004-LOCAL-05"
+          ],
+          "acceptance": [
+            "AC-004-2A",
+            "AC-004-2B",
+            "AC-004-2C"
+          ]
+        },
+        {
+          "id": "004.3",
+          "title": "ПО и переход к связанному журналу",
+          "requirements": [],
+          "local_requirements": [
+            "FR-004-LOCAL-04",
+            "FR-004-LOCAL-06",
+            "FR-004-LOCAL-07",
+            "FR-004-LOCAL-08"
+          ],
+          "acceptance": [
+            "AC-004-3A",
+            "AC-004-3B",
+            "AC-004-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "directory": "005-client-distribution",
+      "title": "Установка и обновление нового клиента",
+      "depends_on": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "requirements": [
+        "FR-127"
+      ],
+      "stages": [
+        {
+          "id": "005.1",
+          "title": "Windows: самостоятельный пакет и hard cutover",
+          "requirements": [],
+          "local_requirements": [
+            "FR-005-LOCAL-01",
+            "FR-005-LOCAL-02",
+            "FR-005-LOCAL-03"
+          ],
+          "acceptance": [
+            "AC-005-1A",
+            "AC-005-1B",
+            "AC-005-1C"
+          ]
+        },
+        {
+          "id": "005.2",
+          "title": "Обновление новой реализации",
+          "requirements": [
+            "FR-127"
+          ],
+          "local_requirements": [
+            "FR-005-LOCAL-04",
+            "FR-005-LOCAL-05",
+            "FR-005-LOCAL-06",
+            "FR-005-LOCAL-07",
+            "FR-005-LOCAL-08",
+            "FR-005-LOCAL-09"
+          ],
+          "acceptance": [
+            "AC-005-2A",
+            "AC-005-2B",
+            "AC-005-2C"
+          ]
+        },
+        {
+          "id": "005.3",
+          "title": "Другие платформы и публикация",
+          "requirements": [],
+          "local_requirements": [
+            "FR-005-LOCAL-10",
+            "FR-005-LOCAL-11",
+            "FR-005-LOCAL-12"
+          ],
+          "acceptance": [
+            "AC-005-3A",
+            "AC-005-3B",
+            "AC-005-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "directory": "006-software-installation",
+      "title": "Чистая установка серверного ПО",
+      "depends_on": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "requirements": [
+        "FR-045",
+        "FR-046",
+        "FR-047"
+      ],
+      "stages": [
+        {
+          "id": "006.1",
+          "title": "Каталог и проверка плана",
+          "requirements": [
+            "FR-045",
+            "FR-046",
+            "FR-047"
+          ],
+          "local_requirements": [
+            "FR-006-LOCAL-01",
+            "FR-006-LOCAL-02",
+            "FR-006-LOCAL-03",
+            "FR-006-LOCAL-04",
+            "FR-006-LOCAL-05"
+          ],
+          "acceptance": [
+            "AC-006-1A",
+            "AC-006-1B",
+            "AC-006-1C"
+          ]
+        },
+        {
+          "id": "006.2",
+          "title": "Подтверждение и установка",
+          "requirements": [],
+          "local_requirements": [
+            "FR-006-LOCAL-06",
+            "FR-006-LOCAL-08"
+          ],
+          "acceptance": [
+            "AC-006-2A",
+            "AC-006-2B",
+            "AC-006-2C"
+          ]
+        },
+        {
+          "id": "006.3",
+          "title": "Сбои, отмена и выпуск рецептов",
+          "requirements": [],
+          "local_requirements": [
+            "FR-006-LOCAL-07",
+            "FR-006-LOCAL-09"
+          ],
+          "acceptance": [
+            "AC-006-3A",
+            "AC-006-3B",
+            "AC-006-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "directory": "007-software-adoption",
+      "title": "Регистрация существующего ПО",
+      "depends_on": [
+        1,
+        2,
+        3,
+        4,
+        6
+      ],
+      "requirements": [
+        "FR-048"
+      ],
+      "stages": [
+        {
+          "id": "007.1",
+          "title": "Осмотр существующей установки",
+          "requirements": [
+            "FR-048"
+          ],
+          "local_requirements": [
+            "FR-007-LOCAL-01",
+            "FR-007-LOCAL-02",
+            "FR-007-LOCAL-03",
+            "FR-007-LOCAL-04"
+          ],
+          "acceptance": [
+            "AC-007-1A",
+            "AC-007-1B",
+            "AC-007-1C"
+          ]
+        },
+        {
+          "id": "007.2",
+          "title": "Локальная регистрация",
+          "requirements": [],
+          "local_requirements": [
+            "FR-007-LOCAL-05",
+            "FR-007-LOCAL-06"
+          ],
+          "acceptance": [
+            "AC-007-2A",
+            "AC-007-2B",
+            "AC-007-2C"
+          ]
+        },
+        {
+          "id": "007.3",
+          "title": "Перепроверка и удаление связи",
+          "requirements": [],
+          "local_requirements": [
+            "FR-007-LOCAL-07",
+            "FR-007-LOCAL-08",
+            "FR-007-LOCAL-09"
+          ],
+          "acceptance": [
+            "AC-007-3A",
+            "AC-007-3B",
+            "AC-007-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "directory": "008-fleet-workspace",
+      "title": "Рабочее пространство и общий инвентарь",
+      "depends_on": [
+        1,
+        4,
+        7
+      ],
+      "requirements": [
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "FR-006",
+        "FR-011",
+        "FR-015",
+        "FR-016",
+        "FR-017",
+        "FR-018",
+        "FR-019",
+        "FR-020",
+        "FR-021"
+      ],
+      "stages": [
+        {
+          "id": "008.1",
+          "title": "Возможности сервера и компактный каталог",
+          "requirements": [
+            "FR-003",
+            "FR-004",
+            "FR-005",
+            "FR-006",
+            "FR-011",
+            "FR-015",
+            "FR-016"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-008-1A",
+            "AC-008-1B",
+            "AC-008-1C"
+          ]
+        },
+        {
+          "id": "008.2",
+          "title": "Сводный поиск, идентичность экземпляров и приёмка на объёме",
+          "requirements": [
+            "FR-017",
+            "FR-018",
+            "FR-019",
+            "FR-020"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-008-2A",
+            "AC-008-2B",
+            "AC-008-2C"
+          ]
+        },
+        {
+          "id": "008.3",
+          "title": "Локальные регистрации",
+          "requirements": [
+            "FR-021"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-008-3A",
+            "AC-008-3B",
+            "AC-008-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "directory": "009-observability",
+      "title": "Наблюдение и диагностика ресурсов",
+      "depends_on": [
+        1,
+        4,
+        8
+      ],
+      "requirements": [
+        "FR-025",
+        "FR-026",
+        "FR-027",
+        "FR-028",
+        "FR-116",
+        "FR-029",
+        "FR-030",
+        "FR-031",
+        "FR-032",
+        "FR-033",
+        "FR-034"
+      ],
+      "stages": [
+        {
+          "id": "009.1",
+          "title": "Журналы, расширенные метрики и аппаратные сведения",
+          "requirements": [
+            "FR-025",
+            "FR-028",
+            "FR-029",
+            "FR-030",
+            "FR-031",
+            "FR-032",
+            "FR-033",
+            "FR-034",
+            "FR-116"
+          ],
+          "local_requirements": [
+            "FR-009-LOCAL-01"
+          ],
+          "acceptance": [
+            "AC-009-1A",
+            "AC-009-1B",
+            "AC-009-1C"
+          ]
+        },
+        {
+          "id": "009.2",
+          "title": "История с явными сроками и пропусками",
+          "requirements": [
+            "FR-026"
+          ],
+          "local_requirements": [
+            "FR-009-LOCAL-02"
+          ],
+          "acceptance": [
+            "AC-009-2A",
+            "AC-009-2B",
+            "AC-009-2C"
+          ]
+        },
+        {
+          "id": "009.3",
+          "title": "Сигналы внутри работающего клиента",
+          "requirements": [
+            "FR-027"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-009-3A",
+            "AC-009-3B",
+            "AC-009-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "directory": "010-system-service-management",
+      "title": "Система, службы и питание",
+      "depends_on": [
+        1,
+        8,
+        9
+      ],
+      "requirements": [
+        "FR-053",
+        "FR-054",
+        "FR-055",
+        "FR-056",
+        "FR-057",
+        "FR-058",
+        "FR-065",
+        "FR-066",
+        "FR-067",
+        "FR-068",
+        "FR-069",
+        "FR-070"
+      ],
+      "stages": [
+        {
+          "id": "010.1",
+          "title": "Состояние служб, автозапуск и обзор таймеров",
+          "requirements": [
+            "FR-053",
+            "FR-054",
+            "FR-055",
+            "FR-056",
+            "FR-058"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-010-1A",
+            "AC-010-1B",
+            "AC-010-1C"
+          ]
+        },
+        {
+          "id": "010.2",
+          "title": "Имя, время и режим производительности",
+          "requirements": [
+            "FR-065",
+            "FR-066",
+            "FR-067"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-010-2A",
+            "AC-010-2B",
+            "AC-010-2C"
+          ]
+        },
+        {
+          "id": "010.3",
+          "title": "Изменение расписаний и управляемое питание",
+          "requirements": [
+            "FR-057",
+            "FR-068",
+            "FR-069",
+            "FR-070"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-010-3A",
+            "AC-010-3B",
+            "AC-010-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "directory": "011-access-management",
+      "title": "Пользователи, права и доступ",
+      "depends_on": [
+        1,
+        10
+      ],
+      "requirements": [
+        "FR-085",
+        "FR-086",
+        "FR-087",
+        "FR-088",
+        "FR-089",
+        "FR-090"
+      ],
+      "stages": [
+        {
+          "id": "011.1",
+          "title": "Обзор аккаунтов и контролируемый жизненный цикл",
+          "requirements": [
+            "FR-085",
+            "FR-086"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-011-1A",
+            "AC-011-1B",
+            "AC-011-1C"
+          ]
+        },
+        {
+          "id": "011.2",
+          "title": "Пароли, сроки, группы и сессии",
+          "requirements": [
+            "FR-087",
+            "FR-088",
+            "FR-089"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-011-2A",
+            "AC-011-2B",
+            "AC-011-2C"
+          ]
+        },
+        {
+          "id": "011.3",
+          "title": "Доменный вариант и внешние каталоги",
+          "requirements": [
+            "FR-090"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-011-3A",
+            "AC-011-3B",
+            "AC-011-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 12,
+      "directory": "012-backup-recovery",
+      "title": "Резервные копии и восстановление",
+      "depends_on": [
+        1,
+        10
+      ],
+      "requirements": [
+        "FR-108",
+        "FR-109",
+        "FR-110",
+        "FR-111",
+        "FR-112",
+        "FR-113",
+        "FR-114"
+      ],
+      "stages": [
+        {
+          "id": "012.1",
+          "title": "Разовая согласованная копия с пробным восстановлением",
+          "requirements": [
+            "FR-108",
+            "FR-109",
+            "FR-113",
+            "FR-114"
+          ],
+          "local_requirements": [
+            "FR-012-LOCAL-01",
+            "FR-012-LOCAL-02"
+          ],
+          "acceptance": [
+            "AC-012-1A",
+            "AC-012-1B",
+            "AC-012-1C"
+          ]
+        },
+        {
+          "id": "012.2",
+          "title": "Восстановление в отдельную цель",
+          "requirements": [
+            "FR-112"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-012-2A",
+            "AC-012-2B",
+            "AC-012-2C"
+          ]
+        },
+        {
+          "id": "012.3",
+          "title": "Расписание и политика хранения",
+          "requirements": [
+            "FR-110",
+            "FR-111"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-012-3A",
+            "AC-012-3B",
+            "AC-012-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 13,
+      "directory": "013-files-diagnostics",
+      "title": "Файлы, конфигурация и диагностические процедуры",
+      "depends_on": [
+        1,
+        11,
+        12
+      ],
+      "requirements": [
+        "FR-091",
+        "FR-092",
+        "FR-093",
+        "FR-094",
+        "FR-095",
+        "FR-096",
+        "FR-097",
+        "FR-098",
+        "FR-115",
+        "FR-099"
+      ],
+      "stages": [
+        {
+          "id": "013.1",
+          "title": "Просмотр, поиск, получение файлов и дополнительные журналы",
+          "requirements": [
+            "FR-091",
+            "FR-092",
+            "FR-093"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-013-1A",
+            "AC-013-1B",
+            "AC-013-1C"
+          ]
+        },
+        {
+          "id": "013.2",
+          "title": "Проверяемая правка конфигурации и файловые действия",
+          "requirements": [
+            "FR-094",
+            "FR-095",
+            "FR-096"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-013-2A",
+            "AC-013-2B",
+            "AC-013-2C"
+          ]
+        },
+        {
+          "id": "013.3",
+          "title": "Процедуры чтения и диагностический отчёт",
+          "requirements": [
+            "FR-097",
+            "FR-098",
+            "FR-099",
+            "FR-115"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-013-3A",
+            "AC-013-3B",
+            "AC-013-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 14,
+      "directory": "014-software-maintenance",
+      "title": "Пакеты и обслуживание приложений",
+      "depends_on": [
+        1,
+        6,
+        7,
+        10,
+        12
+      ],
+      "requirements": [
+        "FR-049",
+        "FR-050",
+        "FR-051",
+        "FR-052",
+        "FR-059",
+        "FR-060",
+        "FR-061",
+        "FR-062",
+        "FR-063",
+        "FR-064"
+      ],
+      "stages": [
+        {
+          "id": "014.1",
+          "title": "Обзор обновлений и управление доверенными источниками",
+          "requirements": [
+            "FR-059",
+            "FR-062",
+            "FR-063"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-014-1A",
+            "AC-014-1B",
+            "AC-014-1C"
+          ]
+        },
+        {
+          "id": "014.2",
+          "title": "Контролируемые пакетные изменения и один переход приложения",
+          "requirements": [
+            "FR-049",
+            "FR-050",
+            "FR-060",
+            "FR-061"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-014-2A",
+            "AC-014-2B",
+            "AC-014-2C"
+          ]
+        },
+        {
+          "id": "014.3",
+          "title": "Удаление с сохранением данных и отдельный транзакционный вариант ОС",
+          "requirements": [
+            "FR-051",
+            "FR-052",
+            "FR-064"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-014-3A",
+            "AC-014-3B",
+            "AC-014-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "directory": "015-storage-management",
+      "title": "Диски, тома и файловые системы",
+      "depends_on": [
+        1,
+        12,
+        14
+      ],
+      "requirements": [
+        "FR-079",
+        "FR-080",
+        "FR-081",
+        "FR-082",
+        "FR-083",
+        "FR-084"
+      ],
+      "stages": [
+        {
+          "id": "015.1",
+          "title": "Обзор зависимостей, монтирование и расширение",
+          "requirements": [
+            "FR-079",
+            "FR-080",
+            "FR-081",
+            "FR-082"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-015-1A",
+            "AC-015-1B",
+            "AC-015-1C"
+          ]
+        },
+        {
+          "id": "015.2",
+          "title": "Опасные операции с явной сохранностью и копиями",
+          "requirements": [
+            "FR-083"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-015-2A",
+            "AC-015-2B",
+            "AC-015-2C"
+          ]
+        },
+        {
+          "id": "015.3",
+          "title": "Отдельные варианты RAID, логических и сетевых томов",
+          "requirements": [
+            "FR-084"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-015-3A",
+            "AC-015-3B",
+            "AC-015-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "directory": "016-network-management",
+      "title": "Сеть и сетевые сервисы",
+      "depends_on": [
+        1,
+        10,
+        12
+      ],
+      "requirements": [
+        "FR-071",
+        "FR-072",
+        "FR-073",
+        "FR-074",
+        "FR-075",
+        "FR-076",
+        "FR-077",
+        "FR-078",
+        "FR-129"
+      ],
+      "stages": [
+        {
+          "id": "016.1",
+          "title": "Обзор сети, правил и защищённых каналов",
+          "requirements": [
+            "FR-071",
+            "FR-075"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-016-1A",
+            "AC-016-1B",
+            "AC-016-1C"
+          ]
+        },
+        {
+          "id": "016.2",
+          "title": "Контролируемые изменения правил и подключения с возвратом",
+          "requirements": [
+            "FR-072",
+            "FR-073",
+            "FR-074",
+            "FR-076"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-016-2A",
+            "AC-016-2B",
+            "AC-016-2C"
+          ]
+        },
+        {
+          "id": "016.3",
+          "title": "Проброс, DNS, файловые ресурсы и выбранный сервис удалённого доступа",
+          "requirements": [
+            "FR-077",
+            "FR-078",
+            "FR-129"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-016-3A",
+            "AC-016-3B",
+            "AC-016-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "directory": "017-compute-management",
+      "title": "Контейнеры и виртуальные машины",
+      "depends_on": [
+        1,
+        12,
+        15,
+        16
+      ],
+      "requirements": [
+        "FR-100",
+        "FR-101",
+        "FR-102",
+        "FR-103",
+        "FR-104",
+        "FR-105",
+        "FR-106",
+        "FR-107"
+      ],
+      "stages": [
+        {
+          "id": "017.1",
+          "title": "Обзор и состояние существующих контейнеров и VM",
+          "requirements": [
+            "FR-100",
+            "FR-101",
+            "FR-104",
+            "FR-105"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-017-1A",
+            "AC-017-1B",
+            "AC-017-1C"
+          ]
+        },
+        {
+          "id": "017.2",
+          "title": "Создание, замена и оборудование с проверкой ресурсов",
+          "requirements": [
+            "FR-102",
+            "FR-106"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-017-2A",
+            "AC-017-2B",
+            "AC-017-2C"
+          ]
+        },
+        {
+          "id": "017.3",
+          "title": "Стек и удаление с отдельным выбором дисков/данных",
+          "requirements": [
+            "FR-103",
+            "FR-107"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-017-3A",
+            "AC-017-3B",
+            "AC-017-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "directory": "018-security-controls",
+      "title": "Безопасность и чувствительная диагностика",
+      "depends_on": [
+        1,
+        9,
+        11,
+        13,
+        16,
+        17
+      ],
+      "requirements": [
+        "FR-117",
+        "FR-118",
+        "FR-119",
+        "FR-120"
+      ],
+      "stages": [
+        {
+          "id": "018.1",
+          "title": "События и версионированные политики",
+          "requirements": [
+            "FR-117",
+            "FR-118"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-018-1A",
+            "AC-018-1B",
+            "AC-018-1C"
+          ]
+        },
+        {
+          "id": "018.2",
+          "title": "Явное исправление нарушений",
+          "requirements": [
+            "FR-119"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-018-2A",
+            "AC-018-2B",
+            "AC-018-2C"
+          ]
+        },
+        {
+          "id": "018.3",
+          "title": "Запись сессий и диагностика сбоев",
+          "requirements": [
+            "FR-120"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-018-3A",
+            "AC-018-3B",
+            "AC-018-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "directory": "019-specialized-capabilities",
+      "title": "Специализированные модули",
+      "depends_on": [
+        1,
+        8,
+        11,
+        13,
+        16,
+        17,
+        18
+      ],
+      "requirements": [
+        "FR-128",
+        "FR-130",
+        "FR-131",
+        "FR-132"
+      ],
+      "stages": [
+        {
+          "id": "019.1",
+          "title": "Каталог и обзор высокой доступности",
+          "requirements": [
+            "FR-128",
+            "FR-130"
+          ],
+          "local_requirements": [
+            "FR-019-LOCAL-01",
+            "FR-019-LOCAL-02"
+          ],
+          "acceptance": [
+            "AC-019-1A",
+            "AC-019-1B",
+            "AC-019-1C"
+          ]
+        },
+        {
+          "id": "019.2",
+          "title": "Подготовка образов ОС",
+          "requirements": [
+            "FR-131"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-019-2A",
+            "AC-019-2B",
+            "AC-019-2C"
+          ]
+        },
+        {
+          "id": "019.3",
+          "title": "Подписки и интеграции доступа",
+          "requirements": [
+            "FR-132"
+          ],
+          "local_requirements": [],
+          "acceptance": [
+            "AC-019-3A",
+            "AC-019-3B",
+            "AC-019-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 20,
+      "directory": "020-metadata-sync",
+      "title": "Необязательная синхронизация метаданных",
+      "depends_on": [
+        1,
+        2,
+        8,
+        19
+      ],
+      "requirements": [],
+      "stages": [
+        {
+          "id": "020.1",
+          "title": "Состав данных и доступ к backend",
+          "requirements": [],
+          "local_requirements": [
+            "FR-020-LOCAL-01",
+            "FR-020-LOCAL-02",
+            "FR-020-LOCAL-03",
+            "FR-020-LOCAL-07"
+          ],
+          "acceptance": [
+            "AC-020-1A",
+            "AC-020-1B",
+            "AC-020-1C"
+          ]
+        },
+        {
+          "id": "020.2",
+          "title": "Ревизии и конфликты",
+          "requirements": [],
+          "local_requirements": [
+            "FR-020-LOCAL-04",
+            "FR-020-LOCAL-05"
+          ],
+          "acceptance": [
+            "AC-020-2A",
+            "AC-020-2B",
+            "AC-020-2C"
+          ]
+        },
+        {
+          "id": "020.3",
+          "title": "Интеграционная приёмка перед включением",
+          "requirements": [],
+          "local_requirements": [
+            "FR-020-LOCAL-06"
+          ],
+          "acceptance": [
+            "AC-020-3A",
+            "AC-020-3B",
+            "AC-020-3C"
+          ]
+        }
+      ]
+    }
+  ]
+}

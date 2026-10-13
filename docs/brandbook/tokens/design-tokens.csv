@@ -1,0 +1,57 @@
+﻿Токен,Тёмная тема,Светлая тема,Назначение / единица
+color.bg,#0C121C,#F3F6FA,Scaffold background
+color.surface,#151E2B,#FFFFFF,Card / sheet / table
+color.raised,#1D2939,#EAF0F6,Header / toolbar / log gutter
+color.hover,#253246,#E2EAF3,Hovered row / secondary control
+color.selected,#173E43,#D9F1EC,Selected row / navigation
+color.text,#EAF0F7,#172337,Primary content
+color.muted,#A7B5C7,#526279,Secondary content / placeholders
+color.border,#35465E,#CDD7E4,Decorative dividers only
+color.control,#8192A8,#718198,Input borders / essential icons
+color.accent,#64DFC5,#087565,Primary fill / links / chart CPU
+color.onAccent,#0C121C,#FFFFFF,Text on primary fill
+color.accentHover,#8CEBD7,#075E51,Primary hover fill
+color.focus,#7DCFFF,#006AAB,Keyboard focus ring
+color.disabled,#A7B5C7,#526279,"Disabled text, no opacity"
+color.available,#72DBAC,#137346,Semantic foreground with symbol + label
+color.unavailable,#FF9DA5,#B62D42,Semantic foreground with symbol + label
+color.unknown,#BCC7D6,#586579,Semantic foreground with symbol + label
+color.warning,#FFC47A,#915000,Semantic foreground with symbol + label
+color.error,#FF8D98,#B6203C,Semantic foreground with symbol + label
+color.running,#86C9FF,#1765A8,Semantic foreground with symbol + label
+color.success,#72DBAC,#137346,Semantic foreground with symbol + label
+color.chart2,#C5ABFF,#7650B4,RAM: dashed + square marker
+color.chart3,#FFC47A,#915000,Disk: dotted + triangle marker
+space.1,4,4,logical px / Flutter dp
+space.2,8,8,logical px / Flutter dp
+space.3,12,12,logical px / Flutter dp
+space.4,16,16,logical px / Flutter dp
+space.6,24,24,logical px / Flutter dp
+space.8,32,32,logical px / Flutter dp
+space.12,48,48,logical px / Flutter dp
+radius.control,8,8,logical px / Flutter dp
+radius.card,12,12,logical px / Flutter dp
+radius.dialog,16,16,logical px / Flutter dp
+stroke.icon,1.5,1.5,logical px / Flutter dp
+size.icon,20,20,logical px / Flutter dp
+size.control,36,36,logical px / Flutter dp
+size.row.dense,36,36,logical px / Flutter dp
+size.row.default,44,44,logical px / Flutter dp
+size.focus,2,2,logical px / Flutter dp
+size.focusGap,2,2,logical px / Flutter dp
+font.ui,Noto Sans,Noto Sans,Shared specification
+font.mono,Noto Sans Mono,Noto Sans Mono,Shared specification
+font.body,14,14,logical px / Flutter dp
+font.body.line,20,20,logical px / Flutter dp
+font.table,13,13,logical px / Flutter dp
+font.table.line,20,20,logical px / Flutter dp
+font.log,13,13,logical px / Flutter dp
+font.log.line,20,20,logical px / Flutter dp
+font.title,24,24,logical px / Flutter dp
+font.title.line,32,32,logical px / Flutter dp
+font.label,12,12,logical px / Flutter dp
+font.label.line,16,16,logical px / Flutter dp
+motion.fast,120,120,ms
+motion.normal,180,180,ms
+shadow.dark,none,none,Shared specification
+shadow.light,"0 4 16 rgba(23,35,55,0.10)","0 4 16 rgba(23,35,55,0.10)",Shared specification

@@ -1,0 +1,42 @@
+name: Foundation Windows
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned hosted MSVC
+        shell: pwsh
+        run: ./tools/prepare-foundation-hosted-msvc.ps1
+      - name: Install verified pinned SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'foundation-sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'foundation-sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Cold source build and current native qualification
+        shell: pwsh
+        run: |
+          ./tools/test-foundation-cold-runner.ps1
+      - name: Preserve safe compatibility proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-safe-proof
+          path: |
+            .local/cold-runner-*/safe-proof.json
+            .local/cold-runner-*/safe-failure.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Acceptance remains incomplete
+        shell: pwsh
+        run: throw 'Available automatic suites do not complete T044/full Q01-Q12 or Windows 11 manual acceptance.'

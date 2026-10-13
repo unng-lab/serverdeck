@@ -4,7 +4,86 @@ Repository H:\projects\unng\serverdeck; initial HEAD
 5900f905677886a5147238cf065187097de64309 was confirmed clean before work.
 Only repository code changed; no Infrastructure/Logs/live server modifications.
 
-## Current architecture increment — Docs approach
+## Production startup — T019
+
+Normal startup no longer seeds demos. Synthetic repository data moved to
+test/support and requires explicit injection. Empty views offer Add SSH server;
+jobs show persisted history only, without a synthetic installation preview.
+prepare-workspace atomically removes non-SSH legacy profiles and their caches,
+preserving SSH identity/pins/custody references, settings and jobs. Deleting the
+last profile and restart do not reseed the workspace.
+
+Executed: final format check clean (49 files), Flutter analyzer clean; 35 Flutter
+tests passed. locald analyzer clean; 24 tests passed, one optional fixture test
+skipped. Native Windows empty/add-first/delete-last/reopen test passed, persistence
+regression 2 passed. Disposable real SSH/systemd/journal API and connected native
+UI tests both passed. Packaged process/DACL/singleton/restart persistence smoke
+passed. Release bundle: output/ServerDeck-production-preview.
+
+The actual legacy application store migrated at launch: three synthetic profiles
+removed; zero SSH profiles were present, all existing SSH JSON remained unchanged.
+Application window ServerDeck confirmed, PID 61500, locald PID 26088.
+Spec links for 001: 20 checked, zero errors. Whole-repository lychee was executed
+and reported three errors in concurrently authored 003 distribution documents
+(unpublished release endpoint and unfinished document links); those are outside
+T019 and are not reported as passing here. Initial native retry failures from
+concurrent build/PDB generation were resolved by sequential rebuilds.
+
+## Earlier read-only increment — T005 code, T006..T008
+
+Implemented real SSH profile CRUD, explicit host-key enrollment, Windows custody,
+Isar settings and observation cache; locald exclusively owns SSH/FFI/database.
+Flutter uses Local API and explicitly separates SSH observations from demo.
+Direct SSH/Win32 dependencies now belong to the locald package. At that milestone
+last-profile deletion was refused (superseded by T019); backup/import tooling is
+outside this increment. The additive cache upgrade preserves legacy profiles and
+the one-time seed marker; tested using an actual old collection set.
+
+Actual successful checks on 2026-10-05:
+
+| Check | Result | Evidence |
+|---|---|---|
+| Format/analyze/Flutter regressions | 44 files, no changes; no analyzer issues; 25 tests passed | Includes both brand themes and narrow desktop regression |
+| locald analyze/tests | No issues; 22 tests passed, 1 fixture test skipped by default | Real Isar/store/API, additive upgrade, parser/delta and 1100-event bounded journal load |
+| `tools/test-read-only-fixture.ps1` | Actual API/SSH test and native Windows UI test passed | Disposable Ubuntu 24.04, actual systemd/journald/OpenSSH; no host filesystem mounts |
+| Native persistence regression | 2 passed | Profile edit/delete/reseed/restart; failed write remains visible and unchanged |
+| Release bundle | Flutter release and compiled locald succeeded | `output/ServerDeck-read-only-preview`, bundled Isar Core |
+| Packaged process smoke | PASS | Restrictive DACL, single owner, forced process restart and durable profile/job/event/lock |
+| Spec links | 35 links OK, 29 unique, no errors | All specs including concurrent brandbook documents |
+
+Real fixture assertions cover trusted fingerprint discovery and explicit
+confirmation, no connection before enrollment, rejected forged saved/seeded pins,
+password custody reference without material in JSON, incorrect pin rejection,
+active/stopped/failed/template-instance units, real package versions, Docker/K8s
+unsupported, host CPU/RAM/disk/network/uptime and MainPID RSS/CPU interval sampling,
+journal history/live/stop/resume, max two streams, denied journal access and
+forced SSH interruption with capped reconnect/cursor resume. A new locald instance
+reuses Windows custody, cache and theme; changed endpoint/port clears enrollment
+and excludes previous observations. Native UI verifies the enrollment checkbox,
+access form, live inventory search, journal history/pause across navigation,
+metric view and persisted light theme.
+
+Memory/page budgets: eight host contexts, max two journal streams; rings500,
+record64 KiB, journal API100/512 KiB; inventory10000/page200, cache4 MiB; read
+command15 seconds/4 MiB. A changed journal generation resets a client's sequence
+with a gap. Boot-change/generation/oversize/malformed/drop/load coverage is
+synthetic; SSH/auth and journald history/follow/denied/reconnect coverage is real.
+All-server search reads cached SSH observations, with explicit scan/row truncation.
+CPU/network need two samples; failed samples retain the last value as stale.
+Service CPU is MainPID only, not the whole cgroup; PID/start time must match.
+
+Unperformed checks: Windows OS reboot custody (T005 stays unchecked for this
+gate), real remote host reboot, multi-hour RSS/load measurements, all platform
+stores, large protected PEM envelopes, automatic Local API rediscovery after
+service crash, backup/restore, and future service/install/sync acceptance.
+Restart UI after a locald crash or when replacing an older running sidecar.
+No production credentials/hosts/logs were used; installations and service writes
+remain disabled. Docker privilege is only for this isolated systemd test fixture,
+not evidence that the future executor passed its least-privilege gate.
+Existing brandbook changes were retained; this increment is not a claim that
+all AC01..AC07 or T009..T013 are complete. Historical evidence follows.
+
+## Previous architecture increment — Docs approach (historical evidence)
 
 T014..T018 completed for Flutter -> authenticated Local API -> detached compiled
 Dart locald -> Isar Community 3.3.2. locald is the only database owner. Demo profile

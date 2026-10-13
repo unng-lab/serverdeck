@@ -1,4 +1,9 @@
-* text=auto
+* text=auto eol=lf
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.dart text eol=lf
+runner/*.py text eol=lf
+docs/development/licenses/native/*.txt -text
+# Pinned native inputs are verified by their exact upstream bytes.
+native/isar-3.3.2/Cargo.lock -text
+native/isar-3.3.2/licenses/** -text
