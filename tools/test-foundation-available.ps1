@@ -71,6 +71,7 @@ try {
     Write-Output "AVAILABLE_ACCEPTANCE_PASSED phases=$($completed.Count)"
     Write-Output "AVAILABLE_ACCEPTANCE_RESULT=$resultPath"
 } catch {
+    $_.Exception.Data['ServerDeckAvailablePhase']=$current
     Write-AvailableResult 'failed'
     # result.json records the failed phase; preserve the original exception and
     # invocation location so a build/preflight failure remains diagnosable.

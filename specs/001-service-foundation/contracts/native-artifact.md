@@ -256,3 +256,14 @@ Create a fresh immutable qualification-receipt-GUID.json beside the compatibilit
 Normal provider selection resolves the pointer, qualification, current compatibility and exact review chain; any missing/unqualified/mismatched item throws without cache/native/PATH/download fallback. Absent pointer with the established marker also throws. Before first activation only, absent pointer/marker retains the historical private-development cached input. Source changes invalidate selection until a new full current qualification and review are activated. run-foundation validates selection before any build output is changed and attaches199-file notices for qualified normal builds, preserving predecessor notices in fresh owned local directories. Runtime entry remains exclusively app-root manifest/DLL-bound and never imports these controls.
 
 `test-native-artifact-activation.ps1` requires a preactivation sequential workspace and actual historical receipt/review. It verifies eight refusals (nested candidate activation, stale compatibility, pointer state/readiness/traversal, missing/stale qualification receipt, missing pointer after established marker), no cache fallback, exact synthetic pointer preservation and restoration of original preactivation state. Successful current-source approval, atomic switch, subsequent normal Debug/Release/notices and tamper refusal require the fresh completed compatibility/review and actual activation acceptance; refusal tests do not substitute for those gates.
+
+Available native/UI failures retain their original nonzero outcome. The dispatcher
+attaches only its fixed current phase name to the private ErrorRecord; qualification
+may publish safe-available-failure.json with current source/artifact hashes, the
+known phase and at most three current hashed tools/*.ps1 source file/line pairs.
+PowerShell frame labels, raw stack, error messages, outputs and machine paths are
+excluded. Missing/unknown phase metadata yields unavailable-phase-details with
+no phase or frames. Stack parsing is capped at256KiB; unknown/modified files and
+invalid line numbers are excluded. Controlled projections carry controlledFixture
+true and are not actual hosted evidence. Full acceptance/distribution/activation
+flags remain false; the CI upload allowlist includes only this fixed safe filename.

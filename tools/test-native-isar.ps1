@@ -6,6 +6,7 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/native-artifact.ps1"
 . "$PSScriptRoot/native-artifact-abi.ps1"
 . "$PSScriptRoot/qualification-test-diagnostics.ps1"
+. "$PSScriptRoot/qualification-available-diagnostics.ps1"
 $candidate=Get-NativeIsarCandidateArtifact $Artifact
 $initial=Get-NativeArtifactSourceSnapshot
 $script:qualificationDirectory=''
@@ -27,6 +28,12 @@ function Invoke-NativeQualificationPhase {
         if($Name.EndsWith('-tests')){
             try {Write-NativeQualificationTestFailure -Directory $script:qualificationDirectory -Phase $Name -SourceSnapshot $initial}
             catch {Write-Output 'NATIVE_TEST_DIAGNOSTIC_PUBLICATION_UNAVAILABLE'}
+        }
+        if($Name -ceq 'available-native-ui'){
+            try {
+                $safe=New-NativeAvailableFailureProjection -SourceSnapshot $initial -Failure $originalFailure -ArtifactManifestSha256 $candidate.manifestSha256
+                Write-NativeIsarJson (Join-Path $script:qualificationDirectory 'safe-available-failure.json') $safe
+            } catch {Write-Output 'NATIVE_AVAILABLE_DIAGNOSTIC_PUBLICATION_UNAVAILABLE'}
         }
         throw $originalFailure
     }
