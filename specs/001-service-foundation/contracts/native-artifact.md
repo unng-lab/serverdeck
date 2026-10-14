@@ -30,6 +30,16 @@ unavailable/incomplete diagnostic, not a passed test. The original test failure
 still fails qualification. Only safe-test-failure-*.json may join the hosted
 allowlist; machine reports and raw logs remain private. Full acceptance stays false.
 
+The workspace VM test privately retains at most64KiB of child stderr and drains
+the stream before reporting failure. Child exit failure attaches its private
+trace to the test reporter; only the existing known-source projection can reach
+the safe artifact. WORKSPACE_CHILD_FAILED and WORKSPACE_CHILD_TIMEOUT are fixed
+test-harness diagnostic codes, not new product error categories. The existing
+90-second child deadline remains unchanged; stderr drain waits at most5seconds
+in one shared attempt, cancels its owned subscription on completion or timeout,
+and does not forward further chunks after cleanup. Controlled stream tests cover
+unterminated stderr, cancellation, repeated drain and the capture bound.
+
 After a completed full standalone source test, long duplicated Isar source
 trees may be retained with tools/retain-native-reproduction-sources.ps1 using
 its closed owned completion log. Only completed candidate/prepared source

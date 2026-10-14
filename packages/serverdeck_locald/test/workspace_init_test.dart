@@ -6,6 +6,7 @@ import 'package:serverdeck_windows/process.dart';
 import 'package:test/test.dart';
 
 import 'support/native_artifact.dart';
+import 'support/private_child_stderr.dart';
 
 void main() {
   test(
@@ -54,16 +55,29 @@ void main() {
         final output = child.stdout
             .transform(utf8.decoder)
             .listen(stdout.write);
-        final errors = child.stderr
-            .transform(utf8.decoder)
-            .listen(stderr.write);
+        // Keep the child stack private, but attach it to the test failure so
+        // the qualification projector can identify known source frames.
+        final errors = PrivateChildStderr(child.stderr, stderr.add);
         try {
-          expect(await child.exitCode.timeout(const Duration(seconds: 90)), 0);
+          final result = await child.exitCode.timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw StateError('WORKSPACE_CHILD_TIMEOUT'),
+          );
+          final failureOutput = await errors.drain();
+          if (result != 0) {
+            Error.throwWithStackTrace(
+              StateError('WORKSPACE_CHILD_FAILED'),
+              StackTrace.fromString(
+                utf8.decode(failureOutput, allowMalformed: true),
+              ),
+            );
+          }
+          expect(result, 0);
         } finally {
           child.kill();
           await child.exitCode;
           await output.cancel();
-          await errors.cancel();
+          await errors.drain().catchError((Object _) => <int>[]);
         }
       } finally {
         parent.deleteSync(recursive: true);

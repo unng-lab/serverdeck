@@ -49,5 +49,29 @@ $invalid=Read-NativeIsarArtifactJson (Join-Path $invalidFixture 'safe-test-failu
 if($invalid.status -cne 'unavailable-reporter' -or $invalid.failures.Count -ne 0 -or $invalid.reporterComplete){throw 'Invalid reporter accepted.'}
 'QUALIFICATION_SAFE_TEST_FAILURE_REAL_REPORTER_AND_PRIVATE_MARKER_EXCLUSION_PASSED'
 'QUALIFICATION_INVALID_REPORTER_FAILED_CLOSED'
+foreach($code in @('WORKSPACE_CHILD_FAILED','WORKSPACE_CHILD_TIMEOUT')) {
+    $childFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($childFixture)
+    $childProbe=Join-Path $childFixture 'controlled-child-code.dart'
+    $childReport=Join-Path $childFixture 'serverdeck_windows-tests.machine.jsonl'
+    $template=[IO.File]::ReadAllText($probe).Replace("const FileSystemException('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER', '', OSError('NT_ATTRIBUTES_STATUS', -1073741790))","StateError('$code')")
+    [IO.File]::WriteAllText($childProbe,$template,[Text.UTF8Encoding]::new($false))
+    Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_windows')
+    try {
+        & $FoundationDart test $childProbe --file-reporter "json:$childReport" *> (Join-Path $childFixture 'controlled-child-code.private.txt')
+        if($LASTEXITCODE -eq 0){throw 'Controlled child failure unexpectedly passed.'}
+    } finally {Pop-Location}
+    Write-NativeQualificationTestFailure -Directory $childFixture -Phase 'serverdeck_windows-tests' -SourceSnapshot $snapshot -ControlledFixture
+    $childProofPath=Join-Path $childFixture 'safe-test-failure-serverdeck_windows-tests.json'
+    $childProof=Read-NativeIsarArtifactJson $childProofPath
+    $childSafe=[IO.File]::ReadAllText($childProofPath)
+    if($childProof.status -cne 'failed-test-details' -or -not $childProof.controlledFixture -or
+        -not $childProof.reporterComplete -or $childProof.failures.Count -ne 1 -or
+        $childProof.failures[0].safeCode -cne $code -or $childProof.failures[0].sourceFrames.Count -ne 1 -or
+        $childSafe.Contains($privateMarker) -or $childSafe.Contains('C:/') -or $childSafe.Contains('stackTrace')) {
+        throw 'Controlled child code projection mismatch.'
+    }
+    'QUALIFICATION_SAFE_'+$code+'_AND_PRIVATE_MARKER_EXCLUSION_PASSED'
+}
 $fixture
 $invalidFixture
