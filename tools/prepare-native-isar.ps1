@@ -16,7 +16,7 @@ $inputs = @(
     @{name='libclang-18.1.1-win64.whl'; spec=$recipe.libclang; kind='zip'; destination='libclang'}
 )
 foreach ($component in $recipe.rust.components) {
-    $inputs += @{name=[IO.Path]::GetFileName(([Uri]$component.url).AbsolutePath); spec=$component; kind='tar.xz'; destination=('rust-' + $component.name)}
+    $inputs += @{name=[IO.Path]::GetFileName(([Uri]$component.url).AbsolutePath); spec=$component; kind='tar.gz'; destination=('rust-' + $component.name)}
 }
 foreach ($input in $inputs) {
     Write-NativeIsarJson (Join-Path $attempt ('safe-phase-fetch-'+$input.destination+'.json')) ([ordered]@{

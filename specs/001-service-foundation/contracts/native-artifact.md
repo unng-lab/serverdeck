@@ -18,6 +18,16 @@ Minimal reviewed mdbx_sys/build.rs patch replaces ensure_libmdbx's floating netw
 
 ## Components and workflow
 
+Rust components use the official Rust1.88.0 Windows x64 TAR.GZ archives and
+SHA256 values pinned in recipe.json and rust-license-material.json. The fixed
+release manifest supplies these pins; ordinary builds do not resolve them.
+TAR names/types/extraction retain owned300second child limits and preflight
+validation. Gzip is the Windows tar built-in route; no external XZ/PATH program
+or archive-format fallback is selected. Missing or mismatched gzip cache inputs
+fail; historical XZ artifacts remain immutable. Changing archive encoding must
+preserve the exact extracted toolchain digest and every pinned license file,
+and requires new recipe-bound build/source receipts and independent review.
+
 - tools/prepare-native-isar.ps1 obtains checked archives into an owned `.local/native-isar/` root, validates hashes before extraction and rejects absolute/traversal/ADS/device/duplicate/link entries escaping the root. Standalone Rust components and libclang are extracted locally; no rustup/global PATH/registry/MSVC installation. Scoped child PATH/RUSTC/CARGO_HOME/LIBCLANG_PATH and whitelisted VS environment are restored in finally. Failed work is preserved; no recursive cleanup of unknown roots, elevation or alternate operation after a system denial.
 - tools/build-native-isar.ps1 verifies recipe/lock/toolchains; copies pinned sources into a fresh owned candidate, applies only the reviewed patch, uses cargo vendor --locked once for checksummed inputs, then cargo metadata/build --frozen offline. Select package isar, Windows x64 release, default features only. No cargo update/generate-lockfile during ordinary build. Source/download failure does not replace previous qualified output.
 - tools/native-artifact.ps1 is the **build-only** provider shared by run-foundation/build-locald/native drivers. Normal selection requires the activated qualified receipt. Candidate selection is explicit only in an owned qualification invocation and propagated to test/build helpers; application entry never imports this control. Dart-only test helpers may read the same build-only test selection to copy the chosen DLL into synthetic bundles; product libraries do not read it.

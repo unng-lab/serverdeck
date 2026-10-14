@@ -210,4 +210,10 @@ F230 extends existing W05/W06/W07 privacy enforcement per FR-123/FR-SVC-016/SC-S
 
 ## T232/T233 — source-built native artifact
 
+T250 changes only Rust distribution encoding to the official pinned1.88.0
+Windows x64 TAR.GZ inputs. The toolchain version/commit and extracted bytes
+remain fixed; compare the complete toolchain digest and license payloads against
+the previous XZ preparation. See the native-artifact contract for the bounded
+TAR route, no fallback and new recipe-bound artifact requirements.
+
 Constitution VIII and T045/T207 require resolved native dependency/license coverage. The old release DLL graph remains unestablished. Build a new same-version artifact using [native-artifact contract](contracts/native-artifact.md), [research](research.md) and checked recipe/lock; qualify it before replacing the current provider. This is a build-input change, not a storage/API migration or new product capability. Components, pinning, artifact custody, qualification, notices, failure preservation and activation are defined in that contract. T232 covers design; T233 covers implementation and evidence. All stage/manual/CI gates remain separate and open. Constitution gates: source/hash/lock/license coverage must pass before activation; independent review and current checks are mandatory. No release publication or project-license decision follows from this design.

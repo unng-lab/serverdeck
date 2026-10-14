@@ -1315,3 +1315,42 @@ The exact cause/subcommand of the old hosted hang remains unestablished.
 Actual current-source hosted completion T244/T245, full001.1 and separate
 Windows11/exact-denied checks remain open. No qualification, activation,
 publication of private evidence or distribution readiness is inferred.
+
+### 2026-10-14: T250 official gzip Rust distributions
+
+Hosted run38566954396 on87c8683 failed after the bounded native TAR names call.
+Safe artifacts contain expand-rust-rustc-names but neither types nor extraction.
+It ended in about ten minutes; the precise internal XZ cause remains unproven.
+Evidence is `.local/audits/hosted-38566954396-safe` and the corresponding
+`t249-hosted-38566954396-terminal.json`.
+
+Both native manifests now pin the official TAR.GZ variants of the same Rust
+1.88.0 Windows x64 release. Their URLs/SHA256 match the retained official
+channel manifest in the audit directory recorded by `t250-gzip-path.txt`.
+Actual downloads passed SHA checks. Windows tar must advertise built-in zlib;
+absolute tool path, owned bounded children, archive guards and no fallback
+remain. Original XZ cache/artifacts are retained.
+
+`t250-toolchain-equivalence.json` records exact equality with the previous
+compiled SDK tree digest and all eight license payloads. Current input tests
+passed ZIP negatives, actual gzip positive, traversal/symbolic/hardlink
+preflight refusal, dual-pipe pressure, owned timeout and sanitized nonzero.
+Rust material tests rejected changed copyright/archive bytes and another SDK.
+The new recipe-bound native build regression passed; candidate
+`candidate-3d07c80532cc4e00bddf0521e4d8b986` and its complete artifact
+`artifact-deb8ad5b7a5e44adaa4f45b111eea9d8` remain unqualified.
+
+Full source tests completed exit0:8107files/183notices/full cross-process repack,
+standalone offline build using the final gzip/zlib helper, spaced root,
+encoded-flag restoration and long-root preflight. Fixture
+`native-source-package-tests-5b3f1de8120346c29cbcb010e4ffbbcf` and extracted
+`src space-9e7d89a9` are retained. Logs/proofs use `.local/audits/t250-*`.
+The complete artifact validator accepted the new input and rejected the old
+recipe's artifact with Native artifact identity mismatch. No old receipt was
+rewritten. Three PowerShell files parsed without errors; links541/zero errors
+and whitespace passed. Fresh readonly native_gzip_inputs_review found no issues
+and read the official pins and final reproduction evidence. T250 is closed.
+
+Current-source hosted compatibility T244/T245, qualification/activation,
+full001.1 and separate Windows11/exact-denied gates remain open. The local
+checks do not authorize distribution or substitute for hosted execution.

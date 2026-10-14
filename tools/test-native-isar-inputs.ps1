@@ -96,4 +96,32 @@ try { Invoke-NativeIsarArchiveProcess $pwsh @('-NoProfile','-File',$failedChild)
 }
 if(-not $failureRejected){throw 'Native archive child failure accepted.'}
 Write-Output 'NATIVE_INPUT_DUAL_PIPE_TIMEOUT_AND_SAFE_FAILURE_PASSED'
+$tarCases=@(
+    @{name='tar-traversal';entry='../escape';type=[System.Formats.Tar.TarEntryType]::RegularFile},
+    @{name='tar-symbolic';entry='link';type=[System.Formats.Tar.TarEntryType]::SymbolicLink},
+    @{name='tar-hardlink';entry='link';type=[System.Formats.Tar.TarEntryType]::HardLink},
+    @{name='tar-good';entry='root/payload';type=[System.Formats.Tar.TarEntryType]::RegularFile}
+)
+foreach($tarCase in $tarCases){
+    $archivePath=Join-Path $fixture ($tarCase.name+'.tar.gz')
+    $file=[IO.File]::Open($archivePath,[IO.FileMode]::CreateNew)
+    $gzip=[IO.Compression.GZipStream]::new($file,[IO.Compression.CompressionMode]::Compress)
+    $writer=[System.Formats.Tar.TarWriter]::new($gzip)
+    $payload=[IO.MemoryStream]::new([Text.Encoding]::UTF8.GetBytes('owned gzip payload'))
+    try {
+        $entry=[System.Formats.Tar.PaxTarEntry]::new($tarCase.type,$tarCase.entry)
+        if($tarCase.type -eq [System.Formats.Tar.TarEntryType]::RegularFile){$entry.DataStream=$payload}
+        else {$entry.LinkName='outside'}
+        $writer.WriteEntry($entry)
+    } finally {$writer.Dispose();$gzip.Dispose();$file.Dispose();$payload.Dispose()}
+    $archiveHash=Get-NativeIsarDigest $archivePath
+    $destinationPath=Join-Path $fixture $tarCase.name
+    $failed=$false
+    try {Expand-NativeIsarArchive $archivePath $destinationPath 'tar.gz'} catch {$failed=$true}
+    if($tarCase.name -eq 'tar-good'){
+        if($failed -or [IO.File]::ReadAllText((Join-Path $destinationPath 'root/payload')) -cne 'owned gzip payload'){throw 'Gzip TAR positive control failed.'}
+    } elseif(-not $failed -or (Test-Path -LiteralPath $destinationPath)){throw 'Unsafe gzip TAR was extracted.'}
+    if((Get-NativeIsarDigest $archivePath) -cne $archiveHash){throw 'Gzip TAR test changed its input.'}
+}
+Write-Output 'NATIVE_INPUT_GZIP_TAR_TRAVERSAL_LINK_PREFLIGHT_AND_POSITIVE_PASSED'
 Write-Output $fixture

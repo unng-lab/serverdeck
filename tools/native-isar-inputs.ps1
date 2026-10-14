@@ -98,7 +98,7 @@ function Invoke-NativeIsarArchiveProcess {
 }
 
 function Expand-NativeIsarArchive {
-    param([string]$Archive, [string]$Destination, [ValidateSet('zip','tar.xz')][string]$Kind,
+    param([string]$Archive, [string]$Destination, [ValidateSet('zip','tar.gz')][string]$Kind,
         [ValidateRange(1,8589934592)][long]$MaximumExpandedBytes = 8GB,
         [scriptblock]$OnTarPhase)
     Assert-NativeIsarPlainPath $Archive
@@ -162,6 +162,8 @@ function Expand-NativeIsarArchive {
     } else {
         $tar = Join-Path $env:SystemRoot 'System32/tar.exe'
         if (-not (Test-Path -LiteralPath $tar -PathType Leaf)) { throw 'Windows tar prerequisite missing.' }
+        $tarVersion=Invoke-NativeIsarArchiveProcess $tar @('--version')
+        if($tarVersion -cnotmatch '\bzlib/'){throw 'Windows tar built-in gzip prerequisite missing.'}
         if($OnTarPhase){& $OnTarPhase 'names'}
         $names = @((Invoke-NativeIsarArchiveProcess $tar @('-tf',$Archive)) -split '\r?\n' | Where-Object {$_ -ne ''})
         if($OnTarPhase){& $OnTarPhase 'types'}

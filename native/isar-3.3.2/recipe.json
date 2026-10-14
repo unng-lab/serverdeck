@@ -21,18 +21,18 @@
     "components": [
       {
         "name": "rustc",
-        "url": "https://static.rust-lang.org/dist/2025-06-26/rustc-1.88.0-x86_64-pc-windows-msvc.tar.xz",
-        "sha256": "238616f0a578d6d4c034ffb8897064fa8df68a3823df201df48ab2baf68a639f"
+        "url": "https://static.rust-lang.org/dist/2025-06-26/rustc-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "8ae5e29324b60137c9c7fdd7af8537289f420d6b670f03f895195bd749d8d99f"
       },
       {
         "name": "cargo",
-        "url": "https://static.rust-lang.org/dist/2025-06-26/cargo-1.88.0-x86_64-pc-windows-msvc.tar.xz",
-        "sha256": "5e3b21d77733e0dbb5542015f89b15de1844bd6e3270fdc90bb821b2a04b1cda"
+        "url": "https://static.rust-lang.org/dist/2025-06-26/cargo-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "c0a84985c164a6db42244b59176414d5690fa1bc6dd8aa8052f0f1be3604c0e0"
       },
       {
         "name": "rust-std",
-        "url": "https://static.rust-lang.org/dist/2025-06-26/rust-std-1.88.0-x86_64-pc-windows-msvc.tar.xz",
-        "sha256": "6b65df769259ad18428271aea110ec1a5027e922f3e36d77923dc69a38ff6318"
+        "url": "https://static.rust-lang.org/dist/2025-06-26/rust-std-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "1b5e3c24ac79aa362ff83ac32f635f4019434eac5b98c25dfa04a12b01ba00b3"
       }
     ]
   },
