@@ -11,8 +11,13 @@ $script:qualificationDirectory=''
 $script:qualificationPhases=[Collections.Generic.List[object]]::new()
 $script:currentQualificationPhase='setup'
 function Invoke-NativeQualificationPhase {
-    param([string]$Name,[scriptblock]$Action)
+    param([ValidateSet('abi','root-format','root-analyze','root-tests','serverdeck_protocol-analyze','serverdeck_protocol-tests','serverdeck_windows-analyze','serverdeck_windows-tests','serverdeck_locald-analyze','serverdeck_locald-tests','bundle-Debug','bundle-Release','available-native-ui','runtime-diagnostics')][string]$Name,[scriptblock]$Action)
     $script:currentQualificationPhase=$Name
+    Write-NativeIsarJson (Join-Path $script:qualificationDirectory ('safe-phase-'+$Name+'.json')) ([ordered]@{
+        schemaVersion=1;kind='native-qualification-phase';status='started';phase=$Name
+        sourceSnapshotSha256=$initial.sha256;artifactManifestSha256=$candidate.manifestSha256
+        fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
     $log=Join-Path $script:qualificationDirectory ($Name + '.txt')
     Write-Output "START native-qualification-$Name"
     $watch=[Diagnostics.Stopwatch]::StartNew()

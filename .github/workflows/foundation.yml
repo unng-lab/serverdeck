@@ -38,6 +38,8 @@ jobs:
           path: |
             .local/cold-runner-*/safe-proof.json
             .local/cold-runner-*/safe-failure.json
+            .local/cold-runner-*/safe-progress-*.json
+            .local/native-qualification-*/safe-phase-*.json
             .local/sdk-preparation-*/safe-started-*.json
             .local/sdk-preparation-*/safe-proof.json
             .local/sdk-preparation-*/safe-failure.json

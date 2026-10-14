@@ -9,9 +9,22 @@ $run=Join-Path $NativeIsarRepository ('.local/cold-runner-' + [Guid]::NewGuid().
 Assert-NativeIsarPlainPath $run
 [void][IO.Directory]::CreateDirectory($run)
 $script:coldPhase='sdk'
+$hosted=$env:GITHUB_ACTIONS -ceq 'true'
+function Write-ColdRunnerProgress {
+    param([ValidateSet('sdk','dependencies-root','dependencies-serverdeck_protocol','dependencies-serverdeck_windows','dependencies-serverdeck_locald','source-build','supplements','rust-material','sources','assembly','qualification','validation')][string]$Name)
+    $script:coldPhase=$Name
+    Write-NativeIsarJson (Join-Path $run ('safe-progress-'+$Name+'.json')) ([ordered]@{
+        schemaVersion=1;kind='cold-runner-phase';status='started';phase=$Name;hosted=$hosted
+        revision=$(if($hosted){$env:GITHUB_SHA}else{$null})
+        runId=$(if($hosted){$env:GITHUB_RUN_ID}else{$null})
+        runAttempt=$(if($hosted){$env:GITHUB_RUN_ATTEMPT}else{$null})
+        fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
+    Write-Host ('COLD_RUNNER_PHASE_STARTED='+$Name)
+}
 function Invoke-ColdRunnerStep {
     param([string]$Name,[scriptblock]$Action,[string]$ExpectedPrefix='')
-    $script:coldPhase=$Name
+    Write-ColdRunnerProgress $Name
     $log=Join-Path $run ($Name+'.private.txt')
     & $Action *> $log
     if ($ExpectedPrefix) {
@@ -26,10 +39,7 @@ function Invoke-ColdRunnerStep {
         return $path
     }
 }
-$hosted=$env:GITHUB_ACTIONS -ceq 'true'
 try {
-    . "$PSScriptRoot/foundation-sdk.ps1"
-    $script:coldPhase='dependencies'
     if ($hosted) {
         if ($env:GITHUB_SHA -cnotmatch '^[a-f0-9]{40}$' -or
             $env:GITHUB_RUN_ID -cnotmatch '^\d+$' -or $env:GITHUB_RUN_ATTEMPT -cnotmatch '^\d+$') {
@@ -38,15 +48,18 @@ try {
         $head=& git -C $NativeIsarRepository rev-parse HEAD
         if ($LASTEXITCODE -ne 0 -or $head -cne $env:GITHUB_SHA) { throw 'Hosted checkout identity mismatch.' }
     }
+    Write-ColdRunnerProgress 'sdk'
+    . "$PSScriptRoot/foundation-sdk.ps1" *> (Join-Path $run 'sdk.private.txt')
     Push-Location $NativeIsarRepository
     try {
-        Invoke-ColdRunnerStep 'dependencies' {
+        Invoke-ColdRunnerStep 'dependencies-root' {
             Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
-            foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
-                Push-Location (Join-Path $NativeIsarRepository ('packages/'+$package))
-                try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
-                finally { Pop-Location }
-            }
+        }
+        foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
+            Push-Location (Join-Path $NativeIsarRepository ('packages/'+$package))
+            try {
+                Invoke-ColdRunnerStep ('dependencies-'+$package) { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
+            } finally { Pop-Location }
         }
         Invoke-ColdRunnerStep 'source-build' { $script:coldCandidate=& "$PSScriptRoot/build-native-isar.ps1" }
         $candidate=$script:coldCandidate
@@ -64,6 +77,7 @@ try {
         }
         $artifact=$script:coldArtifact
         $qualification=Invoke-ColdRunnerStep 'qualification' { & "$PSScriptRoot/test-native-isar.ps1" -Artifact $artifact } 'native-qualification'
+        Write-ColdRunnerProgress 'validation'
         $verified=Get-NativeArtifactCompatibility (Join-Path $qualification 'compatibility-receipt.json') -RequireCurrentSource
         Write-NativeIsarJson (Join-Path $run 'safe-proof.json') ([ordered]@{
             schemaVersion=1;status='compatibility-passed-unreviewed';hosted=$hosted

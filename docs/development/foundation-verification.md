@@ -1026,3 +1026,154 @@ execution and proof export for the reviewed workflow remain unperformed and
 require separately authorized publication under T050. Previously system-denied
 operations remain open and were not retried, bypassed or transferred to runners.
 No full 001.1 acceptance, distribution readiness, release or merge is claimed.
+
+### 2026-10-14: authorized hosted attempts and SDK preparation correction
+
+The user authorized publication of the CI branch and hosted checks, while leaving
+the separate Windows 11 environment and system-denied checks open. Branch
+`feature/foundation-cold-ci` was published without a PR, release or merge.
+
+- Commit `0e9481a070b253ad93eb2afaef405f0d5598a4aa`:
+  [run 38472079523](https://github.com/unng-lab/serverdeck/actions/runs/38472079523)
+  failed while parsing the first SDK machine response. Startup text preceded
+  JSON. MSVC preparation and SDK installation completed; native qualification
+  was not reached.
+- Commit `c107f6b439dafc6a723377e2eafd3c348bf67d3c`:
+  [run 38472745552](https://github.com/unng-lab/serverdeck/actions/runs/38472745552)
+  was cancelled at the 120-minute job limit. The cold step retained only
+  `Building flutter tool... / Running pub upgrade...` before cancellation.
+  MSVC preparation and SDK installation passed. No safe artifact was uploaded;
+  no native build, compatibility or runtime-diagnostics success is established.
+- Commit `bbf6ccaa6638857006bfae122b92c895c05b82eb`:
+  [run 38511617874](https://github.com/unng-lab/serverdeck/actions/runs/38511617874)
+  was started for the reviewed SDK preparation correction. At the time of this
+  entry it is in progress; its outcome is not recorded as passed.
+
+The correction resolves the SDK's own Flutter tool dependencies using the
+bundled Dart executable and `pub get --enforce-lockfile`, compares the tool
+lockfile before and after dependency resolution and normal initialization, and
+retains strict Flutter/Dart/framework-revision validation. The separate SDK
+preparation step has a 15-minute limit. It writes safe phase-start records before
+dependencies and initialization, so cancellation can retain an explicitly
+incomplete phase record. These records are not compatibility or acceptance
+receipts. Both dependency and initialization streams stay in private local
+logs; only the explicit safe JSON patterns are uploaded.
+
+Local preparation passed on a fresh extraction of the original SHA256-verified
+SDK archive, including actual first tool initialization and unchanged lockfile:
+`.local/audits/t244-fresh-sdk-preparation-local.txt` and
+`.local/audits/t244-fresh-sdk-preparation-result.json`. The existing global Pub
+cache was retained; this is not cold-Pub-cache or hosted proof. After the privacy
+fix, actual normal preparation and restored-fixture preparation passed in
+`t244-sdk-preparation-fixed-local.txt` and
+`t244-sdk-preparation-fixed-restored.txt` under `.local/audits/`.
+
+The owned SDK fixture's original `flutter.bat` was retained, temporarily replaced
+with a synthetic failing stderr producer, then restored and hash-verified.
+The child correctly failed initialization; the marker occurred only in
+`initialization.private.txt`, not public output, and safe-failure identified
+`initialization`. Evidence: `.local/audits/t244-sdk-private-diagnostic-result.json`.
+A controller assertion initially used incorrect positional `Select-String`
+arguments; corrected explicit arguments verified the retained actual child
+evidence. That controller failure is not counted as a successful check.
+Missing-SDK refusal was also checked separately.
+
+The first independent `locked_cold_sdk_preparation_review` reported one privacy
+finding: inherited SDK stderr could reach the caller. All initialization streams
+were redirected to the owned private log; the negative and positive checks above
+were completed. Fresh `locked_sdk_preparation_privacy_fixed_review` then reported
+no findings, ready only for this correction and a new authorized CI run.
+Parser and whitespace checks passed; the actual link-check log
+`.local/audits/t244-sdk-preparation-fixed-links.txt` contains 541 OK, 62 unique,
+0 errors. No application Dart files were changed in this increment.
+
+These helper/workflow changes make the earlier worktree source qualification
+historical for the new revision. T244/T245 and full 001.1 remain open pending
+actual current hosted evidence and the other mandatory gates. No Windows 11
+environment acceptance or system-denied operation was performed.
+
+### 2026-10-14: whole 001.1 code/package review and T246
+
+Completed readonly `foundation_whole_code_package_review` inspected the full
+implemented 001.1 composition: Flutter bootstrap/UI/transport/recovery/diagnostics,
+protocol validation and boundaries, locald bootstrap/API/coordinator/storage/
+credential custody, Windows identity/ACL/DPAPI/pipe workers and cancellation,
+Windows runner, build/provenance/selection/qualification/activation chain,
+acceptance helpers and the related specification/operational artifacts.
+The inspection was risk-oriented, not a claim of line-by-line review of every
+generated/vendor file or test helper. No new builds, tests, OS changes or denied
+operations were executed by the reviewer.
+
+The reviewer found no confirmed code defect or missing mandatory product or
+architecture decision in 001.1. Specification readiness for implementation was
+established; runtime acceptance, merge and release readiness were not. One P3
+finding prevented a clean loop: the current Tasks status incorrectly described
+T033–T037, T041 and T045–T047 as still open despite their completed checkboxes.
+T246 records the correction without erasing any completed task or historical
+evidence. The header now distinguishes completed aggregates from the original
+open T038–T040, T043–T044 and T048–T050. Fresh review of this correction remains
+required before closing T246 or treating the review loop as clean; T049 remains
+open at this entry.
+
+The reviewer independently recomputed all 14 historical qualification phase-log
+hashes and all 15 available result/child-log hashes: no mismatches. Comparison of
+the historical 374-file snapshot against current source found only the changed
+workflow, SDK helper and cold runner; the new SDK preparation helper was not in
+that inventory. The actual format/test counts and separate runtime-diagnostics
+marker match the earlier local record. This supports unchanged application code
+at its tested scope, not current whole qualification of the revised CI chain.
+The hosted SDK preparation step in run 38511617874 has passed; the cold native
+qualification step is still in progress. These facts do not close T244/T245 or
+full 001.1, and do not replace the outstanding Windows 11, environment, privacy
+or system-denied gates.
+
+T246 and T049 closed after completed fresh readonly
+`whole_review_status_correction_review`: no findings. The reviewer independently
+compared the corrected current Status with actual checkboxes, confirmed the
+original P3 was resolved, read the actual 541 OK / 62 unique / 0 error link log,
+and passed scoped whitespace verification. Its report explicitly established
+that the completed whole code/package review, correction of its single P3,
+applicable checks, clean fix review and recorded scope satisfy T049; runtime,
+hosted and manual acceptance remain separate gates. Closure synchronizes the
+current header to list T049 as completed and T048/T050 as still open. Earlier
+dated entries remain historical. The fix review did not repeat the full audit of
+unchanged application code, execute new runtime checks or certify full 001.1.
+
+### 2026-10-14: third hosted timeout and phase diagnostics
+
+Run 38511617874 subsequently finished as cancelled at the 120-minute job limit.
+Its SDK preparation succeeded in 31 seconds, so the previous SDK startup stall
+is resolved at its actual hosted scope. The remaining cold source-build/
+qualification step ran from 04:31:40 UTC until cancellation at 06:29:20 UTC;
+its private phase output was not available through the public log.
+Artifact `foundation-safe-proof` (ID 11874297318) was downloaded to
+`.local/audits/hosted-38511617874-safe`. It contains only the SDK preparation
+proof and two SDK phase-start records. It does not establish native compilation,
+compatibility, compiled runtime diagnostics or T244/T245 completion.
+The complete own-repository job log is
+`.local/audits/t244-hosted-run-38511617874-complete.txt`.
+
+The next correction adds immutable safe started-phase JSON records for the cold
+pipeline, separates root and individual package dependency phases, and emits
+safe metadata before each of the existing 14 native qualification phases.
+SDK import in the cold runner also retains all streams in `sdk.private.txt`.
+Only the explicit safe progress JSON patterns join the artifact allowlist;
+private runtime/phase logs, fixture databases and credentials are not exported.
+Started records remain explicitly incomplete and cannot stand in for a passed
+compatibility receipt. Existing qualification criteria and full-acceptance
+barriers are retained.
+
+Controlled cold-runner refusal at root dependency resolution verified both
+started records, the precise failed phase and separation of a synthetic stderr
+marker from public output. Evidence:
+`.local/audits/cold-progress-test-287d46bb9ee940b080f56b6a5840436d/result.json`.
+An isolated invocation of the actual native phase function verified safe
+metadata and that an action failure is not appended as completed:
+`.local/audits/native-phase-test-8b384c68118d4e5bb4449c56c178560c/result.json`.
+Its hashes and actions were synthetic; it is not native acceptance evidence.
+An initial parser failure from an extra closing brace was corrected before these
+successful checks; no failed check is labelled passed. Parser and whitespace
+checks then passed, as did the 541-link check in
+`.local/audits/t244-phase-progress-links.txt`. Fresh independent review and a new
+hosted run of this correction are still required. All environment and previously
+system-denied gates remain open.
