@@ -135,8 +135,10 @@ void main() {
     },
     testOn: 'windows',
   );
+  // Native fixture roots are synthetic LOCALAPPDATA inputs. System temp need
+  // not be a child of the real user's LOCALAPPDATA (for example on CI).
   test('empty native store file is protected at creation and cannot replace existing data', () async {
-    final local = Platform.environment['LOCALAPPDATA']!;
+    final local = p.normalize(p.absolute(Directory.systemTemp.path));
     final parent = Directory.systemTemp.createTempSync(
       'serverdeck-synthetic-empty-',
     );
@@ -168,7 +170,7 @@ void main() {
     }
   }, testOn: 'windows');
   test('protected create flush read and atomic replace preserve ACL', () async {
-    final local = Platform.environment['LOCALAPPDATA']!;
+    final local = p.normalize(p.absolute(Directory.systemTemp.path));
     final parent = Directory.systemTemp.createTempSync(
       'serverdeck-synthetic-file-',
     );
@@ -191,7 +193,7 @@ void main() {
     }
   }, testOn: 'windows');
   test('private directory has explicit owner/SYSTEM ACL and rejects ordinary inherited ACL', () {
-    final local = Platform.environment['LOCALAPPDATA']!;
+    final local = p.normalize(p.absolute(Directory.systemTemp.path));
     final parent = Directory.systemTemp.createTempSync(
       'serverdeck-synthetic-acl-',
     );
@@ -206,6 +208,24 @@ void main() {
       );
     } finally {
       parent.deleteSync(recursive: true);
+    }
+  }, testOn: 'windows');
+  test('declared local root rejects independent temp locations', () {
+    const local = r'C:\synthetic-local-app-data';
+    for (final target in [
+      r'C:\synthetic-temp\private',
+      r'D:\synthetic-temp\private',
+    ]) {
+      expect(
+        () => validateLocalPath(local, target),
+        throwsA(
+          isA<FileSystemException>().having(
+            (error) => error.message,
+            'safe code',
+            'UNSAFE_PATH',
+          ),
+        ),
+      );
     }
   }, testOn: 'windows');
   test('reject UNC and escaping local app data', () {
@@ -226,7 +246,7 @@ void main() {
   test(
     'protected directory read failure contains no private path or native text',
     () async {
-      final local = Platform.environment['LOCALAPPDATA']!;
+      final local = p.normalize(p.absolute(Directory.systemTemp.path));
       final parent = Directory.systemTemp.createTempSync(
         'serverdeck-synthetic-reader-',
       );
@@ -264,7 +284,7 @@ void main() {
     testOn: 'windows',
   );
   test('rejects a real directory junction before creating private data', () {
-    final local = Platform.environment['LOCALAPPDATA']!;
+    final local = p.normalize(p.absolute(Directory.systemTemp.path));
     final parent = Directory.systemTemp.createTempSync(
       'serverdeck-synthetic-junction-',
     );
