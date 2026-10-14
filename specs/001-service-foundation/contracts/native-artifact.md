@@ -18,6 +18,32 @@ Minimal reviewed mdbx_sys/build.rs patch replaces ensure_libmdbx's floating netw
 
 ## Components and workflow
 
+Failed root/package test phases retain an additional JSON file reporter privately
+under the owned qualification directory. tools/qualification-test-diagnostics.ps1
+projects only known current-snapshot Dart source files/valid lines, up to three
+source frames and three whitelisted OS status values per error, and fixed safe
+StateError codes. Names, assertion messages, raw stacks, output and private paths
+are excluded. Proof binds source/context/artifact hashes; controlled fixtures are
+explicitly marked and never claim qualification. Report inputs are capped16MiB,
+events256KiB, errors128; invalid/missing/incomplete reporter produces an explicit
+unavailable/incomplete diagnostic, not a passed test. The original test failure
+still fails qualification. Only safe-test-failure-*.json may join the hosted
+allowlist; machine reports and raw logs remain private. Full acceptance stays false.
+
+After a completed full standalone source test, long duplicated Isar source
+trees may be retained with tools/retain-native-reproduction-sources.ps1 using
+its closed owned completion log. Only completed candidate/prepared source
+copies under that exact owned reproduction root move to fresh short `.local`
+paths. The native root must contain exactly the logged completed candidate and
+one completed preparation with the same recipe hash. Any additional candidate
+or preparation, including an incomplete attempt, makes retention ambiguous and
+fails before a record or move. Retention records preserve original/retained paths, tree and receipt
+hashes; before/after trees must match. Product candidates, DLLs, original
+receipts, test logs and failed/incomplete cases stay in place. Partial retention
+keeps its record and both known locations for diagnosis, emits no passed marker
+and cannot be reset by rerunning. This is evidence maintenance; it does not
+qualify or activate an artifact. Mandatory root `dart format .` remains unchanged.
+
 Rust components use the official Rust1.88.0 Windows x64 TAR.GZ archives and
 SHA256 values pinned in recipe.json and rust-license-material.json. The fixed
 release manifest supplies these pins; ordinary builds do not resolve them.

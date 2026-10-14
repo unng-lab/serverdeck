@@ -229,6 +229,19 @@ Owner-side compilation/baseline on a single account and same-SID exit2 are scope
 
 ### T244/T245: cold source-build CI route
 
+If a completed standalone source reproduction leaves deeply nested duplicate
+source paths that prevent Windows Dart formatter enumeration, first run
+`tools/retain-native-reproduction-sources.ps1 -CompletionLog .local/audits/<completed>-source-tests.txt`.
+The log must be the closed successful four-line output of test-native-isar-sources.ps1.
+It preserves completed duplicated source trees at short owned paths with verified
+hashes and a source-retention.json mapping in the original test fixture. It leaves
+failed/incomplete attempts and original product inputs untouched. An additional
+candidate/preparation in that reproduction root is ambiguous and refuses the
+entire operation; do not remove or reset it to force acceptance. Inspect a
+partial retention record instead of resetting/reusing it. Then rerun the exact
+mandatory root formatting command and qualification; a historical passed source
+test does not establish current compatibility.
+
 `tools/test-foundation-cold-runner.ps1` resolves locked Dart dependencies, downloads and verifies the recipe's pinned source/Rust/libclang archives, builds a new native candidate and its resolved vendor graph, collects the complete corresponding-source/notices package, then invokes `test-native-isar.ps1` for that complete artifact. The qualifier runs package/root checks, both normal bundle configurations, all 14 available automatic acceptance phases and the separate compiled runtime-diagnostics phase. Any failure stops the pipeline. Existing active pointers, cached artifacts and review/activation records are not inputs; the candidate context selects this source-built DLL for the checks.
 
 The native builder requires exactly the recipe's Visual Studio installation, MSVC and Windows SDK versions. Before the SDK/build steps, prepare-foundation-hosted-msvc.ps1 downloads the fixed Microsoft Build Tools 17.14.23 bootstrapper, verifies its SHA256, valid Microsoft signature and 17.14.36811.4 file version, then installs the required VC tools/26100 SDK in a fresh runner-temp directory. Installation is allowed only in the GitHub-hosted Windows route; it does not update or remove the preinstalled Visual Studio, reboot, or run on a developer machine. Nonzero installer exit (including reboot-required), ambiguous installations, mismatched identity or unavailable exact components fail. The builder independently validates MSVC14.44.35207/SDK10.0.26100.0 before use. The local -VerifyBootstrapOnly mode verifies the download without installation and cannot prove hosted installation. GitHub windows-2022 remains the execution image; its moving inventory is not substituted for the pins. Actual hosted installation and execution are required before claiming cold-runner acceptance.

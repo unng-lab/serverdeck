@@ -1,0 +1,110 @@
+. "$PSScriptRoot/native-artifact-source-snapshot.ps1"
+. "$PSScriptRoot/native-isar-artifact-inputs.ps1"
+
+function Write-NativeQualificationTestFailure {
+    param([Parameter(Mandatory)][string]$Directory,
+        [Parameter(Mandatory)][ValidateSet('root-tests','serverdeck_protocol-tests','serverdeck_windows-tests','serverdeck_locald-tests')][string]$Phase,
+        [Parameter(Mandatory)]$SourceSnapshot,
+        [switch]$ControlledFixture)
+    $Directory=[IO.Path]::GetFullPath($Directory)
+    if([IO.Path]::GetDirectoryName($Directory) -cne (Join-Path $NativeIsarRepository '.local') -or
+        [IO.Path]::GetFileName($Directory) -cnotmatch '^native-qualification-[a-f0-9]{32}$'){
+        throw 'Expected owned qualification diagnostics directory.'
+    }
+    Assert-NativeIsarPlainPath $Directory
+    $artifactHash=$null
+    if(-not $ControlledFixture){
+        $context=Read-NativeIsarArtifactJson (Join-Path $Directory 'context.json')
+        if($context.sourceSnapshotSha256 -cne $SourceSnapshot.sha256 -or
+            $context.artifactManifestSha256 -cnotmatch '^[a-f0-9]{64}$'){
+            throw 'Qualification diagnostics context mismatch.'
+        }
+        $artifactHash=$context.artifactManifestSha256
+    }
+    $known=@{}
+    foreach($file in $SourceSnapshot.files){if($file.file.EndsWith('.dart')){$known[$file.file]=@{hash=$file.sha256;file=$file.file}}}
+    $packageRoot=if($Phase -ceq 'root-tests'){$NativeIsarRepository}else{Join-Path $NativeIsarRepository ('packages/'+$Phase.Replace('-tests',''))}
+    function Resolve-DiagnosticSource([string]$Location){
+        if(-not $Location){return $null}
+        $relative=$null
+        if($Location -cmatch '^package:(serverdeck(?:_protocol|_windows|_locald)?)/(.+)$'){
+            $relative=if($Matches[1] -ceq 'serverdeck'){'lib/'+$Matches[2]}else{'packages/'+$Matches[1]+'/lib/'+$Matches[2]}
+        } else {
+            try {
+                $uri=$null
+                if([Uri]::TryCreate($Location,[UriKind]::Absolute,[ref]$uri) -and $uri.IsFile){$absolute=$uri.LocalPath}
+                elseif($Location.Contains('://')){return $null}
+                else {$absolute=[IO.Path]::GetFullPath($Location,$packageRoot)}
+                $relative=[IO.Path]::GetRelativePath($NativeIsarRepository,$absolute).Replace('\','/')
+            } catch {return $null}
+        }
+        if($known.ContainsKey($relative)){return $known[$relative].file}
+        return $null
+    }
+    function Get-DiagnosticLine([string]$File,$Line){
+        if(-not $File -or $Line -isnot [ValueType]){return $null}
+        $number=[long]$Line
+        $path=Join-Path $NativeIsarRepository $File
+        if((Get-NativeIsarDigest $path) -cne $known[$File].hash){return $null}
+        $lineCount=[IO.File]::ReadAllLines($path).Length
+        if($number -lt 1 -or $number -gt $lineCount){return $null}
+        return $number
+    }
+    $report=Join-Path $Directory ($Phase+'.machine.jsonl')
+    $tests=@{};$suites=@{};$failures=[Collections.Generic.List[object]]::new()
+    $complete=$false;$status='missing-reporter'
+    try {
+        Assert-NativeIsarPlainPath $report
+        $stream=[IO.File]::Open($report,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
+        try {
+            if($stream.Length -gt 16MB){throw 'Reporter exceeds bound.'}
+            $reader=[IO.StreamReader]::new($stream,[Text.UTF8Encoding]::new($false,$true),$true,1024,$true)
+            try {
+                while($null -ne ($line=$reader.ReadLine())){
+                    if($line.Length -gt 256KB){throw 'Reporter event exceeds bound.'}
+                    $event=$line|ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                    switch($event.type){
+                        'suite' {$suites[[string]$event.suite.id]=Resolve-DiagnosticSource $event.suite.path}
+                        'testStart' {$tests[[string]$event.test.id]=$event.test}
+                        'error' {
+                            if($failures.Count -ge 128){throw 'Reporter failures exceed bound.'}
+                            $test=$tests[[string]$event.testID]
+                            $file=$null;$declarationLine=$null
+                            if($test){
+                                $file=Resolve-DiagnosticSource $test['url']
+                                if(-not $file){$file=$suites[[string]$test['suiteID']]}
+                                $declarationLine=Get-DiagnosticLine $file $test['line']
+                            }
+                            $frames=[Collections.Generic.List[object]]::new()
+                            foreach($frame in [regex]::Matches([string]$event.stackTrace,'(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
+                                $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+                                $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+                                if($frameFile -and $frameLine){$frames.Add(@{file=$frameFile;line=$frameLine});if($frames.Count -eq 3){break}}
+                            }
+                            $native=[Collections.Generic.List[object]]::new()
+                            foreach($match in [regex]::Matches([string]$event.error,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
+                                $code=[long]$match.Groups['code'].Value
+                                if($code -ge -2147483648 -and $code -le 4294967295){$native.Add(@{kind=$match.Groups['kind'].Value;code=$code});if($native.Count -eq 3){break}}
+                            }
+                            $safeCode=$null
+                            if([string]$event.error -cmatch '^Bad state: (IDENTITY_UNAVAILABLE|PROTECTION_UNAVAILABLE|SECURITY_UNAVAILABLE|UNSAFE_PATH|RESOURCE_LIMIT|SERVICE_UNAVAILABLE|INTERNAL)$'){$safeCode=$Matches[1]}
+                            # Names, messages, raw stack, stdout and private paths never enter proof.
+                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode})
+                        }
+                        'done' {$complete=$event.success -eq $false}
+                    }
+                }
+            } finally {$reader.Dispose()}
+        } finally {$stream.Dispose()}
+        $status=if($complete){'failed-test-details'}else{'incomplete-reporter'}
+    } catch {
+        # Parser/IO details can contain private data. Export only the fixed status.
+        $status='unavailable-reporter';$complete=$false;$failures.Clear()
+    }
+    Write-NativeIsarJson (Join-Path $Directory ('safe-test-failure-'+$Phase+'.json')) ([ordered]@{
+        schemaVersion=1;kind='qualification-test-failure';phase=$Phase;status=$status
+        sourceSnapshotSha256=$SourceSnapshot.sha256;artifactManifestSha256=$artifactHash
+        controlledFixture=[bool]$ControlledFixture;reporterComplete=$complete
+        failures=@($failures.ToArray());fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
+}

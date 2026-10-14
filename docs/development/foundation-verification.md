@@ -1354,3 +1354,38 @@ and read the official pins and final reproduction evidence. T250 is closed.
 Current-source hosted compatibility T244/T245, qualification/activation,
 full001.1 and separate Windows11/exact-denied gates remain open. The local
 checks do not authorize distribution or substitute for hosted execution.
+
+### 2026-10-14: T251 retained completed reproduction sources
+
+Local qualification2064dfb39fd648f8a3051e094f5aa2f1 failed root-format after ABI:
+Dart directory enumeration could not handle nested standalone copies with
+290/291character paths. The failed qualification restored both normal bundles;
+it does not establish current compatibility. Exact formatter command and OS
+policy were retained.
+
+The new retention tool moves only completed duplicate source trees within owned
+workspace namespaces, preserving before/after hashes and original-path mappings.
+Historical T249/T250 complete source cases were retained without deleting bytes
+or changing DLLs/receipts. Two reviews found boundary defects: accepting another
+failed preparation, and skipping a required missing receipt/source. Both were
+fixed. Ambiguous roots now fail before record/move; exact logged candidate plus
+one completed preparation, matching recipe hashes and both source trees are
+mandatory. Existing one-shot/partial records cannot be reset.
+
+Controlled extra-failed-preparation and three missing-input regressions refused
+without changes; the cloned corruption inputs explicitly claim no actual source
+test acceptance. The final real full source test and final helper completed
+exit0 in native-source-package-tests-d6068f2a9b4c449eacd6efed815e8782.
+Logs/proofs use `.local/audits/t251-*`. Repeated literal root format passed
+249files/zero changes, PowerShell parsers and whitespace passed, links541/zero.
+Fresh readonly completed_source_retention_final_review found no issues and
+independently rehashed all eight historical/fixed/final retained source trees,
+their original receipts and final completion-log binding. T251 is closed.
+
+Hosted38571647321 on d6dc429 completed native source compilation/material/source/
+assembly and entered qualification. It failed during serverdeck_windows-tests
+after earlier root/protocol/Windows analyze phases. Its safe phase artifacts
+are retained in `.local/audits/hosted-38571647321-safe`; private assertion output
+was not uploaded. T252 adds safe failure projection and remains open pending
+review and the next hosted diagnosis. Full qualification/activation, T244/T245,
+Windows11 and exact-denied gates remain open.

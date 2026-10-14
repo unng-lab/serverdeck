@@ -5,6 +5,7 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/native-artifact.ps1"
 . "$PSScriptRoot/native-artifact-abi.ps1"
+. "$PSScriptRoot/qualification-test-diagnostics.ps1"
 $candidate=Get-NativeIsarCandidateArtifact $Artifact
 $initial=Get-NativeArtifactSourceSnapshot
 $script:qualificationDirectory=''
@@ -21,7 +22,14 @@ function Invoke-NativeQualificationPhase {
     $log=Join-Path $script:qualificationDirectory ($Name + '.txt')
     Write-Output "START native-qualification-$Name"
     $watch=[Diagnostics.Stopwatch]::StartNew()
-    & $Action *> $log
+    try { & $Action *> $log } catch {
+        $originalFailure=$_
+        if($Name.EndsWith('-tests')){
+            try {Write-NativeQualificationTestFailure -Directory $script:qualificationDirectory -Phase $Name -SourceSnapshot $initial}
+            catch {Write-Output 'NATIVE_TEST_DIAGNOSTIC_PUBLICATION_UNAVAILABLE'}
+        }
+        throw $originalFailure
+    }
     $script:qualificationPhases.Add([ordered]@{name=$Name;passed=$true;elapsedSeconds=[Math]::Round($watch.Elapsed.TotalSeconds,1);log=[IO.Path]::GetFileName($log);logSha256=Get-NativeIsarDigest $log})
     Write-Output "PASS native-qualification-$Name"
 }
@@ -40,12 +48,12 @@ try {
             }
             Invoke-NativeQualificationPhase 'root-format' { Invoke-FoundationCommand $FoundationDart @('format','--output=none','--set-exit-if-changed','.') }
             Invoke-NativeQualificationPhase 'root-analyze' { Invoke-FoundationCommand $FoundationFlutter @('analyze') }
-            Invoke-NativeQualificationPhase 'root-tests' { Invoke-FoundationCommand $FoundationFlutter @('test') }
+            Invoke-NativeQualificationPhase 'root-tests' { Invoke-FoundationCommand $FoundationFlutter @('test','--file-reporter',('json:'+(Join-Path $script:qualificationDirectory 'root-tests.machine.jsonl'))) }
             foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
                 Push-Location (Join-Path $NativeIsarRepository ('packages/' + $package))
                 try {
                     Invoke-NativeQualificationPhase ($package + '-analyze') { Invoke-FoundationCommand $FoundationDart @('analyze') }
-                    Invoke-NativeQualificationPhase ($package + '-tests') { Invoke-FoundationCommand $FoundationDart @('test') }
+                    Invoke-NativeQualificationPhase ($package + '-tests') { Invoke-FoundationCommand $FoundationDart @('test','--file-reporter',('json:'+(Join-Path $script:qualificationDirectory ($package+'-tests.machine.jsonl')))) }
                 } finally { Pop-Location }
             }
             $bundles=[Collections.Generic.List[object]]::new()

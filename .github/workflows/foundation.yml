@@ -40,6 +40,7 @@ jobs:
             .local/cold-runner-*/safe-failure.json
             .local/cold-runner-*/safe-progress-*.json
             .local/native-qualification-*/safe-phase-*.json
+            .local/native-qualification-*/safe-test-failure-*.json
             .local/native-build-progress-*/safe-phase-*.json
             .local/native-isar/prepared-*/safe-phase-*.json
             .local/sdk-preparation-*/safe-started-*.json
