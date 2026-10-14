@@ -18,11 +18,11 @@ import 'package:serverdeck_protocol/models.dart' show CredentialKind, ApiMethod;
 import 'package:serverdeck_windows/client_bootstrap.dart';
 
 import '../packages/serverdeck_locald/test/support/ui_private_file_scan.dart';
+import '../packages/serverdeck_locald/test/support/credential_ui_markers.dart';
 
-const _password = 'synthetic-ui-password-173';
-const _pem =
-    '-----BEGIN PRIVATE KEY-----\r\nZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4Q=\r\n-----END PRIVATE KEY-----\r\n';
-const _passphrase = 'synthetic-ui-passphrase-173';
+const _password = credentialUiPassword;
+const _pem = credentialUiPem;
+const _passphrase = credentialUiPassphrase;
 
 Iterable<String> _strings(Object? value) sync* {
   if (value is String) {

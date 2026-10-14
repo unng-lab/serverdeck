@@ -1211,3 +1211,38 @@ Parser, whitespace and 541-link checks passed. These local checks do not prove
 hosted compilation or complete T244/T245. Final review of the prerequisite
 correction and a new hosted run remain required. Full Windows 11 and exact
 system-denied checks remain open.
+
+### 2026-10-14: T247 completed credential-output privacy acceptance
+
+The real credential UI driver now retains all ten completed drive streams in
+owner-protected ignored fixture files. The separate compiled scanner binds
+access markers and the actual technical receipt key to the original DPAPI
+wrapper/manifest, preserves the postclose product scan, and writes an independent
+safe output proof bound to each original UI stage proof. Captured contents,
+private errors and key material are not published.
+
+The first attempt failed after successful step0 scanning: protected proof
+creation rejected its unprotected parent directory. Fixture
+`.local/foundation-ui-459269314e7a4618913ac68d12bacfde` remains retained.
+Safe phase/type diagnosis localized the refusal to proof publication and the
+existing parent ACL guard. Proofs now use the already protected credential-output
+directory; no ACL guard was weakened or OS permissions changed. The fixed
+compiled scanner passed against the retained original closed step0.
+
+The fresh full journey in
+`.local/foundation-ui-0538da325e8f4a46b45498bd2cba657c` passed ten output scans
+and rejected the deliberate synthetic leak. Evidence includes its
+`output-privacy-result.json`, ten protected `credential-output/output-step-N.json`
+proofs and `.local/audits/t247-fixed-credential-ui.txt`.
+Current mandatory checks passed: format248/zero changes, clean root/package
+analysis, root253 tests, protocol39, Windows34, locald85 and links541/zero errors.
+Audit logs use `.local/audits/t247-fixed-*`. Parent68789 completed exit0.
+Candidate context `.local/native-qualification-ce6806df396a4ed5942f10288448680b`
+finished; both normal bundles were restored and independently rehashed against
+their preserved inventories (`t247-fixed-restoration-verified.json`).
+
+Fresh readonly `credential_output_privacy_fixed_review` completed with no
+findings and supported T247 at its explicit scope. T247 is closed; original
+T204/Q05, full001.1, hosted current-source qualification, separate Windows11 and
+exact system-denied checks remain open. Earlier failed/historical evidence is
+preserved. T248 is next in the correction sequence.

@@ -24,8 +24,11 @@ Future<Map<String, Object?>> scanUiPrivateFilesInIsolate(
 Future<Map<String, Object?>> scanUiPrivateFiles(
   String root,
   List<String> accessMarkers,
-  String pem,
-) async {
+  String pem, {
+  String? outputFile,
+  void Function(String)? onPhase,
+}) async {
+  onPhase?.call('fixture-binding');
   final fixture = p.dirname(p.dirname(Platform.resolvedExecutable));
   check(RegExp(r'^foundation-ui-[a-f0-9]{32}$').hasMatch(p.basename(fixture)));
   check(p.equals(p.normalize(p.absolute(root)), p.join(fixture, 'profile')));
@@ -42,6 +45,7 @@ Future<Map<String, Object?>> scanUiPrivateFiles(
   final scan = PrivateMarkerScan();
   List<int>? clear;
   try {
+    onPhase?.call('access-marker-binding');
     for (final marker in accessMarkers) {
       scan.addSecretText(marker);
     }
@@ -58,6 +62,7 @@ Future<Map<String, Object?>> scanUiPrivateFiles(
     } finally {
       keyBytes.fillRange(0, keyBytes.length, 0);
     }
+    onPhase?.call('receipt-key-binding');
     clear = await DpapiProtection().unprotect(
       await readProtectedFile(
         root,
@@ -73,6 +78,7 @@ Future<Map<String, Object?>> scanUiPrivateFiles(
           wrapper['product'] == 'serverdeck-next' &&
           wrapper['ownerSid'] == sid,
     );
+    onPhase?.call('manifest-binding');
     final manifest = StrictCodec().decode(
       await readProtectedFile(
         root,
@@ -100,6 +106,7 @@ Future<Map<String, Object?>> scanUiPrivateFiles(
     clear = null;
     var files = 0, bytes = 0;
     final names = <String>{};
+    onPhase?.call('postclose-product-files');
     for (final entry in Directory(
       product,
     ).listSync(recursive: true, followLinks: false)) {
@@ -126,11 +133,35 @@ Future<Map<String, Object?>> scanUiPrivateFiles(
       }),
     );
     check(files >= 4 && bytes > 0);
+    var outputBytes = 0;
+    if (outputFile != null) {
+      onPhase?.call('output-path-and-acl');
+      final output = p.normalize(p.absolute(outputFile));
+      check(p.equals(p.dirname(output), p.join(fixture, 'credential-output')));
+      check(
+        RegExp(r'^(step-[0-9]|negative)\.private\.txt$')
+            .hasMatch(p.basename(output)),
+      );
+      requireSafePath(fixture, output);
+      check(
+        FileSystemEntity.typeSync(output, followLinks: false) ==
+            FileSystemEntityType.file,
+      );
+      requireOwnerOnlyFileAcl(output, sid);
+      onPhase?.call('completed-output-scan');
+      outputBytes = await scan.assertCleanFile(File(output));
+      check(outputBytes > 0);
+    }
     return {
       'privateFilesScanned': files,
       'privateBytesScanned': bytes,
       'receiptKeyScan': true,
       'scanAfterDiscoveryRemoval': true,
+      if (outputFile != null) ...{
+        'diagnosticFilesScanned': 1,
+        'diagnosticBytesScanned': outputBytes,
+        'diagnosticScanAfterClose': true,
+      },
     };
   } finally {
     clear?.fillRange(0, clear.length, 0);
