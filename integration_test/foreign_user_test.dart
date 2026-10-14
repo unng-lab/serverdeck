@@ -5,17 +5,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:serverdeck_windows/security.dart';
 import 'package:serverdeck_windows/paths.dart';
+import 'package:serverdeck/profiles/profile_list.dart';
 
-import '../lib/main.dart' as app;
-import '../lib/shell/readiness_view.dart';
+import 'package:serverdeck/main.dart' as app;
+import 'package:serverdeck/shell/readiness_view.dart';
+
 import 'support/runtime_hooks.dart';
 import 'support/foreign_access_proof.dart';
+import 'support/client_checkpoint.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final local = Platform.environment['LOCALAPPDATA'] ?? '';
   final owner = Platform.environment['SERVERDECK_ACCEPTANCE_OWNER_SID'] ?? '';
   final role = Platform.environment['SERVERDECK_ACCEPTANCE_USER_ROLE'] ?? '';
+  final checkpointMode =
+      Platform.environment['SERVERDECK_ACCEPTANCE_CHECKPOINT_MODE'] ?? '';
+  if (checkpointMode.isNotEmpty &&
+      (role != 'owner' || !{'capture', 'verify'}.contains(checkpointMode))) {
+    throw StateError('OWNER_CHECKPOINT_MODE_REQUIRED');
+  }
   if (!RegExp(
         r'[\\/]\.local[\\/]environment-acceptance-[a-f0-9]{32}[\\/]profile$',
       ).hasMatch(local) ||
@@ -57,6 +66,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(reached(), true);
+    if (checkpointMode.isNotEmpty) {
+      final controller = tester
+          .widget<ProfileList>(find.byType(ProfileList))
+          .controller;
+      expect(controller.loaded, true);
+      await clientCheckpoint(
+        controller.bootstrap.client,
+        local,
+        checkpointMode,
+      );
+    }
     if (role == 'foreign') {
       expect(find.text('Environment checkpoint'), findsNothing);
       expect(find.text('Создать профиль'), findsNothing);
@@ -73,5 +93,13 @@ void main() {
           ? 'COMPILED_OWNER_USER_BASELINE_PROVED'
           : 'COMPILED_ACTUAL_FOREIGN_USER_ACCESS_REFUSAL_PROVED',
     );
+    if (checkpointMode.isNotEmpty) {
+      // ignore: avoid_print
+      print(
+        checkpointMode == 'capture'
+            ? 'COMPILED_CLIENT_CHECKPOINT_CAPTURED'
+            : 'COMPILED_CLIENT_CHECKPOINT_VERIFIED',
+      );
+    }
   });
 }

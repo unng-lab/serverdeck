@@ -3,7 +3,9 @@
 
 function Invoke-FoundationUserUi {
     param([Parameter(Mandatory)][string]$Fixture,[Parameter(Mandatory)][ValidateSet('owner','foreign')][string]$Role,
-        [Parameter(Mandatory)][string]$OwnerSid,[Parameter(Mandatory)][string]$OutputRoot)
+        [Parameter(Mandatory)][string]$OwnerSid,[Parameter(Mandatory)][string]$OutputRoot,
+        [ValidateSet('none','capture','verify')][string]$CheckpointMode='none')
+    if ($Role -ne 'owner' -and $CheckpointMode -ne 'none') { throw 'Checkpoint operations require the real owner.' }
     $root=[IO.Path]::GetFullPath($Fixture,(Get-Location).ProviderPath)
     if ([IO.Path]::GetDirectoryName($root) -cne (Join-Path $FoundationRoot '.local') -or
         [IO.Path]::GetFileName($root) -cnotmatch '^environment-acceptance-[a-f0-9]{32}$') { throw 'Owned user fixture required.' }
@@ -23,19 +25,24 @@ function Invoke-FoundationUserUi {
     # Foreign callers must not inspect private owner files before the product
     # verifies access. This target never writes test signals in that profile.
     $saved=@{}
-    foreach($name in @('LOCALAPPDATA','SERVERDECK_ACCEPTANCE_OWNER_SID','SERVERDECK_ACCEPTANCE_USER_ROLE')) { $saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process') }
+    foreach($name in @('LOCALAPPDATA','SERVERDECK_ACCEPTANCE_OWNER_SID','SERVERDECK_ACCEPTANCE_USER_ROLE','SERVERDECK_ACCEPTANCE_CHECKPOINT_MODE')) { $saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process') }
     Push-Location $FoundationRoot
     try {
         $env:LOCALAPPDATA=$profile
         $env:SERVERDECK_ACCEPTANCE_OWNER_SID=$OwnerSid
         $env:SERVERDECK_ACCEPTANCE_USER_ROLE=$Role
-        $log=Join-Path $output ($Role+'-ui.txt')
+        $env:SERVERDECK_ACCEPTANCE_CHECKPOINT_MODE=$(if($CheckpointMode -eq 'none'){''}else{$CheckpointMode})
+        $log=Join-Path $output ($Role+'-ui'+$(if($CheckpointMode -eq 'none'){''}else{'-'+$CheckpointMode})+'.txt')
         if (Test-Path -LiteralPath $log) { throw 'User UI attempt already recorded.' }
         Invoke-FoundationCommand $FoundationFlutter @('drive','--no-pub','--timeout','120','--driver','test_driver/foreign_user_driver.dart','--target','integration_test/foreign_user_test.dart','--use-application-binary',(Join-Path $root 'application bundle/serverdeck.exe'),'--no-keep-app-running','-d','windows') *> $log
         if ((Get-Item -LiteralPath $log).Length -gt 1MB) { throw 'User acceptance log oversized.' }
         $marker=if($Role -eq 'owner'){'COMPILED_OWNER_USER_BASELINE_PROVED'}else{'COMPILED_ACTUAL_FOREIGN_USER_ACCESS_REFUSAL_PROVED'}
         if (@(Get-Content -LiteralPath $log | Where-Object {$_ -ceq $marker}).Count -ne 1 -or
             (Select-String -LiteralPath $log -SimpleMatch 'synthetic-environment-password-243' -Quiet)) { throw 'User UI proof missing or privacy marker found.' }
+        if ($CheckpointMode -ne 'none') {
+            $checkpointMarker=if($CheckpointMode -eq 'capture'){'COMPILED_CLIENT_CHECKPOINT_CAPTURED'}else{'COMPILED_CLIENT_CHECKPOINT_VERIFIED'}
+            if (@(Get-Content -LiteralPath $log | Where-Object {$_ -ceq $checkpointMarker}).Count -ne 1) { throw 'Client checkpoint proof missing.' }
+        }
     } finally {
         foreach($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name,$saved[$name],'Process') }
         Pop-Location

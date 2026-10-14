@@ -26,34 +26,8 @@ function Assert-EnvironmentFixture([string]$Path) {
     return $resolved
 }
 
-function Invoke-EnvironmentActor([string]$Mode,[string]$Marker) {
-    $start=[Diagnostics.ProcessStartInfo]::new((Join-Path $script:root 'checkpoint-actor.exe'))
-    $start.UseShellExecute=$false
-    $start.CreateNoWindow=$true
-    $start.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
-    $start.RedirectStandardOutput=$true
-    $start.RedirectStandardError=$true
-    $start.WorkingDirectory=$script:root
-    foreach($argument in @($script:root,(Join-Path $script:root 'application bundle'),$Mode)) { $start.ArgumentList.Add($argument) }
-    $child=[Diagnostics.Process]::new()
-    $child.StartInfo=$start
-    $started=$false
-    try {
-        if (-not $child.Start()) { throw 'Environment actor start failed.' }
-        $started=$true
-        $held=$child.Handle
-        $output=$child.StandardOutput.ReadToEndAsync()
-        $errors=$child.StandardError.ReadToEndAsync()
-        if (-not $child.WaitForExit(180000)) { throw 'Environment actor deadline exceeded.' }
-        $text=$output.GetAwaiter().GetResult()
-        $errorText=$errors.GetAwaiter().GetResult()
-        $lines=@($text.Trim() -split '\r?\n')
-        if ($child.ExitCode -ne 0 -or $errorText.Length -ne 0 -or $lines.Count -ne 2 -or
-            $lines[0] -cne 'IsarCore using libmdbx: v0.13.8-temp-upstream-fix' -or $lines[1] -cne $Marker) {
-            throw 'Environment actor proof failed; retained fixture requires inspection.'
-        }
-    } finally { Close-NativeFixtureChild $child $started }
-}
+. "$PSScriptRoot/foundation-environment-actor.ps1"
+. "$PSScriptRoot/environment-checkpoint-binding.ps1"
 
 function Get-DurableInventory {
     $directory=Join-Path $script:root 'profile/ServerDeckNext/v1/workspaces/default'
@@ -73,7 +47,7 @@ if ($Phase -eq 'Prepare') {
     if (Test-Path -LiteralPath $script:root) { throw 'Fixture already exists.' }
     [void][IO.Directory]::CreateDirectory($script:root)
     Invoke-NativeArtifactCandidateScope $Artifact -PreserveNormalBundles -Action {
-        & "$PSScriptRoot/run-foundation.ps1" -Configuration Debug -BuildOnly -ForeignUserAcceptance:$ForeignUserTarget
+        & "$PSScriptRoot/run-foundation.ps1" -Configuration Debug -BuildOnly -ForeignUserAcceptance
         $bundle=Join-Path $script:root 'application bundle'
         Copy-Item -LiteralPath (Join-Path $FoundationRoot 'build/windows/x64/runner/Debug') -Destination $bundle -Recurse
         $manifestPath=Join-Path $bundle 'foundation.manifest.json'
@@ -86,11 +60,9 @@ if ($Phase -eq 'Prepare') {
             Invoke-FoundationCommand $FoundationDart @('compile','exe','test/support/environment_checkpoint_child.dart','-o',(Join-Path $script:root 'checkpoint-actor.exe'))
         } finally { Pop-Location }
     }
-    Invoke-EnvironmentActor 'seed' 'ENVIRONMENT_DURABLE_CHECKPOINT_CREATED'
-    if ($ForeignUserTarget) {
-        Invoke-FoundationUserUi -Fixture $script:root -Role owner -OwnerSid $facts.sid -OutputRoot $script:root
-        Invoke-EnvironmentActor 'verify' 'ENVIRONMENT_DURABLE_STATE_AND_CREDENTIAL_VERIFIED'
-    }
+    Invoke-FoundationEnvironmentActor -Root $script:root -Mode 'seed' -Marker 'ENVIRONMENT_DURABLE_CHECKPOINT_CREATED'
+    Invoke-FoundationUserUi -Fixture $script:root -Role owner -OwnerSid $facts.sid -OutputRoot $script:root -CheckpointMode capture
+    Invoke-FoundationEnvironmentActor -Root $script:root -Mode 'verify' -Marker 'ENVIRONMENT_DURABLE_STATE_AND_CREDENTIAL_VERIFIED'
     $source=Get-NativeArtifactSourceSnapshot
     $snapshot=Get-NativeArtifactBundleSnapshot (Join-Path $script:root 'application bundle')
     Write-NativeIsarJson (Join-Path $script:root 'environment-checkpoint.json') ([ordered]@{
@@ -98,6 +70,7 @@ if ($Phase -eq 'Prepare') {
         sourceSnapshotSha256=$source.sha256;bundleTreeSha256=Get-NativeIsarSnapshotDigest $snapshot;
         actorSha256=Get-NativeIsarDigest (Join-Path $script:root 'checkpoint-actor.exe');
         durableCheckpointSha256=Get-NativeIsarDigest (Join-Path $script:root 'profile/durable-checkpoint.json');
+        clientCheckpointSha256=Get-NativeIsarDigest (Join-Path $script:root 'profile/client-checkpoint.json');
         files=Get-DurableInventory;foreignUserTarget=[bool]$ForeignUserTarget;fullAcceptance=$false;distributionReady=$false
     })
     'ENVIRONMENT_CHECKPOINT_PREPARED_REBOOT_UNPROVEN'
@@ -108,15 +81,7 @@ if (-not $Fixture -or $Artifact) { throw 'Verification requires existing Fixture
 $script:root=Assert-EnvironmentFixture $Fixture
 $checkpoint=Read-NativeIsarArtifactJson (Join-Path $script:root 'environment-checkpoint.json')
 $facts=Get-EnvironmentFacts
-if ($checkpoint.schemaVersion -ne 1 -or $checkpoint.kind -cne 'owned-environment-checkpoint' -or
-    $checkpoint.fixture -cne $script:root -or $checkpoint.fullAcceptance -ne $false -or $checkpoint.distributionReady -ne $false -or
-    $checkpoint.facts.sid -cne $facts.sid -or $checkpoint.facts.machineUuid -cne $facts.machineUuid -or
-    $checkpoint.sourceSnapshotSha256 -cne (Get-NativeArtifactSourceSnapshot).sha256 -or
-    $checkpoint.actorSha256 -cne (Get-NativeIsarDigest (Join-Path $script:root 'checkpoint-actor.exe')) -or
-    $checkpoint.bundleTreeSha256 -cne (Get-NativeIsarSnapshotDigest (Get-NativeArtifactBundleSnapshot (Join-Path $script:root 'application bundle'))) -or
-    $checkpoint.durableCheckpointSha256 -cne (Get-NativeIsarDigest (Join-Path $script:root 'profile/durable-checkpoint.json'))) {
-    throw 'Checkpoint identity, source or binary binding mismatch.'
-}
+Assert-EnvironmentCheckpointBinding -Root $script:root -Checkpoint $checkpoint -Facts $facts
 if ($Phase -eq 'VerifyReboot' -and $checkpoint.facts.bootUtcTicks -ceq $facts.bootUtcTicks) {
     'ENVIRONMENT_REBOOT_UNPROVEN_SAME_OS_BOOT'
     exit 2
@@ -129,7 +94,13 @@ if (($checkpoint.files | ConvertTo-Json -Depth 4 -Compress) -cne ((Get-DurableIn
 $result=Join-Path $script:root ($Phase+'.result.json')
 if (Test-Path -LiteralPath $result) { throw 'Verification phase already used.' }
 New-EnvironmentAcceptanceClaim -Fixture $script:root -Phase $Phase -CheckpointSha256 (Get-NativeIsarDigest (Join-Path $script:root 'environment-checkpoint.json'))
-Invoke-EnvironmentActor 'verify' 'ENVIRONMENT_DURABLE_STATE_AND_CREDENTIAL_VERIFIED'
-Write-NativeIsarJson $result ([ordered]@{schemaVersion=1;phase=$Phase;status='passed';facts=$facts;checkpointSha256=Get-NativeIsarDigest (Join-Path $script:root 'environment-checkpoint.json');fullAcceptance=$false;distributionReady=$false;scope='direct-production-workspace-and-dpapi-only';excluded=@('normal-client-ui','foreign-user','runtime-offline','physical-Q12')})
+Invoke-FoundationEnvironmentActor -Root $script:root -Mode 'verify' -Marker 'ENVIRONMENT_DURABLE_STATE_AND_CREDENTIAL_VERIFIED'
+Invoke-FoundationUserUi -Fixture $script:root -Role owner -OwnerSid $facts.sid -OutputRoot $script:root -CheckpointMode verify
+$clientProof=Read-NativeIsarArtifactJson (Join-Path $script:root 'profile/client-verification.json')
+if ($clientProof.format -ne 1 -or $clientProof.scenario -cne 'production-client-durable-checkpoint' -or
+    $clientProof.checkpointSha256 -cne $checkpoint.clientCheckpointSha256 -or $clientProof.fullAcceptance -ne $false -or
+    $clientProof.rebootProven -ne $false) { throw 'Client API recovery proof mismatch.' }
+Invoke-FoundationEnvironmentActor -Root $script:root -Mode 'verify' -Marker 'ENVIRONMENT_DURABLE_STATE_AND_CREDENTIAL_VERIFIED'
+Write-NativeIsarJson $result ([ordered]@{schemaVersion=1;phase=$Phase;status='passed';facts=$facts;checkpointSha256=Get-NativeIsarDigest (Join-Path $script:root 'environment-checkpoint.json');clientProofSha256=Get-NativeIsarDigest (Join-Path $script:root 'profile/client-verification.json');fullAcceptance=$false;distributionReady=$false;rebootProven=($Phase -eq 'VerifyReboot');scope='production-client-api-plus-direct-workspace-and-dpapi';excluded=@('physical-normal-client-ui','foreign-user','runtime-offline','physical-Q12')})
 if ($Phase -eq 'VerifyReboot') { 'ENVIRONMENT_REAL_REBOOT_DURABLE_RECOVERY_PASSED' } else { 'ENVIRONMENT_OWNER_BASELINE_PASSED_REBOOT_UNPROVEN' }
 # Failed fixtures are retained. No reboot, account/firewall changes or cleanup.

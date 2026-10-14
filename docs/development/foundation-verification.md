@@ -1246,3 +1246,38 @@ findings and supported T247 at its explicit scope. T247 is closed; original
 T204/Q05, full001.1, hosted current-source qualification, separate Windows11 and
 exact system-denied checks remain open. Earlier failed/historical evidence is
 preserved. T248 is next in the correction sequence.
+
+### 2026-10-14: T248 compiled client checkpoint verification
+
+The environment route now captures and verifies complete canonical public
+profiles/settings/receipts/revisions through production Bootstrap and
+LocalApiClient, alongside the original direct Workspace/DPAPI oracle. Source,
+bundle, actor, durable and client checkpoints are bound before verification.
+No production test flag or automatic OS change was introduced.
+
+The initial compiled attempt retained fixture
+`.local/environment-acceptance-142199c1329448b6bbe0fcafcf35b1e1` after a widget
+lookup failure. Consistent package imports resolved duplicate Dart library
+identities. The fresh baseline in
+`.local/environment-acceptance-63bce737509b4234ae8bc0e9630129f4` passed capture,
+new client verification and storage/credential oracle checks. Four in-memory
+source/bundle/durable/client binding mismatches were rejected. Its marker
+`CLIENT_CHECKPOINT_BASELINE_PASSED_REBOOT_UNPROVEN` and proof explicitly leave
+fullAcceptance, distributionReady and rebootProven false.
+
+Mandatory checks passed: format249/zero changes, root analysis/root253 tests,
+package analyses/protocol39/Windows34/locald85 tests, links541/zero errors,
+PowerShell parsing and whitespace. Logs use `.local/audits/t248-*`.
+Parent1190 completed exit0 with `T248_ALL_PACKAGES_COMPLETED`; candidate context
+`native-qualification-ba5061f21bc749a38b266e9d5b51535d` finished. Both restored
+normal bundles were independently rehashed in `t248-restoration-verified.json`.
+Fresh readonly `client_checkpoint_recovery_review` completed without findings.
+T248 is closed; full T243/Q08, separate Windows11 reboot/other-user/offline/
+physical checks and exact denied operations remain open.
+
+Hosted run38549681107 on c2a81915 completed cancelled at the two-hour job limit.
+Safe phase artifacts localize its last native input phase to expand-rust-rustc;
+the following Rust component and toolchain phases were never entered. This
+does not establish which TAR inspection/extraction command stalled. MSVC,
+SDK and dependency preparation passed. Run38558487100 remains in progress;
+neither run proves current T248 qualification or full acceptance.
