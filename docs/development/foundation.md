@@ -288,7 +288,7 @@ target; CoreStorage включает WorkspaceLifecycle. Сценарий creden
 control; она не доказывает missing VC runtime/other platform/foreign user.
 
 Исторический полный прогон 13 фаз T221 предшествует изменениям T222–T228.
-Последующие current CoreStorage и десять credential drives проверены отдельно;
+После T221 CoreStorage и десять credential drives были проверены отдельно;
 они сами по себе не объявляются новым aggregate run. Исторический T229 фиксирует отдельный
 частичный прогон всех 13 фаз после T222–T228; результат и ограничения —
 в [журнале проверки](foundation-verification.md). Отложенное live-чтение native files
@@ -297,6 +297,13 @@ control; она не доказывает missing VC runtime/other platform/fore
 reboot/other-user/physical-offline/fullQ и реальный CI не входят в dispatcher.
 Исправляйте функциональные failures перед новым прогоном; system-denied операции
 не повторяйте и не переносите на runner.
+
+На версии `68b1658` завершён более поздний локальный qualification: root и три
+package suites, Debug/Release, все 14 доступных фаз и отдельный compiled
+runtime-diagnostics. Receipt проверен с `-RequireCurrentSource` до следующего
+изменения исходников; обычные Debug/Release bundles восстановлены и повторно
+проверены по хешам. Это доказательство именно указанной версии и локальной
+совместимости, без activation, full acceptance или hosted CI acceptance.
 
 ## Подготовка одноразовой среды для оставшейся приёмки
 

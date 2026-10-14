@@ -1389,3 +1389,41 @@ are retained in `.local/audits/hosted-38571647321-safe`; private assertion outpu
 was not uploaded. T252 adds safe failure projection and remains open pending
 review and the next hosted diagnosis. Full qualification/activation, T244/T245,
 Windows11 and exact-denied gates remain open.
+
+## Current local qualification and hosted diagnostic boundary — 2026-10-14
+
+Commit68b1658 completed the full available local qualifier: parent94498 exit0,
+root format/analyze/tests, all three package analyze/tests, normal Debug/Release
+bundles, all14 available native/UI phases and the separate compiled
+runtime-diagnostics phase. All four real machine reporters ended success=true
+with zero error events. Private parent log:
+`.local/audits/t252-current-68b1658-full-qualification.private.txt`.
+Context/receipt: `.local/native-qualification-53b149e6f79a4d409b052ce5e65028f2`.
+Source snapshot SHA256 a30c911dfadd41f2a29cdc562a4c759b833aac1b495e7ec95650ee40cbd3b416;
+artifact manifest f4e0dd6879d90514d1d82fee04b2c4b9409bd0e3bac8c6cf0f76b399b30de27d.
+Parent10930 exit0 validated Get-NativeArtifactCompatibility -RequireCurrentSource
+before advancing the checkout to6464b01. It independently rehashed the restored
+normal Debug/Release trees against their preservation records; proof is
+`.local/audits/t252-68b1658-full-bundle-restoration.json`. The receipt remains
+compatibility-passed-unreviewed with fullAcceptance/distributionReady/activated
+false. This is not a current6464b01 qualification or a new activation record.
+
+Hosted38602085721 on68b1658 failed in serverdeck_locald-tests. Its complete safe
+report identifies WORKSPACE_CHILD_FAILED and state_store_child.dart:31, but not
+the caller assertion. Real controlled reporter evidence demonstrated normalized
+relative Dart frames were omitted by the former URI-only projection.
+Fresh readonly workspace_child_fixed_diagnostics_review accepted68b1658's
+bounded private child stderr capture and shared drain/cancellation after its
+first review finding was fixed. Fresh relative_reporter_frames_review accepted
+6464b01's known-source/hash/line-validated relative frames after five controlled
+reporter/privacy markers, PS parsing0, links541/0 and whitespace0. On Windows
+both separator inputs were normalized to backslashes by the real reporter;
+the forward-slash parser branch was inspected, not independently exercised by
+a saved forward-slash reporter event. Hosted38608458146 on6464b01 is pending;
+no diagnosis of the caller assertion or hosted success is claimed.
+
+T208 documentation is updated only at this partial scope. T252/T244/T245 and
+whole001.1 remain open. Separate Windows11/reboot/other-user/runtime-offline/
+physical checks and exact system-denied operations remain open and were not
+retried, bypassed or transferred. No PR/release/merge or advancement across
+T208 has occurred.
