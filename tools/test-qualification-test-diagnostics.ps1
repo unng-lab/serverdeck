@@ -73,5 +73,35 @@ foreach($code in @('WORKSPACE_CHILD_FAILED','WORKSPACE_CHILD_TIMEOUT')) {
     }
     'QUALIFICATION_SAFE_'+$code+'_AND_PRIVATE_MARKER_EXCLUSION_PASSED'
 }
+foreach($separator in @('/','\')) {
+    $relativeFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($relativeFixture)
+    $relativeProbe=Join-Path $relativeFixture 'controlled-relative-frame.dart'
+    $relativeReport=Join-Path $relativeFixture 'serverdeck_locald-tests.machine.jsonl'
+    $relativeSource='test/support/workspace_child.dart'.Replace('/',$separator)
+    $dartSource=$relativeSource.Replace('\','\\')
+    $template=[IO.File]::ReadAllText($probe).Replace(
+        "package:serverdeck_windows/native_attributes.dart 65:12 function\nfile:///C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart 9:2",
+        "$dartSource 385:7 main\n$dartSource 999999:1 invalid\n../../SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart 9:2 private")
+    [IO.File]::WriteAllText($relativeProbe,$template,[Text.UTF8Encoding]::new($false))
+    Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_locald')
+    try {
+        & $FoundationDart test $relativeProbe --file-reporter "json:$relativeReport" *> (Join-Path $relativeFixture 'controlled-relative.private.txt')
+        if($LASTEXITCODE -eq 0){throw 'Controlled relative-frame failure unexpectedly passed.'}
+    } finally {Pop-Location}
+    Write-NativeQualificationTestFailure -Directory $relativeFixture -Phase 'serverdeck_locald-tests' -SourceSnapshot $snapshot -ControlledFixture
+    $relativeProofPath=Join-Path $relativeFixture 'safe-test-failure-serverdeck_locald-tests.json'
+    $relativeProof=Read-NativeIsarArtifactJson $relativeProofPath
+    $relativeSafe=[IO.File]::ReadAllText($relativeProofPath)
+    if($relativeProof.status -cne 'failed-test-details' -or -not $relativeProof.controlledFixture -or
+        -not $relativeProof.reporterComplete -or $relativeProof.failures.Count -ne 1 -or
+        $relativeProof.failures[0].sourceFrames.Count -ne 1 -or
+        $relativeProof.failures[0].sourceFrames[0].file -cne 'packages/serverdeck_locald/test/support/workspace_child.dart' -or
+        $relativeProof.failures[0].sourceFrames[0].line -ne 385 -or
+        $relativeSafe.Contains($privateMarker) -or $relativeSafe.Contains('999999') -or $relativeSafe.Contains('stackTrace')) {
+        throw 'Controlled relative source projection mismatch.'
+    }
+}
+'QUALIFICATION_RELATIVE_DART_FRAMES_BOTH_SEPARATORS_AND_PRIVATE_UNKNOWN_INVALID_EXCLUSION_PASSED'
 $fixture
 $invalidFixture

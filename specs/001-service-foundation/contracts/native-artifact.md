@@ -39,6 +39,10 @@ test-harness diagnostic codes, not new product error categories. The existing
 in one shared attempt, cancels its owned subscription on completion or timeout,
 and does not forward further chunks after cleanup. Controlled stream tests cover
 unterminated stderr, cancellation, repeated drain and the capture bound.
+Reporter-normalized relative Dart frame paths (forward or backward separators)
+are resolved against the phase package directory through the same current-source
+inventory, hash and valid-line checks as package/file URIs. Unknown/outside paths
+and out-of-range lines remain excluded; no raw frame text is published.
 
 After a completed full standalone source test, long duplicated Isar source
 trees may be retained with tools/retain-native-reproduction-sources.ps1 using

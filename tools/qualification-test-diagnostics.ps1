@@ -76,7 +76,7 @@ function Write-NativeQualificationTestFailure {
                                 $declarationLine=Get-DiagnosticLine $file $test['line']
                             }
                             $frames=[Collections.Generic.List[object]]::new()
-                            foreach($frame in [regex]::Matches([string]$event.stackTrace,'(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
+                            foreach($frame in [regex]::Matches([string]$event.stackTrace,'(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
                                 $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
                                 $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
                                 if($frameFile -and $frameLine){$frames.Add(@{file=$frameFile;line=$frameLine});if($frames.Count -eq 3){break}}
