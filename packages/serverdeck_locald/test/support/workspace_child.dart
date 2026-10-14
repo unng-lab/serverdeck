@@ -387,6 +387,13 @@ Future<void> main(List<String> arguments) async {
         FileSystemEntity.typeSync(junction, followLinks: false) ==
             FileSystemEntityType.link,
       );
+      final originalJunctionTarget = Link(junction).targetSync();
+      check(
+        p.equals(
+          Directory(junction).resolveSymbolicLinksSync(),
+          Directory(target).resolveSymbolicLinksSync(),
+        ),
+      );
       final deadline = Stopwatch()..start();
       await rejects(
         Workspace.open(
@@ -402,7 +409,7 @@ Future<void> main(List<String> arguments) async {
         FileSystemEntity.typeSync(junction, followLinks: false) ==
             FileSystemEntityType.link,
       );
-      check(Link(junction).targetSync() == target);
+      check(Link(junction).targetSync() == originalJunctionTarget);
       check(Directory(target).listSync().length == 1);
       check(base64.encode(marker.readAsBytesSync()) == 'Hyk7');
       if (position != 'product') {
