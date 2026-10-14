@@ -130,7 +130,13 @@ Future<void> verifyPersistedWorkspaceFileLinks(
         FileSystemEntity.typeSync(source, followLinks: false) ==
             FileSystemEntityType.link,
       );
-      _check(p.equals(Link(source).targetSync(), retained));
+      final originalFileTarget = Link(source).targetSync();
+      _check(
+        p.equals(
+          File(source).resolveSymbolicLinksSync(),
+          File(retained).resolveSymbolicLinksSync(),
+        ),
+      );
       var unsafePath = false;
       try {
         requireSafePath(local, source);
@@ -176,7 +182,7 @@ Future<void> verifyPersistedWorkspaceFileLinks(
         FileSystemEntity.typeSync(source, followLinks: false) ==
             FileSystemEntityType.link,
       );
-      _check(p.equals(Link(source).targetSync(), retained));
+      _check(Link(source).targetSync() == originalFileTarget);
       _check(fileSha256(retained) == originals[entry.value]);
       for (final name in cases.values.where((name) => name != entry.value)) {
         _check(
@@ -351,7 +357,13 @@ Future<void> verifyPersistedWorkspaceReparse(
         FileSystemEntity.typeSync(source, followLinks: false) ==
             FileSystemEntityType.link,
       );
-      _check(p.equals(Link(source).targetSync(), retained));
+      final originalJunctionTarget = Link(source).targetSync();
+      _check(
+        p.equals(
+          Directory(source).resolveSymbolicLinksSync(),
+          Directory(retained).resolveSymbolicLinksSync(),
+        ),
+      );
       final parentEntries =
           Directory(p.dirname(source))
               .listSync(followLinks: false)
@@ -373,7 +385,7 @@ Future<void> verifyPersistedWorkspaceReparse(
         FileSystemEntity.typeSync(source, followLinks: false) ==
             FileSystemEntityType.link,
       );
-      _check(p.equals(Link(source).targetSync(), retained));
+      _check(Link(source).targetSync() == originalJunctionTarget);
       final after = inventory();
       _check(
         before.length == after.length &&
