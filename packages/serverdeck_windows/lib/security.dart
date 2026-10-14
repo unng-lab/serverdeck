@@ -235,6 +235,60 @@ String ownerOnlySddl(String sid) {
   return 'O:${sid}D:P(A;;FA;;;$sid)(A;;FA;;;SY)';
 }
 
+/// Compare exact owner/protected DACL after Windows normalizes SID aliases.
+/// This reads descriptors only; it never changes a token, owner, or ACL.
+bool matchesOwnerOnlyAclDescriptor(
+  Pointer descriptor,
+  String sid,
+  String rights,
+) {
+  final actual = calloc<Pointer<Utf16>>();
+  try {
+    ownerOnlySddl(sid);
+    if (!const {'FA', '0x1f0001', '0x120083'}.contains(rights) ||
+        _descriptorToText(descriptor, 1, 5, actual, nullptr) == 0) {
+      return false;
+    }
+    final value = actual.value.toDartString();
+    for (final acl in [
+      '(A;;$rights;;;$sid)(A;;$rights;;;SY)',
+      '(A;;$rights;;;SY)(A;;$rights;;;$sid)',
+    ]) {
+      final expected = SecurityAttributes('O:${sid}D:P$acl');
+      final text = calloc<Pointer<Utf16>>();
+      try {
+        if (_descriptorToText(
+              expected.pointer.ref.lpSecurityDescriptor,
+              1,
+              5,
+              text,
+              nullptr,
+            ) ==
+            0) {
+          return false;
+        }
+        if (value == text.value.toDartString()) {
+          return true;
+        }
+      } finally {
+        if (text.value != nullptr) {
+          LocalFree(HLOCAL(text.value));
+        }
+        calloc.free(text);
+        expected.close();
+      }
+    }
+    return false;
+  } catch (_) {
+    return false;
+  } finally {
+    if (actual.value != nullptr) {
+      LocalFree(HLOCAL(actual.value));
+    }
+    calloc.free(actual);
+  }
+}
+
 void requireOwnerOnlyFileAcl(String path, String sid) {
   final input = path.toNativeUtf16();
   try {
@@ -268,7 +322,6 @@ void _requireOwnerOnlyAcl(
   String sid,
 ) {
   final length = calloc<Uint32>();
-  final text = calloc<Pointer<Utf16>>();
   Pointer<Uint8> descriptor = nullptr;
   try {
     read(nullptr, 0, length);
@@ -277,28 +330,13 @@ void _requireOwnerOnlyAcl(
     }
     descriptor = calloc<Uint8>(length.value);
     if (read(descriptor, length.value, length) == 0 ||
-        _descriptorToText(descriptor, 1, 5, text, nullptr) == 0) {
-      throw StateError('PROTECTION_UNAVAILABLE');
-    }
-    final sddl = text.value.toDartString();
-    final expectedPrefix = 'O:${sid}D:P';
-    if (!sddl.startsWith(expectedPrefix)) {
-      throw StateError('PROTECTION_UNAVAILABLE');
-    }
-    final acl = sddl.substring(expectedPrefix.length);
-    final first = '(A;;FA;;;$sid)(A;;FA;;;SY)';
-    final second = '(A;;FA;;;SY)(A;;FA;;;$sid)';
-    if (acl != first && acl != second) {
+        !matchesOwnerOnlyAclDescriptor(descriptor, sid, 'FA')) {
       throw StateError('PROTECTION_UNAVAILABLE');
     }
   } finally {
-    if (text.value != nullptr) {
-      LocalFree(HLOCAL(text.value));
-    }
     if (descriptor != nullptr) {
       calloc.free(descriptor);
     }
     calloc.free(length);
-    calloc.free(text);
   }
 }

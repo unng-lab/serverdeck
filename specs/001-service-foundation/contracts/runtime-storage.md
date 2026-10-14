@@ -8,6 +8,14 @@
 
 Directory/file DACL explicit protected без inheritance: owner SID current user и SYSTEM, не Everyone/Users. Проверить до private reads/writes; failure→storage-blocked. Только local fixed-volume path внутри resolved LOCALAPPDATA, без UNC/reparse points в каждом компоненте. Unsafe path не перенаправляется. Admin/full-account compromise вне угроз.
 
+Owner/DACL validation compares actual and expected descriptors in the same native
+Windows canonical serialization. Legal SID aliases (for example LA/SY) are
+representations of the exact expected SID, never additional allowed principals.
+Only the two orders of the owner/SYSTEM allow ACEs are accepted; protected DACL,
+ACE flags and exact file/mutex/pipe masks remain mandatory. Foreign owner,
+unprotected/null DACL, extra ACEs or different rights fail closed. Descriptor
+comparison does not change OS ACLs, tokens or privileges.
+
 Mutex `Global\ServerDeckNext.v1.<SHA256(ownerSid+"default")>` с owner SID/SYSTEM ACL: locald удерживает до create/open и release после Isar close. Восемь pipe slots `\\.\pipe\ServerDeckNext.v1.<sameHash>.<slot0..7>`: каждый отдельное имя и ровно один instance, duplex overlapped byte mode, PIPE_REJECT_REMOTE_CLIENTS и FILE_FLAG_FIRST_PIPE_INSTANCE. DACL даёт current SID только FILE_READ_DATA, FILE_WRITE_DATA, FILE_READ_ATTRIBUTES, READ_CONTROL, SYNCHRONIZE (mask 0x120083), не FILE_CREATE_PIPE_INSTANCE/GENERIC_WRITE. Сервис создаёт восемь разных pipe objects, не дополнительные instances существующего имени. Поэтому ему не требуется grant создания чужого instance через client ACL. CreateFile client запрашивает этот exact mask; FILE_READ_ATTRIBUTES необходим также для внутреннего открытия client endpoint Windows. Не выдавать FILE_WRITE_ATTRIBUTES, WRITE_DAC, WRITE_OWNER или FILE_CREATE_PIPE_INSTANCE. Handles non-inheritable. Невозможность создать любой slot означает unsafe endpoint и останавливает bootstrap, без обхода чужого pipe. Client выбирает свободный slot в пределах deadline; занятые слоты не создают новые pipes.
 
 serverdeck_windows operations: SID/DACL/secure create+flush+rename, DPAPI protect/unprotect, mutex acquire/release, pipe listen/connect/read/write/cancel/peer identity, process image verification. Win32/typed FFI system DLLs kernel32/advapi32/crypt32/bcrypt; CNG SHA256 для image hash, без нового package или runtime download. Handle у одного worker, exactly-once CloseHandle, native buffers freed finally. CancelIoEx deadline, buffer free после completion; blocking waits вне UI isolate. Peer SID читается из process token посредством OpenProcessToken(TOKEN_QUERY), без impersonation или включения debug privilege; ошибку query считать auth failure. Kernel peer PID, retained process handle, creation time, TokenUser и image/hash проверять совместно по Local API. Собственный process/thread token не заменяется ни в одной ветке. Missing bindings — typed lookup, не platform stub.
