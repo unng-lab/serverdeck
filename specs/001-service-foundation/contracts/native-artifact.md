@@ -267,3 +267,12 @@ no phase or frames. Stack parsing is capped at256KiB; unknown/modified files and
 invalid line numbers are excluded. Controlled projections carry controlledFixture
 true and are not actual hosted evidence. Full acceptance/distribution/activation
 flags remain false; the CI upload allowlist includes only this fixed safe filename.
+
+The healthy-owner prerequisite fixture copies the complete verified normal
+Debug bundle, including all nested assets and any generated runtime support
+files. It verifies directory/file inventory and hashes before rewriting only
+the copied manifest appRoot. It does not require an optional filename merely
+because an earlier local build contained it. Destination must be empty, owned,
+plain and disjoint from the source; source and failed fixtures are preserved.
+Missing/invalid-DLL and manifest/hash negative cases retain their deliberate
+minimal layouts and are not repaired by this positive-control copy.

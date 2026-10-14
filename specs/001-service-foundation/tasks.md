@@ -771,3 +771,16 @@ Do not publish raw error/output/stack/path fields or claim success from missing
 metadata. Controlled real ErrorRecord privacy/unknown-phase/changed-source cases,
 PowerShell parser/links/whitespace and fresh readonly review are required before
 publishing. T252/T244/T245/full/manual gates remain open until actual proof.
+
+T252 hosted38626791516/266841b failed at normal-prerequisites,
+test-foundation-prerequisites.ps1:54, copying a hand-maintained Flutter support
+filename. The safe report does not identify which optional filename was absent.
+Copy the entire actual verified normal bundle for healthy-owner, validate all
+copied entries/hashes before changing appRoot, and keep negative-case layouts
+unchanged. Controlled complete bundle cases with optional native_assets.json
+present/absent and an extra runtime file, nested assets, refusal/preservation of
+nonempty/overlapping destinations; PS parse/links/diff and fresh readonly review
+before publication. This does not prove the full healthy owner or resolve all
+hosted failures; T252/T244/T245/manual/full gates remain open.
+
+T252 prerequisite-copy review correction: trim ending directory separators on both absolute paths before equality/ancestor/descendant validation. Real controlled cases use existing empty nested destinations, both containment directions and every trailing-separator combination; require the overlap refusal and unchanged full source inventory/file hashes. Prior first review P2 must be followed by repeated checks and a fresh completed review.

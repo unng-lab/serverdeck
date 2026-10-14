@@ -4,6 +4,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/native-probe-process.ps1"
+. "$PSScriptRoot/prerequisite-bundle.ps1"
 
 function Assert-PrerequisitePath {
     param([string]$Path)
@@ -40,18 +41,12 @@ foreach ($case in @('missing-dll','invalid-dll','manifest-version','executable-h
     Assert-PrerequisitePath $layout
     Assert-PrerequisitePath $caseProfile
     New-Item -ItemType Directory -Path $layout, $caseProfile | Out-Null
-    foreach ($name in @('serverdeck.exe','locald.exe','libisar.dll')) {
-        if ($case -eq 'missing-dll' -and $name -eq 'libisar.dll') { continue }
-        Copy-Item -LiteralPath (Join-Path $source $name) -Destination (Join-Path $layout $name)
-    }
     if ($case -eq 'healthy-owner') {
-        foreach ($name in @('flutter_windows.dll','isar_community_flutter_libs_plugin.dll','native_assets.json','data')) {
-            $support = Join-Path $source $name
-            Assert-PrerequisitePath $support
-            if (Test-Path -LiteralPath $support -PathType Container) {
-                Get-ChildItem -LiteralPath $support -Recurse -Force | ForEach-Object { Assert-PrerequisitePath $_.FullName }
-            }
-            Copy-Item -LiteralPath $support -Destination (Join-Path $layout $name) -Recurse
+        Copy-PrerequisiteNormalBundle -Source $source -Destination $layout
+    } else {
+        foreach ($name in @('serverdeck.exe','locald.exe','libisar.dll')) {
+            if ($case -eq 'missing-dll' -and $name -eq 'libisar.dll') { continue }
+            Copy-Item -LiteralPath (Join-Path $source $name) -Destination (Join-Path $layout $name)
         }
     }
     $manifest = $sourceManifest | ConvertFrom-Json
