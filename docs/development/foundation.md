@@ -305,6 +305,16 @@ runtime-diagnostics. Receipt проверен с `-RequireCurrentSource` до с
 проверены по хешам. Это доказательство именно указанной версии и локальной
 совместимости, без activation, full acceptance или hosted CI acceptance.
 
+На опубликованной версии `60d8d3d` запуск GitHub Actions
+[38635056439](https://github.com/unng-lab/serverdeck/actions/runs/38635056439)
+успешно завершил cold source build и текущий native qualifier: root/три package
+suites, Debug/Release, 14 доступных native/UI фаз и отдельную compiled
+runtime-diagnostics. Это подтверждает hosted scope T244/T245 и исправления T252.
+Итоговый job имеет статус failure только на шаге `Acceptance remains incomplete`:
+полная Q01–Q12/Windows 11 приёмка остаётся открытой. Artifact не активирован и
+не готов к распространению. Проверяемые identities и ограничения сохранены в
+[журнале проверки](foundation-verification.md#hosted-compatibility-2026-10-15).
+
 ## Подготовка одноразовой среды для оставшейся приёмки
 
 Используйте заранее подготовленную Windows 11 x64 VM с двумя отдельными

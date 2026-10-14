@@ -1390,7 +1390,7 @@ was not uploaded. T252 adds safe failure projection and remains open pending
 review and the next hosted diagnosis. Full qualification/activation, T244/T245,
 Windows11 and exact-denied gates remain open.
 
-## Current local qualification and hosted diagnostic boundary — 2026-10-14
+## Historical local qualification and hosted diagnostic boundary — 2026-10-14
 
 Commit68b1658 completed the full available local qualifier: parent94498 exit0,
 root format/analyze/tests, all three package analyze/tests, normal Debug/Release
@@ -1427,3 +1427,75 @@ whole001.1 remain open. Separate Windows11/reboot/other-user/runtime-offline/
 physical checks and exact system-denied operations remain open and were not
 retried, bypassed or transferred. No PR/release/merge or advancement across
 T208 has occurred.
+
+<a id="hosted-compatibility-2026-10-15"></a>
+## Hosted compatibility — 2026-10-15
+
+[GitHub run 38635056439](https://github.com/unng-lab/serverdeck/actions/runs/38635056439)
+on reviewed commit `60d8d3d22a0867ddc7344a7290f7047a600e2510` is completed.
+The cold source build/current native qualification step and safe artifact upload
+both concluded success. The job concluded failure solely at the explicit
+`Acceptance remains incomplete` step. The exact API result is retained in
+[run-status.json](evidence/ci-38635056439/run-status.json); the downloaded bounded
+[safe-proof.json](evidence/ci-38635056439/safe-proof.json) is preserved unchanged.
+
+The proof has `hosted=true`, runAttempt `1`, status
+`compatibility-passed-unreviewed`, compiledRuntimeDiagnostics `true`, and:
+
+- source snapshot: `81a3c6fcb695ff7768fbe0d01772ffaa5174606b8ee68eae45f770df1badf6d4`;
+- artifact manifest: `ee48d19a0d361fc2bde137767a0fc4dcbb71445d051184077cce222ab8f777cc`;
+- compatibility receipt: `f718a2326bc69c25b3c3af59e0de661a0cccd274d5ec97a46f8ab2f31013ed30`.
+
+The successful cold runner writes this proof only after source build/notice
+assembly, the qualifier, and `Get-NativeArtifactCompatibility -RequireCurrentSource`.
+At this revision the qualifier requires ABI, literal root format/analyze/tests,
+analyze/tests for all three packages, normal Debug/Release builds with the same
+selected DLL/notices, all 14 ordered available native/UI phases, the separate
+compiled runtime-diagnostics marker, and restoration of normal bundle outputs.
+The `safe-phase-*.json` records alone say started; they are not success evidence.
+Success is established by the cold-step conclusion and its final validated proof.
+Private receipt/logs, reporter events and fixture databases were not downloaded
+or published; their contents cannot be independently rehashed from this public
+artifact. Receipt/artifact hashes here identify the runner-validated evidence,
+not locally retained or activated binary payloads.
+
+The local checkout's raw source snapshot is
+`b2894eca1d24d86d0b45aed37e308c3316fe197fcbdb7c755e8e1575bc37c2af`,
+which differs from the hosted hash. The private hosted per-file inventory was
+not uploaded, so the difference is not diagnosed here. Local verification
+instead checked the exact HEAD/revision and that every tracked qualification
+input has no Git diff against that revision; these documentation/evidence/task
+changes are outside that input inventory. This does not establish byte-identical
+local/runner trees or validate a local receipt. The hosted result applies to
+the source bytes validated on that runner at the recorded commit.
+
+The normal-prerequisite complete-bundle correction passed its real hosted path.
+Its first independent review found trailing-separator overlap validation missing;
+that was fixed and controlled optional-file/extra-runtime/hidden/nested/empty-dir,
+nonempty destination, and both overlap directions passed. The fresh completed
+`prerequisite_complete_bundle_fixed_review` reported no findings. Earlier hosted
+failures are historical; this successful qualifier supplies the missing hosted
+regression evidence for T252. T244, T245 and T252 are closed at their defined
+automatic compatibility/diagnostic scope, subject to the fresh evidence-closure
+review recorded below. No full parent acceptance task is closed by this result.
+
+All proof readiness flags remain false: fullAcceptance, distributionReady and
+activated. T038–T040/T043/T044/T048/T050/T201–T204/T206/T208 and T243 remain open;
+separate Windows 11 reboot/other-user/runtime-offline/physical checks and exact
+system-denied T185/T227 operations remain open. They were not retried, bypassed
+or transferred to GitHub. The final workflow barrier remains in place, and no
+PR/release/merge or advance to 001.2 occurred.
+
+The user deleted the large project `.local` directory; historical paths above
+are records of earlier verification and may no longer be available. They are
+not evidence for this run. The global SDK `H:/flutter/flutter` was updated in
+place to pinned Flutter 3.47.7 (abaf9c523780a608bd46686fd5e53740a07077f8), Dart
+3.13.5; no SDK was restored under project `.local`.
+
+Completed fresh readonly `hosted_automatic_closure_review`: no findings; ready
+only for automatic T244/T245/T252 closure. The reviewer independently queried the
+terminal GitHub run, matched the preserved proof byte-for-byte with its download,
+and inspected the workflow/cold runner/receipt validator/dispatcher and linked
+specification chain. No private receipt/log rehash, native rebuild, `.local`
+restoration or full-stage readiness was claimed. Mandatory closure links:
+543 OK / 0 Errors; whitespace check exit0. All listed remaining gates stay open.
