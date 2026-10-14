@@ -1,3 +1,4 @@
+#Requires -Version 7.4
 [CmdletBinding()]
 param([string]$ArchiveCache = '')
 . "$PSScriptRoot/native-isar-inputs.ps1"
@@ -18,6 +19,10 @@ foreach ($component in $recipe.rust.components) {
     $inputs += @{name=[IO.Path]::GetFileName(([Uri]$component.url).AbsolutePath); spec=$component; kind='tar.xz'; destination=('rust-' + $component.name)}
 }
 foreach ($input in $inputs) {
+    Write-NativeIsarJson (Join-Path $attempt ('safe-phase-fetch-'+$input.destination+'.json')) ([ordered]@{
+        schemaVersion=1;kind='native-input-phase';status='started';phase=('fetch-'+$input.destination)
+        fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
     $archive = Join-Path $archives $input.name
     if ($ArchiveCache) {
         $cached = Join-Path ([IO.Path]::GetFullPath($ArchiveCache)) $input.name
@@ -26,12 +31,20 @@ foreach ($input in $inputs) {
     } else {
         $uri = [Uri]$input.spec.url
         if ($uri.Scheme -cne 'https' -or $uri.Host -notin @('codeload.github.com','static.rust-lang.org','files.pythonhosted.org')) { throw 'Unexpected native input origin.' }
-        Invoke-WebRequest -Uri $uri -OutFile $archive
+        Invoke-WebRequest -Uri $uri -OutFile $archive -ConnectionTimeoutSeconds 300 -OperationTimeoutSeconds 300
     }
     if ((Get-NativeIsarDigest $archive) -cne $input.spec.sha256) { throw 'Native archive digest mismatch.' }
+    Write-NativeIsarJson (Join-Path $attempt ('safe-phase-expand-'+$input.destination+'.json')) ([ordered]@{
+        schemaVersion=1;kind='native-input-phase';status='started';phase=('expand-'+$input.destination)
+        fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
     Expand-NativeIsarArchive $archive (Join-Path $attempt $input.destination) $input.kind
 }
 $rust = Join-Path $attempt 'rust'
+Write-NativeIsarJson (Join-Path $attempt 'safe-phase-toolchain.json') ([ordered]@{
+    schemaVersion=1;kind='native-input-phase';status='started';phase='toolchain'
+    fullAcceptance=$false;distributionReady=$false;activated=$false
+})
 [IO.Directory]::CreateDirectory($rust) | Out-Null
 foreach ($component in $recipe.rust.components) {
     $expanded = Join-Path $attempt ('rust-' + $component.name)

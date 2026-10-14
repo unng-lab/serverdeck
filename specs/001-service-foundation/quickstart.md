@@ -4,7 +4,7 @@
 
 ## Setup/build
 
-Windows 11 x64, PowerShell 7, VS2022 Build Tools Desktop C++, VC++2015–2022 x64 runtime, pinned Flutter3.47.7 / bundled Dart3.13.5. Получить SDK из official manifest, проверить SHA256 из [Plan](plan.md). SDK ожидается в `.local/sdk/3.47.7/flutter` либо по абсолютному `SERVERDECK_FLUTTER_ROOT`. Команды из root:
+Windows 11 x64, PowerShell 7.4+, VS2022 Build Tools Desktop C++, VC++2015–2022 x64 runtime, pinned Flutter3.47.7 / bundled Dart3.13.5. Получить SDK из official manifest, проверить SHA256 из [Plan](plan.md). SDK ожидается в `.local/sdk/3.47.7/flutter` либо по абсолютному `SERVERDECK_FLUTTER_ROOT`. Команды из root:
 
 ```powershell
 . ./tools/foundation-sdk.ps1

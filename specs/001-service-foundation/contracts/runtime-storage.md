@@ -70,7 +70,7 @@ Lease/watchdog/grace используют monotonic elapsed deadlines. При з
 
 ## Build/prerequisites/composition
 
-Runtime: Windows 11 x64, загруженный user profile, DPAPI, writable fixed-volume LOCALAPPDATA и VC++ 2015–2022 x64 runtime. Native loader проверяется до workspace writes. Build: pinned Flutter, PowerShell 7, Git, VS2022 Build Tools Desktop C++/Windows SDK. Сеть нужна для получения SDK/packages, не для runtime.
+Runtime: Windows 11 x64, загруженный user profile, DPAPI, writable fixed-volume LOCALAPPDATA и VC++ 2015–2022 x64 runtime. Native loader проверяется до workspace writes. Build: pinned Flutter, PowerShell 7.4+, Git, VS2022 Build Tools Desktop C++/Windows SDK. Сеть нужна для получения SDK/packages, не для runtime.
 
 `tools/run-foundation.ps1 -Configuration Debug|Release`: проверить SDK commit/hash/pins; выполнить root/package dependency resolution с lock enforcement; запустить locald generator, dart compile exe и flutter build windows; создать dev manifest с buildId/sha256 UI exe/locald exe/libisar.dll/app-root; собрать единый layout и запустить UI. Использовать bundled Dart из pinned Flutter, не случайный PATH. Manifest format1: buildId=Git commit+configuration+SHA256 sorted lockfile hashes, configuration, testOnly flag, absolute appRoot и sha256 каждого исполняемого файла. Flutter runtime/data, brand assets/fonts, locald.exe, pinned libisar.dll, notices находятся в layout. DLL загружается из absolute allowlisted app-root, не cwd/PATH/download. UI/locald отвергают manifest mismatch. SHA не подпись издателя; production signing/updater/installer относятся к005.
 

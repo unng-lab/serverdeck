@@ -1177,3 +1177,37 @@ checks then passed, as did the 541-link check in
 `.local/audits/t244-phase-progress-links.txt`. Fresh independent review and a new
 hosted run of this correction are still required. All environment and previously
 system-denied gates remain open.
+
+### 2026-10-14: source-build timeout localization and bounded preparation
+
+Run 38525948724 on commit 473532f78afa20c101ad20f7a15fb635b7afd3c7
+finished cancelled at the 120-minute job limit. Safe phase records establish
+successful SDK/dependency preparation and entry into source-build; they do not
+identify the stalled native operation. Evidence is retained in
+`.local/audits/t244-hosted-run-38525948724-complete.txt` and
+`.local/audits/hosted-38525948724-safe`.
+
+Native preparation/build now record safe started-phase JSON for acquisition,
+extraction, toolchain, vendoring, snapshots, compilation and verification.
+Records remain incomplete with all readiness flags false. Only these JSON
+patterns join the hosted artifact allowlist; private logs remain excluded.
+Downloads have separate 300-second connection and response-read inactivity
+timeouts. Build prerequisites now require PowerShell 7.4+, enforced before
+native preparation executes.
+
+Independent reviews found and corrected phase output breaking the strict
+empty-stdout compiler-refusal test, an incomplete response-read timeout and
+the missing PowerShell minimum. Actual local uncached preparation passed;
+the resulting directory is recorded in
+`.local/audits/t244-native-progress-fixed-download-preparation.txt`.
+An owned loopback response that stopped sending its body failed within the
+configured one-second test timeout; evidence is
+`.local/audits/native-timeout-5a1646d77d2e4edaadba8f1760069cc1/result.json`.
+The full native build regression passed with all three success markers:
+`.local/audits/t244-native-progress-build-regression.txt`. It includes a real
+source build under poisoned ambient overrides, controlled missing-compiler
+and interpreter refusals, environment restoration and prior-output preservation.
+Parser, whitespace and 541-link checks passed. These local checks do not prove
+hosted compilation or complete T244/T245. Final review of the prerequisite
+correction and a new hosted run remain required. Full Windows 11 and exact
+system-denied checks remain open.

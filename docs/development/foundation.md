@@ -1,6 +1,6 @@
 # Разработка и проверка 001.1
 
-Все команды ниже выполняются из корня репозитория в PowerShell 7. Это новая
+Все команды ниже выполняются из корня репозитория в PowerShell 7.4+. Это новая
 реализация; команды прежнего приложения не заменяют её сборку и приёмку.
 Полный статус находится в [Tasks](../../specs/001-service-foundation/tasks.md)
 и [evidence](foundation-verification.md). Установка для конечных пользователей,
@@ -302,7 +302,7 @@ reboot/other-user/physical-offline/fullQ и реальный CI не входя�
 
 Используйте заранее подготовленную Windows 11 x64 VM с двумя отдельными
 тестовыми пользователями и восстановимым чистым snapshot. В ней должны быть
-PowerShell 7, перечисленные build prerequisites, проверенный SDK и уже полученные
+PowerShell 7.4+, перечисленные build prerequisites, проверенный SDK и уже полученные
 locked dependencies. Не размещайте реальные credentials/серверные данные.
 Зафиксируйте OS edition/build, runtime/SDK/build identity и пользователя каждого
 прогона. Перенаправленный LOCALAPPDATA не заменяет отдельный SID.

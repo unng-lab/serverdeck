@@ -12,6 +12,18 @@ if ($VendorSource) {
 $recipe = Get-NativeIsarRecipe
 $recipePath = Join-Path $NativeIsarRepository 'native/isar-3.3.2/recipe.json'
 $recipeFileDigest = Get-NativeIsarDigest $recipePath
+$progress=Join-Path $NativeIsarRepository ('.local/native-build-progress-'+[Guid]::NewGuid().ToString('N'))
+Assert-NativeIsarPlainPath $progress
+[void][IO.Directory]::CreateDirectory($progress)
+function Write-NativeBuildPhase {
+    param([ValidateSet('preparation','source-extraction','msvc','vendoring','snapshots','metadata','compilation','verification')][string]$Name)
+    Write-NativeIsarJson (Join-Path $progress ('safe-phase-'+$Name+'.json')) ([ordered]@{
+        schemaVersion=1;kind='native-build-phase';status='started';phase=$Name
+        recipeFileSha256=$recipeFileDigest
+        fullAcceptance=$false;distributionReady=$false;activated=$false
+    })
+}
+Write-NativeBuildPhase 'preparation'
 # Re-extract checked archives instead of trusting a mutable prepared toolchain.
 $prepared = & "$PSScriptRoot/prepare-native-isar.ps1" -ArchiveCache $ArchiveCache
 if ($prepared -isnot [string] -or -not (Test-Path -LiteralPath (Join-Path $prepared 'prepared.json'))) { throw 'Native preparation did not produce an owned input directory.' }
@@ -20,6 +32,7 @@ Assert-NativeIsarPlainPath $candidate
 [IO.Directory]::CreateDirectory($candidate) | Out-Null
 $source = Join-Path $candidate ('source/isar-community-' + $recipe.isar.commit)
 $mdbx = Join-Path $candidate ('mdbx/libmdbx-' + $recipe.mdbx.commit)
+Write-NativeBuildPhase 'source-extraction'
 Expand-NativeIsarArchive (Join-Path $prepared 'archives/isar-3.3.2-source.zip') (Join-Path $candidate 'source') zip
 Expand-NativeIsarArchive (Join-Path $prepared 'archives/libmdbx-source.zip') (Join-Path $candidate 'mdbx') zip
 Copy-Item -LiteralPath (Join-Path $NativeIsarRepository 'native/isar-3.3.2/Cargo.lock') -Destination (Join-Path $source 'Cargo.lock')
@@ -63,6 +76,7 @@ function Assert-BuildTreeSnapshot {
     }
 }
 
+Write-NativeBuildPhase 'msvc'
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw 'MSVC discovery prerequisite missing.' }
 $installations = @(& $vswhere -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json | Out-String | ConvertFrom-Json)
@@ -112,6 +126,7 @@ try {
             }
             $ancestor = [IO.Path]::GetDirectoryName($ancestor)
         }
+        Write-NativeBuildPhase 'vendoring'
         if ($verifiedVendor) {
             Copy-NativeIsarVendorSnapshot $VendorSource (Join-Path $candidate 'vendor') $VendorSha256 $verifiedVendor
         } else {
@@ -121,16 +136,20 @@ try {
         [IO.Directory]::CreateDirectory((Join-Path $source '.cargo')) | Out-Null
         $config = "[source.crates-io]`nreplace-with = 'vendored-sources'`n[source.vendored-sources]`ndirectory = '../../vendor'`n"
         [IO.File]::WriteAllText((Join-Path $source '.cargo/config.toml'),$config,[Text.UTF8Encoding]::new($false))
+        Write-NativeBuildPhase 'snapshots'
         $sourceBefore = Get-BuildTreeSnapshot $source
         $mdbxBefore = Get-BuildTreeSnapshot $mdbx @('src/version.c')
         $vendorBefore = Get-BuildTreeSnapshot (Join-Path $candidate 'vendor')
         $rustBefore = Get-BuildTreeSnapshot $rust
         $clangBefore = Get-BuildTreeSnapshot (Join-Path $prepared 'libclang')
         $env:CARGO_NET_OFFLINE = 'true'
+        Write-NativeBuildPhase 'metadata'
         & $cargo metadata --frozen --format-version 1 --filter-platform $recipe.target > (Join-Path $candidate 'metadata.private.json') 2> (Join-Path $candidate 'metadata.log')
         if ($LASTEXITCODE -ne 0) { throw 'Frozen native metadata failed.' }
+        Write-NativeBuildPhase 'compilation'
         & $cargo build --frozen -p isar --target $recipe.target --release *> (Join-Path $candidate 'build.log')
         if ($LASTEXITCODE -ne 0) { throw 'Frozen native build failed.' }
+        Write-NativeBuildPhase 'verification'
         Assert-BuildTreeSnapshot $sourceBefore (Get-BuildTreeSnapshot $source)
         Assert-BuildTreeSnapshot $mdbxBefore (Get-BuildTreeSnapshot $mdbx @('src/version.c'))
         Assert-BuildTreeSnapshot $vendorBefore (Get-BuildTreeSnapshot (Join-Path $candidate 'vendor'))
