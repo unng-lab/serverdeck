@@ -1281,3 +1281,37 @@ the following Rust component and toolchain phases were never entered. This
 does not establish which TAR inspection/extraction command stalled. MSVC,
 SDK and dependency preparation passed. Run38558487100 remains in progress;
 neither run proves current T248 qualification or full acceptance.
+
+### 2026-10-14: T249 bounded TAR preparation and source prerequisites
+
+All three TAR operations now use an owned child process with closed stdin,
+concurrent private stdout/stderr draining, a300second timeout and termination
+of the retained child on failure. Safe preparation JSON distinguishes names,
+types and extraction for each Rust component. Hashes, archive checks, fresh
+destinations and failed fixtures remain; raw inventories/errors are not exposed.
+The generated REPRODUCE instruction now requires PowerShell7.4+.
+
+Actual input tests passed eight unsafe ZIP cases, contained-link materialization,
+byte-budget refusal, one MiB on each child stream, a real one-second timeout
+with no surviving child, and sanitized nonzero7 refusal. Evidence is
+`.local/audits/t249-inputs.txt`; fixture
+`native-isar-input-tests-55dbd44a802c40ff862bff94fb0b11db` remains retained.
+Pinned preparation completed in `prepared-b662b63b7e364ac99f7c235ae9ea3228`.
+The native build regression completed with its prior-output/environment guards;
+new candidate4662069b7c0341848c7f3e723cc2ef88 is built-unqualified.
+
+Fresh corresponding source was collected at
+`candidate-3ef778e1cda3468bb51388899b738aa3/sources-7520bba62d54449a961ccabc1194600f`.
+Full source tests completed exit0:8107files,183notices, complete cross-process
+repack, standalone offline build, spaced root, encoded-flag restoration and
+long-root preflight. Fixture `native-source-package-tests-e644b2754a534d17a8bbe583777faff2`
+and reproduced candidateec89d1102e364be1af9f9ce6b9174a57 remain retained.
+Logs are `.local/audits/t249-native-build.txt` and `t249-source-tests.txt`.
+All five PowerShell files parsed without errors, links541/zero errors and
+whitespace passed. Fresh readonly native_tar_timeout_review found no issues
+and independently checked generated tool hashes. T249 is closed at this scope.
+
+The exact cause/subcommand of the old hosted hang remains unestablished.
+Actual current-source hosted completion T244/T245, full001.1 and separate
+Windows11/exact-denied checks remain open. No qualification, activation,
+publication of private evidence or distribution readiness is inferred.

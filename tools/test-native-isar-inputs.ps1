@@ -71,4 +71,29 @@ if (-not $budgetFailed -or (Test-Path -LiteralPath $amplifiedDestination) -or
 Write-Output "NATIVE_INPUT_ARCHIVE_NEGATIVES_PASSED=$rejected"
 Write-Output 'NATIVE_INPUT_CONTAINED_LINK_AND_PRESERVATION_PASSED'
 Write-Output 'NATIVE_INPUT_MATERIALIZED_BYTE_BUDGET_REJECTED_BEFORE_EXTRACTION'
+$pwsh=(Get-Process -Id $PID).Path
+$dualOutput=Join-Path $fixture 'dual-output.ps1'
+[IO.File]::WriteAllText($dualOutput,"[Console]::Out.Write(('o'*1048576)); [Console]::Error.Write(('e'*1048576))")
+$captured=Invoke-NativeIsarArchiveProcess $pwsh @('-NoProfile','-File',$dualOutput)
+if($captured.Length -ne 1048576 -or $captured -cne ('o'*1048576)){throw 'Native archive dual-pipe capture failed.'}
+$slowChild=Join-Path $fixture 'slow-child.ps1'
+$slowPid=Join-Path $fixture 'slow-child.pid'
+[IO.File]::WriteAllText($slowChild,'param([string]$PidFile); [IO.File]::WriteAllText($PidFile,[string]$PID); Start-Sleep -Seconds 30')
+$timeoutRejected=$false
+try { Invoke-NativeIsarArchiveProcess $pwsh @('-NoProfile','-File',$slowChild,$slowPid) -TimeoutSeconds 1 | Out-Null } catch {
+    if($_.Exception.Message -cne 'Native archive child timed out.'){throw}
+    $timeoutRejected=$true
+}
+if(-not $timeoutRejected -or -not (Test-Path -LiteralPath $slowPid)){throw 'Native archive timeout was not exercised.'}
+$ownedChildId=[int][IO.File]::ReadAllText($slowPid)
+if(Get-Process -Id $ownedChildId -ErrorAction SilentlyContinue){throw 'Timed-out native archive child remains alive.'}
+$failedChild=Join-Path $fixture 'failed-child.ps1'
+[IO.File]::WriteAllText($failedChild,"[Console]::Error.Write('PRIVATE_SYNTHETIC_ERROR'); exit 7")
+$failureRejected=$false
+try { Invoke-NativeIsarArchiveProcess $pwsh @('-NoProfile','-File',$failedChild) | Out-Null } catch {
+    if($_.Exception.Message -cne 'Native archive child failed.'){throw}
+    $failureRejected=$true
+}
+if(-not $failureRejected){throw 'Native archive child failure accepted.'}
+Write-Output 'NATIVE_INPUT_DUAL_PIPE_TIMEOUT_AND_SAFE_FAILURE_PASSED'
 Write-Output $fixture

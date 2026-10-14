@@ -38,7 +38,15 @@ foreach ($input in $inputs) {
         schemaVersion=1;kind='native-input-phase';status='started';phase=('expand-'+$input.destination)
         fullAcceptance=$false;distributionReady=$false;activated=$false
     })
-    Expand-NativeIsarArchive $archive (Join-Path $attempt $input.destination) $input.kind
+    $nativeInputPhasePrefix='expand-'+$input.destination
+    Expand-NativeIsarArchive $archive (Join-Path $attempt $input.destination) $input.kind -OnTarPhase {
+        param([string]$tarPhase)
+        $phase=$nativeInputPhasePrefix+'-'+$tarPhase
+        Write-NativeIsarJson (Join-Path $attempt ('safe-phase-'+$phase+'.json')) ([ordered]@{
+            schemaVersion=1;kind='native-input-phase';status='started';phase=$phase
+            fullAcceptance=$false;distributionReady=$false;activated=$false
+        })
+    }
 }
 $rust = Join-Path $attempt 'rust'
 Write-NativeIsarJson (Join-Path $attempt 'safe-phase-toolchain.json') ([ordered]@{

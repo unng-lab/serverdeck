@@ -121,7 +121,7 @@ Extract the complete ZIP into a fresh directory whose absolute root path
 contains at most 80 UTF16 characters; spaces are supported. This short-root
 budget keeps the pinned MSVC linker paths below its legacy path limit.
 Requires Windows x64,
-PowerShell 7, and the exact VS/MSVC/Windows SDK versions in recipe.json.
+PowerShell 7.4+, and the exact VS/MSVC/Windows SDK versions in recipe.json.
 Supply the three pinned Rust archives and pinned libclang wheel from their
 recipe.json URLs in an external ToolchainArchiveCache directory. The original
 Isar/MDBX archives and all vendored dependencies are already inside this ZIP.

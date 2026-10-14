@@ -55,9 +55,52 @@ function Assert-NativeIsarArchiveName {
     if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Native archive escapes destination.' }
 }
 
+function Invoke-NativeIsarArchiveProcess {
+    param([Parameter(Mandatory)][string]$File,
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [ValidateRange(1,300)][int]$TimeoutSeconds = 300)
+    Assert-NativeIsarPlainPath $File
+    $start=[Diagnostics.ProcessStartInfo]::new($File)
+    $start.UseShellExecute=$false
+    $start.CreateNoWindow=$true
+    $start.RedirectStandardInput=$true
+    $start.RedirectStandardOutput=$true
+    $start.RedirectStandardError=$true
+    foreach($argument in $Arguments){$start.ArgumentList.Add($argument)}
+    $child=[Diagnostics.Process]::new()
+    $child.StartInfo=$start
+    $started=$false
+    try {
+        $started=$child.Start()
+        if(-not $started){throw 'Native archive child did not start.'}
+        $child.StandardInput.Close()
+        # Drain both pipes while waiting, including verbose archive inventories.
+        $stdout=$child.StandardOutput.ReadToEndAsync()
+        $stderr=$child.StandardError.ReadToEndAsync()
+        if(-not $child.WaitForExit($TimeoutSeconds*1000)){
+            throw 'Native archive child timed out.'
+        }
+        if(-not [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($stdout,$stderr),10000)){
+            throw 'Native archive child output did not close.'
+        }
+        if($child.ExitCode -ne 0){throw 'Native archive child failed.'}
+        if($stdout.Result.Length -gt 128MB -or $stderr.Result.Length -gt 128MB){
+            throw 'Native archive child output exceeds limit.'
+        }
+        return $stdout.Result
+    } finally {
+        if($started -and -not $child.HasExited){
+            $child.Kill($true)
+            if(-not $child.WaitForExit(10000)){throw 'Native archive owned child did not stop.'}
+        }
+        $child.Dispose()
+    }
+}
+
 function Expand-NativeIsarArchive {
     param([string]$Archive, [string]$Destination, [ValidateSet('zip','tar.xz')][string]$Kind,
-        [ValidateRange(1,8589934592)][long]$MaximumExpandedBytes = 8GB)
+        [ValidateRange(1,8589934592)][long]$MaximumExpandedBytes = 8GB,
+        [scriptblock]$OnTarPhase)
     Assert-NativeIsarPlainPath $Archive
     Assert-NativeIsarPlainPath $Destination
     if (Test-Path -LiteralPath $Destination) { throw 'Native extraction destination must be fresh.' }
@@ -119,17 +162,18 @@ function Expand-NativeIsarArchive {
     } else {
         $tar = Join-Path $env:SystemRoot 'System32/tar.exe'
         if (-not (Test-Path -LiteralPath $tar -PathType Leaf)) { throw 'Windows tar prerequisite missing.' }
-        $names = @(& $tar -tf $Archive)
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect native TAR names.' }
-        $details = @(& $tar -tvf $Archive)
-        if ($LASTEXITCODE -ne 0 -or $names.Count -ne $details.Count -or $names.Count -gt 100000) { throw 'Cannot inspect native TAR types.' }
+        if($OnTarPhase){& $OnTarPhase 'names'}
+        $names = @((Invoke-NativeIsarArchiveProcess $tar @('-tf',$Archive)) -split '\r?\n' | Where-Object {$_ -ne ''})
+        if($OnTarPhase){& $OnTarPhase 'types'}
+        $details = @((Invoke-NativeIsarArchiveProcess $tar @('-tvf',$Archive)) -split '\r?\n' | Where-Object {$_ -ne ''})
+        if ($names.Count -ne $details.Count -or $names.Count -gt 100000) { throw 'Cannot inspect native TAR types.' }
         for ($index = 0; $index -lt $names.Count; $index++) {
             Assert-NativeIsarArchiveName $names[$index] $Destination $seen
             if ($details[$index] -cnotmatch '^[-d]') { throw 'Native TAR link or special entry rejected.' }
         }
         [IO.Directory]::CreateDirectory($Destination) | Out-Null
-        & $tar -xf $Archive -C $Destination
-        if ($LASTEXITCODE -ne 0) { throw 'Native TAR extraction failed.' }
+        if($OnTarPhase){& $OnTarPhase 'extract'}
+        [void](Invoke-NativeIsarArchiveProcess $tar @('-xf',$Archive,'-C',$Destination))
     }
     foreach ($entry in Get-ChildItem -LiteralPath $Destination -Recurse -Force) {
         if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Native extraction produced a reparse point.' }

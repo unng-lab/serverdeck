@@ -46,6 +46,9 @@ $extracted = Join-Path $NativeIsarRepository ('.local/src space-' + [Guid]::NewG
 if ($extracted.Length -gt 80 -or (Test-Path -LiteralPath $extracted)) { throw 'No fresh supported source extraction root.' }
 [IO.File]::WriteAllText((Join-Path $Fixture 'extracted-root.txt'),$extracted)
 Expand-NativeIsarArchive $zip $extracted zip
+$reproduceInstructions=[IO.File]::ReadAllText((Join-Path $extracted 'REPRODUCE.txt'))
+if(-not $reproduceInstructions.Contains('PowerShell 7.4+,') -or
+    $reproduceInstructions.Contains('PowerShell 7,')) { throw 'Generated reproduction prerequisite mismatch.' }
 $archive = [IO.Compression.ZipFile]::OpenRead($zip)
 $index = @{}
 try {
