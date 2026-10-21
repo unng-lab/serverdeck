@@ -280,3 +280,8 @@ minimal layouts and are not repaired by this positive-control copy.
 ## Extension021 — 2026-10-21
 
 Bundle021 добавляет проверенный MCP executable, exact image hash и role. Прежний набор executable identities не разрешает авторизовывать новый bridge как UI. Изменение source/bundle bindings требует новой qualification; прежние native proofs не переносятся на новый bundle. См. [нормативное расширение](../../021-mcp-control/plan.md). Это описание будущего upgrade, не утверждение уже изменённого runtime.
+
+
+### MCP package qualification input integration
+
+Once packages/serverdeck_mcp is present, cold runner dependency preparation includes its checked-in pubspec.lock via pub get --enforce-lockfile before root analysis, alongside protocol/windows/locald. Root analysis visits this package even when root pubspec does not depend on the bridge. Source qualification snapshots bind all four packages: manifests/locks and existing lib/bin/test trees, so changing MCP sources invalidates current qualification just like other analyzed sources. The existing14 foundation qualification phases and their receipt order stay unchanged; separate MCP transport tests in the MCP workflow and future1.1 product activation are additional requirements, not silently completed by this source closure. All fullAcceptance/distributionReady/activated boundaries remain unchanged.

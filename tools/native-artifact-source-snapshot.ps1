@@ -14,7 +14,7 @@ function Get-NativeArtifactSourceSnapshot {
         if (Test-Path -LiteralPath (Join-Path $NativeIsarRepository $name) -PathType Leaf) { [void]$paths.Add($name) }
     }
     $roots=@('lib','test','integration_test','test_driver','assets','windows/runner','native/isar-3.3.2','specs/001-service-foundation/contracts','.github/workflows')
-    foreach ($package in @('serverdeck_locald','serverdeck_protocol','serverdeck_windows')) {
+    foreach ($package in @('serverdeck_locald','serverdeck_protocol','serverdeck_windows','serverdeck_mcp')) {
         foreach ($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml','build.yaml','dart_test.yaml')) {
             $path='packages/' + $package + '/' + $name
             if ($name -in @('pubspec.yaml','pubspec.lock') -and -not (Test-Path -LiteralPath (Join-Path $NativeIsarRepository $path) -PathType Leaf)) { throw 'Qualification package manifest missing.' }

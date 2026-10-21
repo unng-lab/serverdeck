@@ -11,7 +11,7 @@ Assert-NativeIsarPlainPath $run
 $script:coldPhase='sdk'
 $hosted=$env:GITHUB_ACTIONS -ceq 'true'
 function Write-ColdRunnerProgress {
-    param([ValidateSet('sdk','dependencies-root','dependencies-serverdeck_protocol','dependencies-serverdeck_windows','dependencies-serverdeck_locald','source-build','supplements','rust-material','sources','assembly','qualification','validation')][string]$Name)
+    param([ValidateSet('sdk','dependencies-root','dependencies-serverdeck_protocol','dependencies-serverdeck_windows','dependencies-serverdeck_locald','dependencies-serverdeck_mcp','source-build','supplements','rust-material','sources','assembly','qualification','validation')][string]$Name)
     $script:coldPhase=$Name
     Write-NativeIsarJson (Join-Path $run ('safe-progress-'+$Name+'.json')) ([ordered]@{
         schemaVersion=1;kind='cold-runner-phase';status='started';phase=$Name;hosted=$hosted
@@ -55,7 +55,7 @@ try {
         Invoke-ColdRunnerStep 'dependencies-root' {
             Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
         }
-        foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
+        foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald','serverdeck_mcp')) {
             Push-Location (Join-Path $NativeIsarRepository ('packages/'+$package))
             try {
                 Invoke-ColdRunnerStep ('dependencies-'+$package) { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
