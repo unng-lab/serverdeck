@@ -25,7 +25,7 @@ void main() {
       sids.add('${current.substring(0, current.lastIndexOf('-') + 1)}500');
     }
     for (final sid in sids) {
-      for (final rights in ['FA', '0x1f0001', '0x120083']) {
+      for (final rights in ['FA', '0x1f0001', '0x1f0003', '0x120083']) {
         for (final acl in [
           '(A;;$rights;;;$sid)(A;;$rights;;;SY)',
           '(A;;$rights;;;SY)(A;;$rights;;;$sid)',
@@ -52,6 +52,15 @@ void main() {
     final valid = ownerOnlySddl(sid);
     expect(matches(valid, other, 'FA'), isFalse);
     expect(matches(valid, sid, '0x1f0001'), isFalse);
+    expect(matches(valid, sid, '0x1f0003'), isFalse);
+    expect(
+      matches(
+        'O:${sid}D:P(A;;0x1f0003;;;$sid)(A;;0x1f0003;;;SY)(A;;FR;;;BU)',
+        sid,
+        '0x1f0003',
+      ),
+      isFalse,
+    );
     expect(matches(valid, sid, 'invalid'), isFalse);
     expect(matches(valid, 'invalid', 'FA'), isFalse);
   }, testOn: 'windows');

@@ -2,6 +2,17 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:convert';
+import 'dart:ffi';
+
+import 'package:cryptography/dart.dart';
+import 'package:ffi/ffi.dart';
+import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart' as w;
+import 'package:serverdeck_protocol/validation.dart' show requireUuid;
+
+import 'kernel_security.dart';
+import 'mutex.dart';
 
 import 'pipe.dart';
 import 'process.dart';
@@ -10,6 +21,7 @@ import 'mcp_build_bundle.dart';
 export 'mcp_build_bundle.dart' show BundlePeerRole;
 
 part 'operational_pipe_worker.dart';
+part 'operational_publication_gate.dart';
 
 /// Only messages cross isolates; native pipe and process handles stay in worker.
 class PipeWorker {

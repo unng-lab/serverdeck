@@ -245,7 +245,7 @@ bool matchesOwnerOnlyAclDescriptor(
   final actual = calloc<Pointer<Utf16>>();
   try {
     ownerOnlySddl(sid);
-    if (!const {'FA', '0x1f0001', '0x120083'}.contains(rights) ||
+    if (!const {'FA', '0x1f0001', '0x1f0003', '0x120083'}.contains(rights) ||
         _descriptorToText(descriptor, 1, 5, actual, nullptr) == 0) {
       return false;
     }

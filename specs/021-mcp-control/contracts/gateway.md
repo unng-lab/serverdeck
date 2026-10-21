@@ -1,6 +1,6 @@
 # Native MCP gateway — 021 API1.1
 
-[MCP](mcp.md), [native client](operational-client.md), [invocations](invocations.md), [tasks](../tasks.md).
+[MCP](mcp.md), [native client](operational-client.md), [invocations](invocations.md), [tasks](../tasks.md), [native gate component](publication-gate.md).
 
 ## Components and admission
 

@@ -85,3 +85,5 @@ The shared native [ordinary RPC client](contracts/operational-client.md) owns th
 The [native MCP gateway](contracts/gateway.md) fixes method mapping, bounded polling/cancellation, heartbeat and fresh authorization after stdout writer wait. It uses the claimed native client and fixed errors; stdio transport never proxies owner methods or acquires server credentials.
 
 Target identity mutations use the workspace MCP session retirement fence defined in [gateway contract](contracts/gateway.md): owner service holds it through actual commit/rollback and cache invalidation, while protected opens remain blocked. T109 implements the shared registry primitive; original target/credential/trust service integration remains required before remote readiness.
+
+The native synchronization helper, its trusted bootstrap identity and actual acquisition/poison/cleanup lifecycle are defined in [publication gate contract](contracts/publication-gate.md). T113 qualifies this component; T110 still wires it to every product authority/target mutator and gateway publication.

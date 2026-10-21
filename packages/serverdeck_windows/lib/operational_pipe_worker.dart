@@ -19,6 +19,15 @@ final class OperationalPipePeer {
   final BundlePeerRole localRole;
   final String buildId;
 
+  /// Derive synchronization identity only from this actual verified endpoint.
+  /// The gate itself grants no tool/session authority.
+  Future<OperationalPublicationGate> publicationGate(String generation) async {
+    requireUuid(generation);
+    final identity =
+        await _worker._call('peerPublicationIdentity', _epoch) as List;
+    return OperationalPublicationGate._open(identity, generation, localRole);
+  }
+
   Future<void> revalidate() async {
     final result = (await _worker._call('peerVerify', _epoch)) as List;
     if (result[0] != _epoch ||
@@ -174,6 +183,13 @@ final class _OperationalEndpoint {
           rethrow;
         }
         return null;
+      case 'peerPublicationIdentity':
+        verify(params as int);
+        return [
+          sid,
+          p.normalize(bundle.manifest.appRoot).toLowerCase(),
+          localRole.name,
+        ];
       case 'peerVerify':
         final role = verify(params as int?);
         return [epoch, role.name, bundle.manifest.buildId, localRole.name];
