@@ -12,4 +12,4 @@ Dependency resolution does not qualify a working executor or installation recipe
 The intended [runtime/protocol](../specs/021-mcp-control/contracts/executor.md)
 and [authorable profile grammar](../specs/021-mcp-control/contracts/profiles.md)
 are normative. Package installation, root custody, the transaction gate and real
-VM acceptance are still pending in [Tasks](../specs/021-mcp-control/tasks.md).
+Docker fixture executor/recipe acceptance are still pending in [Tasks](../specs/021-mcp-control/tasks.md).

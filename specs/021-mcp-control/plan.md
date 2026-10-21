@@ -16,7 +16,7 @@ Operational schema2 retained graph/reference validation and startup composition 
 - SSH: package dartssh2 4.1.0 (pub.dev metadata verified); exact lock фиксируется отдельной dependency qualification задачей до remote implementation; критерий выбора — pinned Dart compatibility, key/password auth, host-key callback до authentication, cancellation, bounded channels, license. Нельзя считать библиотеку работающей по одному pub get. Эта техническая задача не выбирает новую продуктовую семантику.
 - Executor: Ubuntu 24.04 amd64/systemd; Python 3.12, ansible-core2.21.5 venv; точный patch и hashes фиксируются runtime lock при сборке и проверяются handshake. System module interpreter /usr/bin/python3 и python3-apt; control CLI — venv. Нет WSL prerequisite на Windows и автоматического скачивания runtime при apply.
 - Storage: новая schema2 того же Isar, обычные metadata и DPAPI client credentials; existing schema1 retained. [Staged migration](contracts/migration.md) validates source, migrates protected copy and atomically publishes closed DB plus recoverable manifest; native collection creation is not an in-place application transaction. Preservation/quotas in [data model](data-model.md).
-- Testing: Dart test + existing native package suites, root format/analyze/test; Python unittest executor/compiler; disposable systemd VM acceptance обеих БД. Стандартный MCP wire client и второй независимый SDK client, без vendor reliance.
+- Testing: Dart test + existing native package suites, root format/analyze/test; Python unittest executor/compiler; disposable systemd Docker fixture on GitHub Ubuntu runners (or owned VM) acceptance обеих БД. Стандартный MCP wire client и второй независимый SDK client, без vendor reliance.
 - Scale: 250 server profiles, 8 sessions суммарно, 2 SSH transports суммарно, 32 mutation queue как 001. Дополнительные budgets — contracts. Никакого backend изменения.
 
 ## Constitution Check
@@ -29,7 +29,7 @@ Operational schema2 retained graph/reference validation and startup composition 
 | IV bounded observations | Shared read budgets, stale/gaps, no raw log persistence |
 | V reliable jobs | Durable immutable plan, local and host admission/receipts, per-effect authority and unknown tombstone |
 | VI traceability | [Tasks](tasks.md), contracts and acceptance map; completed001 history retained |
-| VII verification | Mandatory checks + fresh independent review; VM evidence not replaced by mocks |
+| VII verification | Mandatory checks + fresh independent review; Real systemd Docker/VM evidence not replaced by mocks; container restart is not kernel reboot |
 | VIII distribution | Compatible UI/locald/MCP bundle; executor separately provisioned/verified by owner; no publication implied |
 
 Delegation is explicit owner consent to declared targets/effects within exact digest and parameter predicates, satisfying Principle II/FR-036; no implicit approval from model text. UI Local API/Isar ownership unchanged. No constitutional amendment required.

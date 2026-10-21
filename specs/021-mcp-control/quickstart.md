@@ -1,6 +1,6 @@
 # Quickstart and acceptance — 021
 
-This guide describes the intended implemented entry points. They do not exist merely because this file is written. Record actual commands/results per task, never label planned VM checks executed.
+This guide describes the intended implemented entry points. They do not exist merely because this file is written. Record actual commands/results per task, never label planned fixture checks executed.
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ Before creating any server, owner issues author-only grant with serverIds=[]; cl
 pwsh -File tools/test-mcp-vm.ps1 -FixtureManifest <owned-disposable-vm.private.json>
 ```
 
-Harness must reject non-owned/non-disposable fixture and any target loaded from user's profiles, provision only this explicitly selected disposable VM, retain process/VM ownership and synthetic credentials, never publish private fixture. VM manifest requires format1, disposable true, unique fixture ID, host/port/user/key reference, expected host fingerprint, owned VM identity, approved cleanup scope; no ambient target discovery. Test actual deployed executor/runtime lock hash.
+Harness must reject non-owned/non-disposable fixture and any target loaded from user's profiles, provision only this explicitly selected disposable systemd Docker fixture (or owned VM), retain process/container/VM ownership and synthetic credentials, never publish private fixture. Fixture manifest requires format1, disposable true, unique fixture ID, host/port/user/key reference, expected host fingerprint, owned container ID plus Docker context (or owned VM identity), approved cleanup scope; no ambient target discovery. Test actual deployed executor/runtime lock hash.
 
 Through actual MCP bridge/UI:
 
@@ -46,12 +46,15 @@ Through actual MCP bridge/UI:
 2. Test identical-content A/r1→A/r2 (including metadata-only edit) and A/r1→B/r1: tuple-based delegation rejects both while already-admitted A/r1 remains bound. Test forged tuple mismatch and out-of-scope server/parameter/revision/expired grant/delegation; owner approval request and deny/approve. AI cannot call grant/trust/approve management.
 3. Qualified clean PostgreSQL16 and ClickHouse recipes each install exact package/dependency pins, preserve unrelated sentinel/NetBird fixture and have local-only listener/active unit/SELECT1. Existing config/data/package, missing SSE4.2, unsigned/missing package, apt drift/downgrade/unrelated transaction block without effect.
 4. Exercise settings file/service profiles after qualification, source/unit dependency conflicts, parser/post-check failure. UI and MCP show exact plan/job/events and desired vs observed.
-5. Crash locald/bridge/supervisor before and after durable admission/step launch/result; drop acknowledgement, reboot fixture VM, second-controller race/alias SSH profile, revoke/cancel at step barriers, unavailable runtime/disk quota. Receipt/unknown retain occupancy; reconciliation never reruns playbook. Current committed step can finish, no next effect after revoke.
+5. Crash locald/bridge/supervisor before and after durable admission/step launch/result; drop acknowledgement, restart fixture container/init (or reboot owned VM); record any host kernel reboot separately, second-controller race/alias SSH profile, revoke/cancel at step barriers, unavailable runtime/disk quota. Receipt/unknown retain occupancy; reconciliation never reruns playbook. Current committed step can finish, no next effect after revoke.
 6. Disconnect active MCP and close UI; job state survives. Reopen/recover explicitly, no automatic replay. Seeded passwords/private keys/client secret markers absent from stdout/errors/progress/profile bodies/ordinary files and generated Ansible args.
 
-Capture separate evidence for Windows/native bridge, wire client1/client2, migration, each real recipe/systemd VM, denial/cancel/recovery and UI sizes/themes (1100×760,800×600,360×800,390×800). The user authorized Docker on GitHub runners for disposable execution acceptance. A real systemd Docker fixture may qualify application, installation, service and durable recovery scenarios; mocks cannot. Record container init restart separately from host kernel reboot and never report one as the other. Host-kernel-specific cases require separate evidence if exercised. Preserve failed evidence and exact missing prerequisite instead of passing a reduced suite.
+Capture separate evidence for Windows/native bridge, wire client1/client2, migration, each real recipe/systemd Docker or VM, denial/cancel/recovery and UI sizes/themes (1100×760,800×600,360×800,390×800). The user authorized Docker on GitHub runners for disposable execution acceptance. A real systemd Docker fixture may qualify application, installation, service and durable recovery scenarios; mocks cannot. Record container init restart separately from host kernel reboot and never report one as the other. Host-kernel-specific cases require separate evidence if exercised. Preserve failed evidence and exact missing prerequisite instead of passing a reduced suite.
 
 
 ## Hosted automation
 
 [MCP automatic checks](../../.github/workflows/mcp.yml) runs Windows source-built native/root/package checks and [Docker prerequisites](../../tools/test-executor-container.sh) on an isolated Ubuntu runner. The Docker job currently proves Python3.12/python3-apt, hash-locked Ansible, systemd PID1, SSH service and persistent state across container restart. It does not yet prove the unimplemented privileged executor or installation recipes. No repository secrets, user profiles or stored server credentials are supplied. Extend this same disposable fixture for T026/T035 acceptance as the executor is implemented.
+
+
+First hosted prerequisite result: [run39555867561](https://github.com/unng-lab/serverdeck/actions/runs/39555867561), source ecf8d534efd2dbea85a0b5546cb450d4a6484066, job119075366238 succeeded in34seconds. The real Docker job reports ansible-core2.21.5, pip check clean, systemd=true, containerRestart=true, kernelReboot=false, executorAcceptance=false. Windows job was still running when this result was recorded. This result closes no executor/recipe/bridge acceptance gate.

@@ -25,7 +25,7 @@
 
 - [x] Every FR mapped to acceptance in Plan/tasks; cross-cutting criteria require whole-path proof.
 - [x] Scenarios cover discovery/read, profile authoring, plan/apply and recovery.
-- [x] Outcomes include real independent clients/VM checks, no mock-only substitution.
+- [x] Outcomes include real independent clients/systemd Docker or VM checks, no mock-only substitution.
 - [x] Implementation detail resides in supporting artifacts, not user journeys.
 
 ## Notes

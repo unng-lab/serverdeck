@@ -12,6 +12,7 @@
 
 - ИИ получает только MCP tools, без выдачи SSH-ключей или произвольного shell. UI использует тот же сервис и правила; перевод самого UI на MCP не требуется.
 - ИИ должен уметь создавать и изменять сами Ansible-профили, а не только запускать встроенные.
+- Q: Где выполнять изолированную приёмку executor вместо отдельной VM? → A: Использовать Docker и GitHub runners; проект публичный. Реальная systemd Docker fixture допускается для приёмки, mock-only проверки — нет; container init restart учитывается отдельно от host kernel reboot.
 
 ## User Scenarios & Testing
 
@@ -44,7 +45,7 @@
 Владелец разрешает ИИ определённые ревизии, цели и диапазоны параметров на срок. ИИ строит план и запускает подходящее изменение либо передаёт запрос владельцу. Сервис сохраняет desired state, исполняет Ansible и проверяет результат. Установка приложений использует этот же путь с требованиями 006.
 
 **Why this priority**: MCP должен доводить управление до проверенного результата.
-**Independent Test**: Disposable Ubuntu systemd VM: служба, конфигурационный файл, PostgreSQL и ClickHouse, конфликт, обрыв, отмена и отзыв.
+**Independent Test**: Disposable Ubuntu24.04 amd64 systemd Docker fixture on GitHub runners (or explicitly owned VM): служба, конфигурационный файл, PostgreSQL и ClickHouse, конфликт, обрыв, отмена и отзыв.
 **Acceptance Scenarios**:
 
 1. **AC-MCP-3A Given** подходящая делегация, **When** ИИ применяет настройку/установку, **Then** один durable job и проверенный результат видны UI/MCP; последующее чтение выявляет drift без автоматической записи.
