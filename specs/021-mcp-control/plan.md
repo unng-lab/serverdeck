@@ -81,3 +81,7 @@ Design correction2: author-only/no-scope client grants use serverIds[] and are v
 Operational API1.1 wire integration follows [channel ownership, dispatch and publication](contracts/operational-channel.md), in addition to handshake/invocations; it preserves pending interest until native publication and rejects queued stale authority. T096 implements this component before actual bootstrap/owner/client product activation.
 
 The shared native [ordinary RPC client](contracts/operational-client.md) owns the post-bootstrap reader/writer, correlation, deadlines and terminal cleanup without callbacks or replay. T103 supplies it for owner/MCP adapters; T104 connects the stdio gateway and later executable/discovery work retains its existing activation gates.
+
+The [native MCP gateway](contracts/gateway.md) fixes method mapping, bounded polling/cancellation, heartbeat and fresh authorization after stdout writer wait. It uses the claimed native client and fixed errors; stdio transport never proxies owner methods or acquires server credentials.
+
+Target identity mutations use the workspace MCP session retirement fence defined in [gateway contract](contracts/gateway.md): owner service holds it through actual commit/rollback and cache invalidation, while protected opens remain blocked. T109 implements the shared registry primitive; original target/credential/trust service integration remains required before remote readiness.

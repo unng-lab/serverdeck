@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:serverdeck_protocol/mcp/wire.dart';
+import 'package:serverdeck_protocol/models.dart';
 
 import 'lifecycle.dart';
 
@@ -14,10 +15,25 @@ abstract interface class McpGateway {
   Future<void> close();
 }
 
+final class McpGatewayFailure implements Exception {
+  const McpGatewayFailure(this.code);
+  final ErrorCode code;
+  @override
+  String toString() => 'McpGatewayFailure(${code.wireName})';
+}
+
 final class McpInvocation {
-  const McpInvocation(this.result, this.cancelInterest);
+  const McpInvocation(
+    this.result,
+    this.cancelInterest, {
+    this.beforePublish,
+    this.validatePublication,
+    this.afterPublish,
+  });
   final Future<Map<String, Object?>> result;
   final Future<void> Function() cancelInterest;
+  final Future<void> Function()? beforePublish, afterPublish;
+  final void Function()? validatePublication;
 }
 
 final class _Pending {
@@ -206,6 +222,9 @@ final class McpServer {
           _pending[id!] = pending;
           unawaited(_complete(request, pending));
       }
+    } on McpGatewayFailure catch (error) {
+      if (!request.isNotification)
+        await _send(_failure(request, error.code.wireName));
     } on McpProtocolException catch (error) {
       if (!request.isNotification) await _send(error.response(id));
     } catch (_) {
@@ -220,6 +239,7 @@ final class McpServer {
   Future<void> _complete(McpInbound request, _Pending pending) async {
     final id = request.id!;
     Map<String, Object?>? response;
+    var gatewayData = false;
     try {
       final result = await Future.any<Map<String, Object?>?>([
         pending.invocation.result,
@@ -227,6 +247,9 @@ final class McpServer {
       ]).timeout(_callTimeout);
       if (result == null) return;
       response = mcpSuccess(id, result);
+      gatewayData = true;
+    } on McpGatewayFailure catch (error) {
+      response = _failure(request, error.code.wireName);
     } on TimeoutException {
       unawaited(_cancel(pending, discard: false));
       response = _failure(request, 'TIMEOUT');
@@ -237,7 +260,12 @@ final class McpServer {
     }
     try {
       if (_current(id, pending))
-        await _send(response, current: () => _current(id, pending));
+        await _send(
+          response,
+          current: () => _current(id, pending),
+          publication: gatewayData ? pending.invocation : null,
+          publicationFailure: (code) => _failure(request, code.wireName),
+        );
     } finally {
       if (identical(_pending[id], pending)) _pending.remove(id);
     }
@@ -279,6 +307,8 @@ final class McpServer {
   Future<void> _send(
     Map<String, Object?> message, {
     bool Function()? current,
+    McpInvocation? publication,
+    Map<String, Object?> Function(ErrorCode)? publicationFailure,
   }) async {
     if (_closed) return;
     if (_queuedWrites >= 32) {
@@ -298,11 +328,72 @@ final class McpServer {
     final write = _writeTail
         .then((_) async {
           if (_closed || (current != null && !current())) return;
+          final clock = Stopwatch()..start();
+          Duration remaining() {
+            final left = _writeTimeout - clock.elapsed;
+            if (left <= Duration.zero) throw TimeoutException('WRITE_FAILED');
+            return left;
+          }
+
+          Future<void>? guard, issuedWrite;
+          Future<void>? release;
+          Future<void> cleanup() {
+            // Publish completion before invoking a potentially reentrant release.
+            if (release != null) return release!;
+            final done = Completer<void>();
+            release = done.future;
+            Future<void>.sync(() => publication?.afterPublish?.call())
+                .then(done.complete, onError: done.completeError);
+            return done.future;
+          }
+
           try {
-            await _write([...bytes, 10]).timeout(_writeTimeout);
+            var output = bytes;
+            try {
+              if (publication != null) {
+                guard = Future<void>.sync(
+                  () => publication.beforePublish?.call(),
+                );
+                await guard.timeout(remaining());
+                if (_closed || (current != null && !current())) return;
+                publication.validatePublication?.call();
+              }
+            } on TimeoutException {
+              rethrow;
+            } catch (error) {
+              final code = error is McpGatewayFailure
+                  ? error.code
+                  : ErrorCode.internal;
+              output = encodeMcpMessage(publicationFailure!(code));
+            }
+            if (_closed || (current != null && !current())) return;
+            final budget = remaining();
+            // No await between the last authority/identity check and issuance.
+            issuedWrite = Future<void>.sync(() => _write([...output, 10]));
+            await issuedWrite.timeout(budget);
           } catch (_) {
             _report('WRITE_FAILED');
             _stop(2);
+          } finally {
+            if (publication != null) {
+              // A timed-out guard may still acquire native ownership. Observe
+              // actual guard AND issued flush settlement before releasing. A
+              // logical timeout alone cannot release native publication ownership.
+              final settled = Future.wait<void>([
+                if (guard != null)
+                  guard.then<void>((_) {}, onError: (Object _) {}),
+                if (issuedWrite != null)
+                  issuedWrite.then<void>((_) {}, onError: (Object _) {}),
+              ]);
+              final cleaned = settled.then((_) => cleanup());
+              cleaned.ignore();
+              try {
+                await cleaned.timeout(remaining());
+              } catch (_) {
+                _report('WRITE_FAILED');
+                _stop(2);
+              }
+            }
           }
         })
         .whenComplete(() {
