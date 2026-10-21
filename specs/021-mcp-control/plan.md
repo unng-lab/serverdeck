@@ -79,3 +79,5 @@ Design correction2: author-only/no-scope client grants use serverIds[] and are v
 
 
 Operational API1.1 wire integration follows [channel ownership, dispatch and publication](contracts/operational-channel.md), in addition to handshake/invocations; it preserves pending interest until native publication and rejects queued stale authority. T096 implements this component before actual bootstrap/owner/client product activation.
+
+The shared native [ordinary RPC client](contracts/operational-client.md) owns the post-bootstrap reader/writer, correlation, deadlines and terminal cleanup without callbacks or replay. T103 supplies it for owner/MCP adapters; T104 connects the stdio gateway and later executable/discovery work retains its existing activation gates.

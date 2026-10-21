@@ -13,6 +13,7 @@ extension _OperationalGrantClient on OperationalClientSession {
     McpCredentialFiles files,
     String grantId,
   ) async {
+    if (_ordinaryClaimed) throw StateError('SERVICE_UNAVAILABLE');
     if (_closed) throw StateError('UNAUTHORIZED');
     if (role != OperationalRole.mcp) throw StateError('FORBIDDEN');
     if (_grantAttempted) {

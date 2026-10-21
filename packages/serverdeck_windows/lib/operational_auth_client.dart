@@ -6,7 +6,10 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:cryptography/dart.dart';
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/errors.dart';
 import 'package:serverdeck_protocol/mcp/handshake.dart';
+import 'package:serverdeck_protocol/mcp/wire.dart';
+import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/protocol.dart';
 import 'package:serverdeck_protocol/validation.dart';
 
@@ -14,6 +17,7 @@ import 'pipe_worker.dart';
 import 'mcp_credential_files.dart';
 
 part 'operational_grant_client.dart';
+part 'operational_api_client.dart';
 
 /// Bounded framing shared by the operational server/client adapters. Reads and
 /// writes use the private epoch-bound native peer, never a raw transport callback.
@@ -239,6 +243,7 @@ final class OperationalClientSession {
   final String id;
   bool _closed = false;
   bool _grantAttempted = false;
+  bool _ordinaryClaimed = false;
   McpOpenResult? _grant;
   McpOpenResult? get grant => _closed ? null : _grant;
   Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) =>
