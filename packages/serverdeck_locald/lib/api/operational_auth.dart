@@ -20,6 +20,7 @@ part 'operational_sessions.dart';
 part 'operational_grants.dart';
 part 'operational_context.dart';
 part 'operational_open_failure.dart';
+part 'operational_target_changes.dart';
 
 String _randomNonce() => base64Url
     .encode(List<int>.generate(32, (_) => Random.secure().nextInt(256)))

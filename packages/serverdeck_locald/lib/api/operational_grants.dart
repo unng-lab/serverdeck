@@ -39,6 +39,7 @@ final class OperationalMcpAuthority {
 extension _OperationalGrantOpen on OperationalSessionRequest {
   Duration _openRemaining() {
     _live();
+    if (_registry.targetChangesBlocked) throw StateError('UNAUTHORIZED');
     final remaining = _began + rpcDeadline - _registry._clock();
     if (remaining <= Duration.zero) throw StateError('TIMEOUT');
     return remaining;

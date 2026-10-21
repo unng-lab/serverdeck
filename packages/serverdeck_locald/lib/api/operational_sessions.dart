@@ -12,6 +12,39 @@ const _mcpMethods = {
 /// Same owner-isolate registry for all operational owner/MCP channels. Public
 /// methods cannot create a session or change its verified role.
 final class OperationalSessions {
+  /// Trusted locald composition creates its generation keeper before intake.
+  /// The caller still owns the peer; this registry owns only the derived gate.
+  static Future<OperationalSessions> withNativePublicationGate({
+    required String generation,
+    required OperationalPipePeer peer,
+    Duration Function()? elapsed,
+    void Function(String)? onDetached,
+    void Function(String)? onExpiredChannel,
+    void Function()? onChanged,
+  }) async {
+    requireUuid(generation);
+    _clientRole(peer); // Requires an actual locald-side native peer.
+    final creating = peer.publicationGate(generation);
+    creating.ignore();
+    try {
+      final gate = await creating.timeout(rpcDeadline);
+      final registry = OperationalSessions(
+        generation: generation,
+        elapsed: elapsed,
+        onDetached: onDetached,
+        onExpiredChannel: onExpiredChannel,
+        onChanged: onChanged,
+      );
+      registry._targets = _TargetChanges(registry, gate);
+      return registry;
+    } catch (error) {
+      creating.then<void>((gate) => gate.close()).ignore();
+      throw StateError(
+        error is TimeoutException ? 'TIMEOUT' : 'SERVICE_UNAVAILABLE',
+      );
+    }
+  }
+
   OperationalSessions({
     required this.generation,
     Duration Function()? elapsed,
@@ -31,6 +64,51 @@ final class OperationalSessions {
   final void Function()? _onChanged;
   final _sessions = <String, _OperationalSession>{};
   final _detachListeners = <void Function(String)>{};
+  _TargetChanges? _targets;
+  Future<void>? _closeFuture;
+
+  int get targetChangeInterests => _targets?._interests.length ?? 0;
+  bool get targetChangesBlocked =>
+      _stopping ||
+      (_targets?._interests.isNotEmpty ?? false) ||
+      (_targets?.gate.isClosed ?? false);
+
+  /// The synchronous call reserves the open fence before any native await.
+  /// Each mutation owns its own gate lease; overlapping mutations serialize.
+  Future<OperationalTargetChangeLease> beginTargetChange({
+    Duration deadline = rpcDeadline,
+  }) {
+    if (_stopping) return Future.error(StateError('SERVICE_UNAVAILABLE'));
+    final targets = _targets;
+    if (targets == null) return Future.error(StateError('NOT_READY'));
+    return targets.begin(deadline);
+  }
+
+  Future<void> close() {
+    if (_closeFuture != null) return _closeFuture!;
+    final done = Completer<void>();
+    _closeFuture = done.future;
+    done.future.ignore();
+    var failed = false;
+    try {
+      stop();
+    } catch (_) {
+      failed = true;
+    }
+    Future<void>(() async {
+      try {
+        await _targets?.close();
+      } catch (_) {
+        failed = true;
+      }
+      if (failed) throw StateError('SERVICE_UNAVAILABLE');
+    }).then<void>(
+      (_) => done.complete(),
+      onError: (Object _) =>
+          done.completeError(StateError('SERVICE_UNAVAILABLE')),
+    );
+    return done.future;
+  }
 
   void Function() onSessionDetached(void Function(String) listener) {
     if (_stopping) throw StateError('NOT_READY');
@@ -160,8 +238,20 @@ final class OperationalSessions {
   void stop() {
     if (_stopping) return;
     _stopping = true;
-    for (final channel in _sessions.keys.toList()) disconnect(channel);
-    _watch.stop();
+    _targets?.stop();
+    var failed = false;
+    try {
+      for (final channel in _sessions.keys.toList()) {
+        try {
+          disconnect(channel);
+        } catch (_) {
+          failed = true;
+        }
+      }
+    } finally {
+      _watch.stop();
+    }
+    if (failed) throw StateError('UNAUTHORIZED');
   }
 }
 

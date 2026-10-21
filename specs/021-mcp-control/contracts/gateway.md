@@ -2,6 +2,8 @@
 
 [MCP](mcp.md), [native client](operational-client.md), [invocations](invocations.md), [tasks](../tasks.md), [native gate component](publication-gate.md).
 
+Concrete registry/open-fence construction, serialization, resource ownership and native acceptance follow [target-change fence](target-fence.md).
+
 ## Components and admission
 
 T104 implements `packages/serverdeck_mcp/lib/src/local_gateway.dart` as LocalMcpGateway, a McpGateway for the existing stdio McpServer. Its configured async factory LocalMcpGateway.connect receives one actual native OperationalClientSession, requires native mcp role and an already completed protected grant-open, then claims its OperationalApiClient. Wrong role/missing grant fails FORBIDDEN before claim/I/O and does not close a caller-owned session. No transport/role/credentials callbacks, locald/Isar/SSH import, arbitrary Local API proxy, key retention, reconnect or effect replay. Gateway owns its claimed client, timers, invocation interest and cleanup; locald remains owner of authority, operations and durable jobs.

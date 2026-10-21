@@ -317,6 +317,7 @@ Future<void> scenario(
   String root,
   String mode, {
   Duration initialWallOffset = Duration.zero,
+  void Function(PausedProtection)? inspectProtection,
   Future<void> Function(
     String,
     StateStore,
@@ -344,6 +345,7 @@ Future<void> scenario(
   );
   final local = p.join(root, 'private'), sid = currentUserSid();
   final protection = PausedProtection();
+  inspectProtection?.call(protection);
   final custody = KeyCustody(protection, sid);
   final key = await custody.openReceiptKey(
     await readProtectedFile(
