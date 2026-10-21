@@ -7,6 +7,7 @@ import 'package:cryptography/dart.dart';
 import 'package:serverdeck_locald/api/operational_auth.dart';
 import 'package:serverdeck_locald/api/operational_channel.dart';
 import 'package:serverdeck_locald/api/operational_server.dart';
+import 'package:serverdeck_locald/api/owner_grants.dart';
 import 'package:serverdeck_locald/mcp/router.dart';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/errors.dart';
@@ -537,6 +538,10 @@ Future<void> main(List<String> args) async {
       await bridge(args);
       return;
     }
+    if (args.first == 'client') {
+      await n.client(args);
+      return;
+    }
     final mode = args[1];
     await g.scenario(
       args[0],
@@ -559,11 +564,42 @@ Future<void> main(List<String> args) async {
         );
         final services = Services(mode);
         final control = Control(mode)..root = root;
-        final router = McpRouter(
-          sessions: registry,
-          authority: authority,
-          services: services,
-        );
+        late final McpRouter router;
+        var routerReady = false;
+        OperationalSessions? nativeRegistry;
+        n.Pair? mutationOwner;
+        var mutationEntered = false;
+        Future<void> revokeThroughOwner() async {
+          final owner = mutationOwner ??= await n.Pair.start(
+            root,
+            'serverdeck.exe',
+            registry,
+          );
+          await owner.exchange();
+          n.check(await owner.next() == 'AUTH:owner');
+          final request = await registry.begin(
+            owner.channel,
+            owner.response!.sessionId,
+            'grants.revoke',
+          );
+          try {
+            final pending =
+                OperationalGrantOwnerApi(
+                  store: store,
+                  sessions: registry,
+                ).dispatch(request, 'grants.revoke', {
+                  'requestId': '92345678-1234-4234-8234-123456789abc',
+                  'grantId': g.grantId,
+                  'expectedRevision':
+                      store.operational.automation.grants[g.grantId]!.revision,
+                });
+            mutationEntered = true;
+            await pending;
+          } finally {
+            request.complete();
+          }
+        }
+
         Process? child;
         OperationalServerChannel? channel;
         OperationalPublicationGate? ownerGate;
@@ -578,6 +614,17 @@ Future<void> main(List<String> args) async {
           final client = transport = Wire(child);
           await accepting;
           final peer = await worker.verifyOperationalPeer();
+          registry = nativeRegistry =
+              await OperationalSessions.withNativePublicationGate(
+                generation: n.generation,
+                peer: peer,
+              );
+          router = McpRouter(
+            sessions: registry,
+            authority: authority,
+            services: services,
+          );
+          routerReady = true;
           ownerGate = await peer.publicationGate(n.generation);
           final handshake = OperationalServerHandshake(
             peer: peer,
@@ -884,16 +931,12 @@ Future<void> main(List<String> args) async {
               var changed = false;
               final mutation = Future<void>(() async {
                 if (mode != 'publish-order') return;
-                final lease = await ownerGate!.acquire();
-                try {
-                  await write('grant.revoke');
-                  changed = true;
-                } finally {
-                  await lease.close();
-                }
+                await revokeThroughOwner();
+                changed = true;
               });
               mutation.ignore();
               if (mode == 'publish-order') {
+                await until(() => mutationEntered);
                 await Future<void>.delayed(const Duration(milliseconds: 50));
                 n.check(!changed);
               }
@@ -947,15 +990,11 @@ Future<void> main(List<String> args) async {
               await until(() => services.calls == 2);
               var changed = false;
               final mutation = Future<void>(() async {
-                final lease = await ownerGate!.acquire();
-                try {
-                  await write('grant.revoke');
-                  changed = true;
-                } finally {
-                  await lease.close();
-                }
+                await revokeThroughOwner();
+                changed = true;
               });
               mutation.ignore();
+              await until(() => mutationEntered);
               await Future<void>.delayed(const Duration(milliseconds: 80));
               n.check(!changed);
               final first = await client.next();
@@ -1042,7 +1081,7 @@ Future<void> main(List<String> args) async {
                   .writeAsStringSync('cleanup-channel');
             if (channel != null) await channel.close();
           } finally {
-            router.close();
+            if (routerReady) router.close();
             if (mode == 'stdout-stop')
               File(p.join(root, 'gateway-fixture-phase'))
                   .writeAsStringSync('cleanup-child');
@@ -1052,6 +1091,7 @@ Future<void> main(List<String> args) async {
               File(p.join(root, 'gateway-fixture-phase'))
                   .writeAsStringSync('cleanup-lines');
             await transport?.lines.cancel();
+            await mutationOwner?.close();
             try {
               try {
                 if (mode == 'stdout-stop')
@@ -1067,7 +1107,17 @@ Future<void> main(List<String> args) async {
               if (mode == 'stdout-stop')
                 File(p.join(root, 'gateway-fixture-phase'))
                     .writeAsStringSync('cleanup-worker');
-              await worker.close();
+              try {
+                try {
+                  await nativeRegistry?.close();
+                } on StateError catch (error) {
+                  if (mode != 'stdout-stop' ||
+                      error.message != 'SERVICE_UNAVAILABLE')
+                    rethrow;
+                }
+              } finally {
+                await worker.close();
+              }
             }
           }
         }

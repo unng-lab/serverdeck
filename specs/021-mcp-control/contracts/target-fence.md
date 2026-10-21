@@ -2,6 +2,8 @@
 
 [Gateway](gateway.md), [native gate](publication-gate.md), [ordinary channel](operational-channel.md), [tasks](../tasks.md).
 
+Authority-only services use the same registry's runAuthorityMutation helper without a target open fence; [native owner grant writes](owner-grants.md) define its admission, queue ordering and physical effect lifetime.
+
 ## Ownership and construction
 
 OperationalSessions.withNativePublicationGate in packages/serverdeck_locald/lib/api/operational_sessions.dart is an asynchronous trusted locald composition factory. It requires a real locald-side OperationalPipePeer, validates the generation UUID and derives a gate for that registry generation through the peer's native bundle proof. It returns only after the generation keeper exists; the caller retains its peer. Failed construction does not return a registry or mutate targets, observes any late gate creation and closes the late gate. The factory has the existing5second RPC budget and fixed TIMEOUT/SERVICE_UNAVAILABLE failures; a wrong native self role fails UNAUTHORIZED before creating a gate. No caller-supplied role, transport, lock or authority provider can replace native proof.

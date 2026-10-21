@@ -5,11 +5,13 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'package:serverdeck_locald/api/operational_auth.dart';
+import 'package:serverdeck_locald/api/owner_grants.dart';
 import 'package:serverdeck_locald/api/operational_channel.dart';
 import 'package:serverdeck_locald/api/operational_server.dart';
 import 'package:serverdeck_locald/mcp/router.dart';
 import 'package:serverdeck_locald/mcp/grants.dart';
 import 'package:serverdeck_protocol/mcp/readiness.dart';
+import 'package:serverdeck_protocol/mcp/handshake.dart';
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 import 'package:serverdeck_windows/security.dart';
@@ -19,6 +21,86 @@ import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
 import 'operational_auth_actor.dart' as a;
 import 'operational_grant_actor.dart' as g;
 import 'operational_channel_actor.dart' as wire;
+import 'gateway_actor.dart' as gateway;
+
+Map<String, Object?> grantWriteParams() => {
+  'requestId': '52345678-1234-4234-8234-123456789abc',
+  'grantId': g.grantId,
+  'expectedRevision': 4,
+  'label': 'owner adapter snapshot',
+  'scopes': ['author'],
+  'serverIds': <String>[],
+  'lifetimeSeconds': 300,
+};
+
+final class CountingOwner implements OperationalOwnerApi {
+  CountingOwner(this.delegate);
+  final OperationalOwnerApi delegate;
+  int calls = 0;
+  @override
+  bool supports(String method) => delegate.supports(method);
+  @override
+  Future<Map<String, Object?>> dispatch(
+    OperationalSessionRequest request,
+    String method,
+    Map<String, Object?> params,
+  ) {
+    calls++;
+    return delegate.dispatch(request, method, params);
+  }
+}
+
+Future<void> ownerClient(List<String> args) async {
+  a.ownRoot(args[2]);
+  final pipe = await PipeWorker.openOperationalClient(
+    args[1],
+    currentUserSid(),
+    args[2],
+  );
+  OperationalApiClient? client;
+  try {
+    final session = await OperationalBootstrapClient(
+      pipe: pipe,
+      generation: a.generation,
+      token: a.token,
+    ).authenticate();
+    if (session.role == OperationalRole.mcp)
+      await session.openGrant(g.files(args[2]), g.grantId);
+    client = OperationalApiClient(session);
+    stdout.writeln('READY');
+    await for (final command
+        in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
+      final params = grantWriteParams();
+      final method = switch (command) {
+        'replace' => 'grants.replace',
+        'create' => 'grants.create',
+        'revoke' => 'grants.revoke',
+        _ => throw StateError('UNKNOWN_OWNER_COMMAND'),
+      };
+      if (command == 'create') {
+        params.remove('expectedRevision');
+        params['requestId'] = '62345678-1234-4234-8234-123456789abc';
+        params['grantId'] = '72345678-1234-4234-8234-123456789abc';
+      }
+      if (command == 'revoke') {
+        params.clear();
+        params.addAll({
+          'requestId': '82345678-1234-4234-8234-123456789abc',
+          'grantId': g.grantId,
+          'expectedRevision': 5,
+        });
+      }
+      try {
+        stdout.writeln(jsonEncode(await client.call(method, params)));
+      } on OperationalRpcException catch (error) {
+        stdout.writeln('ERROR:${error.code.wireName}');
+      }
+    }
+  } finally {
+    await client?.close();
+    await pipe.close();
+  }
+}
 
 Future<void> until(bool Function() condition) async {
   final watch = Stopwatch()..start();
@@ -46,6 +128,10 @@ Future<void> deniedChange(
 
 Future<void> main(List<String> args) async {
   containCurrentFixtureTree();
+  if (args.first == 'owner-client') {
+    await ownerClient(args);
+    return;
+  }
   if (args.first == 'client') {
     if (args[3] == 'factory-deny') {
       final pipe = await PipeWorker.openOperationalClient(
@@ -98,6 +184,7 @@ Future<void> main(List<String> args) async {
         OperationalSessions? owned;
         OperationalPublicationGate? external;
         OperationalPublicationLease? blocked;
+        Completer<void>? authorityRelease;
         Future<a.Pair> pair(
           String image,
           OperationalSessions sessions, {
@@ -138,7 +225,260 @@ Future<void> main(List<String> args) async {
           final opening = await request(mcp, 'mcp.open');
           final signed = await g.signedParams(root, mcp);
           if (mode != 'in-flight') await opening.openGrant(authority, signed);
-          if (mode == 'factory-role') {
+          if (mode == 'owner-write') {
+            final adapter = OperationalGrantOwnerApi(
+              store: store,
+              sessions: registry,
+            );
+            final mcpRequest = await request(mcp, 'session.ping');
+            await a.fails(
+              adapter.dispatch(mcpRequest, 'grants.replace', {}),
+              'FORBIDDEN',
+            );
+            final foreign = await request(seed, 'grants.replace');
+            await a.fails(
+              adapter.dispatch(foreign, 'grants.replace', {}),
+              'FORBIDDEN',
+            );
+            external = await seed.peer!.publicationGate(a.generation);
+            blocked = await external.acquire();
+            final ownerRequest = await request(owner, 'grants.replace');
+            final params = grantWriteParams();
+            var finished = false;
+            final work = adapter.dispatch(
+              ownerRequest,
+              'grants.replace',
+              params,
+            );
+            work.then((_) {
+              finished = true;
+            }).ignore();
+            params['label'] = 'must not be captured after await';
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            a.check(
+              !finished &&
+                  store.operational.automation.grants[g.grantId]!.revision == 4,
+            );
+            await blocked.close();
+            blocked = null;
+            final ack = await work;
+            final saved = store.operational.automation.grants[g.grantId]!;
+            a.check(
+              ack.length == 2 &&
+                  ack['grantId'] == g.grantId &&
+                  ack['revision'] == 5 &&
+                  saved.label == 'owner adapter snapshot',
+            );
+            final retry = await request(owner, 'grants.replace');
+            final repeated = await adapter.dispatch(
+              retry,
+              'grants.replace',
+              grantWriteParams(),
+            );
+            a.check(
+              jsonEncode(repeated) == jsonEncode(ack) &&
+                  store.operational.automation.grants[g.grantId]!.secretRef ==
+                      saved.secretRef,
+            );
+            final conflict = await request(owner, 'grants.replace');
+            await a.fails(
+              adapter.dispatch(conflict, 'grants.replace', {
+                ...grantWriteParams(),
+                'label': 'conflicting retry',
+              }),
+              'IDEMPOTENCY_CONFLICT',
+            );
+            a.check(
+              store.operational.automation.grants[g.grantId]!.revision == 5,
+            );
+          } else if (mode == 'authority-close') {
+            external = await seed.peer!.publicationGate(a.generation);
+            final entered = Completer<void>();
+            authorityRelease = Completer<void>();
+            final work = registry.runAuthorityMutation(() async {
+              final ack = await OwnerGrantService(store)
+                  .submitOwner('grant.replace', grantWriteParams());
+              entered.complete();
+              await authorityRelease!.future;
+              return ack;
+            });
+            work.ignore();
+            await entered.future.timeout(const Duration(seconds: 5));
+            var closed = false;
+            final closing = registry.close();
+            closing.then((_) {
+              closed = true;
+            }).ignore();
+            await gateway.publicationHeld(root);
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            a.check(
+              !closed &&
+                  store.operational.automation.grants[g.grantId]!.revision == 5,
+            );
+            authorityRelease.complete();
+            a.check((await work)['revision'] == 5);
+            await closing;
+            final free = await external.acquire();
+            await free.close();
+          } else if (mode == 'owner-wire' || mode == 'owner-wire-mcp') {
+            final denied = mode == 'owner-wire-mcp';
+            final name = a.pipeName();
+            final worker = await PipeWorker.createOperationalServer(
+              name,
+              currentUserSid(),
+              root,
+            );
+            Process? child;
+            StreamIterator<String>? lines;
+            Future<String>? errors;
+            OperationalServerChannel? channel;
+            McpRouter? router;
+            try {
+              final accepting = worker.accept();
+              child = await Process.start(
+                p.join(root, denied ? 'mcp.exe' : 'serverdeck.exe'),
+                ['owner-client', name, root],
+              );
+              errors = child.stderr.transform(utf8.decoder).join();
+              lines = StreamIterator(
+                child.stdout
+                    .transform(utf8.decoder)
+                    .transform(const LineSplitter()),
+              );
+              await accepting;
+              final services = wire.Services('normal');
+              router = McpRouter(
+                sessions: registry,
+                authority: authority,
+                services: services,
+              );
+              final adapter = CountingOwner(
+                OperationalGrantOwnerApi(store: store, sessions: registry),
+              );
+              channel = OperationalServerChannel(
+                handshake: OperationalServerHandshake(
+                  peer: await worker.verifyOperationalPeer(),
+                  token: a.token,
+                  channel: name,
+                  sessions: registry,
+                ),
+                server: OperationalApiServer(
+                  sessions: registry,
+                  authority: authority,
+                  router: router,
+                  owner: adapter,
+                  readiness: () => OperationalReadiness(
+                    state: ReadinessState.ready,
+                    generation: a.generation,
+                    workspaceId: g.workspaceId,
+                  ),
+                ),
+              );
+              final serving = channel.run();
+              serving.ignore();
+              Future<String> next() async {
+                final reader = lines!;
+                a.check(
+                  await reader.moveNext().timeout(const Duration(seconds: 10)),
+                );
+                a.check(reader.current.length < 512);
+                return reader.current;
+              }
+
+              a.check(await next() == 'READY');
+              external = await seed.peer!.publicationGate(a.generation);
+              blocked = await external.acquire();
+              child.stdin.writeln('replace');
+              if (denied) {
+                a.check(
+                  await next() == 'ERROR:FORBIDDEN' &&
+                      adapter.calls == 0 &&
+                      store
+                              .operational
+                              .automation
+                              .grants[g.grantId]!
+                              .revision ==
+                          4,
+                );
+                await blocked.close();
+                blocked = null;
+              } else {
+                var replied = false;
+                final response = next();
+                response.then((_) {
+                  replied = true;
+                }).ignore();
+                await until(() => adapter.calls == 1);
+                await Future<void>.delayed(const Duration(milliseconds: 100));
+                a.check(
+                  !replied &&
+                      store
+                              .operational
+                              .automation
+                              .grants[g.grantId]!
+                              .revision ==
+                          4,
+                );
+                await blocked.close();
+                blocked = null;
+                final ack = jsonDecode(await response) as Map;
+                a.check(
+                  ack.length == 2 &&
+                      ack['grantId'] == g.grantId &&
+                      ack['revision'] == 5,
+                );
+                final secret =
+                    store.operational.automation.grants[g.grantId]!.secretRef;
+                child.stdin.writeln('replace');
+                a.check(
+                  jsonEncode(jsonDecode(await next())) == jsonEncode(ack) &&
+                      store
+                              .operational
+                              .automation
+                              .grants[g.grantId]!
+                              .secretRef ==
+                          secret,
+                );
+                child.stdin.writeln('create');
+                final created = jsonDecode(await next()) as Map;
+                a.check(
+                  created['grantId'] ==
+                          '72345678-1234-4234-8234-123456789abc' &&
+                      created['revision'] == 1,
+                );
+                child.stdin.writeln('revoke');
+                final revoked = jsonDecode(await next()) as Map;
+                a.check(
+                  revoked['grantId'] == g.grantId &&
+                      revoked['revision'] == 6 &&
+                      store
+                              .operational
+                              .automation
+                              .grants[g.grantId]!
+                              .revokedAt !=
+                          null,
+                );
+                a.check(adapter.calls == 4);
+              }
+              await a.finishClient(child);
+              await serving.timeout(const Duration(seconds: 10));
+              a.check(
+                await child.exitCode == 0 &&
+                    (await errors).isEmpty &&
+                    services.calls == 0,
+              );
+            } finally {
+              try {
+                await channel?.close();
+              } finally {
+                router?.close();
+                child?.kill();
+                if (child != null) await child.exitCode;
+                await lines?.cancel();
+                await worker.close();
+              }
+            }
+          } else if (mode == 'factory-role') {
             final negative = await pair(
               'mcp.exe',
               registry,
@@ -397,6 +737,8 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           protection.release();
+          if (authorityRelease != null && !authorityRelease.isCompleted)
+            authorityRelease.complete();
           await blocked?.close();
           for (final lease in changes) {
             await lease.close();

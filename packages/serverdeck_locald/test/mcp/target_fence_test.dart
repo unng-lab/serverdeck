@@ -30,4 +30,26 @@ void main() {
     );
     await closing;
   });
+  test('authority work has no unprepared or closed fallback', () async {
+    final registry = OperationalSessions(generation: generation);
+    var calls = 0;
+    Future<int> effect() async => ++calls;
+    await expectLater(
+      registry.runAuthorityMutation(effect),
+      throwsA(isA<StateError>().having((e) => e.message, 'code', 'NOT_READY')),
+    );
+    expect(registry.hasNativePublicationGate, false);
+    await registry.close();
+    await expectLater(
+      registry.runAuthorityMutation(effect),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'code',
+          'SERVICE_UNAVAILABLE',
+        ),
+      ),
+    );
+    expect(calls, 0);
+  });
 }

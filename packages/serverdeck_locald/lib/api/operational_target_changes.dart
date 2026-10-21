@@ -8,6 +8,25 @@ final class _TargetChanges {
   final _interests = <_TargetChangeInterest>{};
   Future<void>? _closeFuture;
 
+  Future<T> runAuthority<T>(
+    Future<T> Function() effect,
+    Duration deadline,
+  ) async {
+    if (gate.isClosed) throw StateError('SERVICE_UNAVAILABLE');
+    if (deadline <= Duration.zero) throw StateError('TIMEOUT');
+    final budget = deadline < rpcDeadline ? deadline : rpcDeadline;
+    final watch = Stopwatch()..start();
+    OperationalPublicationLease? lease;
+    try {
+      lease = await gate.acquire(deadline: budget);
+      if (watch.elapsed >= budget) throw StateError('TIMEOUT');
+      if (registry._stopping) throw StateError('SERVICE_UNAVAILABLE');
+      return await effect();
+    } finally {
+      await lease?.close();
+    }
+  }
+
   Future<OperationalTargetChangeLease> begin(Duration deadline) {
     if (gate.isClosed) return Future.error(StateError('SERVICE_UNAVAILABLE'));
     if (deadline <= Duration.zero) return Future.error(StateError('TIMEOUT'));

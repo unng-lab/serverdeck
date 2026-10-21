@@ -68,6 +68,8 @@ final class OperationalSessions {
   Future<void>? _closeFuture;
 
   int get targetChangeInterests => _targets?._interests.length ?? 0;
+  bool get hasNativePublicationGate =>
+      !_stopping && _targets != null && !_targets!.gate.isClosed;
   bool get targetChangesBlocked =>
       _stopping ||
       (_targets?._interests.isNotEmpty ?? false) ||
@@ -82,6 +84,18 @@ final class OperationalSessions {
     final targets = _targets;
     if (targets == null) return Future.error(StateError('NOT_READY'));
     return targets.begin(deadline);
+  }
+
+  /// Trusted authority services enter before joining the store's write queue.
+  /// The effect remains owned through actual completion after a reply timeout.
+  Future<T> runAuthorityMutation<T>(
+    Future<T> Function() effect, {
+    Duration deadline = rpcDeadline,
+  }) {
+    if (_stopping) return Future.error(StateError('SERVICE_UNAVAILABLE'));
+    final targets = _targets;
+    if (targets == null) return Future.error(StateError('NOT_READY'));
+    return targets.runAuthority(effect, deadline);
   }
 
   Future<void> close() {
@@ -280,6 +294,8 @@ final class OperationalSessionRequest {
   final _OperationalSession _session;
   final String channel, method;
   final Duration _began;
+  bool belongsTo(OperationalSessions registry) =>
+      identical(_registry, registry);
   bool _completed = false;
   bool _firstOpen = false;
   OperationalOpenFailure? _openFailure;
