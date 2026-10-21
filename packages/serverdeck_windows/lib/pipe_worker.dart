@@ -1,17 +1,30 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'pipe.dart';
 import 'process.dart';
+import 'security.dart';
+import 'mcp_build_bundle.dart';
+export 'mcp_build_bundle.dart' show BundlePeerRole;
+
+part 'operational_pipe_worker.dart';
 
 /// Only messages cross isolates; native pipe and process handles stay in worker.
 class PipeWorker {
-  PipeWorker._(this._input, this._output, this._exited, this._pending);
+  PipeWorker._(
+    this._input,
+    this._output,
+    this._exited,
+    this._pending,
+    this._operational,
+  );
   final SendPort _input;
   final ReceivePort _output;
   final Future<void> _exited;
   final Map<int, Completer<Object?>> _pending;
+  final bool _operational;
   int _next = 0;
   bool _closing = false;
   Future<void>? _closeFuture;
@@ -21,15 +34,45 @@ class PipeWorker {
       _start(name, sid, true);
   static Future<PipeWorker> openClient(String name, String sid) =>
       _start(name, sid, false);
-  static Future<PipeWorker> _start(String name, String sid, bool server) async {
+  static Future<PipeWorker> createOperationalServer(
+    String name,
+    String sid,
+    String appRoot, {
+    bool testOnly = false,
+  }) => _start(name, sid, true, appRoot: appRoot, testOnly: testOnly);
+  static Future<PipeWorker> openOperationalClient(
+    String name,
+    String sid,
+    String appRoot, {
+    bool testOnly = false,
+  }) => _start(name, sid, false, appRoot: appRoot, testOnly: testOnly);
+  static Future<PipeWorker> _start(
+    String name,
+    String sid,
+    bool server, {
+    String? appRoot,
+    bool testOnly = false,
+  }) async {
     final output = ReceivePort(), done = ReceivePort();
     final pending = <int, Completer<Object?>>{};
     final ready = Completer<SendPort>();
     ready.future.ignore();
     final exited = Completer<void>();
+    var spawned = false;
     output.listen((message) {
       if (message is SendPort) {
         if (!ready.isCompleted) ready.complete(message);
+        return;
+      }
+      if (message is List &&
+          message.length == 3 &&
+          message[0] == 'startupError' &&
+          message[2] is SendPort) {
+        // Acknowledge the classified failure before the worker exits; separate
+        // onExit/output ports must not race away the safe startup error code.
+        (message[2] as SendPort).send('startupErrorAck');
+        if (!ready.isCompleted)
+          ready.completeError(StateError(_safeCode(message[1])));
         return;
       }
       if (message is! List || message.length != 3 || message[0] is! int) return;
@@ -58,9 +101,18 @@ class PipeWorker {
         name,
         sid,
         server,
+        if (appRoot != null) {'appRoot': appRoot, 'testOnly': testOnly},
       ], onExit: done.sendPort);
-      return PipeWorker._(await ready.future, output, exited.future, pending);
+      spawned = true;
+      return PipeWorker._(
+        await ready.future,
+        output,
+        exited.future,
+        pending,
+        appRoot != null,
+      );
     } catch (_) {
+      if (spawned && appRoot != null) await exited.future;
       output.close();
       done.close();
       rethrow;
@@ -101,6 +153,18 @@ class PipeWorker {
 
   Future<void> verifyPeer(String sid, String image, String sha256) async =>
       await _call('verify', [sid, image, sha256]);
+  Future<OperationalPipePeer> verifyOperationalPeer() async {
+    if (!_operational) throw StateError('UNAUTHORIZED');
+    final result = (await _call('peerVerify', null)) as List;
+    return OperationalPipePeer._(
+      this,
+      result[0] as int,
+      BundlePeerRole.values.singleWhere((r) => r.name == result[1]),
+      result[2] as String,
+      BundlePeerRole.values.singleWhere((r) => r.name == result[3]),
+    );
+  }
+
   Future<void> disconnect() => _disconnectFuture ??= _disconnect();
   Future<void> _disconnect() async {
     // Teardown is admitted independently of the ordinary I/O quota. Repeated
@@ -130,11 +194,18 @@ class PipeWorker {
         'IDENTITY_UNAVAILABLE',
         'TIMEOUT',
         'RESOURCE_LIMIT',
+        'UNAUTHORIZED',
+        'INCOMPATIBLE',
+        'PREREQUISITE_UNAVAILABLE',
       }.contains(code)
       ? code as String
       : 'SERVICE_UNAVAILABLE';
 
   static void _worker(List<Object> startup) {
+    if (startup.length == 5) {
+      _operationalWorker(startup).ignore();
+      return;
+    }
     final output = startup[0] as SendPort;
     final input = ReceivePort();
     late final NativePipe pipe;

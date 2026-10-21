@@ -11,6 +11,17 @@ class StrictCodec implements ProtocolCodec {
     List<int> bytes, {
     int maxBytes = maxRequestBytes,
   }) {
+    final value = decodeValue(bytes, maxBytes: maxBytes);
+    if (value is! Map<String, Object?>) {
+      throw const FormatException('INVALID_FRAME');
+    }
+    return value;
+  }
+
+  /// Bounded JSON syntax parsing without the Local API's object-only envelope
+  /// rule. External adapters can distinguish valid JSON from an invalid RPC
+  /// shape, while existing [decode] callers retain exactly the same contract.
+  Object? decodeValue(List<int> bytes, {int maxBytes = maxRequestBytes}) {
     if (bytes.isEmpty || bytes.length > maxBytes) {
       throw const FormatException('INVALID_FRAME');
     }
@@ -18,8 +29,7 @@ class StrictCodec implements ProtocolCodec {
       final parser = _JsonParser(utf8.decode(bytes, allowMalformed: false));
       final value = parser.value(0);
       parser.space();
-      if (parser.index != parser.text.length ||
-          value is! Map<String, Object?>) {
+      if (parser.index != parser.text.length) {
         throw const FormatException('INVALID_FRAME');
       }
       return value;

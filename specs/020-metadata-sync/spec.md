@@ -58,6 +58,11 @@
 
 ## Requirements
 
+### MCP amendment — 2026-10-21
+
+Client credentials, grants/delegations, approvals, trust, executor receipts и действующие jobs [021](../021-mcp-control/spec.md) локальны и не входят в sync. Профили автоматизации/desired state также не синхронизируются первой версией: перенос исполняемого авторского содержимого требует отдельного согласованного расширения. Полученные из backend метаданные не создают ИИ полномочия, не активируют профиль и не запускают задание.
+
+
 ### Scope и зависимости
 
 Обязательные предшественники: [001](../001-service-foundation/spec.md), [002](../002-security-storage/spec.md), [008](../008-fleet-workspace/spec.md), [019](../019-specialized-capabilities/spec.md).

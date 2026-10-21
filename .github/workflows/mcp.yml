@@ -1,0 +1,60 @@
+name: MCP automatic checks
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  executor-prerequisites:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker systemd and locked Ansible prerequisites
+        run: bash tools/test-executor-container.sh
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned hosted MSVC
+        shell: pwsh
+        run: ./tools/prepare-foundation-hosted-msvc.ps1
+      - name: Install verified pinned SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'foundation-sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'foundation-sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Prepare pinned SDK dependencies
+        shell: pwsh
+        run: ./tools/prepare-foundation-sdk.ps1
+      - name: MCP transport checks
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_mcp
+          try {
+            Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile')
+            Invoke-FoundationCommand $FoundationDart @('analyze')
+            Invoke-FoundationCommand $FoundationDart @('test')
+          } finally { Pop-Location }
+      - name: Source-built native library and root/package automatic suites
+        shell: pwsh
+        run: ./tools/test-foundation-cold-runner.ps1
+      - name: Preserve safe proof only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-automatic-safe-proof
+          path: |
+            .local/cold-runner-*/safe-*.json
+            .local/native-qualification-*/safe-*.json
+            .local/native-build-progress-*/safe-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

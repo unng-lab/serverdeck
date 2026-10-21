@@ -1,0 +1,18 @@
+{
+  "bootstrapClient": {
+    "canonical": "{\"apiMajor\":1,\"apiMinor\":1,\"buildId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+Debug+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"clientNonce\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI\",\"clientRole\":\"mcp\",\"generation\":\"12345678-1234-4234-8234-123456789abc\",\"product\":\"serverdeck-next\",\"purpose\":\"serverdeck-next-bootstrap-client-v1.1\",\"requestedCapabilities\":[\"mcp\"],\"serverNonce\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\",\"workspaceSlot\":\"default\"}",
+    "hmacSha256": "b31ae18eb35c46d4cd0623f54b72c18944052c35a71169bd17ebb34661d3ba22"
+  },
+  "bootstrapServer": {
+    "canonical": "{\"apiMajor\":1,\"apiMinor\":1,\"buildId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+Debug+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"capabilities\":[\"mcp\"],\"clientNonce\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI\",\"clientRole\":\"mcp\",\"generation\":\"12345678-1234-4234-8234-123456789abc\",\"idleLeaseSeconds\":60,\"product\":\"serverdeck-next\",\"purpose\":\"serverdeck-next-bootstrap-server-v1.1\",\"requestedCapabilities\":[\"mcp\"],\"serverNonce\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\",\"sessionId\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM\",\"workspaceSlot\":\"default\"}",
+    "hmacSha256": "be4ae60f760662ae450aa787c741091dcca76df29d88543598271ace228c82a3"
+  },
+  "openClient": {
+    "canonical": "{\"apiMajor\":1,\"apiMinor\":1,\"buildId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+Debug+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"clientNonce\":\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ\",\"clientRole\":\"mcp\",\"generation\":\"12345678-1234-4234-8234-123456789abc\",\"grantId\":\"12345678-1234-4234-8234-123456789abe\",\"product\":\"serverdeck-next\",\"purpose\":\"serverdeck-next-mcp-open-client-v1.1\",\"secretRef\":\"12345678-1234-4234-8234-123456789abf\",\"serverNonce\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\",\"sessionId\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM\",\"workspaceId\":\"12345678-1234-4234-8234-123456789abd\",\"workspaceSlot\":\"default\"}",
+    "hmacSha256": "2d43a5742c844d0230cd7f21122bce65daf241608c7df467bc0111ebbef4749f"
+  },
+  "openServer": {
+    "canonical": "{\"apiMajor\":1,\"apiMinor\":1,\"buildId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+Debug+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"clientNonce\":\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ\",\"clientRole\":\"mcp\",\"expiresAt\":\"2027-01-01T00:00:00.000Z\",\"generation\":\"12345678-1234-4234-8234-123456789abc\",\"grantId\":\"12345678-1234-4234-8234-123456789abe\",\"product\":\"serverdeck-next\",\"purpose\":\"serverdeck-next-mcp-open-server-v1.1\",\"revision\":7,\"secretRef\":\"12345678-1234-4234-8234-123456789abf\",\"serverNonce\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\",\"sessionId\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM\",\"workspaceId\":\"12345678-1234-4234-8234-123456789abd\",\"workspaceSlot\":\"default\"}",
+    "hmacSha256": "1a1eef0b822990a0fc647e22a02c149ae817618c75fdb47a827115dc54bf76ac"
+  }
+}

@@ -276,3 +276,7 @@ because an earlier local build contained it. Destination must be empty, owned,
 plain and disjoint from the source; source and failed fixtures are preserved.
 Missing/invalid-DLL and manifest/hash negative cases retain their deliberate
 minimal layouts and are not repaired by this positive-control copy.
+
+## Extension021 — 2026-10-21
+
+Bundle021 добавляет проверенный MCP executable, exact image hash и role. Прежний набор executable identities не разрешает авторизовывать новый bridge как UI. Изменение source/bundle bindings требует новой qualification; прежние native proofs не переносятся на новый bundle. См. [нормативное расширение](../../021-mcp-control/plan.md). Это описание будущего upgrade, не утверждение уже изменённого runtime.

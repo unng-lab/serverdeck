@@ -1,6 +1,6 @@
 # Состав сервиса и границы расширений
 
-Полное описание сервиса, обязанностей, жизненного цикла и первоначального результата находится в [001 — Основа сервиса](001-service-foundation/spec.md). Это общий указатель, не 21-я спецификация и не отдельный MR.
+Полное описание сервиса, обязанностей, жизненного цикла и первоначального результата находится в [001 — Основа сервиса](001-service-foundation/spec.md). Это общий указатель, не отдельная спецификация и не отдельный MR.
 
 ServerDeck состоит из пользовательского клиента и локальной службы текущего пользователя. Клиент ведёт интерфейс и согласие. Авторизованный Local API соединяет его с единственным locald пространства. locald владеет защищёнными данными, credentials/trust, SSH-чтением и координацией заданий. Первая реализация Windows читает существующий Linux-хост напрямую; облачный backend и privileged installer для этого не требуются.
 
@@ -30,3 +30,11 @@ ServerDeck состоит из пользовательского клиента
 | [018](018-security-controls/spec.md) | сбор security evidence и policy evaluation locald, отдельно разрешённый executor исправлений | Проверка политики read-only; remediation — отдельное согласие/job. Чувствительный сбор объявляет место, права, срок и lifecycle; backend ничего не получает автоматически. |
 | [019](019-specialized-capabilities/spec.md) | встроенный capability catalog/адаптеры locald, UI модулей и ограниченный executor | Дополнительный модуль расширяет определённый компонент 001 и не загружает произвольный исполняемый plugin. Новые runtime/prerequisites объявлены до включения; HA read-only и image build не получают полномочия failover/reinstall. |
 | [020](020-metadata-sync/spec.md) | sync coordinator locald, UI opt-in, отдельный backend авторизации/метаданных | Первый пакет с обязательной интеграцией backend: separate public repo, own authorization/revisions, без SSH executor. Locald остаётся владельцем локального состояния, secrets/trust/approval не синхронизируются; отказ backend не блокирует core 001. |
+
+## MCP и автоматизация — 2026-10-21
+
+[021](021-mcp-control/spec.md) добавляет стандартный MCP entry point → авторизованный locald → общие adapters/coordinator. Только locald держит SSH credentials. UI использует прежний Local API; ИИ не получает его UI capabilities. Авторские Ansible-профили хранятся в locald неизменными ревизиями. Отдельные grants/delegations задают цели, ревизии, параметры и срок; выдача прав/доверия остаётся у владельца. Внешний облачный backend для MCP не нужен.
+
+| Пакет | Компоненты | Ответственность |
+| --- | --- | --- |
+| [021](021-mcp-control/spec.md) | MCP bridge, locald grants/profile authoring, общий coordinator, Ansible executor и UI | Открыть ИИ чтение, настройки, журналы, создание/правку профилей, делегируемую установку и verified jobs без выдачи SSH-доступа |

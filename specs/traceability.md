@@ -264,3 +264,24 @@
 | AC-052, AC-053, AC-054 | [019](019-specialized-capabilities/spec.md) |
 
 Защитные требования действуют с первого применимого действия во всех потребителях. Общие SC каталога применяются по сценарию; собственные SC-SVC и компонентные LOCAL SC дают дополнительные outcomes. Проверка текста и наличие ID не доказывают выполнения приёмки.
+
+## MCP — 021
+
+| Requirement | Owner | Acceptance |
+| --- | --- | --- |
+| FR-MCP-001 | [021](021-mcp-control/spec.md) | AC-MCP-1A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-002 | [021](021-mcp-control/spec.md) | AC-MCP-1A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-003 | [021](021-mcp-control/spec.md) | AC-MCP-1A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-004 | [021](021-mcp-control/spec.md) | AC-MCP-1A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-005 | [021](021-mcp-control/spec.md) | AC-MCP-1A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-006 | [021](021-mcp-control/spec.md) | AC-MCP-2A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-007 | [021](021-mcp-control/spec.md) | AC-MCP-2A/B/C; cross-cutting SC-MCP-001–006 |
+| FR-MCP-008 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-009 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-010 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-011 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-012 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-013 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-014 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-015 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+| FR-MCP-016 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |

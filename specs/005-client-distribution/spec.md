@@ -58,6 +58,11 @@
 
 ## Requirements
 
+### MCP amendment — 2026-10-21
+
+Поставка [021](../021-mcp-control/spec.md) добавляет совместимый MCP executable и schemas/config examples в тот же проверенный bundle. Принимается его запуск стандартными MCP-клиентами и отказ чужой/несовместимой сборки. Control-node Ansible не нужен для локальных профилей/чтения; среда исполнения объявляется отдельно. Отсутствующий executor не разрешает скрытую подготовку сервера. Обновление сохраняет grants/revisions/jobs нового пространства, не повторяет первоначальный hard cutover.
+
+
 ### Scope и зависимости
 
 Обязательные предшественники: [001](../001-service-foundation/spec.md), [002](../002-security-storage/spec.md), [003](../003-design-system/spec.md), [004](../004-server-workspace/spec.md).

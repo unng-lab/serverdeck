@@ -68,3 +68,7 @@ Diagnostics: только timestamp, random requestId/generation, code, stage, d
 ## Compatibility
 
 001.1 UI/locald требуют одинаковый dev buildId/hash manifest и API1.0. Несовпадение→incompatible, данные/процессы не заменяются. Future minor policy/migrations оформляются следующим Plan; неизвестная backward compatibility не обещается. Нет unsafe-pipe fallback/kill/reset для исправления версии.
+
+## Extension021 — 2026-10-21
+
+В bundle021 API1.1 добавляет verified-image role owner/mcp, mcp.open/invoke/close и owner-only grants/delegations/approvals. Идентичность роли не выбирается клиентским requestedCapabilities. Старые методы/основная framing semantics сохраняются; API1.0 не используется как fallback. См. [нормативное расширение](../../021-mcp-control/contracts/mcp.md). Это описание будущего upgrade, не утверждение уже изменённого runtime.

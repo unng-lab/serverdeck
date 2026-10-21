@@ -58,6 +58,11 @@
 
 ## Requirements
 
+### MCP amendment — 2026-10-21
+
+[021](../021-mcp-control/spec.md) добавляет MCP-планы системных действий и авторские профили Ansible. Поддержанные service/configuration операции проходят те же ревизии/approval/coordinator/host lock/post-check, что UI. Создание профиля не разрешает новый тип системного действия. ИИ видит desired/observed и drift; исправление требует отдельного apply. Защита NetBird, power/failure и recovery requirements сохраняются.
+
+
 ### Scope и зависимости
 
 Обязательные предшественники: [001](../001-service-foundation/spec.md), [008](../008-fleet-workspace/spec.md), [009](../009-observability/spec.md).

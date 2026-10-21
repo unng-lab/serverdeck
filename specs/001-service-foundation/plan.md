@@ -217,3 +217,7 @@ the previous XZ preparation. See the native-artifact contract for the bounded
 TAR route, no fallback and new recipe-bound artifact requirements.
 
 Constitution VIII and T045/T207 require resolved native dependency/license coverage. The old release DLL graph remains unestablished. Build a new same-version artifact using [native-artifact contract](contracts/native-artifact.md), [research](research.md) and checked recipe/lock; qualify it before replacing the current provider. This is a build-input change, not a storage/API migration or new product capability. Components, pinning, artifact custody, qualification, notices, failure preservation and activation are defined in that contract. T232 covers design; T233 covers implementation and evidence. All stage/manual/CI gates remain separate and open. Constitution gates: source/hash/lock/license coverage must pass before activation; independent review and current checks are mandatory. No release publication or project-license decision follows from this design.
+
+## Extension021 — 2026-10-21
+
+[Plan021](../021-mcp-control/plan.md) и [Tasks021](../021-mcp-control/tasks.md) добавляют MCP роль, API1.1, schema2 preservation migration и необходимую реализацию чтений/jobs. Этот Plan остаётся историческим/действующим scope001.1, его completed evidence не квалифицирует расширение. При запуске Spec Kit001 явно выбирать feature_directory001; текущий feature context указывает021. Не включать мост автоматизации в owner UI capabilities по умолчанию.

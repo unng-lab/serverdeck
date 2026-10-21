@@ -58,6 +58,11 @@
 
 ## Requirements
 
+### MCP amendment — 2026-10-21
+
+[021](../021-mcp-control/spec.md) даёт ИИ те же ограниченные журналы/наблюдения locald через MCP. Фильтры и курсоры привязаны к target/trust/grant revision; отзыв останавливает выдачу, включая delayed results. UI и MCP не умножают буферы/SSH/polling. «Активный клиентский интерес» включает MCP без открытого UI; disconnect завершает его чтения, не означает отмену durable job. Непрерывный monitoring этим не добавляется.
+
+
 ### Scope и зависимости
 
 Обязательные предшественники: [001](../001-service-foundation/spec.md), [004](../004-server-workspace/spec.md), [008](../008-fleet-workspace/spec.md).

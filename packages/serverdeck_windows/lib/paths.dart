@@ -160,6 +160,114 @@ Future<List<int>> readProtectedFile(
   }
 });
 
+/// Copy a retained protected regular file in64KiB chunks into a new protected
+/// file. Never overwrites, follows reparses, or grants a broader destination ACL.
+/// Caller owns the sole-writer lease and verifies source/target content digests.
+/// A failure may leave a partial destination for explicit staged recovery.
+Future<void> copyProtectedFile(
+  String localAppData,
+  String source,
+  String destination,
+  String sid, {
+  int maxBytes = 64 * 1024 * 1024,
+}) => Isolate.run(() {
+  if (maxBytes < 1 || maxBytes > 64 * 1024 * 1024)
+    throw const FileSystemException('RESOURCE_LIMIT');
+  final sourcePath = validateLocalPath(localAppData, source);
+  final targetPath = validateLocalPath(localAppData, destination);
+  if (p.equals(sourcePath, targetPath))
+    throw const FileSystemException('UNSAFE_PATH');
+  requireSafePath(localAppData, targetPath);
+  requireOwnerOnlyFileAcl(p.dirname(targetPath), sid);
+  final reader = ProtectedSnapshotReader.open(
+    localAppData,
+    sourcePath,
+    sid,
+    maxBytes: maxBytes,
+  );
+  try {
+    using((arena) {
+      final size = arena<Int64>(), after = arena<Int64>();
+      final count = arena<Uint32>(), written = arena<Uint32>();
+      final buffer = arena<Uint8>(65536);
+      if (!GetFileSizeEx(reader._handle, size).value || size.value < 0)
+        throw const FileSystemException('STORAGE_BLOCKED');
+      if (size.value > maxBytes)
+        throw const FileSystemException('RESOURCE_LIMIT');
+      final expected = size.value;
+      final attributes = SecurityAttributes(ownerOnlySddl(sid));
+      HANDLE? target;
+      try {
+        final opened = CreateFile(
+          PCWSTR(targetPath.toNativeUtf16(allocator: arena)),
+          0x40000000,
+          FILE_SHARE_MODE(0),
+          attributes.pointer,
+          CREATE_NEW,
+          FILE_FLAGS_AND_ATTRIBUTES(0x00200000 | 0x80000000),
+          null,
+        );
+        if (!opened.value.isValid)
+          throw const FileSystemException('STORAGE_BLOCKED');
+        target = opened.value;
+        requireOwnerOnlyFileHandleAcl(target, sid);
+        var total = 0;
+        while (true) {
+          if (!ReadFile(reader._handle, buffer, 65536, count, null).value ||
+              count.value > 65536)
+            throw const FileSystemException('STORAGE_BLOCKED');
+          if (count.value == 0) break;
+          total += count.value;
+          if (total > maxBytes)
+            throw const FileSystemException('RESOURCE_LIMIT');
+          if (!WriteFile(target, buffer, count.value, written, null).value ||
+              written.value != count.value)
+            throw const FileSystemException('STORAGE_BLOCKED');
+        }
+        if (total != expected ||
+            !GetFileSizeEx(reader._handle, after).value ||
+            after.value != expected ||
+            !FlushFileBuffers(target).value)
+          throw const FileSystemException('STORAGE_BLOCKED');
+      } finally {
+        buffer.asTypedList(65536).fillRange(0, 65536, 0);
+        attributes.close();
+        if (target != null && !CloseHandle(target).value)
+          throw const FileSystemException('STORAGE_BLOCKED');
+      }
+    });
+    requireSafePath(localAppData, targetPath);
+    requireOwnerOnlyFileAcl(targetPath, sid);
+  } finally {
+    reader.close();
+  }
+});
+
+/// Available bytes for the current caller, not the volume's unrestricted quota.
+Future<void> requireProtectedDiskSpace(
+  String localAppData,
+  String directory,
+  String sid, {
+  required int minimumBytes,
+}) => Isolate.run(() {
+  if (minimumBytes < 0) throw const FileSystemException('RESOURCE_LIMIT');
+  final resolved = validateLocalPath(localAppData, directory);
+  requireSafePath(localAppData, resolved);
+  requireOwnerOnlyFileAcl(resolved, sid);
+  using((arena) {
+    final available = arena<Uint64>();
+    if (!GetDiskFreeSpaceEx(
+      PCWSTR(resolved.toNativeUtf16(allocator: arena)),
+      available,
+      null,
+      null,
+    ).value)
+      throw const FileSystemException('STORAGE_BLOCKED');
+    if (available.value < minimumBytes)
+      throw const FileSystemException('RESOURCE_LIMIT');
+  });
+});
+
 /// A single bounded read of the retained file object. Delete sharing lets an
 /// atomic publisher replace the name without invalidating this reader's bytes.
 class ProtectedSnapshotReader {

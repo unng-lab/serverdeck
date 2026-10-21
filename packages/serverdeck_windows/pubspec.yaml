@@ -5,6 +5,7 @@ version: 0.1.0
 environment:
   sdk: '>=3.13.5 <4.0.0'
 dependencies:
+  cryptography: 2.9.0
   serverdeck_protocol:
     path: ../serverdeck_protocol
   win32: 6.4.0

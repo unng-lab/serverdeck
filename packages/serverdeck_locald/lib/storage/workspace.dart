@@ -15,6 +15,7 @@ import 'initialization_probe.dart';
 import 'models.dart';
 import 'records.dart';
 import 'state_store.dart';
+import 'workspace_migration.dart';
 
 /// Owns creation/promotion and receipt-key lifetime; the caller owns the lease.
 class Workspace {
@@ -24,7 +25,9 @@ class Workspace {
   /// An unsuccessful open can retain this reservation if native close failed.
   /// The resource owner must not release its mutex in that case.
   static bool get hasOpenReservation =>
-      _reserved || StateStore.hasOpenReservation;
+      _reserved ||
+      StateStore.hasOpenReservation ||
+      WorkspaceMigration.hasOpenReservation;
   static void requireNoOpenReservation() {
     if (hasOpenReservation) throw StateError('STORAGE_BLOCKED');
   }
@@ -40,7 +43,10 @@ class Workspace {
     required KeyCustody custody,
     void Function()? checkStartup,
   }) async {
-    if (_reserved) throw StateError('STORAGE_BLOCKED');
+    if (_reserved ||
+        StateStore.hasOpenReservation ||
+        WorkspaceMigration.hasOpenReservation)
+      throw StateError('STORAGE_BLOCKED');
     _reserved = true;
     ReceiptKeyMaterial? key;
     StateStore? store;

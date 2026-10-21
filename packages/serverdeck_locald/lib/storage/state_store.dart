@@ -1,21 +1,38 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:isar_community/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/automation/models.dart';
+import 'package:serverdeck_windows/mcp_credentials.dart';
+import 'package:serverdeck_windows/mcp_credential_files.dart';
 import 'package:serverdeck_windows/mutex.dart';
 import 'package:serverdeck_windows/paths.dart';
 import 'package:serverdeck_windows/security.dart';
 
 import '../bootstrap/native_runtime.dart';
+import '../automation/snapshot.dart';
+import '../mcp/grants.dart';
 import 'credential_validation.dart';
+import 'automation_records.dart';
+import 'foundation_snapshot.dart';
+import 'grant_write_probe.dart';
 import 'key_custody.dart';
+import 'migration_journal.dart';
 import 'models.dart';
 import 'native_failure.dart';
 import 'native_close.dart';
 import 'native_schema.dart';
 import 'records.dart';
+import 'workspace_migration.dart';
+import 'workspace.dart';
+
+part 'owner_grant_writes.dart';
+part 'mcp_grant_reads.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
 class StateStore {
@@ -26,16 +43,323 @@ class StateStore {
     this._lease,
     this._custody,
     this._receiptKey,
-    this._state,
-  );
+    this._state, [
+    this._operational,
+    this._operationalRoot,
+  ]);
   final Isar _isar;
   final MutexLease _lease;
   final KeyCustody _custody;
   final ReceiptKeyMaterial _receiptKey;
   WorkspaceState _state;
+  OperationalSnapshot? _operational;
+  final String? _operationalRoot;
+  bool _authorityUnavailable = false;
+  final _pendingAutomation = <String, _AutomationPending>{};
+  final _grantPublished = <void Function(String, int)>{};
+
+  /// Trusted same-isolate lifecycle subscription, never a wire operation.
+  void Function() onMcpGrantPublished(void Function(String, int) listener) {
+    _ensure();
+    _grantPublished.add(listener);
+    return () => _grantPublished.remove(listener);
+  }
+
+  bool get isAutomationReady =>
+      !_blocked &&
+      !_closing &&
+      !_closed &&
+      !_authorityUnavailable &&
+      _operational != null &&
+      _lease.isHeld;
   Future<void> _tail = Future.value();
   Future<void>? _closeOperation;
   bool _blocked = false, _closing = false, _closed = false;
+
+  /// Trusted internal authority read; never exported by Local API or MCP.
+  ClientGrantRecord currentMcpGrant(String id, {required DateTime at}) =>
+      _currentMcpGrant(id, at: at);
+
+  Future<McpGrantKey> openMcpGrantKey(
+    String id, {
+    required DateTime Function() clock,
+  }) => _openMcpGrantKey(id, clock: clock);
+
+  /// Internal existing-schema2 opener. Product bootstrap/1.1 activation and
+  /// mutation admission are separate gates; this neither initializes nor migrates.
+  static Future<StateStore> openOperational({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    required ReceiptKeyMaterial receiptKey,
+  }) => _openOperational(
+    localAppData: localAppData,
+    appRoot: appRoot,
+    lease: lease,
+    custody: custody,
+    receiptKey: receiptKey,
+    mcpBundle: false,
+  );
+
+  /// Explicit existing-schema2 opener for the verified API1.1 locald image.
+  /// Does not create/migrate a workspace or select the product bootstrap mode.
+  static Future<StateStore> openMcpOperational({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    required ReceiptKeyMaterial receiptKey,
+  }) => _openOperational(
+    localAppData: localAppData,
+    appRoot: appRoot,
+    lease: lease,
+    custody: custody,
+    receiptKey: receiptKey,
+    mcpBundle: true,
+  );
+
+  static Future<StateStore> _openOperational({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    required ReceiptKeyMaterial receiptKey,
+    required bool mcpBundle,
+  }) async {
+    if (Workspace.hasOpenReservation ||
+        Isar.getInstance('workspace') != null ||
+        !lease.isHeld ||
+        custody.ownerSid != currentUserSid()) {
+      throw StateError('STORAGE_BLOCKED');
+    }
+    _reserved = true;
+    Isar? isar;
+    String? openedDirectory;
+    var transferred = false, safeToRelease = true, runtimeChecked = false;
+    void owner() {
+      if (!lease.isHeld ||
+          custody.ownerSid != currentUserSid() ||
+          receiptKey.ownerSid != custody.ownerSid) {
+        throw StateError('STORAGE_BLOCKED');
+      }
+    }
+
+    Future<void> live() async {
+      owner();
+      await custody.createWorkspaceManifest(receiptKey);
+      owner();
+    }
+
+    try {
+      if (mcpBundle) await initializeMcpNativeRuntime(appRoot);
+      runtimeChecked = true;
+      await live();
+      if (!mcpBundle) await initializeNativeRuntime(appRoot);
+      await live();
+      var directory = p.normalize(p.absolute(localAppData));
+      for (final segment in ['ServerDeckNext', 'v1', 'workspaces', 'default']) {
+        directory = p.join(directory, segment);
+        requireSafePath(localAppData, directory);
+        if (FileSystemEntity.typeSync(directory, followLinks: false) !=
+            FileSystemEntityType.directory)
+          throw StateError('STORAGE_BLOCKED');
+        requireOwnerOnlyFileAcl(directory, custody.ownerSid);
+      }
+      void settled() {
+        owner();
+        for (final suffix in ['.creating', '.upgrading-1-2']) {
+          final stage = '$directory$suffix';
+          requireSafePath(localAppData, stage);
+          if (FileSystemEntity.typeSync(stage, followLinks: false) !=
+              FileSystemEntityType.notFound)
+            throw StateError('STORAGE_BLOCKED');
+        }
+      }
+
+      settled();
+      final manifest = MigrationManifest.fromJson(
+        StrictCodec().decode(
+          await readProtectedFile(
+            localAppData,
+            p.join(directory, 'workspace.manifest.json'),
+            custody.ownerSid,
+            maxBytes: 4096,
+          ),
+          maxBytes: 4096,
+        ),
+      );
+      await live();
+      if (manifest.schema != 2) throw StateError('INCOMPATIBLE');
+      if (manifest.workspaceId != receiptKey.workspaceId ||
+          manifest.receiptKeyId != receiptKey.receiptKeyId ||
+          manifest.ownerSid != receiptKey.ownerSid)
+        throw StateError('STORAGE_BLOCKED');
+      final wrapper = await readProtectedFile(
+        localAppData,
+        p.join(directory, 'receipt-key.dpapi'),
+        custody.ownerSid,
+        maxBytes: 16384,
+      );
+      await live();
+      if (!_equal(wrapper, receiptKey.wrapper))
+        throw StateError('STORAGE_BLOCKED');
+      final bytes = await readProtectedFile(
+        localAppData,
+        p.join(directory, 'workspace.isar'),
+        custody.ownerSid,
+        maxBytes: 64 << 20,
+      );
+      await live();
+      if (inspectNativeWorkspaceSchema(Uint8List.fromList(bytes)) != 2)
+        throw StateError('INCOMPATIBLE');
+      final lock = p.join(directory, 'workspace.isar-lck');
+      requireSafePath(localAppData, lock);
+      if (FileSystemEntity.typeSync(lock, followLinks: false) !=
+          FileSystemEntityType.file)
+        throw StateError('STORAGE_BLOCKED');
+      requireOwnerOnlyFileAcl(lock, custody.ownerSid);
+      await live();
+      settled();
+      if (Isar.getInstance('workspace') != null)
+        throw StateError('STORAGE_BLOCKED');
+      // An exception before returning an instance cannot prove native ownership
+      // ended. Retain reservation until a confirmed close, including this gap.
+      safeToRelease = false;
+      openedDirectory = directory;
+      isar = await Isar.open(
+        automationWorkspaceSchemas,
+        directory: directory,
+        name: 'workspace',
+        maxSizeMiB: 64,
+        relaxedDurability: false,
+        inspector: false,
+      );
+      await live();
+      final snapshot = await readOperationalSnapshot(
+        isar,
+        receiptKey,
+        custody,
+        localAppData: localAppData,
+        lease: lease,
+      );
+      await live();
+      transferred = true;
+      return StateStore._(
+        isar,
+        lease,
+        custody,
+        receiptKey,
+        snapshot.foundation.state,
+        snapshot,
+        localAppData,
+      );
+    } catch (error) {
+      // A throwing open may have registered its own instance before returning.
+      // Close only that attributable instance, never a preexisting foreign one.
+      final registered = !safeToRelease ? Isar.getInstance('workspace') : null;
+      final candidate =
+          isar ??
+          (registered != null &&
+                  openedDirectory != null &&
+                  registered.directory != null &&
+                  p.equals(p.normalize(registered.directory!), openedDirectory)
+              ? registered
+              : null);
+      if (candidate != null)
+        safeToRelease = await confirmNativeClose(candidate.close);
+      if (error is StateError &&
+          (error.message == 'INCOMPATIBLE' ||
+              error.message == 'PREREQUISITE_UNAVAILABLE' ||
+              mcpBundle && !runtimeChecked && error.message == 'UNAUTHORIZED'))
+        rethrow;
+      throw StateError('STORAGE_BLOCKED');
+    } finally {
+      if (!transferred && safeToRelease) _reserved = false;
+    }
+  }
+
+  OperationalSnapshot get operational {
+    _ensure();
+    if (_authorityUnavailable) throw StateError('STORAGE_BLOCKED');
+    final value = _operational;
+    if (value == null) throw StateError('STORAGE_BLOCKED');
+    return value;
+  }
+
+  Future<Map<String, Object?>> mutateOwnerGrant(
+    OwnerGrantCommand command, {
+    required DateTime Function() clock,
+  }) {
+    try {
+      if (_closing) throw StateError('NOT_READY');
+      _ensure();
+      if (_operational == null || _operationalRoot == null)
+        throw StateError('STORAGE_BLOCKED');
+      final mac = base64.decode(
+        _custody.receiptDigestSync(_receiptKey, command.canonicalRequest),
+      );
+      final digest = mac.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final existing = _pendingAutomation[command.requestId];
+      if (existing != null) {
+        if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
+        return existing.result.future;
+      }
+      if (_pendingAutomation.length >= 32) throw StateError('RESOURCE_LIMIT');
+      final pending = _AutomationPending(digest);
+      _pendingAutomation[command.requestId] = pending;
+      final run = _tail.then((_) => _writeOwnerGrant(command, digest, clock));
+      _tail = run.then<void>(
+        (result) {
+          _pendingAutomation.remove(command.requestId);
+          pending.result.complete(result);
+        },
+        onError: (Object error, StackTrace stack) {
+          _pendingAutomation.remove(command.requestId);
+          final known =
+              error is StateError &&
+              {
+                'NOT_READY',
+                'FORBIDDEN',
+                'REVISION_CONFLICT',
+                'IDEMPOTENCY_CONFLICT',
+                'RESOURCE_LIMIT',
+                'STORAGE_BLOCKED',
+              }.contains(error.message);
+          if (!known || error.message == 'STORAGE_BLOCKED') _blocked = true;
+          pending.result.completeError(
+            StateError(known ? error.message : 'STORAGE_BLOCKED'),
+            stack,
+          );
+        },
+      );
+      return pending.result.future;
+    } on StateError catch (error) {
+      if (_operational != null &&
+          !{
+            'NOT_READY',
+            'IDEMPOTENCY_CONFLICT',
+            'RESOURCE_LIMIT',
+          }.contains(error.message)) {
+        _blocked = true;
+      }
+      return Future.error(
+        StateError(
+          {
+                'NOT_READY',
+                'IDEMPOTENCY_CONFLICT',
+                'RESOURCE_LIMIT',
+                'STORAGE_BLOCKED',
+              }.contains(error.message)
+              ? error.message
+              : 'STORAGE_BLOCKED',
+        ),
+      );
+    } catch (_) {
+      if (_operational != null) _blocked = true;
+      return Future.error(StateError('STORAGE_BLOCKED'));
+    }
+  }
 
   static Future<StateStore> open({
     required String localAppData,
@@ -45,7 +369,10 @@ class StateStore {
     required KeyCustody custody,
     required ReceiptKeyMaterial receiptKey,
   }) async {
-    if (_reserved || !lease.isHeld || custody.ownerSid != currentUserSid()) {
+    if (_reserved ||
+        WorkspaceMigration.hasOpenReservation ||
+        !lease.isHeld ||
+        custody.ownerSid != currentUserSid()) {
       throw StateError('STORAGE_BLOCKED');
     }
     // Isar registers only after its async native open: reserve synchronously.
@@ -97,8 +424,11 @@ class StateStore {
         relaxedDurability: false,
         inspector: false,
       );
-      final state = await _load(isar, receiptKey);
-      await validateWorkspaceCredentials(state, custody);
+      final state = (await readFoundationSnapshot(
+        isar,
+        receiptKey,
+        custody,
+      )).state;
       if (!lease.isHeld) throw StateError('STORAGE_BLOCKED');
       transferred = true;
       return StateStore._(isar, lease, custody, receiptKey, state);
@@ -126,69 +456,10 @@ class StateStore {
       throw StateError('STORAGE_BLOCKED');
   }
 
-  static Future<WorkspaceState> _load(Isar isar, ReceiptKeyMaterial key) async {
-    if (await isar.storedWorkspaces.count() != 1 ||
-        await isar.storedSettings.count() != 1 ||
-        await isar.storedProfiles.count() > 250 ||
-        await isar.storedCredentials.count() > 250 ||
-        await isar.storedReceipts.count() > 10000)
-      throw StateError('STORAGE_BLOCKED');
-    final workspace = await isar.storedWorkspaces.get(1),
-        settings = await isar.storedSettings.get(1);
-    if (workspace == null || settings == null)
-      throw StateError('STORAGE_BLOCKED');
-    Map<String, Object?> document(String value, int bound) =>
-        StrictCodec().decode(utf8.encode(value), maxBytes: bound);
-    final metadata = document(workspace.payload, 4096);
-    if (metadata.keys.toSet().difference({
-          'schemaVersion',
-          'workspaceId',
-          'receiptKeyId',
-          'ownerSid',
-          'storeRevision',
-        }).isNotEmpty ||
-        metadata.length != 5) {
-      throw StateError('STORAGE_BLOCKED');
-    }
-    Map<String, Object?> entities(List<(int, String, String)> rows, int bound) {
-      final values = <String, Object?>{};
-      for (final row in rows) {
-        if (row.$1 < 1 || values.containsKey(row.$2))
-          throw StateError('STORAGE_BLOCKED');
-        final value = document(row.$3, bound);
-        if (row.$2 != value['id'] && row.$2 != value['requestId'])
-          throw StateError('STORAGE_BLOCKED');
-        values[row.$2] = value;
-      }
-      return values;
-    }
-
-    final profiles = await isar.storedProfiles.where().findAll();
-    final credentials = await isar.storedCredentials.where().findAll();
-    final receipts = await isar.storedReceipts.where().findAll();
-    return WorkspaceState.fromJson(
-      {
-        ...metadata,
-        'settings': document(settings.payload, 4096),
-        'profiles': entities([
-          for (final row in profiles) (row.id, row.entityId, row.payload),
-        ], 16 * 1024),
-        'credentials': entities([
-          for (final row in credentials) (row.id, row.entityId, row.payload),
-        ], 512 * 1024),
-        'receipts': entities([
-          for (final row in receipts) (row.id, row.entityId, row.payload),
-        ], 4096),
-      },
-      workspaceId: key.workspaceId,
-      receiptKeyId: key.receiptKeyId,
-      ownerSid: key.ownerSid,
-    );
-  }
-
   /// Serial durable primitive; upstream coordinator owns CAS/idempotency/grants.
   Future<void> commit(WorkspaceState next) {
     _ensure();
+    if (_operational != null) throw StateError('STORAGE_BLOCKED');
     final result = _tail.then((_) => _commit(next));
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;
@@ -274,8 +545,11 @@ class StateStore {
               (error is StateError && error.message == 'RESOURCE_LIMIT'))) {
         try {
           _ensure();
-          final persisted = await _load(_isar, _receiptKey);
-          await validateWorkspaceCredentials(persisted, _custody);
+          final persisted = (await readFoundationSnapshot(
+            _isar,
+            _receiptKey,
+            _custody,
+          )).state;
           if (!_equal(
             codec.canonical(persisted.toJson()),
             codec.canonical(current.toJson()),

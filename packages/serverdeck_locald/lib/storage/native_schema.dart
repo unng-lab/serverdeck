@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'native_registry.dart';
+import 'automation_records.dart';
 import 'records.dart';
 
 /// Read-only schema preflight, not a complete database integrity check.
@@ -15,14 +16,31 @@ void validateNativeSnapshot(Uint8List snapshot) {
   }
 }
 
+/// Read-only full structural preflight plus supported registry version. The
+/// application marker/manifest/journal and semantic rows are validated later.
+/// Normal legacy open continues using validateNativeSnapshot (schema1 only).
+int inspectNativeWorkspaceSchema(Uint8List snapshot) {
+  try {
+    final parsed = _Snapshot(snapshot, recognizeVersions: true)..validate();
+    return parsed.schema;
+  } on RangeError {
+    throw StateError('STORAGE_BLOCKED');
+  } on FormatException {
+    throw StateError('STORAGE_BLOCKED');
+  }
+}
+
 Never _blocked() => throw StateError('STORAGE_BLOCKED');
 Never _incompatible() => throw StateError('INCOMPATIBLE');
 
 // Pinned MDBX v0.13.8-temp-upstream-fix layout-dxb.h, little endian.
 // No native call, file access, schema migration or writable open occurs here.
 class _Snapshot {
-  _Snapshot(this.bytes) : data = ByteData.sublistView(bytes);
+  _Snapshot(this.bytes, {this.recognizeVersions = false})
+    : data = ByteData.sublistView(bytes);
   final Uint8List bytes;
+  final bool recognizeVersions;
+  int schema = 1;
   final ByteData data;
   late int pageSize;
   late int nextPage;
@@ -77,12 +95,17 @@ class _Snapshot {
     if (info == null) _incompatible();
     if (info.flags != 0 || info.duplicateSize != 0) _blocked();
     final documents = _entries(info, namedTrees: false);
-    validateNativeRegistry(documents);
+    if (recognizeVersions) {
+      schema = recognizeNativeRegistry(documents);
+    } else {
+      validateNativeRegistry(documents);
+    }
     final expected = <String, int>{'_info': 0};
-    for (final schema in workspaceSchemas) {
-      expected[schema.name] = 8; // MDBX_INTEGERKEY for native Id.
-      for (final index in schema.indexes.values) {
-        expected['_i_${schema.name}_${index.name}'] = 0;
+    for (final collection
+        in schema == 2 ? automationWorkspaceSchemas : workspaceSchemas) {
+      expected[collection.name] = 8; // MDBX_INTEGERKEY for native Id.
+      for (final index in collection.indexes.values) {
+        expected['_i_${collection.name}_${index.name}'] = 0;
       }
     }
     if (catalogue.length != expected.length ||

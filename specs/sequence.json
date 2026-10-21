@@ -1,7 +1,7 @@
 {
-  "version": 4,
-  "date": "2026-10-10",
-  "baseline": "service foundation first; fresh implementation; hard cutover; Specify only",
+  "version": 5,
+  "date": "2026-10-21",
+  "baseline": "new implementation; preserve completed foundation history; MCP-first extension 021",
   "packages": [
     {
       "number": 1,
@@ -1394,6 +1394,74 @@
             "AC-020-3A",
             "AC-020-3B",
             "AC-020-3C"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 21,
+      "directory": "021-mcp-control",
+      "title": "MCP и делегируемые Ansible-профили",
+      "depends_on": [
+        "001.1"
+      ],
+      "requirements": [
+        "FR-MCP-001",
+        "FR-MCP-002",
+        "FR-MCP-003",
+        "FR-MCP-004",
+        "FR-MCP-005",
+        "FR-MCP-006",
+        "FR-MCP-007",
+        "FR-MCP-008",
+        "FR-MCP-009",
+        "FR-MCP-010",
+        "FR-MCP-011",
+        "FR-MCP-012",
+        "FR-MCP-013",
+        "FR-MCP-014",
+        "FR-MCP-015",
+        "FR-MCP-016"
+      ],
+      "stages": [
+        {
+          "id": "021.1",
+          "title": "MCP и общее чтение",
+          "depends_on": [
+            "001.1",
+            "001.2"
+          ],
+          "acceptance": [
+            "AC-MCP-1A",
+            "AC-MCP-1B",
+            "AC-MCP-1C"
+          ]
+        },
+        {
+          "id": "021.2",
+          "title": "Авторство профилей",
+          "depends_on": [
+            "021.1"
+          ],
+          "acceptance": [
+            "AC-MCP-2A",
+            "AC-MCP-2B",
+            "AC-MCP-2C"
+          ]
+        },
+        {
+          "id": "021.3",
+          "title": "Делегация, настройка и установка",
+          "depends_on": [
+            "021.2",
+            "001.3",
+            "006"
+          ],
+          "acceptance": [
+            "AC-MCP-3A",
+            "AC-MCP-3B",
+            "AC-MCP-3C",
+            "AC-MCP-3D"
           ]
         }
       ]
