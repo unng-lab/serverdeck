@@ -147,6 +147,10 @@ void main() {
           expect(await owner.command('close'), 'CLOSED');
           final mcp = await connect(host, 'mcp.exe', name, 'mcp');
           expect(await host.command('old'), 'STALE_DENIED');
+          expect(
+            await host.command('old-disconnect'),
+            'STALE_DISCONNECT_DENIED',
+          );
           await echo(host, mcp);
           expect(await host.command('disconnect'), 'DISCONNECTED');
           expect(await mcp.command('close'), 'CLOSED');
@@ -192,7 +196,7 @@ void main() {
           );
           final owner = await connect(server, 'serverdeck.exe', name, 'owner');
           expect(await server.command('pending'), 'PENDING');
-          expect(await server.command('disconnect'), 'DISCONNECTED');
+          expect(await server.command('disconnect-peer'), 'DISCONNECTED');
           expect(
             await server.command('pending-result'),
             'RESULT:SERVICE_UNAVAILABLE',
@@ -250,7 +254,7 @@ void main() {
         expect(await server.next(), 'READY');
         final owner = await connect(server, 'serverdeck.exe', name, 'owner');
         expect(await server.command('full'), 'FULL_PENDING');
-        expect(await server.command('disconnect'), 'DISCONNECTED');
+        expect(await server.command('disconnect-peer'), 'DISCONNECTED');
         expect(
           await server.command('full-result'),
           'RESULT:SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE',

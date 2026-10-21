@@ -290,7 +290,9 @@ class NativePipe {
             info[7] > info[6]) {
           throw StateError('SERVICE_UNAVAILABLE');
         }
-        if (info[7] == info[6]) return;
+        // An accepted write may still be starting its native isolate. Empty
+        // kernel quota alone must not report it drained before native issuance.
+        if (info[7] == info[6] && !_writing) return;
       } finally {
         calloc.free(info);
         calloc.free(io);
@@ -449,6 +451,12 @@ class NativePipe {
     int eventAddress,
     int cancellationAddress,
   ) {
+    // Compile-time scheduling probe only. It cannot alter payloads, bypass
+    // native I/O or grant identity, and is absent from ordinary AOT builds.
+    if (const bool.fromEnvironment('serverdeck.test.delay-native-write') &&
+        kind == 'write') {
+      Sleep(150);
+    }
     final nativeHandle = HANDLE(Pointer.fromAddress(handleAddress));
     final overlapped = Pointer<OVERLAPPED>.fromAddress(overlappedAddress);
     final buffer = Pointer<Uint8>.fromAddress(bufferAddress);

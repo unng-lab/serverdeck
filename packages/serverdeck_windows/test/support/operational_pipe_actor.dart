@@ -79,6 +79,9 @@ Future<void> main(List<String> args) async {
             await denied(() => original!.write([99]));
             await denied(() => original!.drainOutput());
             stdout.writeln('STALE_DENIED');
+          case 'old-disconnect':
+            await denied(() => original!.disconnect());
+            stdout.writeln('STALE_DISCONNECT_DENIED');
           case 'write':
             if (legacy) {
               await worker.write([server ? 43 : 42]);
@@ -119,6 +122,9 @@ Future<void> main(List<String> args) async {
             throw StateError('EXPECTED_TIMEOUT');
           case 'disconnect':
             await worker.disconnect();
+            stdout.writeln('DISCONNECTED');
+          case 'disconnect-peer':
+            await peer!.disconnect();
             stdout.writeln('DISCONNECTED');
           case 'close':
             await worker.close();

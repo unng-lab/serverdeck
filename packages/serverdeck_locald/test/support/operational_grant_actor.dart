@@ -326,9 +326,21 @@ Future<void> scenario(
     void Function(Duration),
   )?
   routerRun,
+  Future<void> Function(
+    String,
+    StateStore,
+    OperationalMcpAuthority,
+    OperationalSessions,
+    Future<void> Function(String),
+    void Function(Duration),
+  )?
+  readyRun,
 }) async {
   await initializeMcpNativeRuntime(root);
-  await r.existingStore(root, withTarget: mode == 'router-targets');
+  await r.existingStore(
+    root,
+    withTarget: mode == 'router-targets' || mode == 'channel-all',
+  );
   final local = p.join(root, 'private'), sid = currentUserSid();
   final protection = PausedProtection();
   final custody = KeyCustody(protection, sid);
@@ -383,9 +395,14 @@ Future<void> scenario(
         if (revision > 0) 'expectedRevision': revision,
         if (op != 'grant.revoke') ...{
           'label': 'native fixture',
-          'scopes': [if (mode == 'router-targets') 'read', 'author'],
+          'scopes': [
+            if (mode == 'router-targets' || mode == 'channel-all') 'read',
+            if (mode == 'channel-all') 'logs',
+            'author',
+            if (mode == 'channel-all') ...['plan', 'apply'],
+          ],
           'serverIds': [
-            if (mode == 'router-targets')
+            if (mode == 'router-targets' || mode == 'channel-all')
               '32345678-1234-4234-8234-123456789abc',
           ],
           'lifetimeSeconds': 300,
@@ -405,6 +422,17 @@ Future<void> scenario(
       for (var i = 0; i < 3; i++) await write('grant.replace');
     }
     final auth = authority = OperationalMcpAuthority(state, clock: () => wall);
+    if (readyRun != null) {
+      await readyRun(
+        root,
+        state,
+        auth,
+        registry,
+        write,
+        (duration) => wall = wall.add(duration),
+      );
+      return;
+    }
     if (mode == 'pool' || mode == 'replay' || mode.startsWith('late-')) {
       await controlled(root, mode, state, auth, registry, protection, write);
       return;

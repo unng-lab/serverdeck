@@ -125,7 +125,10 @@ class PipeWorker {
         method != 'disconnect' &&
         method != 'close')
       throw StateError('SERVICE_UNAVAILABLE');
-    if (_pending.length >= 3 && method != 'close' && method != 'disconnect')
+    if (_pending.length >= 3 &&
+        method != 'close' &&
+        method != 'disconnect' &&
+        method != 'peerDisconnect')
       throw StateError('RESOURCE_LIMIT');
     final id = ++_next;
     final result = Completer<Object?>();

@@ -54,6 +54,11 @@ final class OperationalPipePeer {
     Duration deadline = const Duration(seconds: 5),
   }) async =>
       await _worker._call('peerDrain', [_epoch, deadline.inMilliseconds]);
+
+  /// Cleanup is bound to this connection epoch even after identity failure.
+  /// A late close must never disconnect a replacement accepted on the slot.
+  Future<void> disconnect() async =>
+      await _worker._call('peerDisconnect', _epoch);
 }
 
 enum _OperationalSlot {
@@ -202,6 +207,11 @@ final class _OperationalEndpoint {
           );
           return null;
         });
+      case 'peerDisconnect':
+        if (!server) throw StateError('UNSAFE_ENDPOINT');
+        if (params != epoch || state != _OperationalSlot.connected)
+          throw StateError('UNAUTHORIZED');
+        return call('disconnect', null);
       case 'disconnect':
         if (!server ||
             state == _OperationalSlot.closed ||
