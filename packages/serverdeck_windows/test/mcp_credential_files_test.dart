@@ -94,43 +94,100 @@ void quotaFile(Fixture f, int n, int size) {
 }
 
 void main() {
-  test(
-    'actual caller-space query refuses stage/publication; normal builds cannot install probes',
-    () async {
-      final vm = p.join(p.dirname(Platform.resolvedExecutable), 'dartvm.exe');
-      for (final mode in [
-        'disabled',
-        'initial',
-        'stage',
-        'publish',
-        'revoke',
-      ]) {
-        final child = await Process.start(vm, [
-          if (mode != 'disabled') '-DSERVERDECK_TEST_MCP_FILE_PROBES=true',
-          'test/support/mcp_credential_space_child.dart',
-          mode,
-        ]);
-        final output = child.stdout.transform(utf8.decoder).join();
-        final errors = child.stderr.transform(utf8.decoder).join();
-        try {
-          final code = await child.exitCode.timeout(
-            const Duration(seconds: 30),
-          );
-          final stdout = await output.timeout(const Duration(seconds: 5));
-          final stderr = await errors.timeout(const Duration(seconds: 5));
-          expect(code, 0, reason: '$stdout$stderr');
-          expect(
-            stdout,
-            contains(mode == 'disabled' ? 'PROBES_DISABLED' : 'SPACE_REFUSED'),
-          );
-        } finally {
-          child.kill();
-          await child.exitCode.timeout(const Duration(seconds: 10));
+  group(
+    'compiled credential-space child',
+    () {
+      late Directory compiled;
+      late String ordinary, probe;
+      void ownCompiled() {
+        final root = p.normalize(p.absolute(compiled.path));
+        if (!p.isWithin(
+              p.normalize(p.absolute(Directory.systemTemp.path)),
+              root,
+            ) ||
+            !p.basename(root).startsWith('serverdeck-mcp-space-aot-')) {
+          throw StateError('UNSAFE_FIXTURE');
         }
       }
+
+      setUpAll(() async {
+        compiled = Directory.systemTemp.createTempSync(
+          'serverdeck-mcp-space-aot-',
+        );
+        ownCompiled();
+        ordinary = p.join(compiled.path, 'ordinary.exe');
+        probe = p.join(compiled.path, 'probe.exe');
+        // Compile separately from the runtime deadline. Cold JIT compilation must
+        // not consume the 30s budget for the actual native file/DPAPI operation.
+        for (final enabled in [false, true]) {
+          final compiler = await Process.start(Platform.resolvedExecutable, [
+            'compile',
+            'exe',
+            if (enabled) '-DSERVERDECK_TEST_MCP_FILE_PROBES=true',
+            'test/support/mcp_credential_space_child.dart',
+            '-o',
+            enabled ? probe : ordinary,
+          ]);
+          final output = compiler.stdout.transform(utf8.decoder).join();
+          final errors = compiler.stderr.transform(utf8.decoder).join();
+          try {
+            expect(
+              await compiler.exitCode.timeout(const Duration(seconds: 90)),
+              0,
+              reason: '${await output}\n${await errors}',
+            );
+          } finally {
+            compiler.kill();
+            await compiler.exitCode.timeout(const Duration(seconds: 10));
+          }
+        }
+      });
+      tearDownAll(() {
+        ownCompiled();
+        compiled.deleteSync(recursive: true);
+      });
+
+      test(
+        'actual caller-space query refuses stage/publication; normal builds cannot install probes',
+        () async {
+          for (final mode in [
+            'disabled',
+            'initial',
+            'stage',
+            'publish',
+            'revoke',
+          ]) {
+            final child = await Process.start(
+              mode == 'disabled' ? ordinary : probe,
+              [mode],
+            );
+            final output = child.stdout.transform(utf8.decoder).join();
+            final errors = child.stderr.transform(utf8.decoder).join();
+            try {
+              final code = await child.exitCode.timeout(
+                const Duration(seconds: 30),
+              );
+              final stdout = await output.timeout(const Duration(seconds: 5));
+              final stderr = await errors.timeout(const Duration(seconds: 5));
+              expect(code, 0, reason: '$mode: $stdout$stderr');
+              expect(
+                stdout,
+                contains(
+                  mode == 'disabled' ? 'PROBES_DISABLED' : 'SPACE_REFUSED',
+                ),
+              );
+            } finally {
+              child.kill();
+              await child.exitCode.timeout(const Duration(seconds: 10));
+            }
+          }
+        },
+        testOn: 'windows',
+        timeout: const Timeout(Duration(minutes: 3)),
+      );
     },
     testOn: 'windows',
-    timeout: const Timeout(Duration(minutes: 3)),
+    timeout: const Timeout(Duration(minutes: 4)),
   );
   test(
     'real file symbolic reparses at blob and lookup never follow the target',
