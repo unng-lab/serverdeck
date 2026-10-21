@@ -316,6 +316,7 @@ Future<void> client(List<String> args) async {
 Future<void> scenario(
   String root,
   String mode, {
+  Duration initialWallOffset = Duration.zero,
   Future<void> Function(
     String,
     StateStore,
@@ -384,7 +385,7 @@ Future<void> scenario(
       custody: custody,
       receiptKey: key,
     );
-    var wall = DateTime.now().toUtc();
+    var wall = DateTime.now().toUtc().add(initialWallOffset);
     final service = OwnerGrantService(state, clock: () => wall);
     var revision = 0;
     Future<void> write(String op) async {
