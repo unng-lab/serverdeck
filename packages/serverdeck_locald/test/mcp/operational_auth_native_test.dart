@@ -75,6 +75,7 @@ void main() {
   );
   for (final scenario in [
     'roles',
+    'stale-close',
     'proofs',
     'quota',
     'expiry',

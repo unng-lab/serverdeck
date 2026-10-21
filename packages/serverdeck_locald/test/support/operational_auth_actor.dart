@@ -200,6 +200,7 @@ final class Pair {
     OperationalSessions registry, {
     String mode = 'normal',
     Duration Function()? clock,
+    String? channelOverride,
   }) async {
     final name = pipeName();
     final server = await PipeWorker.createOperationalServer(
@@ -221,7 +222,15 @@ final class Pair {
         child.stdout.transform(utf8.decoder).transform(const LineSplitter()),
       );
       await accepting;
-      return Pair(server, child, lines, errors, registry, name, clock);
+      return Pair(
+        server,
+        child,
+        lines,
+        errors,
+        registry,
+        channelOverride ?? name,
+        clock,
+      );
     } catch (_) {
       child?.kill();
       if (child != null) await child.exitCode;
@@ -296,7 +305,6 @@ final class Pair {
 
   Future<void> close() async {
     handshake?.close();
-    registry.disconnect(channel);
     child.kill();
     await child.exitCode.timeout(const Duration(seconds: 10));
     await server.close();
@@ -334,6 +342,41 @@ Future<void> scenario(String root, String name) async {
 
   try {
     switch (name) {
+      case 'stale-close':
+        final first = await start('mcp.exe');
+        await first.exchange();
+        check(await first.next() == 'AUTH:mcp');
+        first.handshake!.close();
+        final second = await Pair.start(
+          root,
+          'mcp.exe',
+          registry,
+          channelOverride: first.channel,
+        );
+        pairs.add(second);
+        await second.exchange();
+        check(await second.next() == 'AUTH:mcp');
+        first.handshake!.close();
+        check(registry.count == 1 && detached == 1);
+        final rejected = await Pair.start(
+          root,
+          'mcp.exe',
+          registry,
+          mode: 'wrongrole',
+          channelOverride: first.channel,
+        );
+        pairs.add(rejected);
+        await rejected.exchange(expectedError: 'UNAUTHORIZED');
+        await rejected.close();
+        pairs.remove(rejected);
+        check(registry.count == 1 && detached == 1);
+        final request = await registry.begin(
+          second.channel,
+          second.response!.sessionId,
+          'session.ping',
+        );
+        request.complete();
+        break;
       case 'roles':
         for (final image in ['serverdeck.exe', 'mcp.exe']) {
           final pair = await start(image);

@@ -359,7 +359,11 @@ Future<void> scenario(
   StateStore? store;
   a.Pair? pair;
   OperationalMcpAuthority? authority;
-  final registry = OperationalSessions(generation: a.generation);
+  var monotonic = Duration.zero;
+  final registry = OperationalSessions(
+    generation: a.generation,
+    elapsed: mode.startsWith('permit-') ? () => monotonic : null,
+  );
   try {
     final state = store = await StateStore.openMcpOperational(
       localAppData: local,
@@ -433,7 +437,7 @@ Future<void> scenario(
     final params = Map<String, Object?>.of(
       envelope['params'] as Map<String, Object?>,
     );
-    if (mode == 'badproof')
+    if (mode == 'badproof' || mode.startsWith('permit-'))
       params['proof'] = base64Url
           .encode(List<int>.filled(32, 0))
           .replaceAll('=', '');
@@ -448,8 +452,6 @@ Future<void> scenario(
       result = await request.openGrant(auth, params);
     } on StateError catch (error) {
       failure = error.message;
-    } finally {
-      request.complete();
     }
     if (mode == 'current' ||
         mode.startsWith('router-') ||
@@ -480,12 +482,82 @@ Future<void> scenario(
               : ErrorCode.unauthorized,
         ).toJson(),
     };
+    if (mode.startsWith('permit-')) {
+      final permit = request.openFailure;
+      a.check(permit != null && result == null);
+      a.Pair? replacement;
+      try {
+        if (mode == 'permit-replaced') {
+          replacement = await a.Pair.start(
+            root,
+            'mcp.exe',
+            registry,
+            channelOverride: live.channel,
+          );
+          await replacement.exchange();
+          a.check(await replacement.next() == 'AUTH:mcp');
+        }
+        if (mode == 'permit-completed') request.complete();
+        if (mode == 'permit-stopped') registry.stop();
+        if (mode == 'permit-expired') monotonic = const Duration(seconds: 5);
+        if (mode == 'permit-lease') monotonic = const Duration(seconds: 60);
+        if (mode == 'permit-native') {
+          r.manifest(root, (m) => (m['sha256'] as Map)['mcp.exe'] = '0' * 64);
+        }
+        await a.fails(
+          permit!.write(
+            envelope['id'] as String,
+            deadline: mode == 'permit-outer'
+                ? Duration.zero
+                : const Duration(seconds: 5),
+          ),
+          mode == 'permit-expired' || mode == 'permit-outer'
+              ? 'TIMEOUT'
+              : 'UNAUTHORIZED',
+        );
+        await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+        request.complete();
+        await live.server.disconnect();
+        final error = await live.next();
+        a.check(
+          error == 'ERROR:UNAUTHORIZED' || error == 'ERROR:SERVICE_UNAVAILABLE',
+        );
+        a.check(
+          registry.count == (replacement == null ? 0 : 1) &&
+              auth.pendingOpens == 0,
+        );
+        if (replacement != null) {
+          final ping = await registry.begin(
+            replacement.channel,
+            replacement.response!.sessionId,
+            'session.ping',
+          );
+          ping.complete();
+        }
+        await a.finishClient(live.child);
+        a.check(await live.child.exitCode == 0);
+        return;
+      } finally {
+        await replacement?.close();
+      }
+    }
     if (mode == 'clientproof')
       (response['result'] as Map)['proof'] = base64Url
           .encode(List<int>.filled(32, 0))
           .replaceAll('=', '');
     if (mode == 'clientcorrelation') response['id'] = requestId;
-    await io.write(response, remaining);
+    try {
+      if (result == null) {
+        final permit = request.openFailure;
+        a.check(permit != null);
+        await permit!.write(envelope['id'] as String, deadline: remaining());
+        await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+      } else {
+        await io.write(response, remaining);
+      }
+    } finally {
+      request.complete();
+    }
     a.check(
       await live.next() ==
           (result == null

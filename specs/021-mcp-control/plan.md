@@ -76,3 +76,6 @@ Host executor is necessary for durable cross-controller physical-host ownership 
 Design correction1: permission identity `(profileId,revision,bodyDigest)` distinct from content identity. Complete tuple persists in delegation/plan/job and each step authority; same-content new revision/profile denied. T037 adds cross-layer negative cases before dependent implementation closure. Fresh review follows checks.
 
 Design correction2: author-only/no-scope client grants use serverIds[] and are valid before any server exists. Target scopes require explicit existing1..250 targets; no inherited read/apply. T038 defines model/service/actual MCP regression before dependent closure.
+
+
+Operational API1.1 wire integration follows [channel ownership, dispatch and publication](contracts/operational-channel.md), in addition to handshake/invocations; it preserves pending interest until native publication and rejects queued stale authority. T096 implements this component before actual bootstrap/owner/client product activation.

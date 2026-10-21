@@ -191,6 +191,9 @@ final class OperationalSessionRequest {
   final String channel, method;
   final Duration _began;
   bool _completed = false;
+  bool _firstOpen = false;
+  OperationalOpenFailure? _openFailure;
+  OperationalOpenFailure? get openFailure => _openFailure;
   Duration get rpcRemaining {
     _live();
     final value = _began + rpcDeadline - _registry._clock();
@@ -262,6 +265,7 @@ final class OperationalSessionRequest {
       _detach();
       throw StateError('UNAUTHORIZED');
     }
+    _firstOpen = true;
     _session.openAttempted = true;
     final interest = Completer<void>();
     try {
@@ -287,12 +291,15 @@ final class OperationalSessionRequest {
       _session.grant = result.$1;
       return result.$2;
     } on TimeoutException {
+      _recordOpenFailure('TIMEOUT');
       _detach();
       throw StateError('TIMEOUT');
     } on FormatException {
+      _recordOpenFailure('UNAUTHORIZED');
       _detach();
       throw StateError('UNAUTHORIZED');
-    } catch (_) {
+    } catch (error) {
+      _recordOpenFailure(error is StateError ? error.message : null);
       _detach();
       rethrow;
     } finally {

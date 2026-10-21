@@ -8,6 +8,9 @@ import 'package:cryptography/dart.dart';
 import 'package:serverdeck_protocol/mcp/handshake.dart';
 import 'package:serverdeck_protocol/automation/models.dart';
 import 'package:serverdeck_protocol/protocol.dart';
+import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/errors.dart';
+import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 
@@ -16,6 +19,7 @@ import '../storage/state_store.dart';
 part 'operational_sessions.dart';
 part 'operational_grants.dart';
 part 'operational_context.dart';
+part 'operational_open_failure.dart';
 
 String _randomNonce() => base64Url
     .encode(List<int>.generate(32, (_) => Random.secure().nextInt(256)))
@@ -84,6 +88,7 @@ final class OperationalServerHandshake {
   late final Duration Function() _clock;
   late final Duration _deadline;
   OperationalHello? _hello;
+  String? _issuedSessionId;
   bool _started = false, _used = false, _closed = false;
 
   Duration _remaining() {
@@ -192,6 +197,7 @@ final class OperationalServerHandshake {
       );
       await _verify();
       _remaining();
+      _issuedSessionId = response.sessionId;
       sessions._register(channel, response.sessionId, _hello!, peer);
       registered = true;
       return response;
@@ -201,7 +207,7 @@ final class OperationalServerHandshake {
       // Successful registration outlives the consumed bootstrap key. The channel
       // must disconnect it if authenticated response delivery subsequently fails.
       _disposeToken();
-      if (!registered) sessions.disconnect(channel);
+      if (!registered) _removeOwnedSession();
     }
   }
 
@@ -213,6 +219,15 @@ final class OperationalServerHandshake {
 
   void close() {
     _disposeToken();
-    sessions.disconnect(channel);
+    _removeOwnedSession();
+  }
+
+  void _removeOwnedSession() {
+    final current = sessions._sessions[channel];
+    if (current != null &&
+        current.id == _issuedSessionId &&
+        identical(current.peer, peer)) {
+      sessions.disconnect(channel);
+    }
   }
 }
