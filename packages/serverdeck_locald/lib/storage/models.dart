@@ -49,7 +49,14 @@ String nextRevision(String revision) {
 
 class ProfileRecord {
   ProfileRecord._(this._value);
-  factory ProfileRecord.fromJson(Map<String, Object?> value) {
+  factory ProfileRecord.fromJson(Map<String, Object?> value) =>
+      ProfileRecord._parse(value, trusted: false);
+  factory ProfileRecord.fromTrustedJson(Map<String, Object?> value) =>
+      ProfileRecord._parse(value, trusted: true);
+  factory ProfileRecord._parse(
+    Map<String, Object?> value, {
+    required bool trusted,
+  }) {
     requireFields(value, {
       'id',
       'revision',
@@ -94,7 +101,11 @@ class ProfileRecord {
     ]) {
       if (BigInt.parse(value[field] as String) > revision) _blocked();
     }
-    if (value['connectionRevision'] != value['trustRevision']) _blocked();
+    if (trusted
+        ? BigInt.parse(value['connectionRevision'] as String) >
+              BigInt.parse(value['trustRevision'] as String)
+        : value['connectionRevision'] != value['trustRevision'])
+      _blocked();
     return ProfileRecord._(
       Map.unmodifiable({
         ...value,
@@ -107,6 +118,9 @@ class ProfileRecord {
   String get revision => _value['revision'] as String;
   String? get credentialRef => _value['credentialRef'] as String?;
   String get credentialRevision => _value['credentialRevision'] as String;
+  String get connectionRevision => _value['connectionRevision'] as String;
+  String get trustRevision => _value['trustRevision'] as String;
+  String get updatedAt => _value['updatedAt'] as String;
   String get name => _value['name'] as String;
   Map<String, Object?> toJson() => {
     ..._value,
@@ -176,7 +190,14 @@ class CredentialRecord {
 
 class MutationReceipt {
   MutationReceipt._(this._value, this.result);
-  factory MutationReceipt.fromJson(Map<String, Object?> value) {
+  factory MutationReceipt.fromJson(Map<String, Object?> value) =>
+      MutationReceipt._parse(value, trusted: false);
+  factory MutationReceipt.fromTrustedJson(Map<String, Object?> value) =>
+      MutationReceipt._parse(value, trusted: true);
+  factory MutationReceipt._parse(
+    Map<String, Object?> value, {
+    required bool trusted,
+  }) {
     StrictCodec().encode(value, maxBytes: 4096);
     requireFields(value, {
       'requestId',
@@ -189,16 +210,23 @@ class MutationReceipt {
     requireUuid(value['requestId']);
     _base64(value['inputDigest'], exactBytes: 32);
     final operation = _text(value['operation']);
-    if (!ApiMethod.values
-        .where((m) => m.isMutation)
-        .any((m) => m.wireName == operation))
+    final trustMutation =
+        trusted &&
+        (operation == 'servers.trust.confirm' ||
+            operation == 'servers.trust.revoke');
+    if (!trustMutation &&
+        !ApiMethod.values
+            .where((m) => m.isMutation)
+            .any((m) => m.wireName == operation))
       _blocked();
     final body = _map(value['result']);
-    validateMethodResult(operation, body);
+    validateMethodResult(trustMutation ? 'profiles.update' : operation, body);
     final entityRevision = BigInt.parse(body['entityRevision'] as String);
     final committedRevision = BigInt.parse(body['storeRevision'] as String);
     if ((operation == 'profiles.create' && entityRevision != BigInt.one) ||
-        ((operation == 'profiles.update' || operation == 'settings.update') &&
+        ((trustMutation ||
+                operation == 'profiles.update' ||
+                operation == 'settings.update') &&
             entityRevision <= BigInt.one) ||
         (operation == 'profiles.delete' &&
             entityRevision >= committedRevision) ||
@@ -241,6 +269,7 @@ class MutationReceipt {
 
 class WorkspaceState {
   WorkspaceState._({
+    required this.schemaVersion,
     required this.workspaceId,
     required this.receiptKeyId,
     required this.ownerSid,
@@ -276,8 +305,37 @@ class WorkspaceState {
     required String workspaceId,
     required String receiptKeyId,
     required String ownerSid,
+  }) => WorkspaceState._parse(
+    value,
+    workspaceId: workspaceId,
+    receiptKeyId: receiptKeyId,
+    ownerSid: ownerSid,
+    trusted: false,
+  );
+
+  /// Explicit schema3 foundation view; not proof of the full retained graph.
+  factory WorkspaceState.fromTrustedJson(
+    Map<String, Object?> value, {
+    required String workspaceId,
+    required String receiptKeyId,
+    required String ownerSid,
+  }) => WorkspaceState._parse(
+    value,
+    workspaceId: workspaceId,
+    receiptKeyId: receiptKeyId,
+    ownerSid: ownerSid,
+    trusted: true,
+  );
+
+  factory WorkspaceState._parse(
+    Map<String, Object?> value, {
+    required String workspaceId,
+    required String receiptKeyId,
+    required String ownerSid,
+    required bool trusted,
   }) {
-    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1)
+    final schema = trusted ? 3 : 1;
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != schema)
       throw StateError('INCOMPATIBLE');
     try {
       requireFields(value, {
@@ -308,7 +366,9 @@ class WorkspaceState {
         _blocked();
       final profiles = <String, ProfileRecord>{};
       for (final entry in rawProfiles.entries) {
-        final profile = ProfileRecord.fromJson(_map(entry.value));
+        final profile = trusted
+            ? ProfileRecord.fromTrustedJson(_map(entry.value))
+            : ProfileRecord.fromJson(_map(entry.value));
         if (entry.key != profile.id ||
             BigInt.parse(profile.revision) > BigInt.parse(revision))
           _blocked();
@@ -353,7 +413,9 @@ class WorkspaceState {
       final receipts = <String, MutationReceipt>{};
       final committedRevisions = <String>{};
       for (final entry in rawReceipts.entries) {
-        final receipt = MutationReceipt.fromJson(_map(entry.value));
+        final receipt = trusted
+            ? MutationReceipt.fromTrustedJson(_map(entry.value))
+            : MutationReceipt.fromJson(_map(entry.value));
         final committedRevision = receipt.result.storeRevision;
         if (entry.key != receipt.requestId ||
             BigInt.parse(committedRevision) < BigInt.one ||
@@ -365,6 +427,7 @@ class WorkspaceState {
       // Each successful mutation increments once and keeps exactly one receipt.
       if (BigInt.from(receipts.length) != BigInt.parse(revision)) _blocked();
       return WorkspaceState._(
+        schemaVersion: schema,
         workspaceId: workspaceId,
         receiptKeyId: receiptKeyId,
         ownerSid: ownerSid,
@@ -378,6 +441,7 @@ class WorkspaceState {
       _blocked();
     }
   }
+  final int schemaVersion;
   final String workspaceId, receiptKeyId, ownerSid, storeRevision;
   final Map<String, ProfileRecord> profiles;
   final Map<String, CredentialRecord> credentials;
@@ -393,7 +457,7 @@ class WorkspaceState {
       !settings.reduceMotion &&
       settings.selectedProfileId == null;
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
+    'schemaVersion': schemaVersion,
     'workspaceId': workspaceId,
     'receiptKeyId': receiptKeyId,
     'ownerSid': ownerSid,

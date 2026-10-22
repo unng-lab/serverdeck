@@ -70,7 +70,13 @@ class WorkspaceRecords {
   factory WorkspaceRecords.fromOperationalState(WorkspaceState state) {
     return WorkspaceRecords._fromState(state, 2);
   }
+  factory WorkspaceRecords.fromTrustedState(WorkspaceState state) {
+    return WorkspaceRecords._fromState(state, 3);
+  }
   factory WorkspaceRecords._fromState(WorkspaceState state, int schema) {
+    if (state.schemaVersion != (schema == 3 ? 3 : 1)) {
+      throw StateError('INCOMPATIBLE');
+    }
     final codec = StrictCodec();
     String document(Map<String, Object?> value, int maxBytes) =>
         utf8.decode(codec.encode(value, maxBytes: maxBytes));
