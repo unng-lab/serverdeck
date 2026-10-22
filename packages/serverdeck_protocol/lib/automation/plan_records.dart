@@ -360,6 +360,19 @@ final class AutomationPlanRecord {
   static Future<AutomationPlanRecord> fromJson(
     Map<String, Object?> input, {
     required AutomationRevisionRecord revision,
+  }) => _parse(input, revision: revision, trusted: false);
+
+  /// Explicit schema3 history parser. Runtime composition must select this
+  /// mode; JSON input never switches validation rules or authorizes execution.
+  static Future<AutomationPlanRecord> fromTrustedJson(
+    Map<String, Object?> input, {
+    required AutomationRevisionRecord revision,
+  }) => _parse(input, revision: revision, trusted: true);
+
+  static Future<AutomationPlanRecord> _parse(
+    Map<String, Object?> input, {
+    required AutomationRevisionRecord revision,
+    required bool trusted,
   }) async {
     final value = _snapshot(input);
     requireFields(value, {
@@ -407,7 +420,9 @@ final class AutomationPlanRecord {
     final connection = requireRevision(value['connectionRevision']);
     final access = requireRevision(value['accessRevision']);
     final trust = requireRevision(value['trustRevision']);
-    if (connection != trust ||
+    if ((trusted
+            ? BigInt.parse(connection) > BigInt.parse(trust)
+            : connection != trust) ||
         [connection, access, trust].any(
           (counter) => BigInt.parse(counter) > BigInt.parse(serverRevision),
         ))

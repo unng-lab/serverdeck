@@ -35,7 +35,17 @@ final class ManagedResourceObservationRecord {
 
   factory ManagedResourceObservationRecord.fromJson(
     Map<String, Object?> value,
-  ) {
+  ) => ManagedResourceObservationRecord._parse(value, trusted: false);
+
+  /// Schema3 structural history only; callers still establish live trust.
+  factory ManagedResourceObservationRecord.fromTrustedJson(
+    Map<String, Object?> value,
+  ) => ManagedResourceObservationRecord._parse(value, trusted: true);
+
+  factory ManagedResourceObservationRecord._parse(
+    Map<String, Object?> value, {
+    required bool trusted,
+  }) {
     // Validate Unicode, tree depth and JSON types, but do not store canonical
     // bytes: observed text is data and must retain its original normalization.
     StrictCodec().canonical(value);
@@ -65,7 +75,9 @@ final class ManagedResourceObservationRecord {
     final connection = requireRevision(value['connectionRevision']);
     final access = requireRevision(value['accessRevision']);
     final trust = requireRevision(value['trustRevision']);
-    if (connection != trust ||
+    if ((trusted
+            ? BigInt.parse(connection) > BigInt.parse(trust)
+            : connection != trust) ||
         [
           connection,
           access,
