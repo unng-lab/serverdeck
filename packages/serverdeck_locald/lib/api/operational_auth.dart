@@ -11,6 +11,7 @@ import 'package:serverdeck_protocol/protocol.dart';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/errors.dart';
 import 'package:serverdeck_protocol/models.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
 import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 

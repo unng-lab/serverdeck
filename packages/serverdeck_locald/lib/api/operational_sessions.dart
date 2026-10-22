@@ -425,7 +425,7 @@ final class _Session<P> {
   int pending = 0;
   bool openAttempted = false;
   final detached = Completer<void>();
-  OperationalMcpAuthority? authority;
+  _McpAuthority? authority;
   ClientGrantRecord? grant;
 }
 
@@ -549,24 +549,80 @@ sealed class _SessionRequest<P> {
 }
 
 final class OperationalSessionRequest
-    extends _SessionRequest<OperationalPipePeer> {
+    extends _GrantSessionRequest<OperationalPipePeer> {
   OperationalSessionRequest._(
     OperationalSessions registry,
     String channel,
     _Session<OperationalPipePeer> session,
     String method,
   ) : super._(registry, channel, session, method);
+  OperationalOpenFailure? _failure;
+  OperationalOpenFailure? get openFailure => _openFailureCode == null
+      ? null
+      : _failure ??= OperationalOpenFailure._(this, _openFailureCode!);
   @override
-  OperationalSessions get _registry => super._registry as OperationalSessions;
-  bool _firstOpen = false;
-  OperationalOpenFailure? _openFailure;
-  OperationalOpenFailure? get openFailure => _openFailure;
+  OperationalMcpContext _makeContext() => OperationalMcpContext._(
+    _registry as OperationalSessions,
+    channel,
+    _session,
+  );
+  OperationalMcpContext mcpContext() => _context() as OperationalMcpContext;
+  Future<OperationalMcpContext> mcpContextWhenStable() async =>
+      await _contextWhenStable() as OperationalMcpContext;
+  void requireMcpInvocationBinding(
+    OperationalSessions registry,
+    OperationalMcpAuthority authority,
+  ) => _requireInvocationBinding(registry, authority);
+  Future<McpOpenResult> openGrant(
+    OperationalMcpAuthority authority,
+    Object? params,
+  ) => _openGrant(authority, params);
+}
 
-  Future<OperationalMcpContext> mcpContextWhenStable() async {
+final class TrustedSessionRequest
+    extends _GrantSessionRequest<TrustedPipePeer> {
+  TrustedSessionRequest._(
+    TrustedSessions registry,
+    String channel,
+    _Session<TrustedPipePeer> session,
+    String method,
+  ) : super._(registry, channel, session, method);
+  TrustedOpenFailure? _failure;
+  TrustedOpenFailure? get openFailure => _openFailureCode == null
+      ? null
+      : _failure ??= TrustedOpenFailure._(this, _openFailureCode!);
+  @override
+  TrustedMcpContext _makeContext() =>
+      TrustedMcpContext._(_registry as TrustedSessions, channel, _session);
+  TrustedMcpContext mcpContext() => _context() as TrustedMcpContext;
+  Future<TrustedMcpContext> mcpContextWhenStable() async =>
+      await _contextWhenStable() as TrustedMcpContext;
+  void requireMcpInvocationBinding(
+    TrustedSessions registry,
+    TrustedMcpAuthority authority,
+  ) => _requireInvocationBinding(registry, authority);
+  Future<McpOpenResult> openGrant(
+    TrustedMcpAuthority authority,
+    Object? params,
+  ) => _openGrant(authority, params);
+}
+
+sealed class _GrantSessionRequest<P> extends _SessionRequest<P> {
+  _GrantSessionRequest._(
+    _Sessions<P> registry,
+    String channel,
+    _Session<P> session,
+    String method,
+  ) : super._(registry, channel, session, method);
+  bool _firstOpen = false;
+  ErrorCode? _openFailureCode;
+  _McpContext<P> _makeContext();
+
+  Future<_McpContext<P>> _contextWhenStable() async {
     _identityLive();
     final authority = _session.authority;
     if (authority == null) throw StateError('FORBIDDEN');
-    return authority._stable(mcpContext, rpcBudgetRemaining);
+    return authority._stable(_context, rpcBudgetRemaining);
   }
 
   /// Consult live policy before object lookup and again before publishing results.
@@ -581,17 +637,17 @@ final class OperationalSessionRequest
     return grant;
   }
 
-  OperationalMcpContext mcpContext() {
+  _McpContext<P> _context() {
     _live();
     if (method != 'mcp.invoke') throw StateError('FORBIDDEN');
     authorizeMcp();
-    return OperationalMcpContext._(_registry, channel, _session);
+    return _makeContext();
   }
 
   /// Native binding gate before payload parsing; this supplies no permission.
-  void requireMcpInvocationBinding(
-    OperationalSessions registry,
-    OperationalMcpAuthority authority,
+  void _requireInvocationBinding(
+    _Sessions<P> registry,
+    _McpAuthority authority,
   ) {
     _identityLive();
     if (!belongsTo(registry) ||
@@ -603,8 +659,8 @@ final class OperationalSessionRequest
     }
   }
 
-  Future<McpOpenResult> openGrant(
-    OperationalMcpAuthority authority,
+  Future<McpOpenResult> _openGrant(
+    _McpAuthority authority,
     Object? params,
   ) async {
     _live();
@@ -658,15 +714,4 @@ final class OperationalSessionRequest
       authority._interests.remove(interest);
     }
   }
-}
-
-/// Native format3 admission/interest only. No format2 MCP authority or context
-/// can be installed here; production format3 grant composition is separate.
-final class TrustedSessionRequest extends _SessionRequest<TrustedPipePeer> {
-  TrustedSessionRequest._(
-    TrustedSessions registry,
-    String channel,
-    _Session<TrustedPipePeer> session,
-    String method,
-  ) : super._(registry, channel, session, method);
 }

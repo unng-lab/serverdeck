@@ -1,8 +1,9 @@
 part of 'operational_auth.dart';
 
-extension _FailedOpen on OperationalSessionRequest {
+extension _FailedOpen<P> on _GrantSessionRequest<P> {
   void _recordOpenFailure(Object? reason) {
-    if (!_firstOpen || _session.grant != null || _openFailure != null) return;
+    if (!_firstOpen || _session.grant != null || _openFailureCode != null)
+      return;
     final code = switch (reason) {
       'STORAGE_BLOCKED' => ErrorCode.storageBlocked,
       'RESOURCE_LIMIT' => ErrorCode.resourceLimit,
@@ -10,15 +11,37 @@ extension _FailedOpen on OperationalSessionRequest {
       'INCOMPATIBLE' => ErrorCode.incompatible,
       _ => ErrorCode.unauthorized,
     };
-    _openFailure = OperationalOpenFailure._(this, code);
+    _openFailureCode = code;
   }
 }
 
 /// The sole post-detach publication: a fixed initial-open failure, never a tool
 /// result or arbitrary bytes. Only the admitted request can mint this permit.
-final class OperationalOpenFailure {
-  OperationalOpenFailure._(this._request, this._code);
-  final OperationalSessionRequest _request;
+final class OperationalOpenFailure extends _OpenFailure<OperationalPipePeer> {
+  OperationalOpenFailure._(OperationalSessionRequest request, ErrorCode code)
+    : super._(request, code);
+  @override
+  Map<String, Object?> get _error => LocalError(_code).toJson();
+  @override
+  Future<void> _write(List<int> bytes, Duration deadline) =>
+      _request._session.peer.write(bytes, deadline: deadline);
+}
+
+final class TrustedOpenFailure extends _OpenFailure<TrustedPipePeer> {
+  TrustedOpenFailure._(TrustedSessionRequest request, ErrorCode code)
+    : super._(request, code);
+  @override
+  Map<String, Object?> get _error => TrustedLocalError(_code.wireName).toJson();
+  @override
+  Future<void> _write(List<int> bytes, Duration deadline) =>
+      _request._session.peer.write(bytes, deadline: deadline);
+}
+
+sealed class _OpenFailure<P> {
+  _OpenFailure._(this._request, this._code);
+  final _GrantSessionRequest<P> _request;
+  Map<String, Object?> get _error;
+  Future<void> _write(List<int> bytes, Duration deadline);
   final ErrorCode _code;
   bool _used = false;
 
@@ -55,20 +78,20 @@ final class OperationalOpenFailure {
       return outer < original ? outer : original;
     }
 
-    final peer = _request._session.peer;
+    final peer = _request._session.binding;
     try {
       final bytes = frameBytes(
         StrictCodec().encode({
           'v': 1,
           'id': requestId,
           'generation': _request._registry.generation,
-          'error': LocalError(_code).toJson(),
+          'error': _error,
         }),
       );
       final verificationBudget = remaining();
       await peer.revalidate().timeout(verificationBudget);
       // Synchronous guard after the await, immediately before issuing I/O.
-      await peer.write(bytes, deadline: remaining());
+      await _write(bytes, remaining());
       remaining();
     } on TimeoutException {
       throw StateError('TIMEOUT');

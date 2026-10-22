@@ -1,9 +1,33 @@
 part of 'operational_auth.dart';
 
 /// One per workspace/service generation. Not a wire-accessible signing service.
-final class OperationalMcpAuthority {
-  OperationalMcpAuthority(this._store, {DateTime Function()? clock})
-    : _clock = clock ?? DateTime.now;
+final class OperationalMcpAuthority extends _McpAuthority {
+  OperationalMcpAuthority(super.store, {super.clock});
+  @override
+  ClientGrantRecord _read(String id) =>
+      _store.currentMcpGrant(id, at: _clock());
+  @override
+  Future<McpGrantKey> _openKey(String id, Duration deadline) =>
+      _store.openMcpGrantKey(id, clock: _clock, publicationDeadline: deadline);
+}
+
+/// Format3 authority. Only trusted native requests can bind this authority.
+final class TrustedMcpAuthority extends _McpAuthority {
+  TrustedMcpAuthority(super.store, {super.clock});
+  @override
+  ClientGrantRecord _read(String id) =>
+      _store.currentTrustedMcpGrant(id, at: _clock());
+  @override
+  Future<McpGrantKey> _openKey(String id, Duration deadline) => _store
+      .openTrustedMcpGrantKey(id, clock: _clock, publicationDeadline: deadline);
+}
+
+sealed class _McpAuthority {
+  _McpAuthority(StateStore store, {DateTime Function()? clock})
+    : _store = store,
+      _clock = clock ?? DateTime.now;
+  ClientGrantRecord _read(String id);
+  Future<McpGrantKey> _openKey(String id, Duration deadline);
   final StateStore _store;
   final DateTime Function() _clock;
   final _interests = <Completer<void>>{};
@@ -48,7 +72,7 @@ final class OperationalMcpAuthority {
 
   ClientGrantRecord _current(String id) {
     if (_closed) throw StateError('UNAUTHORIZED');
-    return _store.currentMcpGrant(id, at: _clock());
+    return _read(id);
   }
 
   ClientGrantRecord _exact(ClientGrantRecord binding) {
@@ -68,7 +92,7 @@ final class OperationalMcpAuthority {
   }
 }
 
-extension _OperationalGrantOpen on OperationalSessionRequest {
+extension _GrantOpen<P> on _GrantSessionRequest<P> {
   Duration _openRemaining() {
     _live();
     if (_registry.targetChangesBlocked) throw StateError('UNAUTHORIZED');
@@ -79,7 +103,7 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
 
   Future<void> _openVerify() async {
     try {
-      await _session.peer.revalidate().timeout(_openRemaining());
+      await _session.binding.revalidate().timeout(_openRemaining());
       _openRemaining();
     } on TimeoutException {
       throw StateError('TIMEOUT');
@@ -87,7 +111,7 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
   }
 
   Future<(ClientGrantRecord, McpOpenResult)> _openWork(
-    OperationalMcpAuthority authority,
+    _McpAuthority authority,
     McpOpenRequest input,
   ) async {
     McpGrantKey? owned;
@@ -98,11 +122,7 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
         _openRemaining(),
       );
       await _openVerify();
-      owned = await authority._store.openMcpGrantKey(
-        input.grantId,
-        clock: authority._clock,
-        publicationDeadline: _openRemaining(),
-      );
+      owned = await authority._openKey(input.grantId, _openRemaining());
       _openRemaining();
       await authority._stable(
         () => authority._exact(owned!.grant),

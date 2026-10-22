@@ -2,20 +2,38 @@ part of 'operational_auth.dart';
 
 /// Native-backed operation context, independent of one RPC's response interest.
 /// No public constructor, role override, key, serialization or owner fallback.
-final class OperationalMcpContext {
-  OperationalMcpContext._(this._registry, this._channel, this._session);
-  final OperationalSessions _registry;
-  final String _channel;
-  final _Session<OperationalPipePeer> _session;
+final class OperationalMcpContext extends _McpContext<OperationalPipePeer> {
+  OperationalMcpContext._(
+    OperationalSessions registry,
+    String channel,
+    _Session<OperationalPipePeer> session,
+  ) : super._(registry, channel, session);
+  bool belongsTo(
+    OperationalSessions sessions,
+    OperationalMcpAuthority authority,
+  ) => _belongsTo(sessions, authority);
+}
 
+final class TrustedMcpContext extends _McpContext<TrustedPipePeer> {
+  TrustedMcpContext._(
+    TrustedSessions registry,
+    String channel,
+    _Session<TrustedPipePeer> session,
+  ) : super._(registry, channel, session);
+  bool belongsTo(TrustedSessions sessions, TrustedMcpAuthority authority) =>
+      _belongsTo(sessions, authority);
+}
+
+sealed class _McpContext<P> {
+  _McpContext._(this._registry, this._channel, this._session);
+  final _Sessions<P> _registry;
+  final String _channel;
+  final _Session<P> _session;
   String get sessionId => _session.id;
   String get grantId => _session.grant!.id;
   String get workspaceId => _session.grant!.workspaceId;
   int get revision => _session.grant!.revision;
-  bool belongsTo(
-    OperationalSessions sessions,
-    OperationalMcpAuthority authority,
-  ) =>
+  bool _belongsTo(_Sessions<P> sessions, _McpAuthority authority) =>
       identical(_registry, sessions) &&
       identical(_session.authority, authority);
 
@@ -88,7 +106,7 @@ final class OperationalMcpContext {
       await _session.authority!._stable(_current, remaining());
       try {
         final budget = remaining();
-        final actual = _session.peer.revalidate(
+        final actual = _session.binding.revalidate(
           observeNativeCompletion: observeNativeCompletion,
         );
         actual.ignore();
