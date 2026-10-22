@@ -261,7 +261,34 @@ and all credential DPAPI checks still run on protected copies.
 
 Under the same sole-writer lease, refuse any nonterminal job (anything other
 than succeeded/failed/cancelled), including unknown/reconciling, with HOST_BUSY
-before staging; preserve source. Retained plans/approvals are unchanged but
+before staging; preserve source rows. This requires an initial owned schema2
+preflight before freezing any migration hashes. Only when the2→3 stage is
+absent or an empty protected directory (and no creating/1→2 stage exists),
+verify the format3 actual-locald runtime, exact schema2 manifest/key wrapper,
+fixed active path/ACL/lock and exact15 native registry, then open active with
+exact schema2 definitions under the same global open reservation and writer
+lease. Perform no application transaction or native schema change. Capture and
+validate the entire15-collection graph, all server/client DPAPI bindings and
+existing credential lookups, without publishing or repairing any lookup. Close
+and confirm every native handle before returning HOST_BUSY or freezing hashes.
+An unconfirmed close retains the shared reservation and lease and returns
+STORAGE_BLOCKED. No stage/journal/backup or service readiness is created by this
+preflight. A normal same-schema native open may change physical housekeeping
+bytes; those preflight bytes are not migration source hashes. Existing row
+payloads/native IDs and manifest/key bytes remain unchanged. Once closed and
+job-free, capture source hashes and start the original7-step protocol; no
+subsequent active native open is allowed while a journal/hash binding exists.
+On recovery with a nonempty stage, never repeat active preflight: validate only
+the protected source/target copy selected by the recovery table. Its complete
+graph must also be job-free before candidate change or resumed publication;
+nonterminal jobs in a journal-bound copy mean STORAGE_BLOCKED, not permission
+to reopen or mutate active with a schema2 build. The same immutable capture
+and preservation digest are used for source2 and target3 copies; target trust
+must be empty, and migration validation never publishes credential lookups.
+Use distinct internal source-preflight/source-copy/target-copy entries with
+fixed active or default.upgrading-2-3 paths, not a caller-selected directory or
+JSON schema switch. Keep existing normal schema2/3 loader publication behavior.
+Retained plans/approvals are unchanged but
 cannot execute with absent trust or after a later trust-revision change.
 64MiB map,144MiB free staging/16MiB reserve, atomic retained-handle rename,
 hash-bound no-active-open recovery and process-kill failure model remain exact.
@@ -270,7 +297,8 @@ DB publication. Recovery table substitutes2/3 for1/2 literally; malformed or
 cross-step stage/journal/hash/identity blocks without reset. Schema1 startup
 runs1→2 then2→3 sequentially under one writer lease; no remote readiness or
 mutations between steps. An interrupted fully valid2 resumes3; active/unknown
-jobs require reconciliation using a compatible schema2 build before upgrade.
+jobs require reconciliation using a compatible schema2 build before upgrade,
+while no2→3 journal/hash binding exists.
 
 ## Acceptance and implementation order
 

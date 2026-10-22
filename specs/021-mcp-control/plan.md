@@ -7,6 +7,8 @@
 
 Persisted remote trust requires explicit schema3 and owner-only challenge/confirmation under the [host trust contract](contracts/host-trust.md). Schema2 components remain exact historical/prototype readers; remote startup uses a separate format3/API1.1/schema3 bundle after protected migration and all service gates, with no implicit trust-table fallback.
 
+The2→3 job guard uses an initial same-schema owned source preflight before stage creation and before freezing recovery hashes. It validates the full15-collection graph/DPAPI without application writes or credential lookup publication, confirms native close, then either refuses HOST_BUSY or starts protected migration. Journal-bound recovery opens only protected copies. Separate fixed-path source/target capture entries share immutable raw-row preservation checks; native housekeeping before hash capture is not covered by later source byte hashes. Details and acceptance are in the host trust contract and T156.
+
 The staged [SSH transport contract](contracts/ssh-transport.md) qualifies the pinned library, exact host-key verification before authentication and bounded physical connection ownership in T144. Persisted trust/native service integration remains T011 and does not reuse schema2 automation rows implicitly.
 
 Operational schema2 retained graph/reference validation and startup composition follow the [loading contract](contracts/loading.md); pure DTO parsing and migration's empty-automation view do not establish service readiness.
