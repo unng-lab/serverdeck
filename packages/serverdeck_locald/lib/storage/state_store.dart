@@ -23,6 +23,7 @@ import 'credential_validation.dart';
 import 'automation_records.dart';
 import 'foundation_snapshot.dart';
 import 'grant_write_probe.dart';
+import 'host_trust_records.dart';
 import 'key_custody.dart';
 import 'migration_journal.dart';
 import 'models.dart';
@@ -30,6 +31,7 @@ import 'native_failure.dart';
 import 'native_close.dart';
 import 'native_schema.dart';
 import 'records.dart';
+import 'trusted_snapshot.dart';
 import 'workspace_migration.dart';
 import 'workspace.dart';
 
@@ -50,6 +52,7 @@ class StateStore {
     this._state, [
     this._operational,
     this._operationalRoot,
+    this._trustedOperational,
   ]);
   final Isar _isar;
   final MutexLease _lease;
@@ -57,6 +60,7 @@ class StateStore {
   final ReceiptKeyMaterial _receiptKey;
   WorkspaceState _state;
   OperationalSnapshot? _operational;
+  final TrustedOperationalSnapshot? _trustedOperational;
   final String? _operationalRoot;
   bool _authorityUnavailableValue = false;
   Completer<void>? _authorityPublication;
@@ -121,6 +125,16 @@ class StateStore {
       !_authorityUnavailable &&
       _operational != null &&
       _lease.isHeld;
+
+  /// Internal retained schema3 snapshot only; service/writer readiness is a
+  /// separate gate. Existing schema2 services cannot consume this store.
+  bool get isTrustedSnapshotLoaded =>
+      !_blocked &&
+      !_closing &&
+      !_closed &&
+      !_authorityUnavailable &&
+      _trustedOperational != null &&
+      _lease.isHeld;
   Future<void> _tail = Future.value();
   Future<void>? _closeOperation;
   bool _blockedValue = false, _closing = false, _closed = false;
@@ -178,6 +192,24 @@ class StateStore {
     mcpBundle: true,
   );
 
+  /// Explicit existing-schema3 composition for the actual format3 locald.
+  /// Never creates, migrates or activates a workspace or remote service.
+  static Future<StateStore> openTrustedOperational({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    required ReceiptKeyMaterial receiptKey,
+  }) => _openOperational(
+    localAppData: localAppData,
+    appRoot: appRoot,
+    lease: lease,
+    custody: custody,
+    receiptKey: receiptKey,
+    mcpBundle: true,
+    trusted: true,
+  );
+
   static Future<StateStore> _openOperational({
     required String localAppData,
     required String appRoot,
@@ -185,6 +217,7 @@ class StateStore {
     required KeyCustody custody,
     required ReceiptKeyMaterial receiptKey,
     required bool mcpBundle,
+    bool trusted = false,
   }) async {
     if (Workspace.hasOpenReservation ||
         Isar.getInstance('workspace') != null ||
@@ -206,12 +239,20 @@ class StateStore {
 
     Future<void> live() async {
       owner();
-      await custody.createWorkspaceManifest(receiptKey);
+      if (trusted) {
+        await custody.createTrustedWorkspaceManifest(receiptKey);
+      } else {
+        await custody.createWorkspaceManifest(receiptKey);
+      }
       owner();
     }
 
     try {
-      if (mcpBundle) await initializeMcpNativeRuntime(appRoot);
+      if (trusted) {
+        await initializeTrustedNativeRuntime(appRoot);
+      } else if (mcpBundle) {
+        await initializeMcpNativeRuntime(appRoot);
+      }
       runtimeChecked = true;
       await live();
       if (!mcpBundle) await initializeNativeRuntime(appRoot);
@@ -227,7 +268,11 @@ class StateStore {
       }
       void settled() {
         owner();
-        for (final suffix in ['.creating', '.upgrading-1-2']) {
+        for (final suffix in [
+          '.creating',
+          '.upgrading-1-2',
+          if (trusted) '.upgrading-2-3',
+        ]) {
           final stage = '$directory$suffix';
           requireSafePath(localAppData, stage);
           if (FileSystemEntity.typeSync(stage, followLinks: false) !=
@@ -237,23 +282,29 @@ class StateStore {
       }
 
       settled();
-      final manifest = MigrationManifest.fromJson(
-        StrictCodec().decode(
-          await readProtectedFile(
-            localAppData,
-            p.join(directory, 'workspace.manifest.json'),
-            custody.ownerSid,
-            maxBytes: 4096,
-          ),
+      final manifestDocument = StrictCodec().decode(
+        await readProtectedFile(
+          localAppData,
+          p.join(directory, 'workspace.manifest.json'),
+          custody.ownerSid,
           maxBytes: 4096,
         ),
+        maxBytes: 4096,
       );
       await live();
-      if (manifest.schema != 2) throw StateError('INCOMPATIBLE');
-      if (manifest.workspaceId != receiptKey.workspaceId ||
-          manifest.receiptKeyId != receiptKey.receiptKeyId ||
-          manifest.ownerSid != receiptKey.ownerSid)
-        throw StateError('STORAGE_BLOCKED');
+      if (trusted) {
+        await custody.verifyTrustedWorkspaceManifest(
+          manifestDocument,
+          receiptKey,
+        );
+      } else {
+        final manifest = MigrationManifest.fromJson(manifestDocument);
+        if (manifest.schema != 2) throw StateError('INCOMPATIBLE');
+        if (manifest.workspaceId != receiptKey.workspaceId ||
+            manifest.receiptKeyId != receiptKey.receiptKeyId ||
+            manifest.ownerSid != receiptKey.ownerSid)
+          throw StateError('STORAGE_BLOCKED');
+      }
       final wrapper = await readProtectedFile(
         localAppData,
         p.join(directory, 'receipt-key.dpapi'),
@@ -270,8 +321,10 @@ class StateStore {
         maxBytes: 64 << 20,
       );
       await live();
-      if (inspectNativeWorkspaceSchema(Uint8List.fromList(bytes)) != 2)
-        throw StateError('INCOMPATIBLE');
+      final schema = trusted
+          ? inspectTrustedNativeWorkspaceSchema(Uint8List.fromList(bytes))
+          : inspectNativeWorkspaceSchema(Uint8List.fromList(bytes));
+      if (schema != (trusted ? 3 : 2)) throw StateError('INCOMPATIBLE');
       final lock = p.join(directory, 'workspace.isar-lck');
       requireSafePath(localAppData, lock);
       if (FileSystemEntity.typeSync(lock, followLinks: false) !=
@@ -287,7 +340,7 @@ class StateStore {
       safeToRelease = false;
       openedDirectory = directory;
       isar = await Isar.open(
-        automationWorkspaceSchemas,
+        trusted ? trustedWorkspaceSchemas : automationWorkspaceSchemas,
         directory: directory,
         name: 'workspace',
         maxSizeMiB: 64,
@@ -295,6 +348,27 @@ class StateStore {
         inspector: false,
       );
       await live();
+      if (trusted) {
+        final snapshot = await readTrustedOperationalSnapshot(
+          isar,
+          receiptKey,
+          custody,
+          localAppData: localAppData,
+          lease: lease,
+        );
+        await live();
+        transferred = true;
+        return StateStore._(
+          isar,
+          lease,
+          custody,
+          receiptKey,
+          snapshot.foundation.foundation,
+          null,
+          localAppData,
+          snapshot,
+        );
+      }
       final snapshot = await readOperationalSnapshot(
         isar,
         receiptKey,
@@ -342,6 +416,14 @@ class StateStore {
     _ensure();
     if (_authorityUnavailable) throw StateError('STORAGE_BLOCKED');
     final value = _operational;
+    if (value == null) throw StateError('STORAGE_BLOCKED');
+    return value;
+  }
+
+  TrustedOperationalSnapshot get trustedOperational {
+    _ensure();
+    if (_authorityUnavailable) throw StateError('STORAGE_BLOCKED');
+    final value = _trustedOperational;
     if (value == null) throw StateError('STORAGE_BLOCKED');
     return value;
   }
@@ -522,7 +604,8 @@ class StateStore {
   /// Serial durable primitive; upstream coordinator owns CAS/idempotency/grants.
   Future<void> commit(WorkspaceState next) {
     _ensure();
-    if (_operational != null) throw StateError('STORAGE_BLOCKED');
+    if (_operational != null || _trustedOperational != null)
+      throw StateError('STORAGE_BLOCKED');
     final result = _tail.then((_) => _commit(next));
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;
