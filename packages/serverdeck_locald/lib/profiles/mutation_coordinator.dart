@@ -6,10 +6,13 @@ import 'package:serverdeck_protocol/validation.dart';
 
 import '../credentials/provider.dart';
 import '../storage/key_custody.dart';
+import '../storage/host_trust_models.dart';
 import '../storage/models.dart';
 import '../storage/state_store.dart';
 import 'service.dart';
 import 'validation.dart';
+
+enum _FoundationMode { legacy, operational, trusted }
 
 /// Internal authenticated-session consumer; no transport is enabled here.
 class MutationCoordinator {
@@ -18,31 +21,42 @@ class MutationCoordinator {
     KeyCustody custody,
     ReceiptKeyMaterial receiptKey, {
     DateTime Function()? clock,
-  }) : this._(store, custody, receiptKey, false, clock);
+  }) : this._(store, custody, receiptKey, _FoundationMode.legacy, clock);
   MutationCoordinator.operational(
     StateStore store,
     KeyCustody custody,
     ReceiptKeyMaterial receiptKey, {
     DateTime Function()? clock,
-  }) : this._(store, custody, receiptKey, true, clock);
+  }) : this._(store, custody, receiptKey, _FoundationMode.operational, clock);
   MutationCoordinator._(
     this.store,
     this.custody,
     this.receiptKey,
-    this.isOperational,
+    this._mode,
     DateTime Function()? clock,
   ) : _clock = clock ?? DateTime.now,
       _profiles = ProfileService(CredentialProvider(custody)) {
-    if (isOperational) {
-      final state = store.operational.foundation.state;
+    if (_isQueued) {
+      final state = _state;
       if (receiptKey.workspaceId != state.workspaceId ||
           receiptKey.receiptKeyId != state.receiptKeyId ||
           receiptKey.ownerSid != state.ownerSid ||
           custody.ownerSid != state.ownerSid)
         throw StateError('STORAGE_BLOCKED');
+      if (_trusted) store.assertAutomationCustody(custody, receiptKey);
     }
   }
-  final bool isOperational;
+  final _FoundationMode _mode;
+  bool get isOperational => _operational;
+  bool get _operational => _mode == _FoundationMode.operational;
+  bool get isTrusted => _trusted;
+  bool get _trusted => _mode == _FoundationMode.trusted;
+  bool get _isQueued => _mode != _FoundationMode.legacy;
+  WorkspaceState get _state => switch (_mode) {
+    _FoundationMode.trusted => store.trustedOperational.foundation.foundation,
+    _FoundationMode.operational => store.operational.foundation.state,
+    _FoundationMode.legacy => store.state,
+  };
   final StateStore store;
   final KeyCustody custody;
   final ReceiptKeyMaterial receiptKey;
@@ -91,7 +105,7 @@ class MutationCoordinator {
         'params': input,
       });
       _checkAutomationId(requestId);
-      final receipt = store.state.receipts[requestId];
+      final receipt = _state.receipts[requestId];
       if (receipt != null) {
         if (receipt.inputDigest != digest)
           throw StateError('IDEMPOTENCY_CONFLICT');
@@ -115,7 +129,7 @@ class MutationCoordinator {
           existing.result.future,
         );
       }
-      if ((isOperational ? _inflight.length : _queue.length) >= 32)
+      if ((_isQueued ? _inflight.length : _queue.length) >= 32)
         throw StateError('RESOURCE_LIMIT');
       final pending = _Pending(requestId, method, input, digest, requester);
       pending.result.future.ignore();
@@ -158,21 +172,25 @@ class MutationCoordinator {
   }
 
   void _checkAutomationId(String id) {
-    if (isOperational && store.operational.automation.receipts.containsKey(id))
+    if (_isQueued &&
+        (_trusted
+                ? store.trustedOperational.automation.receipts
+                : store.operational.automation.receipts)
+            .containsKey(id))
       throw StateError('IDEMPOTENCY_CONFLICT');
   }
 
   void _ensure() {
     if (_blocked) throw StateError('STORAGE_BLOCKED');
     if (_stopping) throw StateError('NOT_READY');
-    store.state;
-    if (isOperational) store.operational;
+    _state;
+    if (_operational) store.operational;
   }
 
   MutationStatusResult status(String requestId) {
     _ensure();
     requireUuid(requestId);
-    final receipt = store.state.receipts[requestId];
+    final receipt = _state.receipts[requestId];
     if (receipt != null) return MutationStatusResult.committed(receipt.result);
     final pending = _inflight[requestId];
     if (pending == null) return const MutationStatusResult.notFound();
@@ -184,7 +202,7 @@ class MutationCoordinator {
   RecentMutationsView recent({int limit = 20}) {
     _ensure();
     if (limit < 1 || limit > 100) throw const FormatException('VALIDATION');
-    final receipts = store.state.receipts.values.toList()
+    final receipts = _state.receipts.values.toList()
       ..sort(
         (a, b) =>
             BigInt.parse(b.result.storeRevision)
@@ -198,18 +216,18 @@ class MutationCoordinator {
 
   ProfilesSnapshot listProfiles() {
     _ensure();
-    return _profiles.list(store.state);
+    return _profiles.list(_state);
   }
 
   ProfileSnapshot getProfile(String id) {
     _ensure();
     requireUuid(id);
-    return _profiles.get(store.state, id);
+    return _profiles.get(_state, id);
   }
 
   SettingsSnapshot getSettings() {
     _ensure();
-    return _profiles.settings.get(store.state);
+    return _profiles.settings.get(_state);
   }
 
   void detach(String requester) {
@@ -234,7 +252,7 @@ class MutationCoordinator {
     ).toIso8601String();
     // A persisted floor survives restart and keeps revision-ordered receipts
     // compatible with timestamp-ordered wire validation after clock rollback.
-    final state = store.state;
+    final state = _state;
     for (final receipt in state.receipts.values) {
       if (receipt.committedAt.compareTo(timestamp) > 0)
         timestamp = receipt.committedAt;
@@ -243,8 +261,12 @@ class MutationCoordinator {
       final updated = profile.toJson()['updatedAt'] as String;
       if (updated.compareTo(timestamp) > 0) timestamp = updated;
     }
-    if (isOperational) {
-      for (final receipt in store.operational.automation.receipts.values) {
+    if (_isQueued) {
+      for (final receipt
+          in (_trusted
+                  ? store.trustedOperational.automation.receipts
+                  : store.operational.automation.receipts)
+              .values) {
         final value = receipt.createdAt.toUtc().toIso8601String();
         if (value.compareTo(timestamp) > 0) timestamp = value;
       }
@@ -260,12 +282,19 @@ class MutationCoordinator {
         if (_blocked) throw StateError('STORAGE_BLOCKED');
         _checkAutomationId(pending.id);
         final now = _commitTimestamp();
-        final prepared = await _profiles.prepare(
-          store.state,
-          pending.method,
-          pending.input,
-          now,
-        );
+        final prepared = _trusted
+            ? await _profiles.prepareTrusted(
+                store.trustedOperational.foundation,
+                pending.method,
+                pending.input,
+                now,
+              )
+            : await _profiles.prepare(
+                _state,
+                pending.method,
+                pending.input,
+                now,
+              );
         (prepared.value['receipts'] as Map)[pending.id] = {
           'requestId': pending.id,
           'inputDigest': pending.digest,
@@ -274,13 +303,23 @@ class MutationCoordinator {
           'result': prepared.result.toJson(),
           'committedAt': now,
         };
-        final state = WorkspaceState.fromJson(
+        final parse = _trusted
+            ? WorkspaceState.fromTrustedJson
+            : WorkspaceState.fromJson;
+        final state = parse(
           prepared.value,
-          workspaceId: store.state.workspaceId,
-          receiptKeyId: store.state.receiptKeyId,
-          ownerSid: store.state.ownerSid,
+          workspaceId: _state.workspaceId,
+          receiptKeyId: _state.receiptKeyId,
+          ownerSid: _state.ownerSid,
         );
-        if (isOperational) {
+        if (_trusted) {
+          await store.commitTrustedFoundation(
+            HostTrustState.fromRecords(
+              state,
+              (prepared as PreparedTrustedMutation).trust,
+            ),
+          );
+        } else if (_operational) {
           await store.commitOperationalFoundation(state);
         } else {
           await store.commit(state);
@@ -334,6 +373,16 @@ class MutationCoordinator {
       return error;
     return StateError('STORAGE_BLOCKED');
   }
+}
+
+/// Fixed schema3 queue; never selected by request JSON or an owner role flag.
+final class TrustedMutationCoordinator extends MutationCoordinator {
+  TrustedMutationCoordinator(
+    StateStore store,
+    KeyCustody custody,
+    ReceiptKeyMaterial receiptKey, {
+    DateTime Function()? clock,
+  }) : super._(store, custody, receiptKey, _FoundationMode.trusted, clock);
 }
 
 class _Pending {

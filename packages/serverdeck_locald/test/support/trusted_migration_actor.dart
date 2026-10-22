@@ -31,6 +31,7 @@ import 'trusted_schema_child.dart' as raw show retained;
 import 'trusted_graph_write_fixture.dart';
 import 'trusted_migration_capacity_fixture.dart';
 import 'trusted_automation_write_fixture.dart';
+import 'trusted_coordinator_scenarios.dart';
 import 'mcp_runtime_actor.dart' show check, ownRoot;
 
 final class FaultProtection implements UserProtection {
@@ -462,7 +463,8 @@ Future<void> main(List<String> args) async {
           }
           if (mode == 'writer-graph' ||
               mode.startsWith('writer-busy-') ||
-              mode.startsWith('writer-automation')) {
+              mode.startsWith('writer-automation') ||
+              mode.startsWith('writer-coordinator-')) {
             final expected = jsonDecode(
               File(p.join(root, 'fixture-expected.json')).readAsStringSync(),
             ) as Map;
@@ -471,7 +473,15 @@ Future<void> main(List<String> args) async {
               expected['workspaceId'] as String,
               expected['receiptKeyId'] as String,
             );
-            if (mode.startsWith('writer-automation')) {
+            if (mode.startsWith('writer-coordinator-')) {
+              await exerciseTrustedCoordinator(
+                root,
+                custody,
+                key,
+                lease,
+                mode.substring('writer-'.length),
+              );
+            } else if (mode.startsWith('writer-automation')) {
               await exerciseTrustedAutomationWrite(
                 root,
                 custody,

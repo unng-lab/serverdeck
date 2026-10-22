@@ -1,4 +1,7 @@
 import 'package:serverdeck_protocol/models.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
+
+import '../storage/host_trust_models.dart';
 
 import '../credentials/provider.dart';
 import '../storage/models.dart';
@@ -8,6 +11,16 @@ class PreparedMutation {
   PreparedMutation(this.value, this.result);
   final Map<String, Object?> value;
   final MutationResult result;
+}
+
+/// Prepared schema3 data only; admission and the actual queue remain external.
+final class PreparedTrustedMutation extends PreparedMutation {
+  PreparedTrustedMutation(
+    super.value,
+    super.result,
+    Map<String, HostTrustRecord> trust,
+  ) : trust = Map.unmodifiable(trust);
+  final Map<String, HostTrustRecord> trust;
 }
 
 /// Pure model preparation plus custody. Only the coordinator commits the result.
@@ -53,6 +66,52 @@ class ProfileService {
     Map<String, Object?> params,
     String timestamp,
   ) async {
+    if (state.schemaVersion != 1) throw StateError('INCOMPATIBLE');
+    return _prepare(state, method, params, timestamp, trusted: false);
+  }
+
+  Future<PreparedTrustedMutation> prepareTrusted(
+    HostTrustState snapshot,
+    ApiMethod method,
+    Map<String, Object?> params,
+    String timestamp,
+  ) async {
+    final state = snapshot.foundation;
+    if (state.schemaVersion != 3) throw StateError('INCOMPATIBLE');
+    final prepared = await _prepare(
+      state,
+      method,
+      params,
+      timestamp,
+      trusted: true,
+    );
+    final trust = Map<String, HostTrustRecord>.of(snapshot.trust);
+    final id = params['profileId'];
+    if (method == ApiMethod.profilesDelete) {
+      trust.remove(id);
+    } else if (method == ApiMethod.profilesUpdate && trust.containsKey(id)) {
+      final profile = (prepared.value['profiles'] as Map)[id] as Map;
+      final old = trust[id]!;
+      if (profile['connectionRevision'] !=
+          state.profiles[id]!.connectionRevision) {
+        trust[id as String] = HostTrustRecord.fromJson({
+          ...old.toJson(),
+          'revision': profile['trustRevision'],
+          'status': 'revoked',
+          'updatedAt': timestamp,
+        });
+      }
+    }
+    return PreparedTrustedMutation(prepared.value, prepared.result, trust);
+  }
+
+  Future<PreparedMutation> _prepare(
+    WorkspaceState state,
+    ApiMethod method,
+    Map<String, Object?> params,
+    String timestamp, {
+    required bool trusted,
+  }) async {
     if (state.receipts.length >= 10000) throw StateError('RESOURCE_LIMIT');
     final value = state.toJson();
     final revision = nextRevision(state.storeRevision);
@@ -143,7 +202,13 @@ class ProfileService {
       'credentialRef': reference,
       'credentialRevision': credentialRevision,
       'connectionRevision': connectionRevision,
-      'trustRevision': connectionRevision,
+      'trustRevision': creating
+          ? '1'
+          : trusted
+          ? connectionChanged
+                ? nextRevision(old!.trustRevision)
+                : old!.trustRevision
+          : connectionRevision,
       'createdAt': previous?['createdAt'] ?? timestamp,
       'updatedAt': timestamp,
     };
