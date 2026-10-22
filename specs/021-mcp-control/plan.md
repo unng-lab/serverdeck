@@ -7,6 +7,8 @@
 
 Operational schema2 retained graph/reference validation and startup composition follow the [loading contract](contracts/loading.md); pure DTO parsing and migration's empty-automation view do not establish service readiness.
 
+Shared owner/MCP authorable catalog implementation follows the [profile catalog contract](contracts/profile-catalog.md), including origin-isolated receipts, native publication lifetime, immutable revisions and bounded cursor/diff/read semantics.
+
 Добавить stdio MCP bridge к существующему Windows locald. UI сохраняет Local API. Locald единственный владелец Isar/DPAPI/SSH/automation/grants/jobs. Ansible исполняется на управляемом Ubuntu хосте внутри заранее установленного root-owned executor с local connection: Windows не копирует SSH-секреты в WSL и не требует control-node runtime. ИИ создаёт типизированные декларативные профили; compiler переводит их в Ansible JSON playbook, не выполняет присланный произвольный YAML/Jinja/plugin.
 
 ## Technical Context
