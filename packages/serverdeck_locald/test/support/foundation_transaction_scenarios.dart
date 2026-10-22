@@ -14,6 +14,7 @@ import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../automation/snapshot_test.dart' as g;
+import 'foundation_coordinator_scenarios.dart';
 import 'operational_open_scenarios.dart' show refusal;
 import 'operational_snapshot_child.dart' show check, sameJson, graphDocument;
 
@@ -24,12 +25,18 @@ const foundationWriteModes = {
   'foundation-unknown',
   'foundation-queue',
   'foundation-capacity',
+  'coordinator-basic',
+  'coordinator-reservation',
+  'coordinator-running',
+  'coordinator-active',
+  'coordinator-unknown',
 };
 
 void prepareFoundationJobs(
   Map<String, List<Map<String, Object?>>> data,
   String mode,
 ) {
+  mode = mode.replaceFirst('coordinator-', 'foundation-');
   if (mode != 'foundation-active' && mode != 'foundation-unknown') return;
   data['jobs']!.single.addAll({
     'state': mode == 'foundation-active' ? 'running' : 'unknown',
@@ -53,6 +60,9 @@ Future<StateStore> verifyFoundationTransactions(
   ReceiptKeyMaterial key,
   String mode,
 ) async {
+  if (mode.startsWith('coordinator-')) {
+    return verifyFoundationCoordinator(store, open, custody, key, mode);
+  }
   final expectedGraph = graphDocument(store.operational);
   final oldRows = store.operational.rows;
   final service = ProfileService(CredentialProvider(custody));

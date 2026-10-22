@@ -592,7 +592,7 @@ Future<void> main(List<String> args) async {
                   'grantId': g.grantId,
                   'expectedRevision':
                       store.operational.automation.grants[g.grantId]!.revision,
-                });
+                }, requestId: n.generation);
             mutationEntered = true;
             await pending;
           } finally {

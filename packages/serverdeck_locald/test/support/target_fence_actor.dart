@@ -40,13 +40,14 @@ final class CountingOwner implements OperationalOwnerApi {
   @override
   bool supports(String method) => delegate.supports(method);
   @override
-  Future<Map<String, Object?>> dispatch(
+  OperationalOwnerInvocation prepare(
     OperationalSessionRequest request,
     String method,
-    Map<String, Object?> params,
-  ) {
+    Map<String, Object?> params, {
+    required String requestId,
+  }) {
     calls++;
-    return delegate.dispatch(request, method, params);
+    return delegate.prepare(request, method, params, requestId: requestId);
   }
 }
 
@@ -232,12 +233,22 @@ Future<void> main(List<String> args) async {
             );
             final mcpRequest = await request(mcp, 'session.ping');
             await a.fails(
-              adapter.dispatch(mcpRequest, 'grants.replace', {}),
+              adapter.dispatch(
+                mcpRequest,
+                'grants.replace',
+                {},
+                requestId: a.generation,
+              ),
               'FORBIDDEN',
             );
             final foreign = await request(seed, 'grants.replace');
             await a.fails(
-              adapter.dispatch(foreign, 'grants.replace', {}),
+              adapter.dispatch(
+                foreign,
+                'grants.replace',
+                {},
+                requestId: a.generation,
+              ),
               'FORBIDDEN',
             );
             external = await seed.peer!.publicationGate(a.generation);
@@ -249,6 +260,7 @@ Future<void> main(List<String> args) async {
               ownerRequest,
               'grants.replace',
               params,
+              requestId: a.generation,
             );
             work.then((_) {
               finished = true;
@@ -274,6 +286,7 @@ Future<void> main(List<String> args) async {
               retry,
               'grants.replace',
               grantWriteParams(),
+              requestId: a.generation,
             );
             a.check(
               jsonEncode(repeated) == jsonEncode(ack) &&
@@ -285,7 +298,7 @@ Future<void> main(List<String> args) async {
               adapter.dispatch(conflict, 'grants.replace', {
                 ...grantWriteParams(),
                 'label': 'conflicting retry',
-              }),
+              }, requestId: a.generation),
               'IDEMPOTENCY_CONFLICT',
             );
             a.check(

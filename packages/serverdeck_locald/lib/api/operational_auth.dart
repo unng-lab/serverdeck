@@ -15,6 +15,7 @@ import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 
 import '../storage/state_store.dart';
+import 'owner_service_probe.dart';
 
 part 'operational_sessions.dart';
 part 'operational_grants.dart';

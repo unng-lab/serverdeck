@@ -26,11 +26,12 @@ final class OperationalGrantOwnerApi implements OperationalOwnerApi {
   bool supports(String method) => _methods.containsKey(method);
 
   @override
-  Future<Map<String, Object?>> dispatch(
+  OperationalOwnerInvocation prepare(
     OperationalSessionRequest request,
     String method,
-    Map<String, Object?> params,
-  ) async {
+    Map<String, Object?> params, {
+    required String requestId,
+  }) {
     if (!request.belongsTo(sessions) ||
         request.role != OperationalRole.owner ||
         request.method != method) {
@@ -40,16 +41,19 @@ final class OperationalGrantOwnerApi implements OperationalOwnerApi {
     if (operation == null) throw StateError('UNSUPPORTED');
     // Capture immutable typed fields synchronously before the native gate wait.
     final command = OwnerGrantCommand.parse(operation, params);
-    final budget = request.rpcRemaining;
-    return sessions.runAuthorityMutation(() async {
-      // A queued writer's former proof is not authority to start a mutation.
-      try {
-        await request.revalidate().timeout(request.rpcRemaining);
-      } on TimeoutException {
-        throw StateError('TIMEOUT');
-      }
-      request.rpcRemaining;
-      return store.mutateOwnerGrant(command, clock: DateTime.now);
-    }, deadline: budget);
+    return OperationalOwnerInvocation(
+      request,
+      () => sessions.runAuthorityMutation(() async {
+        // A queued writer's former proof is not authority to start a mutation.
+        try {
+          final budget = request.rpcRemaining;
+          await request.revalidate().timeout(budget);
+        } on TimeoutException {
+          throw StateError('TIMEOUT');
+        }
+        request.rpcRemaining;
+        return store.mutateOwnerGrant(command, clock: DateTime.now);
+      }, deadline: request.rpcRemaining),
+    );
   }
 }

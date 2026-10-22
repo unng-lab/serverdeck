@@ -61,8 +61,9 @@ final class OperationalApiClient {
 
   Future<Map<String, Object?>> call(
     String method,
-    Map<String, Object?> params,
-  ) {
+    Map<String, Object?> params, {
+    String? requestId,
+  }) {
     final until = _watch.elapsed + rpcDeadline;
     if (isClosed) {
       return Future.error(
@@ -71,6 +72,26 @@ final class OperationalApiClient {
           OperationalRpcFailureOrigin.transport,
         ),
       );
+    }
+    if (requestId != null) {
+      try {
+        requireUuid(requestId);
+      } catch (_) {
+        return Future.error(
+          const OperationalRpcException._(
+            ErrorCode.validation,
+            OperationalRpcFailureOrigin.local,
+          ),
+        );
+      }
+      if (_pending.containsKey(requestId)) {
+        return Future.error(
+          const OperationalRpcException._(
+            ErrorCode.idempotencyConflict,
+            OperationalRpcFailureOrigin.local,
+          ),
+        );
+      }
     }
     if (_pending.length >= maxPendingPerSession) {
       return Future.error(
@@ -81,9 +102,13 @@ final class OperationalApiClient {
       );
     }
     String id;
-    do {
-      id = _requestId();
-    } while (_pending.containsKey(id));
+    if (requestId != null) {
+      id = requestId;
+    } else {
+      do {
+        id = _requestId();
+      } while (_pending.containsKey(id));
+    }
     late final List<int> bytes;
     try {
       if (method.isEmpty || method.runes.length > 256)

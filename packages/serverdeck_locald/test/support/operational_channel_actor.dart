@@ -134,16 +134,19 @@ final class Owner implements OperationalOwnerApi {
   @override
   bool supports(String method) => method == 'fixture.wait';
   @override
-  Future<Map<String, Object?>> dispatch(
+  OperationalOwnerInvocation prepare(
     OperationalSessionRequest request,
     String method,
-    Map<String, Object?> params,
-  ) async {
-    final number = ++calls;
-    if (mode == 'output-error') return {'invalid': Object()};
-    await gate.future;
-    settled++;
-    return {'number': number};
+    Map<String, Object?> params, {
+    required String requestId,
+  }) {
+    return OperationalOwnerInvocation(request, () async {
+      final number = ++calls;
+      if (mode == 'output-error') return {'invalid': Object()};
+      await gate.future;
+      settled++;
+      return {'number': number};
+    });
   }
 }
 

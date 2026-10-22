@@ -14,12 +14,35 @@ import 'validation.dart';
 /// Internal authenticated-session consumer; no transport is enabled here.
 class MutationCoordinator {
   MutationCoordinator(
+    StateStore store,
+    KeyCustody custody,
+    ReceiptKeyMaterial receiptKey, {
+    DateTime Function()? clock,
+  }) : this._(store, custody, receiptKey, false, clock);
+  MutationCoordinator.operational(
+    StateStore store,
+    KeyCustody custody,
+    ReceiptKeyMaterial receiptKey, {
+    DateTime Function()? clock,
+  }) : this._(store, custody, receiptKey, true, clock);
+  MutationCoordinator._(
     this.store,
     this.custody,
-    this.receiptKey, {
+    this.receiptKey,
+    this.isOperational,
     DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now,
-       _profiles = ProfileService(CredentialProvider(custody));
+  ) : _clock = clock ?? DateTime.now,
+      _profiles = ProfileService(CredentialProvider(custody)) {
+    if (isOperational) {
+      final state = store.operational.foundation.state;
+      if (receiptKey.workspaceId != state.workspaceId ||
+          receiptKey.receiptKeyId != state.receiptKeyId ||
+          receiptKey.ownerSid != state.ownerSid ||
+          custody.ownerSid != state.ownerSid)
+        throw StateError('STORAGE_BLOCKED');
+    }
+  }
+  final bool isOperational;
   final StateStore store;
   final KeyCustody custody;
   final ReceiptKeyMaterial receiptKey;
@@ -31,6 +54,21 @@ class MutationCoordinator {
   Completer<void>? _closed;
 
   Future<MutationResult> submit(
+    String requestId,
+    ApiMethod method,
+    Map<String, Object?> params, {
+    required String requester,
+  }) {
+    try {
+      return activate(reserve(requestId, method, params, requester: requester));
+    } catch (error) {
+      return Future.error(_safe(error));
+    }
+  }
+
+  /// Pure, synchronous admission. No credential preparation, native wait or
+  /// StateStore queue is entered until the trusted adapter activates its token.
+  FoundationMutationReservation reserve(
     String requestId,
     ApiMethod method,
     Map<String, Object?> params, {
@@ -52,36 +90,83 @@ class MutationCoordinator {
         'operation': method.wireName,
         'params': input,
       });
+      _checkAutomationId(requestId);
       final receipt = store.state.receipts[requestId];
       if (receipt != null) {
         if (receipt.inputDigest != digest)
           throw StateError('IDEMPOTENCY_CONFLICT');
-        return Future.value(receipt.result);
+        return FoundationMutationReservation._(
+          this,
+          requestId,
+          requester,
+          null,
+          Future.value(receipt.result),
+        );
       }
       final existing = _inflight[requestId];
       if (existing != null) {
         if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
         existing.requesters.add(requester);
-        return existing.result.future;
+        return FoundationMutationReservation._(
+          this,
+          requestId,
+          requester,
+          existing,
+          existing.result.future,
+        );
       }
-      if (_queue.length >= 32) throw StateError('RESOURCE_LIMIT');
+      if ((isOperational ? _inflight.length : _queue.length) >= 32)
+        throw StateError('RESOURCE_LIMIT');
       final pending = _Pending(requestId, method, input, digest, requester);
+      pending.result.future.ignore();
       _inflight[requestId] = pending;
+      return FoundationMutationReservation._(
+        this,
+        requestId,
+        requester,
+        pending,
+        pending.result.future,
+      );
+    } catch (error) {
+      throw _safe(error);
+    }
+  }
+
+  Future<MutationResult> activate(FoundationMutationReservation reservation) {
+    try {
+      _ensure();
+      if (!identical(reservation._coordinator, this))
+        throw StateError('FORBIDDEN');
+      _checkAutomationId(reservation._id);
+      final pending = reservation._pending;
+      if (pending == null || pending.result.isCompleted)
+        return reservation.result;
+      if (!identical(_inflight[pending.id], pending) ||
+          !pending.requesters.contains(reservation._requester))
+        throw StateError('SERVICE_UNAVAILABLE');
+      if (pending.activated) return pending.result.future;
+      pending.activated = true;
       _queue.add(pending);
       if (!_running) {
         _running = true;
         scheduleMicrotask(_drain);
       }
-      return pending.result.future;
+      return reservation.result;
     } catch (error) {
       return Future.error(_safe(error));
     }
+  }
+
+  void _checkAutomationId(String id) {
+    if (isOperational && store.operational.automation.receipts.containsKey(id))
+      throw StateError('IDEMPOTENCY_CONFLICT');
   }
 
   void _ensure() {
     if (_blocked) throw StateError('STORAGE_BLOCKED');
     if (_stopping) throw StateError('NOT_READY');
     store.state;
+    if (isOperational) store.operational;
   }
 
   MutationStatusResult status(String requestId) {
@@ -158,6 +243,12 @@ class MutationCoordinator {
       final updated = profile.toJson()['updatedAt'] as String;
       if (updated.compareTo(timestamp) > 0) timestamp = updated;
     }
+    if (isOperational) {
+      for (final receipt in store.operational.automation.receipts.values) {
+        final value = receipt.createdAt.toUtc().toIso8601String();
+        if (value.compareTo(timestamp) > 0) timestamp = value;
+      }
+    }
     return timestamp;
   }
 
@@ -167,6 +258,7 @@ class MutationCoordinator {
       pending.running = true;
       try {
         if (_blocked) throw StateError('STORAGE_BLOCKED');
+        _checkAutomationId(pending.id);
         final now = _commitTimestamp();
         final prepared = await _profiles.prepare(
           store.state,
@@ -188,13 +280,17 @@ class MutationCoordinator {
           receiptKeyId: store.state.receiptKeyId,
           ownerSid: store.state.ownerSid,
         );
-        await store.commit(state);
+        if (isOperational) {
+          await store.commitOperationalFoundation(state);
+        } else {
+          await store.commit(state);
+        }
         pending.result.complete(prepared.result);
-      } catch (error) {
+      } catch (error, stack) {
         final safe = _safe(error);
         if (safe is StateError && safe.message == 'STORAGE_BLOCKED')
           _blocked = true;
-        pending.result.completeError(safe);
+        pending.result.completeError(safe, stack);
       } finally {
         pending.input.clear();
         _inflight.remove(pending.id);
@@ -208,7 +304,9 @@ class MutationCoordinator {
     if (_closed != null) return _closed!.future;
     _stopping = true;
     _closed = Completer<void>();
-    for (final pending in _queue.toList()) _cancel(pending);
+    for (final pending in _inflight.values.toList()) {
+      if (!pending.running) _cancel(pending);
+    }
     if (!_running) _closed!.complete();
     return _closed!.future;
   }
@@ -220,6 +318,8 @@ class MutationCoordinator {
       );
     if (error is StateError &&
         {
+          'VALIDATION',
+          'UNSUPPORTED',
           'STORAGE_BLOCKED',
           'RESOURCE_LIMIT',
           'REVISION_CONFLICT',
@@ -228,6 +328,8 @@ class MutationCoordinator {
           'NOT_FOUND',
           'NOT_READY',
           'SERVICE_UNAVAILABLE',
+          'HOST_BUSY',
+          'FORBIDDEN',
         }.contains(error.message))
       return error;
     return StateError('STORAGE_BLOCKED');
@@ -242,5 +344,20 @@ class _Pending {
   final Map<String, Object?> input;
   final Set<String> requesters;
   final result = Completer<MutationResult>();
-  bool running = false;
+  bool running = false, activated = false;
+}
+
+/// Opaque, same-coordinator interest; never decoded from a wire request.
+final class FoundationMutationReservation {
+  FoundationMutationReservation._(
+    this._coordinator,
+    this._id,
+    this._requester,
+    this._pending,
+    this.result,
+  );
+  final MutationCoordinator _coordinator;
+  final String _id, _requester;
+  final _Pending? _pending;
+  final Future<MutationResult> result;
 }

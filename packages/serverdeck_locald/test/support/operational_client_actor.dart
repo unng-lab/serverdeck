@@ -58,14 +58,18 @@ final class Owner implements OperationalOwnerApi {
     'fixture.timeout',
   }.contains(method);
   @override
-  Future<Map<String, Object?>> dispatch(
+  OperationalOwnerInvocation prepare(
     OperationalSessionRequest request,
     String method,
-    Map<String, Object?> params,
-  ) async {
-    if (method == 'fixture.error') throw StateError('SERVICE_UNAVAILABLE');
-    if (method == 'fixture.timeout') throw StateError('TIMEOUT');
-    return params;
+    Map<String, Object?> params, {
+    required String requestId,
+  }) {
+    final captured = Map<String, Object?>.from(params);
+    return OperationalOwnerInvocation(request, () async {
+      if (method == 'fixture.error') throw StateError('SERVICE_UNAVAILABLE');
+      if (method == 'fixture.timeout') throw StateError('TIMEOUT');
+      return captured;
+    });
   }
 }
 
@@ -193,15 +197,46 @@ Future<void> client(List<String> args) async {
         final calls = <Future<Map<String, Object?>>>[];
         for (var i = 0; i < count; i++) {
           final index = i;
-          final call = rpc.call('fixture.echo', {'slot': i}).then((value) {
-            order.add(index);
-            return value;
-          });
+          final call = rpc
+              .call(
+                'fixture.echo',
+                {'slot': i},
+                requestId: mode == 'quota'
+                    ? '92345678-1234-4234-8234-${(i + 1).toString().padLeft(12, '0')}'
+                    : null,
+              )
+              .then((value) {
+                order.add(index);
+                return value;
+              });
           call.ignore();
           calls.add(call);
         }
         n.check(rpc.pendingRequests == count);
         if (mode == 'quota') {
+          await failure(
+            rpc.call(
+              'fixture.echo',
+              {},
+              requestId: '92345678-1234-4234-8234-000000000001',
+            ),
+            ErrorCode.idempotencyConflict,
+            OperationalRpcFailureOrigin.local,
+          );
+          await failure(
+            rpc.call(
+              'fixture.echo',
+              {},
+              requestId: '92345678-1234-4234-8234-000000000017',
+            ),
+            ErrorCode.resourceLimit,
+            OperationalRpcFailureOrigin.local,
+          );
+          await failure(
+            rpc.call('fixture.echo', {}, requestId: 'invalid'),
+            ErrorCode.validation,
+            OperationalRpcFailureOrigin.local,
+          );
           await failure(
             rpc.call('fixture.echo', {}),
             ErrorCode.resourceLimit,

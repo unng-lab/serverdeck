@@ -183,6 +183,12 @@ final class OperationalSessions {
     String id,
     String method,
   ) async {
+    final request = reserve(channel, id, method);
+    await completeAdmission(request);
+    return request;
+  }
+
+  OperationalSessionRequest reserve(String channel, String id, String method) {
     expire();
     final session = _sessions[channel];
     if (session == null || session.id != id || !_current(channel, session))
@@ -195,13 +201,39 @@ final class OperationalSessions {
     if (session.pending >= maxPendingPerSession)
       throw StateError('RESOURCE_LIMIT');
     session.pending++;
-    final request = OperationalSessionRequest._(this, channel, session, method);
+    return OperationalSessionRequest._(this, channel, session, method);
+  }
+
+  Future<void> completeAdmission(OperationalSessionRequest request) {
+    if (!request.belongsTo(this)) return Future.error(StateError('FORBIDDEN'));
     try {
-      await request.revalidate();
-      session.expires = _clock() + sessionLease;
+      request._live();
+      return request._initialAdmission ??= _completeAdmission(request);
+    } catch (error, stack) {
+      return Future.error(error, stack);
+    }
+  }
+
+  Future<void> _completeAdmission(OperationalSessionRequest request) async {
+    try {
+      try {
+        if (ownerServiceProbesEnabled) {
+          final budget = request.rpcRemaining;
+          await OwnerServiceProbe.hit(
+            OwnerServiceBoundary.beforeInitialProof,
+            request.method,
+          ).timeout(budget);
+        }
+        final budget = request.rpcRemaining;
+        await request.revalidate().timeout(budget);
+      } on TimeoutException {
+        throw StateError('TIMEOUT');
+      }
+      request.rpcRemaining;
+      request._session.expires = _clock() + sessionLease;
       _onChanged?.call();
       request._live();
-      return request;
+      request._initialAdmissionProved = true;
     } catch (_) {
       request.complete();
       rethrow;
@@ -297,6 +329,13 @@ final class OperationalSessionRequest {
   bool belongsTo(OperationalSessions registry) =>
       identical(_registry, registry);
   bool _completed = false;
+  bool _initialAdmissionProved = false;
+  Future<void>? _initialAdmission;
+  bool get initialAdmissionProved {
+    _live();
+    return _initialAdmissionProved;
+  }
+
   bool _firstOpen = false;
   OperationalOpenFailure? _openFailure;
   OperationalOpenFailure? get openFailure => _openFailure;
