@@ -587,6 +587,21 @@ final class TrustedSessionRequest
     _Session<TrustedPipePeer> session,
     String method,
   ) : super._(registry, channel, session, method);
+  TrustedOwnerProbeContext? _ownerProbe;
+  TrustedOwnerProbeContext ownerProbeContext() {
+    _live();
+    if (_session.role != OperationalRole.owner ||
+        method != 'servers.trust.probe' ||
+        !_initialAdmissionProved)
+      throw StateError('FORBIDDEN');
+    return _ownerProbe ??= TrustedOwnerProbeContext._(
+      _registry as TrustedSessions,
+      channel,
+      _session,
+      _began,
+    );
+  }
+
   TrustedOpenFailure? _failure;
   TrustedOpenFailure? get openFailure => _openFailureCode == null
       ? null

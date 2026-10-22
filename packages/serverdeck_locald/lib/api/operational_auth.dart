@@ -21,6 +21,7 @@ import 'owner_service_probe.dart';
 part 'operational_sessions.dart';
 part 'operational_grants.dart';
 part 'operational_context.dart';
+part 'trusted_owner_context.dart';
 part 'operational_open_failure.dart';
 part 'operational_target_changes.dart';
 part 'server_peer.dart';

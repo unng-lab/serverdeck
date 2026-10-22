@@ -348,6 +348,164 @@ Future<void> scenario(String root, String name) async {
   }
 
   try {
+    if (name.startsWith('owner-context')) {
+      final owner = await start('serverdeck.exe');
+      await owner.exchange();
+      check(await owner.next() == 'AUTH:owner');
+      final request = registry.reserve(
+        owner.channel,
+        owner.response!.sessionId,
+        'servers.trust.probe',
+      );
+      await fails(Future.sync(request.ownerProbeContext), 'FORBIDDEN');
+      await registry.completeAdmission(request);
+      final context = request.ownerProbeContext();
+      check(identical(context, request.ownerProbeContext()));
+      check(
+        context.belongsTo(registry) &&
+            context.sessionId == request.sessionId &&
+            context.generation == generation,
+      );
+      request.complete();
+      await fails(Future.sync(request.ownerProbeContext), 'UNAUTHORIZED');
+      if (name == 'owner-context-physical') {
+        final observation = await owner.peer!.observeNextRevalidationForTest();
+        time = const Duration(milliseconds: 29900);
+        final proof = context.revalidate();
+        proof.ignore();
+        try {
+          await observation.reached.timeout(const Duration(seconds: 2));
+          await fails(proof, 'TIMEOUT');
+          var drained = false;
+          final settling = context.settled.then<void>((_) {
+            drained = true;
+          });
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          check(!drained);
+          await observation.release();
+          await settling;
+          check(drained);
+          time = const Duration(seconds: 30);
+          await fails(context.revalidate(), 'TIMEOUT');
+        } finally {
+          await observation.release();
+          await context.settled;
+        }
+      } else if (name == 'owner-context-stop') {
+        registry.stop();
+        await context.detached;
+        await fails(context.revalidate(), 'UNAUTHORIZED');
+      } else if (name == 'owner-context-detach') {
+        owner.handshake!.close();
+        await context.detached;
+        await fails(context.revalidate(), 'UNAUTHORIZED');
+        final replacement = await Pair.start(
+          root,
+          'serverdeck.exe',
+          registry,
+          channelOverride: owner.channel,
+        );
+        pairs.add(replacement);
+        await replacement.exchange();
+        check(await replacement.next() == 'AUTH:owner');
+        final fresh = await registry.begin(
+          replacement.channel,
+          replacement.response!.sessionId,
+          'servers.trust.confirm',
+        );
+        try {
+          check(!context.matches(fresh));
+        } finally {
+          fresh.complete();
+        }
+      } else if (name == 'owner-context-expiry') {
+        time = const Duration(seconds: 60);
+        await fails(context.revalidate(), 'UNAUTHORIZED');
+        registry.expire();
+        await context.detached;
+      } else if (name == 'owner-context-native') {
+        final manifest = File(p.join(root, 'foundation.manifest.json'));
+        final original = manifest.readAsBytesSync();
+        try {
+          manifest.writeAsBytesSync([...original, 10]);
+          await fails(context.revalidate(), 'UNAUTHORIZED');
+          await context.detached;
+          check(registry.count == 0);
+        } finally {
+          manifest.writeAsBytesSync(original);
+        }
+      } else {
+        time = const Duration(seconds: 6);
+        check(context.remaining == const Duration(seconds: 24));
+        await context.revalidate();
+        final fresh = await registry.begin(
+          owner.channel,
+          owner.response!.sessionId,
+          'servers.trust.confirm',
+        );
+        try {
+          check(context.matches(fresh));
+          await fails(Future.sync(fresh.ownerProbeContext), 'FORBIDDEN');
+          if (name == 'owner-context-budget') {
+            time = const Duration(seconds: 30);
+            await fails(context.revalidate(), 'TIMEOUT');
+            // Challenge identity may outlive the probe's service deadline.
+            final later = await registry.begin(
+              owner.channel,
+              owner.response!.sessionId,
+              'servers.trust.confirm',
+            );
+            try {
+              check(context.matches(later));
+            } finally {
+              later.complete();
+            }
+          } else {
+            await fails(
+              owner.peer!.observeNextRevalidationForTest(),
+              'UNSUPPORTED',
+            );
+            final other = await start('serverdeck.exe');
+            await other.exchange();
+            check(await other.next() == 'AUTH:owner');
+            final otherRequest = await registry.begin(
+              other.channel,
+              other.response!.sessionId,
+              'servers.trust.confirm',
+            );
+            try {
+              check(!context.matches(otherRequest));
+            } finally {
+              otherRequest.complete();
+            }
+            final mcp = await start('mcp.exe');
+            await mcp.exchange();
+            check(await mcp.next() == 'AUTH:mcp');
+            final denied = await registry.begin(
+              mcp.channel,
+              mcp.response!.sessionId,
+              'session.ping',
+            );
+            try {
+              await fails(Future.sync(denied.ownerProbeContext), 'FORBIDDEN');
+              check(!context.matches(denied));
+            } finally {
+              denied.complete();
+            }
+            final foreign = TrustedSessions(generation: generation);
+            try {
+              check(!context.belongsTo(foreign));
+            } finally {
+              await foreign.close();
+            }
+          }
+        } finally {
+          fresh.complete();
+        }
+      }
+      await context.settled;
+      return;
+    }
     switch (name) {
       case 'native-gate':
         final owner = await Pair.start(
