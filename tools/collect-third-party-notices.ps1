@@ -7,6 +7,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/serverdeck-binding-source.ps1"
 $boundNative = $null
 if ($NativeArtifact) {
     . "$PSScriptRoot/native-isar-artifact-inputs.ps1"
@@ -79,6 +80,18 @@ foreach ($context in $contexts.GetEnumerator()) {
         $noticeFiles = @(Get-ChildItem -LiteralPath $root -File | Where-Object Name -Match '^(LICENSE|COPYING|NOTICE)([._-].*)?$')
         foreach ($file in $noticeFiles) { Add-NoticeText "$id/$($file.Name)" $file.FullName "https://pub.dev/packages/$name/versions/$installedVersion" }
         if (-not $resolvedPackages.ContainsKey($id)) { $resolvedPackages[$id] = [ordered]@{ id = $id; contexts = [Collections.Generic.List[string]]::new() } }
+        $resolvedPackages[$id].contexts.Add($context.Key)
+    }
+    $localBinding=@($config.packages | Where-Object name -CEQ 'isar_community')
+    if ($localBinding.Count -gt 0 -or
+        ($context.Key -in @('root','serverdeck_locald') -and
+            (Test-Path -LiteralPath (Join-Path $WorkspaceRoot 'third_party/isar_community')))) {
+        $binding=Get-ServerDeckBindingSource -WorkspaceRoot $WorkspaceRoot -PackageConfig (Join-Path $packageRoot '.dart_tool/package_config.json')
+        $id='isar_community@'+$binding.packageVersion
+        foreach ($file in @('LICENSE','UPSTREAM.md')) {
+            Add-NoticeText "$id/$file" (Join-Path $binding.root $file) ('third_party/isar_community/'+$file)
+        }
+        if (-not $resolvedPackages.ContainsKey($id)) { $resolvedPackages[$id]=[ordered]@{id=$id;contexts=[Collections.Generic.List[string]]::new()} }
         $resolvedPackages[$id].contexts.Add($context.Key)
     }
 }

@@ -13,7 +13,7 @@ function Get-NativeArtifactSourceSnapshot {
     foreach ($name in @('build.yaml','dart_test.yaml')) {
         if (Test-Path -LiteralPath (Join-Path $NativeIsarRepository $name) -PathType Leaf) { [void]$paths.Add($name) }
     }
-    $roots=@('lib','test','integration_test','test_driver','assets','windows/runner','native/isar-3.3.2','specs/001-service-foundation/contracts','.github/workflows')
+    $roots=@('lib','test','integration_test','test_driver','assets','windows/runner','native/isar-3.3.2','third_party/isar_community','specs/001-service-foundation/contracts','.github/workflows')
     foreach ($package in @('serverdeck_locald','serverdeck_protocol','serverdeck_windows','serverdeck_mcp')) {
         foreach ($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml','build.yaml','dart_test.yaml')) {
             $path='packages/' + $package + '/' + $name

@@ -27,10 +27,17 @@ try {
         Write-FixtureFile "hosted/fixturepkg-$version/pubspec.yaml" "name: fixturepkg`nversion: $version`n"
         Write-FixtureFile "hosted/fixturepkg-$version/LICENSE" "Complete copyright $version`nLine one`r`nLine two`nEND`n"
     }
+    [void][IO.Directory]::CreateDirectory((Join-Path $fixtureRoot 'third_party'))
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'third_party/isar_community') -Destination (Join-Path $fixtureRoot 'third_party/isar_community') -Recurse
     foreach ($context in @('', 'packages/serverdeck_locald', 'packages/serverdeck_protocol', 'packages/serverdeck_windows')) {
         $version = if ($context -match 'protocol|windows') { '2.0.0' } else { '1.0.0' }
         $uri = ([Uri]((Join-Path $fixtureRoot "hosted/fixturepkg-$version") + '/')).AbsoluteUri
-        Write-FixtureFile "$context/.dart_tool/package_config.json" (@{ configVersion = 2; packages = @(@{name = 'fixturepkg'; rootUri = $uri}) } | ConvertTo-Json -Depth 4)
+        $entries=@(@{name = 'fixturepkg'; rootUri = $uri})
+        if ($context -in @('','packages/serverdeck_locald')) {
+            $relative=if($context){'../../../third_party/isar_community'}else{'../third_party/isar_community'}
+            $entries+=@{name='isar_community';rootUri=$relative}
+        }
+        Write-FixtureFile "$context/.dart_tool/package_config.json" (@{ configVersion = 2; packages = $entries } | ConvertTo-Json -Depth 4)
         Write-FixtureFile "$context/pubspec.lock" "packages:`n  fixturepkg:`n    source: hosted`n    version: `"$version`"`nsdks:`n  dart: '>=3.13.5'`n"
     }
     Write-FixtureFile 'sdk/bin/cache/flutter.version.json' (@{frameworkVersion='3.47.7';dartSdkVersion='3.13.5';frameworkRevision='abaf9c523780a608bd46686fd5e53740a07077f8'} | ConvertTo-Json)
@@ -39,7 +46,7 @@ try {
     New-Item -ItemType Directory -Path $nativePath -Force | Out-Null
     Get-ChildItem -LiteralPath (Join-Path $repoRoot 'docs/development/licenses/native') -File | Copy-Item -Destination $nativePath
     $result = Invoke-Collection
-    Assert-True ($result.Packages -eq 2 -and $result.Sources -eq 11) 'both resolved versions and all source texts'
+    Assert-True ($result.Packages -eq 3 -and $result.Sources -eq 13) 'both hosted versions and pinned local runtime with provenance'
     $previewPath = Join-Path $fixtureRoot 'build/foundation/notices/THIRD_PARTY_NOTICES.preview.txt'
     $inventoryPath = Join-Path $fixtureRoot 'build/foundation/notices/notices.preview.json'
     $previewHash = (Get-FileHash -LiteralPath $previewPath).Hash
@@ -47,8 +54,13 @@ try {
     $preview = [IO.File]::ReadAllText($previewPath)
     Assert-True ($preview.Contains([IO.File]::ReadAllText((Join-Path $fixtureRoot 'hosted/fixturepkg-1.0.0/LICENSE')))) 'unabridged license1'
     Assert-True ($preview.Contains([IO.File]::ReadAllText((Join-Path $fixtureRoot 'hosted/fixturepkg-2.0.0/LICENSE')))) 'unabridged license2'
+    foreach($file in @('LICENSE','UPSTREAM.md')) {
+        Assert-True ($preview.Contains([IO.File]::ReadAllText((Join-Path $fixtureRoot ('third_party/isar_community/'+$file))))) ('unabridged binding '+$file)
+    }
     Assert-True (-not $preview.Contains($fixtureRoot)) 'no machine paths in output'
     $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+    $binding=@($inventory.packages|Where-Object id -CEQ 'isar_community@3.3.2+serverdeck.1')
+    Assert-True ($binding.Count -eq 1 -and ($binding[0].contexts -join ',') -ceq 'root,serverdeck_locald') 'local binding deduplicated with exact resolution contexts'
     Assert-True ($inventory.previewSha256 -eq $previewHash.ToLowerInvariant() -and -not $inventory.distributionReady) 'preview hash and explicit incomplete status'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path (Split-Path $previewPath) 'THIRD_PARTY_NOTICES.txt'))) 'no final distribution artifact'
     Invoke-Collection | Out-Null
@@ -63,6 +75,16 @@ try {
     Write-FixtureFile 'hosted/fixturepkg-1.0.0/LICENSE' ' '
     Assert-Rejected { Invoke-Collection } 'Empty notice'
     Write-FixtureFile 'hosted/fixturepkg-1.0.0/LICENSE' $licenseText
+    $bindingPubspec=Join-Path $fixtureRoot 'third_party/isar_community/pubspec.yaml'
+    $bindingText=[IO.File]::ReadAllText($bindingPubspec)
+    [IO.File]::WriteAllText($bindingPubspec,$bindingText.Replace('3.3.2+serverdeck.1','3.3.2'))
+    Assert-Rejected { Invoke-Collection } 'Binding source package identity mismatch'
+    [IO.File]::WriteAllText($bindingPubspec,$bindingText)
+    $bindingLicense=Join-Path $fixtureRoot 'third_party/isar_community/LICENSE'
+    $bindingBytes=[IO.File]::ReadAllBytes($bindingLicense)
+    Remove-Item -LiteralPath $bindingLicense
+    Assert-Rejected { Invoke-Collection } 'Binding source input missing'
+    [IO.File]::WriteAllBytes($bindingLicense,$bindingBytes)
     Assert-Rejected { & $collector -WorkspaceRoot $fixtureRoot -SdkDirectory (Join-Path $fixtureRoot 'sdk') -OutputDirectory $repoRoot } 'output must remain'
     $manifestPath = Join-Path $nativePath 'sources.json'
     $manifestText = [IO.File]::ReadAllText($manifestPath)

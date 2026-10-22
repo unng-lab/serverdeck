@@ -33,7 +33,9 @@ try {
     }
     if ((Get-NativeArtifactSourceSnapshot).sha256 -cne $baseline.sha256) { throw 'Mutable qualification evidence entered source snapshot.' }
     foreach ($name in @('lib/main.dart','specs/001-service-foundation/contracts/local-api.md','pubspec.lock','tools/run-foundation.ps1',
-        'test_driver/integration_test.dart','packages/serverdeck_locald/build.yaml','packages/serverdeck_locald/dart_test.yaml')) {
+        'test_driver/integration_test.dart','packages/serverdeck_locald/build.yaml','packages/serverdeck_locald/dart_test.yaml',
+        'third_party/isar_community/lib/src/native/txn.dart','third_party/isar_community/lib/src/common/isar_common.dart',
+        'third_party/isar_community/pubspec.yaml','third_party/isar_community/LICENSE','third_party/isar_community/UPSTREAM.md')) {
         $path=Join-Path $Fixture $name
         $bytes=[IO.File]::ReadAllBytes($path)
         try {

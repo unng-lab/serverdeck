@@ -1,4 +1,5 @@
 . "$PSScriptRoot/native-isar-artifact-inputs.ps1"
+. "$PSScriptRoot/serverdeck-binding-source.ps1"
 
 function Get-NativeArtifactAbiEvidence {
     param([Parameter(Mandatory)][string]$Artifact)
@@ -10,16 +11,9 @@ function Get-NativeArtifactAbiEvidence {
     $pe=[BitConverter]::ToInt32($bytes,60)
     if ($pe -lt 64 -or $pe -gt $bytes.Length-26 -or [BitConverter]::ToUInt32($bytes,$pe) -ne 0x4550 -or
         [BitConverter]::ToUInt16($bytes,$pe+4) -ne 0x8664 -or [BitConverter]::ToUInt16($bytes,$pe+24) -ne 0x20b) { throw 'Native ABI is not PE32+ x64.' }
-    $config=Read-NativeIsarArtifactJson (Join-Path $NativeIsarRepository 'packages/serverdeck_locald/.dart_tool/package_config.json')
-    $packages=@($config.packages | Where-Object name -CEQ 'isar_community')
-    if ($packages.Count -ne 1) { throw 'Native ABI binding package missing.' }
-    $uri=[Uri]$packages[0].rootUri
-    if (-not $uri.IsAbsoluteUri -or -not $uri.IsFile) { throw 'Native ABI binding source must be a local package.' }
-    $bindingRoot=$uri.LocalPath
-    $pubspec=Join-Path $bindingRoot 'pubspec.yaml'
-    Assert-NativeIsarPlainPath $pubspec
-    $packageText=[IO.File]::ReadAllText($pubspec)
-    if ($packageText -notmatch '(?m)^name:\s*isar_community\s*$' -or $packageText -notmatch '(?m)^version:\s*3\.3\.2\s*$') { throw 'Native ABI binding version mismatch.' }
+    $binding=Get-ServerDeckBindingSource -WorkspaceRoot $NativeIsarRepository -PackageConfig 'packages/serverdeck_locald/.dart_tool/package_config.json'
+    $bindingRoot=$binding.root
+    if ($binding.bindingVersion -cne $recipe.bindingVersion) { throw 'Native ABI binding version mismatch.' }
     $bindings=Join-Path $bindingRoot 'lib/src/native/bindings.dart'
     $core=Join-Path $bindingRoot 'lib/src/native/isar_core.dart'
     foreach ($file in @($bindings,$core)) {
