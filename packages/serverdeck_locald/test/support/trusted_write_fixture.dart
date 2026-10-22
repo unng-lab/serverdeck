@@ -1,16 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:isar_community/isar.dart';
 import 'package:serverdeck_locald/storage/automation_records.dart';
 import 'package:serverdeck_locald/storage/host_trust_models.dart';
+import 'package:serverdeck_locald/storage/host_trust_records.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_locald/storage/models.dart';
+import 'package:serverdeck_locald/storage/native_failure.dart';
 import 'package:serverdeck_locald/storage/records.dart';
 import 'package:serverdeck_locald/storage/state_store.dart';
 import 'package:serverdeck_protocol/host_trust.dart';
 
 import '../models_test.dart' as f;
 import 'mcp_runtime_actor.dart' show check, refusal;
+import 'trusted_schema_child.dart' as raw;
 
 String id(int n) => '20000000-0000-4000-8000-${n.toString().padLeft(12, '0')}';
 
@@ -121,7 +125,84 @@ Future<void> exerciseTrustedWrite(
     check(await db.storedReceipts.count() == 1);
     return;
   }
-  if (mode == 'write-race' || mode == 'write-queue') {
+  if (mode == 'write-capacity') {
+    Future<String> capture() async {
+      final trust = await db.storedHostTrusts.where().findAll();
+      trust.sort((a, b) => a.id.compareTo(b.id));
+      return '${await raw.capture(db)}\n${jsonEncode([
+        for (final row in trust) [row.id, row.entityId, row.payload],
+      ])}';
+    }
+
+    final rawBefore = await capture();
+    final ready = Completer<void>(), release = Completer<void>();
+    final reader = db.txn(() async {
+      check(await db.storedSettings.get(1) != null);
+      ready.complete();
+      await release.future;
+    });
+    await ready.future;
+    final before = jsonEncode({
+      for (final entry in store.trustedOperational.rows.entries)
+        entry.key: [
+          for (final row in entry.value)
+            [row.nativeId, row.entityId, row.payload],
+        ],
+    });
+    try {
+      final original = (await db.storedSettings.get(1))!.payload;
+      final parsed = jsonDecode(original) as Map;
+      final alternate = jsonEncode({
+        ...parsed,
+        'reduceMotion': !(parsed['reduceMotion'] as bool),
+      });
+      var full = false;
+      // Each committed maintenance transaction restores the exact row. The
+      // genuine retained reader pins native page versions in the production
+      // 64MiB map; no fake error, quota or reduced native map is used.
+      for (var n = 0; n < 20000; n++) {
+        try {
+          await db.writeTxn(() async {
+            await db.storedSettings.put(StoredSettings()..payload = alternate);
+            await db.storedSettings.put(StoredSettings()..payload = original);
+          });
+        } catch (error) {
+          if (!isNativeCapacityFailure(error)) rethrow;
+          full = true;
+          break;
+        }
+      }
+      check(full && (await db.storedSettings.get(1))!.payload == original);
+      check(await capture() == rawBefore);
+      await refusal(
+        () => store.commitTrustedFoundation(confirm),
+        'RESOURCE_LIMIT',
+      );
+      check(store.isTrustedSnapshotLoaded && store.state.storeRevision == '1');
+      check(
+        await db.storedReceipts.count() == 1 &&
+            await db.storedHostTrusts.count() == 0,
+      );
+      final after = store.trustedOperational;
+      check(
+        before ==
+            jsonEncode({
+              for (final entry in after.rows.entries)
+                entry.key: [
+                  for (final row in entry.value)
+                    [row.nativeId, row.entityId, row.payload],
+                ],
+            }),
+      );
+      check(await capture() == rawBefore);
+    } finally {
+      release.complete();
+      await reader;
+    }
+    // Explicit retry of the same prevalidated state succeeds after real native
+    // reader reclamation; subsequent delete/reopen checks run below as usual.
+    await store.commitTrustedFoundation(confirm);
+  } else if (mode == 'write-race' || mode == 'write-queue') {
     final count = mode == 'write-queue' ? 33 : 2;
     final results = await Future.wait([
       for (var i = 0; i < count; i++)

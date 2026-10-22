@@ -32,6 +32,7 @@ void main() {
     'write-corrupt',
     'write-seeded',
     'write-overflow',
+    'write-capacity',
   ]) {
     test(
       'actual trusted store write $mode',
