@@ -24,6 +24,8 @@ part 'operational_pipe_worker.dart';
 part 'operational_publication_gate.dart';
 part 'operational_native_observation.dart';
 
+enum _PipeMode { legacy, operational, trusted }
+
 /// Only messages cross isolates; native pipe and process handles stay in worker.
 class PipeWorker {
   PipeWorker._(
@@ -31,13 +33,13 @@ class PipeWorker {
     this._output,
     this._exited,
     this._pending,
-    this._operational,
+    this._mode,
   );
   final SendPort _input;
   final ReceivePort _output;
   final Future<void> _exited;
   final Map<int, Completer<Object?>> _pending;
-  final bool _operational;
+  final _PipeMode _mode;
   int _next = 0;
   bool _closing = false;
   Future<void>? _closeFuture;
@@ -52,19 +54,60 @@ class PipeWorker {
     String sid,
     String appRoot, {
     bool testOnly = false,
-  }) => _start(name, sid, true, appRoot: appRoot, testOnly: testOnly);
+  }) => _start(
+    name,
+    sid,
+    true,
+    appRoot: appRoot,
+    testOnly: testOnly,
+    mode: _PipeMode.operational,
+  );
   static Future<PipeWorker> openOperationalClient(
     String name,
     String sid,
     String appRoot, {
     bool testOnly = false,
-  }) => _start(name, sid, false, appRoot: appRoot, testOnly: testOnly);
+  }) => _start(
+    name,
+    sid,
+    false,
+    appRoot: appRoot,
+    testOnly: testOnly,
+    mode: _PipeMode.operational,
+  );
+  static Future<PipeWorker> createTrustedServer(
+    String name,
+    String sid,
+    String appRoot, {
+    bool testOnly = false,
+  }) => _start(
+    name,
+    sid,
+    true,
+    appRoot: appRoot,
+    testOnly: testOnly,
+    mode: _PipeMode.trusted,
+  );
+  static Future<PipeWorker> openTrustedClient(
+    String name,
+    String sid,
+    String appRoot, {
+    bool testOnly = false,
+  }) => _start(
+    name,
+    sid,
+    false,
+    appRoot: appRoot,
+    testOnly: testOnly,
+    mode: _PipeMode.trusted,
+  );
   static Future<PipeWorker> _start(
     String name,
     String sid,
     bool server, {
     String? appRoot,
     bool testOnly = false,
+    _PipeMode mode = _PipeMode.legacy,
   }) async {
     final output = ReceivePort(), done = ReceivePort();
     final pending = <int, Completer<Object?>>{};
@@ -109,20 +152,24 @@ class PipeWorker {
       if (!exited.isCompleted) exited.complete();
     });
     try {
-      await Isolate.spawn(_worker, [
-        output.sendPort,
-        name,
-        sid,
-        server,
-        if (appRoot != null) {'appRoot': appRoot, 'testOnly': testOnly},
-      ], onExit: done.sendPort);
+      await Isolate.spawn(
+        mode == _PipeMode.trusted ? _trustedWorker : _worker,
+        [
+          output.sendPort,
+          name,
+          sid,
+          server,
+          if (appRoot != null) {'appRoot': appRoot, 'testOnly': testOnly},
+        ],
+        onExit: done.sendPort,
+      );
       spawned = true;
       return PipeWorker._(
         await ready.future,
         output,
         exited.future,
         pending,
-        appRoot != null,
+        mode,
       );
     } catch (_) {
       if (spawned && appRoot != null) await exited.future;
@@ -170,9 +217,21 @@ class PipeWorker {
   Future<void> verifyPeer(String sid, String image, String sha256) async =>
       await _call('verify', [sid, image, sha256]);
   Future<OperationalPipePeer> verifyOperationalPeer() async {
-    if (!_operational) throw StateError('UNAUTHORIZED');
+    if (_mode != _PipeMode.operational) throw StateError('UNAUTHORIZED');
     final result = (await _call('peerVerify', null)) as List;
     return OperationalPipePeer._(
+      this,
+      result[0] as int,
+      BundlePeerRole.values.singleWhere((r) => r.name == result[1]),
+      result[2] as String,
+      BundlePeerRole.values.singleWhere((r) => r.name == result[3]),
+    );
+  }
+
+  Future<TrustedPipePeer> verifyTrustedPeer() async {
+    if (_mode != _PipeMode.trusted) throw StateError('UNAUTHORIZED');
+    final result = (await _call('peerVerify', null)) as List;
+    return TrustedPipePeer._(
       this,
       result[0] as int,
       BundlePeerRole.values.singleWhere((r) => r.name == result[1]),

@@ -2,8 +2,29 @@ part of 'pipe_worker.dart';
 
 /// Only this worker can issue an epoch-bound handle. It carries no native object
 /// across isolates; every operation is checked inside its owning pipe worker.
-final class OperationalPipePeer {
+final class OperationalPipePeer extends _EpochPipePeer {
   OperationalPipePeer._(
+    super._worker,
+    super._epoch,
+    super.role,
+    super.buildId,
+    super.localRole,
+  ) : super._();
+}
+
+/// Format3 native proof, with no conversion into a format2 operational peer.
+final class TrustedPipePeer extends _EpochPipePeer {
+  TrustedPipePeer._(
+    super._worker,
+    super._epoch,
+    super.role,
+    super.buildId,
+    super.localRole,
+  ) : super._();
+}
+
+sealed class _EpochPipePeer {
+  _EpochPipePeer._(
     this._worker,
     this._epoch,
     this.role,
@@ -36,7 +57,12 @@ final class OperationalPipePeer {
     requireUuid(generation);
     final identity =
         await _worker._call('peerPublicationIdentity', _epoch) as List;
-    return OperationalPublicationGate._open(identity, generation, localRole);
+    return OperationalPublicationGate._open(
+      identity,
+      generation,
+      localRole,
+      _worker._mode,
+    );
   }
 
   Future<void> revalidate({
@@ -110,6 +136,37 @@ enum _OperationalSlot {
   closed,
 }
 
+// Private native-owner adapters reuse IO/epoch mechanics without converting
+// either public proof type or accepting a claimed role/schema from a client.
+final class _EndpointProof {
+  _EndpointProof(this._role, this.revalidate);
+  final BundlePeerRole Function() _role;
+  BundlePeerRole get role => _role();
+  final void Function() revalidate;
+}
+
+final class _EndpointBundle {
+  _EndpointBundle._(this.appRoot, this.buildId, this.verifyPeer);
+  factory _EndpointBundle.operational(McpBuildBundle bundle) =>
+      _EndpointBundle._(bundle.manifest.appRoot, bundle.manifest.buildId, (
+        identity,
+        sid,
+      ) {
+        final proof = bundle.verifyPeer(identity, sid);
+        return _EndpointProof(() => proof.role, proof.revalidate);
+      });
+  factory _EndpointBundle.trusted(TrustedBuildBundle bundle) =>
+      _EndpointBundle._(bundle.manifest.appRoot, bundle.manifest.buildId, (
+        identity,
+        sid,
+      ) {
+        final proof = bundle.verifyPeer(identity, sid);
+        return _EndpointProof(() => proof.role, proof.revalidate);
+      });
+  final String appRoot, buildId;
+  final _EndpointProof Function(RetainedProcessIdentity, String) verifyPeer;
+}
+
 final class _OperationalEndpoint {
   _OperationalEndpoint(
     this.pipe,
@@ -122,16 +179,16 @@ final class _OperationalEndpoint {
       state = server ? _OperationalSlot.idle : _OperationalSlot.connected,
       epoch = server ? 0 : 1;
   final NativePipe pipe;
-  final McpBuildBundle bundle;
+  final _EndpointBundle bundle;
   final RetainedProcessIdentity self;
-  final VerifiedBundlePeer selfProof;
+  final _EndpointProof selfProof;
   final BundlePeerRole localRole;
   final String sid;
   final bool server;
   _OperationalSlot state;
   int epoch;
   bool failed = false;
-  VerifiedBundlePeer? peer;
+  _EndpointProof? peer;
   _NativeObservationPause? _proofPause;
   bool _proofPauseConsumed = false;
   int _proofObservationToken = 0;
@@ -221,11 +278,7 @@ final class _OperationalEndpoint {
         return null;
       case 'peerPublicationIdentity':
         verify(params as int);
-        return [
-          sid,
-          p.normalize(bundle.manifest.appRoot).toLowerCase(),
-          localRole.name,
-        ];
+        return [sid, p.normalize(bundle.appRoot).toLowerCase(), localRole.name];
       case 'peerVerify':
         var role = verify(params as int?);
         if (operationalNativeObservationEnabled &&
@@ -236,7 +289,7 @@ final class _OperationalEndpoint {
           await pause.hit();
           role = verify(params);
         }
-        return [epoch, role.name, bundle.manifest.buildId, localRole.name];
+        return [epoch, role.name, bundle.buildId, localRole.name];
       case 'testPeerObservationArm':
         if (!operationalNativeObservationEnabled)
           throw StateError('UNAUTHORIZED');
@@ -336,7 +389,16 @@ final class _OperationalEndpoint {
   }
 }
 
-Future<void> _operationalWorker(List<Object> startup) async {
+Future<void> _operationalWorker(List<Object> startup) =>
+    _bundleWorker(startup, trusted: false);
+
+Future<void> _trustedWorker(List<Object> startup) =>
+    _bundleWorker(startup, trusted: true);
+
+Future<void> _bundleWorker(
+  List<Object> startup, {
+  required bool trusted,
+}) async {
   final output = startup[0] as SendPort, input = ReceivePort();
   RetainedProcessIdentity? self;
   NativePipe? pipe;
@@ -344,10 +406,15 @@ Future<void> _operationalWorker(List<Object> startup) async {
     final config = startup[4] as Map,
         sid = startup[2] as String,
         server = startup[3] as bool;
-    final bundle = await verifyMcpBuildBundle(
-      config['appRoot'] as String,
-      testOnly: config['testOnly'] as bool,
-    );
+    final root = config['appRoot'] as String,
+        testOnly = config['testOnly'] as bool;
+    final bundle = trusted
+        ? _EndpointBundle.trusted(
+            await verifyTrustedBuildBundle(root, testOnly: testOnly),
+          )
+        : _EndpointBundle.operational(
+            await verifyMcpBuildBundle(root, testOnly: testOnly),
+          );
     self = RetainedProcessIdentity.open(pid);
     final selfProof = bundle.verifyPeer(self, sid), role = selfProof.role;
     if (server ? role != BundlePeerRole.locald : role == BundlePeerRole.locald)

@@ -39,7 +39,7 @@ final class OperationalPublicationGate {
   final String generation, _name, _sid;
   final BundlePeerRole localRole;
   final RetainedProcessIdentity _identity;
-  final VerifiedBundlePeer _proof;
+  final _EndpointProof _proof;
   final w.HANDLE _poison, _keeper;
   final _attempts = <_PublicationAttempt>{};
   final _leases = <OperationalPublicationLease>{};
@@ -73,13 +73,22 @@ final class OperationalPublicationGate {
     List metadata,
     String generation,
     BundlePeerRole expected,
+    _PipeMode mode,
   ) async {
     if (metadata.length != 3 || metadata.any((v) => v is! String))
       throw StateError('UNAUTHORIZED');
     final sid = metadata[0] as String, root = metadata[1] as String;
     if (metadata[2] != expected.name || sid != currentUserSid())
       throw StateError('UNAUTHORIZED');
-    final bundle = await verifyMcpBuildBundle(root);
+    final bundle = switch (mode) {
+      _PipeMode.operational => _EndpointBundle.operational(
+        await verifyMcpBuildBundle(root),
+      ),
+      _PipeMode.trusted => _EndpointBundle.trusted(
+        await verifyTrustedBuildBundle(root),
+      ),
+      _PipeMode.legacy => throw StateError('UNAUTHORIZED'),
+    };
     final identity = RetainedProcessIdentity.open(pid);
     w.HANDLE? poison, keeper;
     try {
