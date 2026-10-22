@@ -51,6 +51,29 @@ function Write-NativeQualificationTestFailure {
         return $number
     }
     $report=Join-Path $Directory ($Phase+'.machine.jsonl')
+    # Fixed public fixture identifiers only; never export arbitrary test names.
+    $operationalCases=@(
+        'good','empty','stale','revoked','reservation','reservation-race','grant-basic',
+        'foundation-settings','foundation-delete','foundation-active','foundation-unknown','foundation-queue','foundation-capacity',
+        'coordinator-basic','coordinator-reservation','coordinator-running','coordinator-active','coordinator-unknown',
+        'grant-empty','grant-count','grant-receipts','grant-id-limit','grant-receipt-id-limit',
+        'grant-key-closed-admission','grant-key-closed-queued','grant-capacity','grant-corrupt-afterCommit','grant-probe-disabled',
+        'grant-pointer-disabled','grant-pointer-corrupt-readback',
+        'manifest-malformed','manifest-foreign','manifest-schema1','native-schema1','bundle','wrapper','creating','upgrading',
+        'acl-product','acl-version','acl-parent','acl-active','acl-database','acl-lock','junction','link-database','link-lock',
+        'closed-key','closed-lease','close-false','open-throw','wrong-schema','bad-graph','bad-native-id','second-corrupt','second-lookup'
+    )
+    foreach($point in @('beforeStage','afterStage','beforeTransaction','afterGrantWrite','afterReceiptWrite','afterCommit','beforePublication','afterPublication','beforeAcknowledgement')) {
+        $operationalCases+='grant-fault-'+$point
+    }
+    foreach($operation in @('create','replace','revoke')) {
+        foreach($point in @('afterPending','afterRename','afterReadback')) {
+            $operationalCases+='grant-pointer-throw-'+$operation+'-'+$point
+        }
+    }
+    $gatewayCases=@('basic','quota','queued-cancel','heartbeat','heartbeat-remote-limit','wrong-catalog','wrong-poll','wrong-cancel',
+        'rpc-timeout','rpc-remote','overall','cancel-timeout','missing-grant','owner-deny','pending','cancel-ack','native-loss',
+        'expiry','revoke','stdout-revoke','stdout-target-change','stdout-target-failure','stdout-stop','writer-cancel','publish-order','publish-expiry','eof')
     $tests=@{};$suites=@{};$failures=[Collections.Generic.List[object]]::new()
     $complete=$false;$status='missing-reporter'
     try {
@@ -88,8 +111,39 @@ function Write-NativeQualificationTestFailure {
                             }
                             $safeCode=$null
                             if([string]$event.error -cmatch '^Bad state: (IDENTITY_UNAVAILABLE|PROTECTION_UNAVAILABLE|SECURITY_UNAVAILABLE|UNSAFE_PATH|RESOURCE_LIMIT|SERVICE_UNAVAILABLE|INTERNAL|WORKSPACE_CHILD_FAILED|WORKSPACE_CHILD_TIMEOUT)$'){$safeCode=$Matches[1]}
+                            $fixtureCase=$null;$failureKind=$null
+                            if($declarationLine) {
+                                if([string]$event.error -cmatch '^TimeoutException(?: after [0-9]{1,3}:[0-5][0-9]:[0-5][0-9]\.[0-9]{6})?:') {
+                                    $failureKind='timeout'
+                                }
+                                if($file -ceq 'packages/serverdeck_locald/test/storage/operational_open_native_test.dart') {
+                                    foreach($case in $operationalCases) {
+                                        if($test['name'] -is [string] -and
+                                            $test['name'] -ceq ('compiled operational snapshot actual owned operational native open '+$case)) {
+                                            $fixtureCase=$case
+                                            break
+                                        }
+                                    }
+                                }
+                                if($file -ceq 'packages/serverdeck_locald/test/storage/native_commit_capacity_test.dart') {
+                                    foreach($case in @('async','sync')) {
+                                        if($test['name'] -is [string] -and $test['name'] -ceq ('actual native commit-time capacity preserves process and recovery '+$case)) {
+                                            $fixtureCase='commit-capacity-'+$case
+                                            break
+                                        }
+                                    }
+                                }
+                                if($file -ceq 'packages/serverdeck_locald/test/mcp/gateway_native_test.dart') {
+                                    foreach($case in $gatewayCases) {
+                                        if($test['name'] -is [string] -and $test['name'] -ceq ('actual native MCP gateway '+$case)) {
+                                            $fixtureCase='gateway-'+$case
+                                            break
+                                        }
+                                    }
+                                }
+                            }
                             # Names, messages, raw stack, stdout and private paths never enter proof.
-                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode})
+                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode;fixtureCase=$fixtureCase;failureKind=$failureKind})
                         }
                         'done' {$complete=$event.success -eq $false}
                     }
