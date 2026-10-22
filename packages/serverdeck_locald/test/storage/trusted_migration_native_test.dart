@@ -136,6 +136,22 @@ void main() {
       testOn: 'windows',
       timeout: const Timeout(Duration(minutes: 2)),
     );
+  test(
+    'actual trusted migration native capacity rollback and fresh recovery',
+    () async {
+      final f = fixture();
+      try {
+        await run(f, 'prepare2');
+        await run(f, 'capacity');
+        await run(f, 'verify');
+        await run(f, 'verify');
+      } finally {
+        await f.close();
+      }
+    },
+    testOn: 'windows',
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
   for (final mode in [
     'writer-graph',
     for (final state in [

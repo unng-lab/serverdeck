@@ -19,6 +19,7 @@ enum MigrationBoundary {
   cleanupFile,
   journalRemoved,
   stageRemoved,
+  nativeCapacityFailure,
 }
 
 abstract final class MigrationProbe {

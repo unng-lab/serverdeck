@@ -29,6 +29,7 @@ import '../automation/snapshot_test.dart' as g;
 import 'trusted_snapshot_child.dart' show seedAutomation;
 import 'trusted_schema_child.dart' as raw show retained;
 import 'trusted_graph_write_fixture.dart';
+import 'trusted_migration_capacity_fixture.dart';
 import 'mcp_runtime_actor.dart' show check, ownRoot;
 
 final class FaultProtection implements UserProtection {
@@ -274,6 +275,10 @@ Future<void> main(List<String> args) async {
           }),
         );
       } else {
+        final capacity = mode == 'capacity'
+            ? TrustedMigrationCapacityFixture(active, lease)
+            : null;
+        capacity?.install();
         var reservationSources = 0;
         if (mode == 'reservation')
           MigrationProbe.install((boundary) async {
@@ -336,7 +341,15 @@ Future<void> main(List<String> args) async {
             }
           });
         }
-        if (mode.startsWith('fault-') || mode == 'blocked') {
+        if (mode == 'capacity') {
+          try {
+            await run();
+            throw StateError('EXPECTED_MIGRATION_CAPACITY_REFUSAL');
+          } on StateError catch (error) {
+            check(error.message == 'STORAGE_BLOCKED');
+          }
+          capacity!.verify();
+        } else if (mode.startsWith('fault-') || mode == 'blocked') {
           Future<void> reject() async {
             try {
               await run();

@@ -19,6 +19,7 @@ import 'key_custody.dart';
 import 'migration_journal.dart';
 import 'migration_probe.dart';
 import 'native_close.dart';
+import 'native_failure.dart';
 import 'native_schema.dart';
 import 'records.dart';
 import 'trusted_snapshot.dart';
@@ -384,6 +385,12 @@ final class _Migration {
       );
       owner();
       return await action(opened);
+    } catch (error) {
+      // Test-only classification signal; never export native text/credentials
+      // or change the ordinary failure/close/recovery path.
+      if (migrationProbesEnabled && isNativeCapacityFailure(error))
+        await probe(MigrationBoundary.nativeCapacityFailure);
+      rethrow;
     } finally {
       final registered = Isar.getInstance('workspace');
       final instance =

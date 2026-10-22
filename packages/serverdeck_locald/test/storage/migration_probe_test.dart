@@ -14,10 +14,9 @@ void main() {
       throwsStateError,
     );
     expect(() => MigrationProbe.minimumFreeBytes(144 << 20), throwsStateError);
-    expect(
-      () => MigrationProbe.reached(MigrationBoundary.sourceValidated),
-      throwsStateError,
-    );
+    for (final boundary in MigrationBoundary.values) {
+      expect(() => MigrationProbe.reached(boundary), throwsStateError);
+    }
     expect(
       () => MigrationProbe.closeNative(() async {
         nativeCalled = true;
