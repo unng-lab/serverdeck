@@ -5,6 +5,7 @@ import 'codec.dart';
 import 'errors.dart';
 import 'models.dart';
 import 'validation.dart';
+import 'wire.dart' show validateMethodResult;
 
 enum SshTransportCode {
   VALIDATION_ERROR,
@@ -111,11 +112,10 @@ enum HostTrustStatus { trusted, revoked }
 
 /// Structural metadata only. Current owner authorization, target binding and
 /// complete retained graph validation belong to the native schema3 service.
-final class HostTrustRecord {
-  factory HostTrustRecord.fromJson(Map<String, Object?> value) {
+final class PublicHostTrustRecord {
+  factory PublicHostTrustRecord.fromJson(Map<String, Object?> value) {
     StrictCodec().encode(value, maxBytes: 4096);
     requireFields(value, {
-      'workspaceId',
       'profileId',
       'revision',
       'connectionRevision',
@@ -124,7 +124,6 @@ final class HostTrustRecord {
       'createdAt',
       'updatedAt',
     });
-    final workspace = requireUuid(value['workspaceId']);
     final profile = requireUuid(value['profileId']);
     final revision = requireRevision(value['revision']);
     final connection = requireRevision(value['connectionRevision']);
@@ -143,8 +142,7 @@ final class HostTrustRecord {
     final createdAt = _time(value['createdAt']);
     final updatedAt = _time(value['updatedAt']);
     if (createdAt.compareTo(updatedAt) > 0) _bad();
-    return HostTrustRecord._(
-      workspace,
+    return PublicHostTrustRecord._(
       profile,
       revision,
       connection,
@@ -154,8 +152,7 @@ final class HostTrustRecord {
       updatedAt,
     );
   }
-  const HostTrustRecord._(
-    this.workspaceId,
+  const PublicHostTrustRecord._(
     this.profileId,
     this.revision,
     this.connectionRevision,
@@ -164,16 +161,10 @@ final class HostTrustRecord {
     this.createdAt,
     this.updatedAt,
   );
-  final String workspaceId,
-      profileId,
-      revision,
-      connectionRevision,
-      createdAt,
-      updatedAt;
+  final String profileId, revision, connectionRevision, createdAt, updatedAt;
   final HostTrustStatus status;
   final SshHostPin key;
   Map<String, Object?> toJson() => {
-    'workspaceId': workspaceId,
     'profileId': profileId,
     'revision': revision,
     'connectionRevision': connectionRevision,
@@ -182,7 +173,46 @@ final class HostTrustRecord {
     'createdAt': createdAt,
     'updatedAt': updatedAt,
   };
-  Map<String, Object?> toPublicJson() => toJson()..remove('workspaceId');
+  @override
+  String toString() => 'PublicHostTrustRecord';
+}
+
+final class HostTrustRecord extends PublicHostTrustRecord {
+  factory HostTrustRecord.fromJson(Map<String, Object?> value) {
+    StrictCodec().encode(value, maxBytes: 4096);
+    requireFields(value, {
+      'workspaceId',
+      'profileId',
+      'revision',
+      'connectionRevision',
+      'status',
+      'key',
+      'createdAt',
+      'updatedAt',
+    });
+    final workspace = requireUuid(value['workspaceId']);
+    final public = PublicHostTrustRecord.fromJson(
+      Map.of(value)..remove('workspaceId'),
+    );
+    return HostTrustRecord._(workspace, public);
+  }
+  HostTrustRecord._(this.workspaceId, PublicHostTrustRecord value)
+    : super._(
+        value.profileId,
+        value.revision,
+        value.connectionRevision,
+        value.status,
+        value.key,
+        value.createdAt,
+        value.updatedAt,
+      );
+  final String workspaceId;
+  @override
+  Map<String, Object?> toJson() => {
+    'workspaceId': workspaceId,
+    ...super.toJson(),
+  };
+  Map<String, Object?> toPublicJson() => super.toJson();
   @override
   String toString() => 'HostTrustRecord';
 }
@@ -263,6 +293,200 @@ final class TrustedLocalError {
 String requireTrustFailureCode(Object? value) {
   if (value is! String || !TrustedLocalError.codes.contains(value)) _bad();
   return value;
+}
+
+void _capturedTrustCounters(Map<String, Object?> value, String revisionField) {
+  final revision = BigInt.parse(requireRevision(value[revisionField]));
+  final connection = BigInt.parse(requireRevision(value['connectionRevision']));
+  final credential = BigInt.parse(requireRevision(value['credentialRevision']));
+  final trust = BigInt.parse(requireRevision(value['trustRevision']));
+  if (connection > trust || trust > revision || credential > revision) _bad();
+}
+
+/// A public snapshot, not current authority to connect or change the key.
+final class HostTrustSnapshot {
+  factory HostTrustSnapshot.fromJson(Map<String, Object?> value) {
+    StrictCodec().encode(value);
+    requireFields(value, {
+      'profileId',
+      'profileRevision',
+      'connectionRevision',
+      'credentialRevision',
+      'trustRevision',
+      'trust',
+    });
+    final profile = requireUuid(value['profileId']);
+    _capturedTrustCounters(value, 'profileRevision');
+    final trust = value['trust'] == null
+        ? null
+        : PublicHostTrustRecord.fromJson(_map(value['trust']));
+    if (trust == null) {
+      if (value['connectionRevision'] != value['trustRevision']) _bad();
+    } else if (trust.profileId != profile ||
+        trust.revision != value['trustRevision'] ||
+        BigInt.parse(trust.connectionRevision) >
+            BigInt.parse(value['connectionRevision'] as String) ||
+        (trust.status == HostTrustStatus.trusted &&
+            trust.connectionRevision != value['connectionRevision'])) {
+      _bad();
+    }
+    return HostTrustSnapshot._(
+      profile,
+      value['profileRevision'] as String,
+      value['connectionRevision'] as String,
+      value['credentialRevision'] as String,
+      value['trustRevision'] as String,
+      trust,
+    );
+  }
+  const HostTrustSnapshot._(
+    this.profileId,
+    this.profileRevision,
+    this.connectionRevision,
+    this.credentialRevision,
+    this.trustRevision,
+    this.trust,
+  );
+  final String profileId,
+      profileRevision,
+      connectionRevision,
+      credentialRevision,
+      trustRevision;
+  final PublicHostTrustRecord? trust;
+  Map<String, Object?> toJson() => {
+    'profileId': profileId,
+    'profileRevision': profileRevision,
+    'connectionRevision': connectionRevision,
+    'credentialRevision': credentialRevision,
+    'trustRevision': trustRevision,
+    'trust': trust?.toJson(),
+  };
+  @override
+  String toString() => 'HostTrustSnapshot';
+}
+
+/// Display/correlation metadata only. Native owner/session/generation binding
+/// and the actual monotonic expiry/consume check belong to the service.
+final class HostTrustChallenge {
+  factory HostTrustChallenge.fromJson(Map<String, Object?> value) {
+    StrictCodec().encode(value);
+    requireFields(value, {
+      'challengeId',
+      'profileId',
+      'expectedRevision',
+      'connectionRevision',
+      'credentialRevision',
+      'trustRevision',
+      'key',
+      'expiresAt',
+    });
+    final challenge = requireUuid(value['challengeId']);
+    final profile = requireUuid(value['profileId']);
+    _capturedTrustCounters(value, 'expectedRevision');
+    SshHostPin key;
+    try {
+      key = SshHostPin.fromJson(_map(value['key']));
+    } on SshTransportFailure {
+      _bad();
+    }
+    return HostTrustChallenge._(
+      challenge,
+      profile,
+      value['expectedRevision'] as String,
+      value['connectionRevision'] as String,
+      value['credentialRevision'] as String,
+      value['trustRevision'] as String,
+      key,
+      _time(value['expiresAt']),
+    );
+  }
+  const HostTrustChallenge._(
+    this.challengeId,
+    this.profileId,
+    this.expectedRevision,
+    this.connectionRevision,
+    this.credentialRevision,
+    this.trustRevision,
+    this.key,
+    this.expiresAt,
+  );
+  final String challengeId,
+      profileId,
+      expectedRevision,
+      connectionRevision,
+      credentialRevision,
+      trustRevision,
+      expiresAt;
+  final SshHostPin key;
+  Map<String, Object?> toJson() => {
+    'challengeId': challengeId,
+    'profileId': profileId,
+    'expectedRevision': expectedRevision,
+    'connectionRevision': connectionRevision,
+    'credentialRevision': credentialRevision,
+    'trustRevision': trustRevision,
+    'key': key.toJson(),
+    'expiresAt': expiresAt,
+  };
+  @override
+  String toString() => 'HostTrustChallenge';
+}
+
+Object? _freezeTrustResult(Object? value) => switch (value) {
+  Map<String, Object?>() => Map<String, Object?>.unmodifiable({
+    for (final entry in value.entries)
+      entry.key: _freezeTrustResult(entry.value),
+  }),
+  _ => value,
+};
+
+/// Exact ordinary owner response validation. Does not authorize a route or
+/// select format3; verified native composition must do both before use.
+Map<String, Object?> captureHostTrustResult(
+  String method,
+  Map<String, Object?> value,
+) {
+  StrictCodec().encode(value);
+  Map<String, Object?> result;
+  switch (method) {
+    case 'servers.trust.get':
+      result = HostTrustSnapshot.fromJson(value).toJson();
+    case 'servers.trust.probe' || 'servers.trust.probeStatus':
+      requireUuid(value['operationId']);
+      switch (value['state']) {
+        case 'running':
+          requireFields(value, {'operationId', 'state'});
+          result = Map.of(value);
+        case 'succeeded' when method == 'servers.trust.probeStatus':
+          requireFields(value, {'operationId', 'state', 'challenge'});
+          result = {
+            ...value,
+            'challenge': HostTrustChallenge.fromJson(_map(value['challenge']))
+                .toJson(),
+          };
+        case 'failed' when method == 'servers.trust.probeStatus':
+          requireFields(value, {'operationId', 'state', 'code'});
+          requireTrustFailureCode(value['code']);
+          result = Map.of(value);
+        default:
+          _bad();
+      }
+    case 'servers.trust.probeCancel':
+      requireFields(value, {'operationId', 'cancelled'});
+      requireUuid(value['operationId']);
+      if (value['cancelled'] is! bool) _bad();
+      result = Map.of(value);
+    case 'servers.trust.confirm' || 'servers.trust.revoke':
+      validateMethodResult('profiles.update', value);
+      final revision = BigInt.parse(value['entityRevision'] as String);
+      if (revision < BigInt.two ||
+          revision > BigInt.parse(value['storeRevision'] as String))
+        _bad();
+      result = Map.of(value);
+    default:
+      throw const FormatException('UNSUPPORTED');
+  }
+  return _freezeTrustResult(result) as Map<String, Object?>;
 }
 
 const hostTrustMethodFields = <String, Set<String>>{
