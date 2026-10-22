@@ -6,6 +6,7 @@ import 'errors.dart';
 import 'models.dart';
 import 'validation.dart';
 import 'wire.dart' show validateMethodResult;
+import 'mcp/readiness.dart';
 
 enum SshTransportCode {
   VALIDATION_ERROR,
@@ -290,6 +291,80 @@ final class TrustedLocalError {
   String toString() => 'TrustedLocalError($code)';
 }
 
+/// Closed format3 response. Existing validateResponseEnvelope stays format2.
+void validateTrustedResponseEnvelope(Map<String, Object?> value) {
+  requireFields(value, {'v', 'id', 'generation'}, {'result', 'error'});
+  requireUuid(value['id']);
+  requireUuid(value['generation']);
+  if (value['v'] is! int ||
+      value['v'] != 1 ||
+      value.containsKey('result') == value.containsKey('error') ||
+      (value['result'] ?? value['error']) is! Map<String, Object?>)
+    throw const FormatException('INVALID_TRUST_RESPONSE');
+  if (value.containsKey('error'))
+    TrustedLocalError.fromJson(value['error'] as Map<String, Object?>);
+}
+
+/// Typed result boundary selected only by the verified format3 client/service.
+/// It is neither route admission nor a version flag supplied over the wire.
+Map<String, Object?> captureTrustedMethodResult(
+  String method,
+  Map<String, Object?> value,
+) {
+  if (hostTrustMethodFields.containsKey(method))
+    return captureHostTrustResult(method, value);
+  if (method == 'readiness.get') {
+    return _freezeTrustResult(TrustedReadiness.fromJson(value).toJson())
+        as Map<String, Object?>;
+  }
+  if (method != 'mutations.recent') {
+    validateMethodResult(method, value);
+    return _freezeTrustResult(value) as Map<String, Object?>;
+  }
+  requireFields(value, {'receipts', 'truncated'});
+  final receipts = value['receipts'];
+  if (receipts is! List || receipts.length > 100 || value['truncated'] is! bool)
+    _bad();
+  final ids = <String>{};
+  String? previous;
+  for (final item in receipts) {
+    final body = _map(item);
+    requireFields(body, {
+      'requestId',
+      'operation',
+      'profileId',
+      'result',
+      'committedAt',
+    });
+    if (!ids.add(requireUuid(body['requestId']))) _bad();
+    final operation = body['operation'];
+    if (operation is! String ||
+        (!const {
+              'servers.trust.confirm',
+              'servers.trust.revoke',
+            }.contains(operation) &&
+            !ApiMethod.values
+                .where((m) => m.isMutation)
+                .any((m) => m.wireName == operation)))
+      _bad();
+    if (operation == 'settings.update') {
+      if (body['profileId'] != null) _bad();
+    } else {
+      requireUuid(body['profileId']);
+    }
+    final result = _map(body['result']);
+    if (operation.startsWith('servers.trust.'))
+      captureHostTrustResult(operation, result);
+    else
+      validateMethodResult(operation, result);
+    if (result['entityId'] != body['profileId']) _bad();
+    final timestamp = _time(body['committedAt']);
+    if (previous != null && previous.compareTo(timestamp) < 0) _bad();
+    previous = timestamp;
+  }
+  return _freezeTrustResult(value) as Map<String, Object?>;
+}
+
 String requireTrustFailureCode(Object? value) {
   if (value is! String || !TrustedLocalError.codes.contains(value)) _bad();
   return value;
@@ -437,6 +512,7 @@ Object? _freezeTrustResult(Object? value) => switch (value) {
     for (final entry in value.entries)
       entry.key: _freezeTrustResult(entry.value),
   }),
+  List() => List<Object?>.unmodifiable(value.map(_freezeTrustResult)),
   _ => value,
 };
 

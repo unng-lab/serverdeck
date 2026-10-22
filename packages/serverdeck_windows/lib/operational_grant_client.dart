@@ -8,7 +8,7 @@ String _requestId() {
   return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
 }
 
-extension _OperationalGrantClient on OperationalClientSession {
+extension _OperationalGrantClient on _ClientSession<Object?> {
   Future<McpOpenResult> _openGrant(
     McpCredentialFiles files,
     String grantId,
@@ -63,7 +63,7 @@ extension _OperationalGrantClient on OperationalClientSession {
         }
         await verify();
         final requestId = _requestId();
-        final io = OperationalHandshakeIo(peer);
+        final io = _HandshakeIo(_binding);
         await io.write({
           'v': 1,
           'id': requestId,
@@ -79,7 +79,11 @@ extension _OperationalGrantClient on OperationalClientSession {
           await io.read(remaining),
           maxBytes: maxHandshakeBytes,
         );
-        validateResponseEnvelope(response);
+        if (this is TrustedClientSession) {
+          validateTrustedResponseEnvelope(response);
+        } else {
+          validateResponseEnvelope(response);
+        }
         if (response['id'] != requestId ||
             response['generation'] != hello.generation)
           throw StateError('UNAUTHORIZED');

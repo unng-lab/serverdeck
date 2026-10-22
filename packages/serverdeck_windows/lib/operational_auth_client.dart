@@ -7,6 +7,8 @@ import 'package:cryptography/cryptography.dart';
 import 'package:cryptography/dart.dart';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/errors.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
+import 'package:serverdeck_protocol/mcp/readiness.dart';
 import 'package:serverdeck_protocol/mcp/handshake.dart';
 import 'package:serverdeck_protocol/mcp/wire.dart';
 import 'package:serverdeck_protocol/models.dart';
@@ -18,19 +20,30 @@ import 'mcp_credential_files.dart';
 
 part 'operational_grant_client.dart';
 part 'operational_api_client.dart';
+part 'client_peer.dart';
 
 /// Bounded framing shared by the operational server/client adapters. Reads and
 /// writes use the private epoch-bound native peer, never a raw transport callback.
-final class OperationalHandshakeIo {
-  OperationalHandshakeIo(this.peer);
+final class OperationalHandshakeIo extends _HandshakeIo {
+  OperationalHandshakeIo(this.peer) : super(_ClientPeer.operational(peer));
   final OperationalPipePeer peer;
+}
+
+final class TrustedHandshakeIo extends _HandshakeIo {
+  TrustedHandshakeIo(this.peer) : super(_ClientPeer.trusted(peer));
+  final TrustedPipePeer peer;
+}
+
+class _HandshakeIo {
+  _HandshakeIo(this._peer);
+  final _ClientPeer _peer;
 
   Future<Uint8List> read(Duration Function() remaining) async {
     Future<Uint8List> fill(int count) async {
       final result = Uint8List(count);
       var offset = 0;
       while (offset < count) {
-        final bytes = await peer.read(
+        final bytes = await _peer.read(
           count: count - offset,
           deadline: remaining(),
         );
@@ -61,7 +74,7 @@ final class OperationalHandshakeIo {
       ),
     );
     try {
-      await peer.write(bytes, deadline: remaining());
+      await _peer.write(bytes, deadline: remaining());
       remaining();
     } finally {
       bytes.fillRange(0, bytes.length, 0);
@@ -71,7 +84,8 @@ final class OperationalHandshakeIo {
 
 /// One client bootstrap attempt. Both the own image role and locald peer are
 /// worker-verified; there is deliberately no expected-role argument/callback.
-final class OperationalBootstrapClient {
+final class OperationalBootstrapClient
+    extends _BootstrapClient<OperationalPipePeer, OperationalClientSession> {
   factory OperationalBootstrapClient({
     required PipeWorker pipe,
     required String generation,
@@ -89,6 +103,63 @@ final class OperationalBootstrapClient {
     );
   }
   OperationalBootstrapClient._(
+    super._pipe,
+    super.generation,
+    super._token,
+    super.elapsed,
+  ) : super._();
+  @override
+  Future<OperationalPipePeer> _nativePeer() => _pipe.verifyOperationalPeer();
+  @override
+  _ClientPeer _binding(OperationalPipePeer peer) =>
+      _ClientPeer.operational(peer);
+  @override
+  OperationalClientSession _sessionFor(
+    OperationalPipePeer peer,
+    OperationalHello hello,
+    String id,
+  ) => OperationalClientSession._(_pipe, peer, hello, id);
+}
+
+/// Format3 bootstrap has no caller-provided role, native proof or schema switch.
+final class TrustedBootstrapClient
+    extends _BootstrapClient<TrustedPipePeer, TrustedClientSession> {
+  factory TrustedBootstrapClient({
+    required PipeWorker pipe,
+    required String generation,
+    required List<int> token,
+    Duration Function()? elapsed,
+  }) {
+    requireUuid(generation);
+    if (token.length != 32 || token.any((b) => b < 0 || b > 255))
+      throw ArgumentError('INVALID_HANDSHAKE_CONFIGURATION');
+    return TrustedBootstrapClient._(
+      pipe,
+      generation,
+      Uint8List.fromList(token),
+      elapsed,
+    );
+  }
+  TrustedBootstrapClient._(
+    super._pipe,
+    super.generation,
+    super._token,
+    super.elapsed,
+  ) : super._();
+  @override
+  Future<TrustedPipePeer> _nativePeer() => _pipe.verifyTrustedPeer();
+  @override
+  _ClientPeer _binding(TrustedPipePeer peer) => _ClientPeer.trusted(peer);
+  @override
+  TrustedClientSession _sessionFor(
+    TrustedPipePeer peer,
+    OperationalHello hello,
+    String id,
+  ) => TrustedClientSession._(_pipe, peer, hello, id);
+}
+
+sealed class _BootstrapClient<P, S extends _ClientSession<P>> {
+  _BootstrapClient._(
     this._pipe,
     this.generation,
     this._token,
@@ -104,7 +175,10 @@ final class OperationalBootstrapClient {
   late final Duration Function() _clock;
   late final Duration _deadline;
   bool _used = false, _closed = false;
-  OperationalClientSession? _session;
+  S? _session;
+  Future<P> _nativePeer();
+  _ClientPeer _binding(P peer);
+  S _sessionFor(P peer, OperationalHello hello, String id);
 
   Duration _remaining() {
     if (_closed) throw StateError('UNAUTHORIZED');
@@ -113,7 +187,7 @@ final class OperationalBootstrapClient {
     return value;
   }
 
-  Future<void> _verify(OperationalPipePeer peer) async {
+  Future<void> _verify(_ClientPeer peer) async {
     await peer.revalidate().timeout(_remaining());
     _remaining();
     if (peer.role != BundlePeerRole.locald ||
@@ -141,7 +215,7 @@ final class OperationalBootstrapClient {
     }
   }
 
-  Future<OperationalClientSession> authenticate() async {
+  Future<S> authenticate() async {
     if (_used || _closed) {
       await close();
       throw StateError('UNAUTHORIZED');
@@ -149,12 +223,13 @@ final class OperationalBootstrapClient {
     _used = true;
     var success = false;
     try {
-      final peer = await _pipe.verifyOperationalPeer().timeout(_remaining());
+      final native = await _nativePeer().timeout(_remaining());
+      final peer = _binding(native);
       await _verify(peer);
       final role = peer.localRole == BundlePeerRole.owner
           ? OperationalRole.owner
           : OperationalRole.mcp;
-      final io = OperationalHandshakeIo(peer);
+      final io = _HandshakeIo(peer);
       final document = StrictCodec().decode(
         await io.read(_remaining),
         maxBytes: maxHandshakeBytes,
@@ -204,12 +279,7 @@ final class OperationalBootstrapClient {
       if (difference != 0) throw StateError('UNAUTHORIZED');
       await _verify(peer);
       _remaining();
-      final session = OperationalClientSession._(
-        _pipe,
-        peer,
-        hello,
-        response.sessionId,
-      );
+      final session = _sessionFor(native, hello, response.sessionId);
       _session = session;
       success = true;
       return session;
@@ -235,10 +305,35 @@ final class OperationalBootstrapClient {
 
 /// A bootstrap session only; an MCP session still has no grant authority until
 /// a separate successful, current-policy-checked mcp.open.
-final class OperationalClientSession {
-  OperationalClientSession._(this._pipe, this.peer, this.hello, this.id);
+final class OperationalClientSession
+    extends _ClientSession<OperationalPipePeer> {
+  OperationalClientSession._(
+    PipeWorker pipe,
+    OperationalPipePeer peer,
+    OperationalHello hello,
+    String id,
+  ) : super._(pipe, peer, _ClientPeer.operational(peer), hello, id);
+  Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) =>
+      _openGrant(files, grantId);
+}
+
+/// A native format3 bootstrap session; MCP still has no grant authority.
+final class TrustedClientSession extends _ClientSession<TrustedPipePeer> {
+  TrustedClientSession._(
+    PipeWorker pipe,
+    TrustedPipePeer peer,
+    OperationalHello hello,
+    String id,
+  ) : super._(pipe, peer, _ClientPeer.trusted(peer), hello, id);
+  Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) =>
+      _openGrant(files, grantId);
+}
+
+sealed class _ClientSession<P> {
+  _ClientSession._(this._pipe, this.peer, this._binding, this.hello, this.id);
   final PipeWorker _pipe;
-  final OperationalPipePeer peer;
+  final P peer;
+  final _ClientPeer _binding;
   final OperationalHello hello;
   final String id;
   bool _closed = false;
@@ -246,12 +341,10 @@ final class OperationalClientSession {
   bool _ordinaryClaimed = false;
   McpOpenResult? _grant;
   McpOpenResult? get grant => _closed ? null : _grant;
-  Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) =>
-      _openGrant(files, grantId);
   OperationalRole get role => hello.clientRole;
   Future<void> revalidate() async {
     if (_closed) throw StateError('UNAUTHORIZED');
-    await peer.revalidate();
+    await _binding.revalidate();
     if (_closed) throw StateError('UNAUTHORIZED');
   }
 

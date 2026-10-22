@@ -141,3 +141,93 @@ final class OperationalReadiness {
   };
   List<int> encode() => encodeMcpMessage(toJson(), maxBytes: 8192);
 }
+
+/// Structural format3 readiness only; native composition supplies authority.
+final class TrustedReadiness {
+  factory TrustedReadiness({
+    required ReadinessState state,
+    required String generation,
+    String? workspaceId,
+    OperationalFeatures features = const OperationalFeatures(),
+  }) {
+    requireUuid(generation);
+    if (workspaceId != null) requireUuid(workspaceId);
+    if (state == ReadinessState.ready && workspaceId == null ||
+        state != ReadinessState.ready && features.any)
+      _invalid();
+    return TrustedReadiness._(state, generation, workspaceId, features);
+  }
+  const TrustedReadiness._(
+    this.state,
+    this.generation,
+    this.workspaceId,
+    this.features,
+  );
+  factory TrustedReadiness.fromJson(Object? input) {
+    try {
+      final value = _object(input);
+      requireFields(value, {
+        'state',
+        'reason',
+        'product',
+        'apiMajor',
+        'apiMinor',
+        'workspaceSlot',
+        'workspaceId',
+        'generation',
+        'storageSchema',
+        'features',
+        'clientPlatform',
+      });
+      for (final entry in const <String, Object>{
+        'product': 'serverdeck-next',
+        'apiMajor': 1,
+        'apiMinor': 1,
+        'workspaceSlot': 'default',
+        'storageSchema': 3,
+        'clientPlatform': 'windows-x64',
+      }.entries) {
+        final actual = value[entry.key];
+        if (actual != entry.value ||
+            actual.runtimeType != entry.value.runtimeType)
+          _invalid();
+      }
+      final state = ReadinessState.values.where(
+        (s) => _state(s) == value['state'],
+      );
+      if (state.length != 1 || value['reason'] != _reason(state.single))
+        _invalid();
+      if (value['generation'] is! String ||
+          value['workspaceId'] != null && value['workspaceId'] is! String)
+        _invalid();
+      return TrustedReadiness(
+        state: state.single,
+        generation: value['generation'] as String,
+        workspaceId: value['workspaceId'] as String?,
+        features: OperationalFeatures.fromJson(value['features']),
+      );
+    } catch (_) {
+      _invalid();
+    }
+  }
+  factory TrustedReadiness.decode(List<int> bytes) =>
+      TrustedReadiness.fromJson(StrictCodec().decode(bytes, maxBytes: 8192));
+  final ReadinessState state;
+  final String generation;
+  final String? workspaceId;
+  final OperationalFeatures features;
+  Map<String, Object?> toJson() => {
+    'state': _state(state),
+    'reason': _reason(state),
+    'product': 'serverdeck-next',
+    'apiMajor': 1,
+    'apiMinor': 1,
+    'workspaceSlot': 'default',
+    'workspaceId': workspaceId,
+    'generation': generation,
+    'storageSchema': 3,
+    'features': features.toJson(),
+    'clientPlatform': 'windows-x64',
+  };
+  List<int> encode() => encodeMcpMessage(toJson(), maxBytes: 8192);
+}

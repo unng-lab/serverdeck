@@ -15,17 +15,18 @@ final class OperationalRpcException implements Exception {
 }
 
 final class _RpcPending {
-  _RpcPending(this.until) {
+  _RpcPending(this.until, this.method) {
     result.future.ignore();
   }
   final Duration until;
+  final String method;
   final result = Completer<Map<String, Object?>>();
   Timer? timer;
 }
 
 /// Exactly one ordinary RPC owner of a real native-bootstrap session.
 /// There are no raw transport callbacks or automatic connection/effect retries.
-final class OperationalApiClient {
+final class OperationalApiClient extends _RpcClient {
   factory OperationalApiClient(OperationalClientSession session) {
     if (session._closed ||
         session._ordinaryClaimed ||
@@ -38,11 +39,86 @@ final class OperationalApiClient {
     session._ordinaryClaimed = true;
     return OperationalApiClient._(session);
   }
-  OperationalApiClient._(this._session) {
+  OperationalApiClient._(super._session) : super._();
+  @override
+  Object _failure(ErrorCode code, OperationalRpcFailureOrigin origin) =>
+      OperationalRpcException._(code, origin);
+  @override
+  Object _remoteError(Map<String, Object?> error) => OperationalRpcException._(
+    ErrorCode.values.singleWhere((code) => code.wireName == error['code']),
+    OperationalRpcFailureOrigin.remote,
+    error['field'] as String?,
+  );
+  @override
+  void _validateEnvelope(Map<String, Object?> response) =>
+      validateResponseEnvelope(response);
+}
+
+final class TrustedRpcException implements Exception {
+  const TrustedRpcException._(this.code, this.origin, [this.field]);
+  final String code;
+  final OperationalRpcFailureOrigin origin;
+  final String? field;
+  bool get terminal => origin == OperationalRpcFailureOrigin.transport;
+  RetryAdvice get retry => TrustedLocalError(code, field: field).retry;
+  @override
+  String toString() => 'TrustedRpcException($code,${origin.name})';
+}
+
+/// Format3 RPC owner, permanently bound to its verified native bootstrap.
+final class TrustedApiClient extends _RpcClient {
+  factory TrustedApiClient(TrustedClientSession session) {
+    if (session._closed ||
+        session._ordinaryClaimed ||
+        session._grantAttempted && session._grant == null)
+      throw const TrustedRpcException._(
+        'SERVICE_UNAVAILABLE',
+        OperationalRpcFailureOrigin.local,
+      );
+    session._ordinaryClaimed = true;
+    return TrustedApiClient._(session);
+  }
+  TrustedApiClient._(super._session) : super._();
+  @override
+  Object _failure(ErrorCode code, OperationalRpcFailureOrigin origin) =>
+      TrustedRpcException._(code.wireName, origin);
+  @override
+  Object _remoteError(Map<String, Object?> error) => TrustedRpcException._(
+    error['code'] as String,
+    OperationalRpcFailureOrigin.remote,
+    error['field'] as String?,
+  );
+  @override
+  void _validateEnvelope(Map<String, Object?> response) =>
+      validateTrustedResponseEnvelope(response);
+  @override
+  Map<String, Object?> _captureResult(
+    String method,
+    Map<String, Object?> result,
+  ) {
+    if (ApiMethod.values.any((m) => m.wireName == method) ||
+        hostTrustMethodFields.containsKey(method))
+      return captureTrustedMethodResult(method, result);
+    return super._captureResult(method, result);
+  }
+
+  Future<TrustedReadiness> readiness() async =>
+      TrustedReadiness.fromJson(await call('readiness.get', {}));
+}
+
+sealed class _RpcClient {
+  _RpcClient._(this._session) {
     _done.future.ignore();
     _readLoop().ignore();
   }
-  final OperationalClientSession _session;
+  final _ClientSession<Object?> _session;
+  Object _failure(ErrorCode code, OperationalRpcFailureOrigin origin);
+  Object _remoteError(Map<String, Object?> error);
+  void _validateEnvelope(Map<String, Object?> response);
+  Map<String, Object?> _captureResult(
+    String method,
+    Map<String, Object?> result,
+  ) => _freeze(result) as Map<String, Object?>;
   final _watch = Stopwatch()..start();
   final _pending = <String, _RpcPending>{};
   final _done = Completer<void>();
@@ -67,7 +143,7 @@ final class OperationalApiClient {
     final until = _watch.elapsed + rpcDeadline;
     if (isClosed) {
       return Future.error(
-        const OperationalRpcException._(
+        _failure(
           ErrorCode.serviceUnavailable,
           OperationalRpcFailureOrigin.transport,
         ),
@@ -78,15 +154,12 @@ final class OperationalApiClient {
         requireUuid(requestId);
       } catch (_) {
         return Future.error(
-          const OperationalRpcException._(
-            ErrorCode.validation,
-            OperationalRpcFailureOrigin.local,
-          ),
+          _failure(ErrorCode.validation, OperationalRpcFailureOrigin.local),
         );
       }
       if (_pending.containsKey(requestId)) {
         return Future.error(
-          const OperationalRpcException._(
+          _failure(
             ErrorCode.idempotencyConflict,
             OperationalRpcFailureOrigin.local,
           ),
@@ -95,10 +168,7 @@ final class OperationalApiClient {
     }
     if (_pending.length >= maxPendingPerSession) {
       return Future.error(
-        const OperationalRpcException._(
-          ErrorCode.resourceLimit,
-          OperationalRpcFailureOrigin.local,
-        ),
+        _failure(ErrorCode.resourceLimit, OperationalRpcFailureOrigin.local),
       );
     }
     String id;
@@ -128,20 +198,14 @@ final class OperationalApiClient {
       if (error is StateError && error.message == 'TIMEOUT') {
         _terminate(ErrorCode.timeout).ignore();
         return Future.error(
-          const OperationalRpcException._(
-            ErrorCode.timeout,
-            OperationalRpcFailureOrigin.transport,
-          ),
+          _failure(ErrorCode.timeout, OperationalRpcFailureOrigin.transport),
         );
       }
       return Future.error(
-        const OperationalRpcException._(
-          ErrorCode.validation,
-          OperationalRpcFailureOrigin.local,
-        ),
+        _failure(ErrorCode.validation, OperationalRpcFailureOrigin.local),
       );
     }
-    final pending = _RpcPending(until);
+    final pending = _RpcPending(until, method);
     _pending[id] = pending;
     pending.timer = Timer(until - _watch.elapsed, () {
       if (identical(_pending[id], pending))
@@ -150,7 +214,7 @@ final class OperationalApiClient {
     final write = _writeTail.then((_) async {
       if (isClosed || !identical(_pending[id], pending)) return;
       try {
-        await _session.peer.write(bytes, deadline: _remaining(until));
+        await _session._binding.write(bytes, deadline: _remaining(until));
         _remaining(until);
       } catch (error) {
         _terminate(_transportCode(error)).ignore();
@@ -177,7 +241,7 @@ final class OperationalApiClient {
           frame,
           maxBytes: maxResponseBytes,
         );
-        validateResponseEnvelope(response);
+        _validateEnvelope(response);
         final id = response['id'] as String;
         final pending = _pending[id];
         if (response['generation'] != _session.hello.generation ||
@@ -186,7 +250,10 @@ final class OperationalApiClient {
         }
         final error = response['error'] as Map<String, Object?>?;
         final result = error == null
-            ? _freeze(response['result']) as Map<String, Object?>
+            ? _captureResult(
+                pending.method,
+                response['result'] as Map<String, Object?>,
+              )
             : null;
         _remaining(pending.until);
         if (!identical(_pending[id], pending))
@@ -196,15 +263,7 @@ final class OperationalApiClient {
         if (error == null) {
           pending.result.complete(result!);
         } else {
-          pending.result.completeError(
-            OperationalRpcException._(
-              ErrorCode.values.singleWhere(
-                (code) => code.wireName == error['code'],
-              ),
-              OperationalRpcFailureOrigin.remote,
-              error['field'] as String?,
-            ),
-          );
+          pending.result.completeError(_remoteError(error));
         }
       }
     } on FormatException {
@@ -232,7 +291,7 @@ final class OperationalApiClient {
         final until = partialUntil == null || idleUntil < partialUntil!
             ? idleUntil
             : partialUntil!;
-        final bytes = await _session.peer.read(
+        final bytes = await _session._binding.read(
           count: (count - offset).clamp(1, 65536),
           deadline: _remaining(until),
         );
@@ -264,7 +323,7 @@ final class OperationalApiClient {
     for (final pending in calls) {
       pending.timer?.cancel();
       pending.result.completeError(
-        OperationalRpcException._(code, OperationalRpcFailureOrigin.transport),
+        _failure(code, OperationalRpcFailureOrigin.transport),
       );
     }
     _finishClose().ignore();
@@ -277,7 +336,7 @@ final class OperationalApiClient {
       _done.complete();
     } catch (_) {
       _done.completeError(
-        const OperationalRpcException._(
+        _failure(
           ErrorCode.serviceUnavailable,
           OperationalRpcFailureOrigin.transport,
         ),
