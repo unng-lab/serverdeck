@@ -204,6 +204,57 @@ final class HostTrustProbeService {
     return {'operationId': operation.id, 'cancelled': changed};
   }
 
+  /// Internal coordinator claim, after fresh owner proof and target fencing.
+  /// CAS precedes challenge lookup. Only successful committed readback consumes
+  /// the claim; rollback releases it without reviving cancelled/expired trust.
+  HostTrustConfirmation claimConfirm(
+    TrustedSessionRequest request,
+    Map<String, Object?> params,
+  ) {
+    requireOwner(request, 'servers.trust.confirm');
+    final input = captureHostTrustParams(request.method, params);
+    _sweep();
+    final profile = _profile(input['profileId'] as String);
+    if (profile.revision != input['expectedRevision'])
+      throw StateError('REVISION_CONFLICT');
+    for (final operation in _operations.values) {
+      final challenge = operation.challenge;
+      if (challenge == null || challenge.challengeId != input['challengeId'])
+        continue;
+      if (operation.retired ||
+          operation.cancelled ||
+          operation.claim != null ||
+          !operation.context!.matches(request) ||
+          challenge.profileId != profile.id ||
+          challenge.expectedRevision != profile.revision ||
+          challenge.connectionRevision != profile.connectionRevision ||
+          challenge.credentialRevision != profile.credentialRevision ||
+          challenge.trustRevision != profile.trustRevision ||
+          challenge.key.format != (input['key'] as Map)['format'] ||
+          challenge.key.fingerprint != (input['key'] as Map)['fingerprint'])
+        throw StateError('TRUST_REQUIRED');
+      request.rpcRemaining;
+      final claim = HostTrustConfirmation._(this, operation);
+      operation.claim = claim;
+      return claim;
+    }
+    throw StateError('TRUST_REQUIRED');
+  }
+
+  void _finishClaim(HostTrustConfirmation claim, bool committed) {
+    if (claim._done.isCompleted) return;
+    final operation = claim._operation;
+    if (identical(operation.claim, claim)) {
+      operation.claim = null;
+      if (committed) {
+        operation.challenge = null;
+        operation.challengeExpiry = null;
+      }
+    }
+    claim._done.complete();
+    _sweep();
+  }
+
   void _check(_TrustProbe operation) {
     _ready();
     if (operation.retired || operation.cancelled) throw StateError('CANCELLED');
@@ -311,7 +362,9 @@ final class HostTrustProbeService {
     operation.timer?.cancel();
     operation.budget?.cancel();
     operation.attempt?.cancel();
-    if (!operation.running && identical(_operations[operation.id], operation))
+    if (!operation.running &&
+        operation.claim == null &&
+        identical(_operations[operation.id], operation))
       _operations.remove(operation.id);
   }
 
@@ -326,7 +379,8 @@ final class HostTrustProbeService {
     for (final operation in _operations.values.toList()) {
       operation.timer?.cancel();
       if (operation.retired) {
-        if (!operation.running) _operations.remove(operation.id);
+        if (!operation.running && operation.claim == null)
+          _operations.remove(operation.id);
         continue;
       }
       if (operation.resultExpiry != null && now >= operation.resultExpiry!) {
@@ -340,6 +394,7 @@ final class HostTrustProbeService {
       }
       if (operation.completed &&
           !operation.running &&
+          operation.claim == null &&
           operation.result == null &&
           operation.challenge == null) {
         _operations.remove(operation.id);
@@ -367,6 +422,8 @@ final class HostTrustProbeService {
     await Future.wait<void>([
       for (final operation in operations)
         if (operation.running) operation.done.future,
+      for (final operation in operations)
+        if (operation.claim != null) operation.claim!._done.future,
     ]);
     _operations.clear();
     _watch.stop();
@@ -391,6 +448,19 @@ final class TrustProbeReservation {
   final int _interest;
 }
 
+/// Opaque claim minted from an actual native owner session's live challenge.
+/// Trusted coordinator code holds it through the real transaction/readback.
+final class HostTrustConfirmation {
+  HostTrustConfirmation._(this._service, this._operation);
+  final HostTrustProbeService _service;
+  final _TrustProbe _operation;
+  final _done = Completer<void>();
+  bool matches(TrustedSessionRequest request) =>
+      !_done.isCompleted && _operation.context!.matches(request);
+  void finish({required bool committed}) =>
+      _service._finishClaim(this, committed);
+}
+
 final class _TrustProbe {
   _TrustProbe(this.id, this.session, this.profile, this.revision);
   final String id, session, profile, revision;
@@ -405,6 +475,7 @@ final class _TrustProbe {
   ProfileRecord? captured;
   SshAttempt<SshHostPin>? attempt;
   HostTrustChallenge? challenge;
+  HostTrustConfirmation? claim;
   Duration? resultExpiry, challengeExpiry;
   Map<String, Object?>? result;
   Timer? timer, budget;

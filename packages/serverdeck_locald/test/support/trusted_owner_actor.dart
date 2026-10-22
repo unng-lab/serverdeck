@@ -30,7 +30,10 @@ Future<void> scenario(String root, String mode) => g.scenario(
       'serverdeck.exe',
       plain,
       nativeGate: true,
-      clock: mode == 'probe-success-deadline' || mode == 'probe-admission-clock'
+      clock:
+          mode == 'probe-success-deadline' ||
+              mode == 'probe-admission-clock' ||
+              mode == 'probe-success-write-clock'
           ? () => nativeProbeTime
           : null,
     );

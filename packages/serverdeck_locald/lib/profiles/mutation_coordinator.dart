@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/validation.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
 
 import '../credentials/provider.dart';
 import '../storage/key_custody.dart';
 import '../storage/host_trust_models.dart';
 import '../storage/models.dart';
 import '../storage/state_store.dart';
+import '../api/operational_auth.dart';
+import '../remote/trust_probes.dart';
+import 'host_trust.dart';
 import 'service.dart';
 import 'validation.dart';
 
@@ -100,50 +104,76 @@ class MutationCoordinator {
           maxBytes: 256 * 1024,
         ),
       );
-      final digest = custody.receiptDigestSync(receiptKey, {
-        'operation': method.wireName,
-        'params': input,
-      });
-      _checkAutomationId(requestId);
-      final receipt = _state.receipts[requestId];
-      if (receipt != null) {
-        if (receipt.inputDigest != digest)
-          throw StateError('IDEMPOTENCY_CONFLICT');
-        return FoundationMutationReservation._(
-          this,
-          requestId,
-          requester,
-          null,
-          Future.value(receipt.result),
-        );
-      }
-      final existing = _inflight[requestId];
-      if (existing != null) {
-        if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
-        existing.requesters.add(requester);
-        return FoundationMutationReservation._(
-          this,
-          requestId,
-          requester,
-          existing,
-          existing.result.future,
-        );
-      }
-      if ((_isQueued ? _inflight.length : _queue.length) >= 32)
-        throw StateError('RESOURCE_LIMIT');
-      final pending = _Pending(requestId, method, input, digest, requester);
-      pending.result.future.ignore();
-      _inflight[requestId] = pending;
-      return FoundationMutationReservation._(
-        this,
+      return _reserveCaptured(
         requestId,
+        method,
+        method.wireName,
+        input,
         requester,
-        pending,
-        pending.result.future,
       );
     } catch (error) {
       throw _safe(error);
     }
+  }
+
+  FoundationMutationReservation _reserveCaptured(
+    String requestId,
+    ApiMethod? method,
+    String operation,
+    Map<String, Object?> input,
+    String requester,
+  ) {
+    final digest = custody.receiptDigestSync(receiptKey, {
+      'operation': operation,
+      'params': input,
+    });
+    _checkAutomationId(requestId);
+    final receipt = _state.receipts[requestId];
+    if (receipt != null) {
+      if (receipt.inputDigest != digest)
+        throw StateError('IDEMPOTENCY_CONFLICT');
+      return FoundationMutationReservation._(
+        this,
+        requestId,
+        requester,
+        operation,
+        null,
+        Future.value(receipt.result),
+      );
+    }
+    final existing = _inflight[requestId];
+    if (existing != null) {
+      if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
+      existing.requesters.add(requester);
+      return FoundationMutationReservation._(
+        this,
+        requestId,
+        requester,
+        operation,
+        existing,
+        existing.result.future,
+      );
+    }
+    if ((_isQueued ? _inflight.length : _queue.length) >= 32)
+      throw StateError('RESOURCE_LIMIT');
+    final pending = _Pending(
+      requestId,
+      method,
+      operation,
+      input,
+      digest,
+      requester,
+    );
+    pending.result.future.ignore();
+    _inflight[requestId] = pending;
+    return FoundationMutationReservation._(
+      this,
+      requestId,
+      requester,
+      operation,
+      pending,
+      pending.result.future,
+    );
   }
 
   Future<MutationResult> activate(FoundationMutationReservation reservation) {
@@ -151,23 +181,30 @@ class MutationCoordinator {
       _ensure();
       if (!identical(reservation._coordinator, this))
         throw StateError('FORBIDDEN');
+      if (reservation._operation.startsWith('servers.trust.'))
+        throw StateError('FORBIDDEN');
       _checkAutomationId(reservation._id);
       final pending = reservation._pending;
       if (pending == null || pending.result.isCompleted)
         return reservation.result;
+      if (pending.method == null) throw StateError('FORBIDDEN');
       if (!identical(_inflight[pending.id], pending) ||
           !pending.requesters.contains(reservation._requester))
         throw StateError('SERVICE_UNAVAILABLE');
       if (pending.activated) return pending.result.future;
-      pending.activated = true;
-      _queue.add(pending);
-      if (!_running) {
-        _running = true;
-        scheduleMicrotask(_drain);
-      }
+      _enqueue(pending);
       return reservation.result;
     } catch (error) {
       return Future.error(_safe(error));
+    }
+  }
+
+  void _enqueue(_Pending pending) {
+    pending.activated = true;
+    _queue.add(pending);
+    if (!_running) {
+      _running = true;
+      scheduleMicrotask(_drain);
     }
   }
 
@@ -240,6 +277,7 @@ class MutationCoordinator {
   void _cancel(_Pending pending) {
     _queue.remove(pending);
     _inflight.remove(pending.id);
+    pending.claim?.finish(committed: false);
     pending.input.clear();
     pending.result.completeError(StateError('SERVICE_UNAVAILABLE'));
   }
@@ -282,23 +320,30 @@ class MutationCoordinator {
         if (_blocked) throw StateError('STORAGE_BLOCKED');
         _checkAutomationId(pending.id);
         final now = _commitTimestamp();
-        final prepared = _trusted
+        final prepared = pending.method == null
+            ? prepareHostTrustMutation(
+                store.trustedOperational.foundation,
+                pending.operation,
+                pending.input,
+                now,
+              )
+            : _trusted
             ? await _profiles.prepareTrusted(
                 store.trustedOperational.foundation,
-                pending.method,
+                pending.method!,
                 pending.input,
                 now,
               )
             : await _profiles.prepare(
                 _state,
-                pending.method,
+                pending.method!,
                 pending.input,
                 now,
               );
         (prepared.value['receipts'] as Map)[pending.id] = {
           'requestId': pending.id,
           'inputDigest': pending.digest,
-          'operation': pending.method.wireName,
+          'operation': pending.operation,
           'profileId': prepared.result.entityId,
           'result': prepared.result.toJson(),
           'committedAt': now,
@@ -324,6 +369,7 @@ class MutationCoordinator {
         } else {
           await store.commit(state);
         }
+        pending.claim?.finish(committed: true);
         pending.result.complete(prepared.result);
       } catch (error, stack) {
         final safe = _safe(error);
@@ -331,6 +377,7 @@ class MutationCoordinator {
           _blocked = true;
         pending.result.completeError(safe, stack);
       } finally {
+        pending.claim?.finish(committed: false);
         pending.input.clear();
         _inflight.remove(pending.id);
       }
@@ -369,6 +416,7 @@ class MutationCoordinator {
           'SERVICE_UNAVAILABLE',
           'HOST_BUSY',
           'FORBIDDEN',
+          if (_trusted) 'TRUST_REQUIRED',
         }.contains(error.message))
       return error;
     return StateError('STORAGE_BLOCKED');
@@ -383,13 +431,100 @@ final class TrustedMutationCoordinator extends MutationCoordinator {
     ReceiptKeyMaterial receiptKey, {
     DateTime Function()? clock,
   }) : super._(store, custody, receiptKey, _FoundationMode.trusted, clock);
+
+  /// Immutable shared32 admission only. No challenge or owner is captured here:
+  /// duplicate reservations can belong to different live native owner sessions.
+  FoundationMutationReservation reserveTrust(
+    String requestId,
+    String method,
+    Map<String, Object?> params, {
+    required String requester,
+  }) {
+    try {
+      _ensure();
+      requireUuid(requestId);
+      if (requester.isEmpty) throw const FormatException('VALIDATION');
+      if (method != 'servers.trust.confirm' && method != 'servers.trust.revoke')
+        throw const FormatException('UNSUPPORTED');
+      return _reserveCaptured(
+        requestId,
+        null,
+        method,
+        Map<String, Object?>.from(captureHostTrustParams(method, params)),
+        requester,
+      );
+    } catch (error) {
+      throw _safe(error);
+    }
+  }
+
+  /// The adapter owns fresh proof and the actual native target lease through
+  /// this future's physical commit/readback. Stable replay needs no challenge.
+  Future<MutationResult> activateTrust(
+    FoundationMutationReservation reservation,
+    HostTrustProbeService service,
+    TrustedSessionRequest request,
+  ) {
+    HostTrustConfirmation? acquired;
+    try {
+      _ensure();
+      if (!identical(reservation._coordinator, this) ||
+          !identical(service.store, store))
+        throw StateError('FORBIDDEN');
+      final pending = reservation._pending;
+      final method = reservation._operation;
+      if (method != 'servers.trust.confirm' && method != 'servers.trust.revoke')
+        throw StateError('FORBIDDEN');
+      service.requireOwner(request, method);
+      request.rpcRemaining;
+      _checkAutomationId(reservation._id);
+      if (pending == null || pending.result.isCompleted)
+        return reservation.result;
+      if (pending.method != null) throw StateError('FORBIDDEN');
+      if (!identical(_inflight[pending.id], pending) ||
+          !pending.requesters.contains(reservation._requester))
+        throw StateError('SERVICE_UNAVAILABLE');
+      if (pending.activated) {
+        if (pending.claim != null && !pending.claim!.matches(request))
+          throw StateError('TRUST_REQUIRED');
+        return pending.result.future;
+      }
+      final profile = _state.profiles[pending.input['profileId']];
+      if (profile == null) throw StateError('NOT_FOUND');
+      if (profile.revision != pending.input['expectedRevision'])
+        throw StateError('REVISION_CONFLICT');
+      if (method == 'servers.trust.confirm')
+        acquired = service.claimConfirm(request, pending.input);
+      request.rpcRemaining;
+      pending.claim = acquired;
+      _enqueue(pending);
+      return reservation.result;
+    } catch (error) {
+      acquired?.finish(committed: false);
+      // Preserve actual owner deadline/liveness refusals at this boundary.
+      final failure =
+          error is StateError &&
+              const {'TIMEOUT', 'UNAUTHORIZED'}.contains(error.message)
+          ? error
+          : _safe(error);
+      return Future.error(failure);
+    }
+  }
 }
 
 class _Pending {
-  _Pending(this.id, this.method, this.input, this.digest, String requester)
-    : requesters = {requester};
+  _Pending(
+    this.id,
+    this.method,
+    this.operation,
+    this.input,
+    this.digest,
+    String requester,
+  ) : requesters = {requester};
   final String id, digest;
-  final ApiMethod method;
+  final ApiMethod? method;
+  final String operation;
+  HostTrustConfirmation? claim;
   final Map<String, Object?> input;
   final Set<String> requesters;
   final result = Completer<MutationResult>();
@@ -402,11 +537,12 @@ final class FoundationMutationReservation {
     this._coordinator,
     this._id,
     this._requester,
+    this._operation,
     this._pending,
     this.result,
   );
   final MutationCoordinator _coordinator;
-  final String _id, _requester;
+  final String _id, _requester, _operation;
   final _Pending? _pending;
   final Future<MutationResult> result;
 }

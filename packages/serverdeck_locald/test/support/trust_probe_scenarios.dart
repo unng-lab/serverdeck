@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:serverdeck_locald/api/operational_auth.dart';
 import 'package:serverdeck_locald/api/owner_api.dart';
 import 'package:serverdeck_locald/api/owner_trust_probes.dart';
+import 'package:serverdeck_locald/api/owner_trust_mutations.dart';
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
 import 'package:serverdeck_locald/remote/trust_probes.dart';
 import 'package:serverdeck_locald/remote/ssh_transport.dart';
@@ -13,6 +14,7 @@ import 'package:serverdeck_locald/storage/state_store.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import 'trusted_auth_actor.dart' as a;
+import 'trust_write_scenarios.dart';
 
 Future<void> exerciseTrustProbes(
   String root,
@@ -37,6 +39,7 @@ Future<void> exerciseTrustProbes(
     socket.listen((_) {}, onError: (Object _) {});
   });
   HostTrustProbeService? service;
+  TrustMutationOwnerApi? writeApi;
   Process? ssh;
   StreamIterator<String>? sshLines;
   Future<String>? sshErrors;
@@ -106,7 +109,15 @@ Future<void> exerciseTrustProbes(
         return DateTime.now();
       },
     );
-    final api = TrustProbeOwnerApi(probes);
+    final TrustedOwnerApi api = mode.startsWith('probe-success-write-')
+        ? TrustedOwnerApiGroup([
+            TrustProbeOwnerApi(probes),
+            writeApi = TrustMutationOwnerApi(
+              service: probes,
+              coordinator: coordinator,
+            ),
+          ])
+        : TrustProbeOwnerApi(probes);
     Future<Map<String, Object?>> call(
       String method,
       Map<String, Object?> params, {
@@ -477,6 +488,24 @@ Future<void> exerciseTrustProbes(
         a.check(closing.elapsed < const Duration(seconds: 3));
         await Future<void>.delayed(const Duration(milliseconds: 5));
       }
+      if (mode.startsWith('probe-success-write-')) {
+        await exerciseTrustWrites(
+          root: root,
+          mode: mode,
+          profile: profile,
+          operation: operation,
+          challenge: challenge,
+          api: api,
+          coordinator: coordinator,
+          service: probes,
+          store: store,
+          owner: owner,
+          id: id,
+          advance: (value) => elapsed = value,
+          armClock: (value) => shiftOnSweep = value,
+        );
+        return;
+      }
       if (mode == 'probe-success-cancel') {
         a.check(
           (await call('servers.trust.probeCancel', {
@@ -573,6 +602,7 @@ Future<void> exerciseTrustProbes(
     }
     a.check(store.trustedOperational.foundation.trust.isEmpty);
   } finally {
+    await writeApi?.close();
     try {
       await service?.close();
     } finally {

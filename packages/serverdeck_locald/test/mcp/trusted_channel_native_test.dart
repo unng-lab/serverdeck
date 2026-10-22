@@ -31,6 +31,7 @@ void main() {
     'catalog',
     'foundation',
     'trust-probes',
+    'trust-writes',
     'readiness-bad',
     'owner-blocked',
     'mcp-builtin-errors',

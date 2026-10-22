@@ -11,6 +11,7 @@ import 'package:serverdeck_locald/api/owner_profiles.dart';
 import 'package:serverdeck_locald/api/trusted_owner_foundation.dart';
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
 import 'package:serverdeck_locald/api/owner_trust_probes.dart';
+import 'package:serverdeck_locald/api/owner_trust_mutations.dart';
 import 'package:serverdeck_locald/remote/trust_probes.dart';
 import 'package:serverdeck_locald/remote/ssh_transport.dart';
 import 'package:serverdeck_locald/automation/profiles.dart';
@@ -66,6 +67,7 @@ int wireDepth(Object? value) {
 
 bool ownerMode(String mode) => const {
   'trust-probes',
+  'trust-writes',
   'foundation',
   'owner',
   'codes',
@@ -354,6 +356,89 @@ Future<void> client(List<String> args) async {
     n.check((denied['error'] as Map)['code'] == 'FORBIDDEN');
     final invalidReadiness = await rpc.call('readiness.get', {'extra': true});
     n.check((invalidReadiness['error'] as Map)['code'] == 'VALIDATION');
+    if (mode == 'trust-writes') {
+      final api = TrustedApiClient(session);
+      const profile = '62345678-1234-4234-8234-000000090003';
+      const operation = '62345678-1234-4234-8234-000000090004';
+      const mutation = '62345678-1234-4234-8234-000000090006';
+      try {
+        try {
+          await api.call('servers.trust.revoke', {
+            'profileId': profile,
+            'expectedRevision': '1',
+          });
+          throw StateError('EXPECTED_TRUST_REQUIRED');
+        } on TrustedRpcException catch (error) {
+          n.check(error.code == 'TRUST_REQUIRED');
+        }
+        await api.call('servers.trust.probe', {
+          'profileId': profile,
+          'expectedRevision': '1',
+        }, requestId: operation);
+        Map<String, Object?> status;
+        final wait = Stopwatch()..start();
+        do {
+          n.check(wait.elapsed < const Duration(seconds: 5));
+          status = await api.call('servers.trust.probeStatus', {
+            'operationId': operation,
+          });
+          if (status['state'] == 'running')
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+        } while (status['state'] == 'running');
+        n.check(status['state'] == 'succeeded');
+        final challenge = status['challenge'] as Map;
+        final body = <String, Object?>{
+          'profileId': profile,
+          'expectedRevision': '1',
+          'challengeId': challenge['challengeId'],
+          'key': challenge['key'],
+        };
+        final confirmed = await api.call(
+          'servers.trust.confirm',
+          body,
+          requestId: mutation,
+        );
+        n.check(confirmed['entityRevision'] == '2');
+        n.check(
+          (await api.call('servers.trust.probeCancel', {
+                'operationId': operation,
+              }))['cancelled'] ==
+              false,
+        );
+        final revoked = await api.call('servers.trust.revoke', {
+          'profileId': profile,
+          'expectedRevision': '2',
+        });
+        n.check(revoked['entityRevision'] == '3');
+        n.check(
+          jsonEncode(
+                await api.call(
+                  'servers.trust.confirm',
+                  body,
+                  requestId: mutation,
+                ),
+              ) ==
+              jsonEncode(confirmed),
+        );
+        final current = await api.call('servers.trust.get', {
+          'profileId': profile,
+        });
+        n.check(
+          current['trustRevision'] == '3' &&
+              (current['trust'] as Map)['status'] == 'revoked',
+        );
+        final history = await api.call('mutations.get', {
+          'requestId': mutation,
+        });
+        n.check(history['state'] == 'committed');
+        n.check((await api.call('session.ping', {}))['leaseSeconds'] == 60);
+        await api.call('session.close', {});
+      } finally {
+        await api.close();
+      }
+      stdout.writeln('CLIENT_PASS');
+      return;
+    }
     if (mode == 'trust-probes') {
       final api = TrustedApiClient(session);
       const profile = '62345678-1234-4234-8234-000000090003';
@@ -863,10 +948,16 @@ Future<void> main(List<String> args) async {
         HostTrustProbeService? probes;
         SshTransportPool? probeTransports;
         TrustProbeOwnerApi? probeOwner;
+        TrustMutationOwnerApi? trustWrites;
+        Process? sshFixture;
+        StreamIterator<String>? sshLines;
+        Future<String>? sshErrors;
+        Map? sshKey;
         try {
           if (mode == 'catalog' ||
               mode == 'foundation' ||
-              mode == 'trust-probes') {
+              mode == 'trust-probes' ||
+              mode == 'trust-writes') {
             keeper = await n.Pair.start(
               root,
               'serverdeck.exe',
@@ -895,19 +986,45 @@ Future<void> main(List<String> args) async {
               g.workspaceId,
               g.keyId,
             );
-            if (mode == 'foundation' || mode == 'trust-probes') {
+            if (mode == 'foundation' ||
+                mode == 'trust-probes' ||
+                mode == 'trust-writes') {
               foundationOwner = TrustedFoundationOwnerApi(
                 store: store,
                 coordinator: TrustedMutationCoordinator(store, custody, key),
                 sessions: registry,
               );
-              if (mode == 'trust-probes') {
+              if (mode == 'trust-probes' || mode == 'trust-writes') {
                 final socket = await ServerSocket.bind(
                   InternetAddress.loopbackIPv4,
                   0,
                 );
-                final port = socket.port;
+                var port = socket.port;
                 await socket.close();
+                if (mode == 'trust-writes') {
+                  final python =
+                      Platform.environment['SERVERDECK_TRUST_FIXTURE_PYTHON'];
+                  if (python == null)
+                    throw StateError('TRUST_FIXTURE_PREREQUISITE');
+                  sshFixture = await Process.start(python, [
+                    '-I',
+                    p.absolute('test/support/ssh_key_probe_server.py'),
+                  ]);
+                  sshErrors = sshFixture.stderr.transform(utf8.decoder).join();
+                  sshLines = StreamIterator(
+                    sshFixture.stdout
+                        .transform(utf8.decoder)
+                        .transform(const LineSplitter()),
+                  );
+                  n.check(
+                    await sshLines.moveNext().timeout(
+                      const Duration(seconds: 8),
+                    ),
+                  );
+                  final metadata = jsonDecode(sshLines.current) as Map;
+                  port = metadata['port'] as int;
+                  sshKey = metadata['key'] as Map;
+                }
                 await foundationOwner.coordinator.submit(
                   '62345678-1234-4234-8234-000000090005',
                   ApiMethod.profilesCreate,
@@ -929,6 +1046,11 @@ Future<void> main(List<String> args) async {
                   transports: probeTransports,
                 );
                 probeOwner = TrustProbeOwnerApi(probes);
+                if (mode == 'trust-writes')
+                  trustWrites = TrustMutationOwnerApi(
+                    service: probes,
+                    coordinator: foundationOwner.coordinator,
+                  );
               }
             } else {
               catalog = TrustedAutomationProfileService(
@@ -960,7 +1082,11 @@ Future<void> main(List<String> args) async {
             owner:
                 (probeOwner == null
                     ? null
-                    : TrustedOwnerApiGroup([foundationOwner!, probeOwner])) ??
+                    : TrustedOwnerApiGroup([
+                        foundationOwner!,
+                        probeOwner,
+                        if (trustWrites != null) trustWrites,
+                      ])) ??
                 foundationOwner ??
                 profileOwner ??
                 (ownerMode(mode) && mode != 'owner' ? owner : null),
@@ -1158,7 +1284,8 @@ Future<void> main(List<String> args) async {
               registry.count ==
                       (mode == 'catalog' ||
                               mode == 'foundation' ||
-                              mode == 'trust-probes'
+                              mode == 'trust-probes' ||
+                              mode == 'trust-writes'
                           ? 1
                           : 0) &&
                   router.retainedOperations == 0,
@@ -1207,6 +1334,7 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           await cleanupCatalogFixture([
+            () async => trustWrites?.close(),
             () async => probes?.close(),
             () async => probeTransports?.close(),
             () async => foundationOwner?.close(),
@@ -1216,6 +1344,34 @@ Future<void> main(List<String> args) async {
               if (keeper != null) await registry.close();
             },
             () async => keeper?.close(),
+            () async {
+              final process = sshFixture, lines = sshLines;
+              if (process == null || lines == null) return;
+              try {
+                process.stdin.writeln('stats');
+                n.check(
+                  await lines.moveNext().timeout(const Duration(seconds: 3)),
+                );
+                final stats = jsonDecode(lines.current) as Map;
+                n.check(stats['authentication'] == 0 && stats['accepted'] == 1);
+                final row = store
+                    .trustedOperational
+                    .foundation
+                    .trust['62345678-1234-4234-8234-000000090003']!;
+                n.check(jsonEncode(row.key.toJson()) == jsonEncode(sshKey));
+              } finally {
+                process.stdin.writeln('close');
+                await process.stdin.close();
+                try {
+                  await process.exitCode.timeout(const Duration(seconds: 5));
+                } on TimeoutException {
+                  process.kill();
+                  await process.exitCode;
+                }
+                await sshLines?.cancel();
+                n.check((await sshErrors!).isEmpty);
+              }
+            },
             () async => key?.close(),
           ]);
         }
