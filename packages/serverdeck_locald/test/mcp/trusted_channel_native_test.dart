@@ -30,6 +30,7 @@ void main() {
     'codes',
     'catalog',
     'foundation',
+    'trust-probes',
     'readiness-bad',
     'owner-blocked',
     'mcp-builtin-errors',
@@ -85,6 +86,18 @@ void main() {
             reason: '${await output}\n${await errors}',
           );
           expect((await output).trim().endsWith('PASS:$mode'), true);
+          if (mode == 'codes') {
+            final reports = (await output)
+                .split('\n')
+                .where(
+                  (line) =>
+                      RegExp(r'^CODES_VERIFIED:28;ELAPSED_MS:[0-9]+$')
+                          .hasMatch(line.trim()),
+                )
+                .toList();
+            expect(reports.length, 1);
+            stdout.writeln(reports.single.trim());
+          }
         } finally {
           await fixture.close();
         }

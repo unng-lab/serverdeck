@@ -26,6 +26,15 @@ jobs:
         timeout-minutes: 15
         shell: pwsh
         run: ./tools/prepare-foundation-sdk.ps1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+      - name: Prepare hash-locked loopback SSH fixture
+        shell: pwsh
+        run: |
+          $fixturePython = & ./tools/prepare-trust-probe-fixture.ps1
+          "SERVERDECK_TRUST_FIXTURE_PYTHON=$fixturePython" >> $env:GITHUB_ENV
       - name: Cold source build and current native qualification
         shell: pwsh
         run: |

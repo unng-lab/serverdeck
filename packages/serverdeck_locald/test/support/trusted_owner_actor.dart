@@ -18,16 +18,21 @@ import 'trusted_grant_actor.dart' as g;
 import 'profile_catalog_actor.dart' show cleanupCatalogFixture;
 import 'profile_catalog_storage_scenarios.dart' show catalogBody;
 import 'trusted_foundation_owner_scenarios.dart';
+import 'trust_probe_scenarios.dart';
 
 Future<void> scenario(String root, String mode) => g.scenario(
   root,
   'owner-$mode',
   readyRun: (root, store, authority, plain, write, advance) async {
+    var nativeProbeTime = Duration.zero;
     final owner = await a.Pair.start(
       root,
       'serverdeck.exe',
       plain,
       nativeGate: true,
+      clock: mode == 'probe-success-deadline' || mode == 'probe-admission-clock'
+          ? () => nativeProbeTime
+          : null,
     );
     final sessions = owner.registry;
     final custody = KeyCustody(DpapiProtection(), currentUserSid());
@@ -66,6 +71,19 @@ Future<void> scenario(String root, String mode) => g.scenario(
     try {
       await owner.exchange();
       a.check(await owner.next() == 'AUTH:owner');
+      if (mode.startsWith('probe-')) {
+        await exerciseTrustProbes(
+          root,
+          mode,
+          store,
+          custody,
+          key,
+          owner,
+          plain,
+          advanceNative: (value) => nativeProbeTime = value,
+        );
+        return;
+      }
       if (mode.startsWith('foundation-')) {
         await exerciseTrustedFoundationOwner(
           root,

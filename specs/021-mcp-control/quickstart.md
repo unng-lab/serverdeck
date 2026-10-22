@@ -54,6 +54,8 @@ Capture separate evidence for Windows/native bridge, wire client1/client2, migra
 
 ## Hosted automation
 
+Windows native owner trust probe tests additionally use a disposable loopback SSH server with an ephemeral in-memory RSA key. Prepare Python3.12.10 x64 with [the fixture setup script](../../tools/prepare-trust-probe-fixture.ps1), which installs only the exact hash-locked Windows wheels from [the fixture requirements](../../tools/trust-probe-fixture-requirements.txt) into `.local/trust-probe-python`. Set `SERVERDECK_TRUST_FIXTURE_PYTHON` to the returned absolute executable before native tests. Both Windows workflows perform this setup. This test-only dependency is absent from the product bundle: the fixture accepts only loopback connections, rejects every authentication method and exposes only its generated public fingerprint and counters. Successful owner probes must match that actual SSH fingerprint, drain the physical transport before challenge publication and show zero authentication attempts. These cases do not establish trust confirmation, remote execution or full release acceptance.
+
 [MCP automatic checks](../../.github/workflows/mcp.yml) runs Windows source-built native/root/package checks and [Docker prerequisites](../../tools/test-executor-container.sh) on an isolated Ubuntu runner. The Docker job currently proves Python3.12/python3-apt, hash-locked Ansible, systemd PID1, SSH service and persistent state across container restart. It does not yet prove the unimplemented privileged executor or installation recipes. No repository secrets, user profiles or stored server credentials are supplied. Extend this same disposable fixture for T026/T035 acceptance as the executor is implemented.
 
 

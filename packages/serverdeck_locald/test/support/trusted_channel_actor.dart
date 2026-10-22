@@ -10,6 +10,9 @@ import 'package:serverdeck_locald/api/trusted_channel.dart';
 import 'package:serverdeck_locald/api/owner_profiles.dart';
 import 'package:serverdeck_locald/api/trusted_owner_foundation.dart';
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
+import 'package:serverdeck_locald/api/owner_trust_probes.dart';
+import 'package:serverdeck_locald/remote/trust_probes.dart';
+import 'package:serverdeck_locald/remote/ssh_transport.dart';
 import 'package:serverdeck_locald/automation/profiles.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_locald/mcp/profile_services.dart';
@@ -62,6 +65,7 @@ int wireDepth(Object? value) {
 }
 
 bool ownerMode(String mode) => const {
+  'trust-probes',
   'foundation',
   'owner',
   'codes',
@@ -350,6 +354,70 @@ Future<void> client(List<String> args) async {
     n.check((denied['error'] as Map)['code'] == 'FORBIDDEN');
     final invalidReadiness = await rpc.call('readiness.get', {'extra': true});
     n.check((invalidReadiness['error'] as Map)['code'] == 'VALIDATION');
+    if (mode == 'trust-probes') {
+      final api = TrustedApiClient(session);
+      const profile = '62345678-1234-4234-8234-000000090003';
+      const operation = '62345678-1234-4234-8234-000000090004';
+      try {
+        n.check(
+          (await api.call('servers.trust.get', {
+                'profileId': profile,
+              }))['trust'] ==
+              null,
+        );
+        final body = {'profileId': profile, 'expectedRevision': '1'};
+        n.check(
+          (await api.call(
+                'servers.trust.probe',
+                body,
+                requestId: operation,
+              ))['operationId'] ==
+              operation,
+        );
+        n.check(
+          (await api.call(
+                'servers.trust.probe',
+                body,
+                requestId: operation,
+              ))['operationId'] ==
+              operation,
+        );
+        final watch = Stopwatch()..start();
+        Map<String, Object?> status;
+        do {
+          n.check(watch.elapsed < const Duration(seconds: 5));
+          status = await api.call('servers.trust.probeStatus', {
+            'operationId': operation,
+          });
+          if (status['state'] == 'running')
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+        } while (status['state'] == 'running');
+        n.check(
+          status['state'] == 'failed' && status['code'] == 'CONNECTION_FAILED',
+        );
+        n.check(
+          (await api.call('servers.trust.probeCancel', {
+                'operationId': operation,
+              }))['cancelled'] ==
+              false,
+        );
+        try {
+          await api.call('servers.trust.probe', {
+            ...body,
+            'expectedRevision': '2',
+          }, requestId: operation);
+          throw StateError('EXPECTED_CONFLICT');
+        } on TrustedRpcException catch (error) {
+          n.check(error.code == 'IDEMPOTENCY_CONFLICT');
+        }
+        n.check((await api.call('session.ping', {}))['leaseSeconds'] == 60);
+        await api.call('session.close', {});
+      } finally {
+        await api.close();
+      }
+      stdout.writeln('CLIENT_PASS');
+      return;
+    }
     if (mode == 'foundation') {
       final api = TrustedApiClient(session);
       try {
@@ -706,6 +774,7 @@ Future<void> client(List<String> args) async {
         return;
       } else if (mode == 'codes') {
         final api = TrustedApiClient(session);
+        var completedCodes = 0;
         try {
           for (final code in TrustedLocalError.codes.where(
             (c) => c != 'UNAUTHORIZED',
@@ -722,6 +791,7 @@ Future<void> client(List<String> args) async {
               );
             }
             n.check((await api.call('session.ping', {}))['leaseSeconds'] == 60);
+            stdout.writeln('CODES_PROGRESS:${++completedCodes}');
           }
           for (final code in SshTransportCode.values) {
             try {
@@ -736,6 +806,7 @@ Future<void> client(List<String> args) async {
                     error.code == TrustedLocalError.fromTransport(code).code,
               );
             }
+            stdout.writeln('CODES_PROGRESS:${++completedCodes}');
           }
           try {
             await api.call('fixture.error', {
@@ -789,8 +860,13 @@ Future<void> main(List<String> args) async {
         TrustedAutomationProfileService? catalog;
         TrustedProfileOwnerApi? profileOwner;
         TrustedFoundationOwnerApi? foundationOwner;
+        HostTrustProbeService? probes;
+        SshTransportPool? probeTransports;
+        TrustProbeOwnerApi? probeOwner;
         try {
-          if (mode == 'catalog' || mode == 'foundation') {
+          if (mode == 'catalog' ||
+              mode == 'foundation' ||
+              mode == 'trust-probes') {
             keeper = await n.Pair.start(
               root,
               'serverdeck.exe',
@@ -819,12 +895,41 @@ Future<void> main(List<String> args) async {
               g.workspaceId,
               g.keyId,
             );
-            if (mode == 'foundation') {
+            if (mode == 'foundation' || mode == 'trust-probes') {
               foundationOwner = TrustedFoundationOwnerApi(
                 store: store,
                 coordinator: TrustedMutationCoordinator(store, custody, key),
                 sessions: registry,
               );
+              if (mode == 'trust-probes') {
+                final socket = await ServerSocket.bind(
+                  InternetAddress.loopbackIPv4,
+                  0,
+                );
+                final port = socket.port;
+                await socket.close();
+                await foundationOwner.coordinator.submit(
+                  '62345678-1234-4234-8234-000000090005',
+                  ApiMethod.profilesCreate,
+                  {
+                    'profileId': '62345678-1234-4234-8234-000000090003',
+                    'name': 'Wire probe',
+                    'address': '127.0.0.1',
+                    'port': port,
+                    'sshUser': 'fixture',
+                    'tags': <String>[],
+                    'credential': {'action': 'remove'},
+                  },
+                  requester: 'fixture',
+                );
+                probeTransports = SshTransportPool();
+                probes = HostTrustProbeService(
+                  store: store,
+                  sessions: registry,
+                  transports: probeTransports,
+                );
+                probeOwner = TrustProbeOwnerApi(probes);
+              }
             } else {
               catalog = TrustedAutomationProfileService(
                 store: store,
@@ -853,6 +958,9 @@ Future<void> main(List<String> args) async {
             authority: authority,
             router: router,
             owner:
+                (probeOwner == null
+                    ? null
+                    : TrustedOwnerApiGroup([foundationOwner!, probeOwner])) ??
                 foundationOwner ??
                 profileOwner ??
                 (ownerMode(mode) && mode != 'owner' ? owner : null),
@@ -944,9 +1052,28 @@ Future<void> main(List<String> args) async {
             }
             final running = channel.run();
             running.ignore();
-            final began = await lines.moveNext().timeout(
+            final codesWatch = Stopwatch()..start();
+            var completedCodes = 0;
+            var began = await lines.moveNext().timeout(
               const Duration(seconds: 12),
             );
+            while (mode == 'codes' &&
+                began &&
+                lines.current.startsWith('CODES_PROGRESS:')) {
+              n.check(
+                completedCodes < 28 &&
+                    lines.current == 'CODES_PROGRESS:${++completedCodes}',
+              );
+              began = await lines.moveNext().timeout(
+                const Duration(seconds: 12),
+              );
+            }
+            if (mode == 'codes') {
+              n.check(completedCodes == 28);
+              stdout.writeln(
+                'CODES_VERIFIED:$completedCodes;ELAPSED_MS:${codesWatch.elapsedMilliseconds}',
+              );
+            }
             if (!began) stderr.write(await errors);
             n.check(began);
             if (mode == 'pending' || mode.endsWith('-pending')) {
@@ -1029,7 +1156,11 @@ Future<void> main(List<String> args) async {
             }
             n.check(
               registry.count ==
-                      (mode == 'catalog' || mode == 'foundation' ? 1 : 0) &&
+                      (mode == 'catalog' ||
+                              mode == 'foundation' ||
+                              mode == 'trust-probes'
+                          ? 1
+                          : 0) &&
                   router.retainedOperations == 0,
             );
             if (mode == 'eof' || mode == 'reentrant-close') {
@@ -1076,6 +1207,8 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           await cleanupCatalogFixture([
+            () async => probes?.close(),
+            () async => probeTransports?.close(),
             () async => foundationOwner?.close(),
             () async => profileOwner?.close(),
             () async => catalog?.close(),

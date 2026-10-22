@@ -59,6 +59,15 @@ jobs:
             Invoke-FoundationCommand $FoundationDart @('analyze')
             Invoke-FoundationCommand $FoundationDart @('test')
           } finally { Pop-Location }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+      - name: Prepare hash-locked loopback SSH fixture
+        shell: pwsh
+        run: |
+          $fixturePython = & ./tools/prepare-trust-probe-fixture.ps1
+          "SERVERDECK_TRUST_FIXTURE_PYTHON=$fixturePython" >> $env:GITHUB_ENV
       - name: Source-built native library and root/package automatic suites
         shell: pwsh
         run: ./tools/test-foundation-cold-runner.ps1

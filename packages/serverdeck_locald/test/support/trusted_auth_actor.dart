@@ -227,6 +227,7 @@ final class Pair {
         registry = await TrustedSessions.withNativePublicationGate(
           generation: generation,
           peer: await server.verifyTrustedPeer(),
+          elapsed: clock,
         );
       }
       return Pair(
