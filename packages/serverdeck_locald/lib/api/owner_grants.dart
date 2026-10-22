@@ -5,7 +5,7 @@ import 'package:serverdeck_protocol/mcp/handshake.dart';
 import '../mcp/grants.dart';
 import '../storage/state_store.dart';
 import 'operational_auth.dart';
-import 'operational_server.dart';
+import 'owner_api.dart';
 
 /// Actual owner-role Local API adapter. Credential custody and durable receipt
 /// semantics remain in StateStore; no input can supply a role or a gate.
@@ -53,6 +53,56 @@ final class OperationalGrantOwnerApi implements OperationalOwnerApi {
         }
         request.rpcRemaining;
         return store.mutateOwnerGrant(command, clock: DateTime.now);
+      }, deadline: request.rpcRemaining),
+    );
+  }
+}
+
+/// Fixed schema3 native owner adapter.
+final class TrustedGrantOwnerApi implements TrustedOwnerApi {
+  TrustedGrantOwnerApi({required this.store, required this.sessions}) {
+    if (!sessions.hasNativePublicationGate) throw StateError('NOT_READY');
+    if (!store.isTrustedSnapshotLoaded) throw StateError('STORAGE_BLOCKED');
+  }
+  final StateStore store;
+  final TrustedSessions sessions;
+  static const _methods = {
+    'grants.create': 'grant.create',
+    'grants.replace': 'grant.replace',
+    'grants.revoke': 'grant.revoke',
+  };
+
+  @override
+  bool supports(String method) => _methods.containsKey(method);
+
+  @override
+  TrustedOwnerInvocation prepare(
+    TrustedSessionRequest request,
+    String method,
+    Map<String, Object?> params, {
+    required String requestId,
+  }) {
+    if (!request.belongsTo(sessions) ||
+        request.role != OperationalRole.owner ||
+        request.method != method) {
+      throw StateError('FORBIDDEN');
+    }
+    final operation = _methods[method];
+    if (operation == null) throw StateError('UNSUPPORTED');
+    // Capture immutable typed fields synchronously before the native gate wait.
+    final command = OwnerGrantCommand.parse(operation, params);
+    return TrustedOwnerInvocation(
+      request,
+      () => sessions.runAuthorityMutation(() async {
+        // A queued writer's former proof is not authority to start a mutation.
+        try {
+          final budget = request.rpcRemaining;
+          await request.revalidate().timeout(budget);
+        } on TimeoutException {
+          throw StateError('TIMEOUT');
+        }
+        request.rpcRemaining;
+        return store.mutateTrustedOwnerGrant(command, clock: DateTime.now);
       }, deadline: request.rpcRemaining),
     );
   }
