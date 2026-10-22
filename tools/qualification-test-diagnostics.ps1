@@ -74,6 +74,10 @@ function Write-NativeQualificationTestFailure {
     $gatewayCases=@('basic','quota','queued-cancel','heartbeat','heartbeat-remote-limit','wrong-catalog','wrong-poll','wrong-cancel',
         'rpc-timeout','rpc-remote','overall','cancel-timeout','missing-grant','owner-deny','pending','cancel-ack','native-loss',
         'expiry','revoke','stdout-revoke','stdout-target-change','stdout-target-failure','stdout-stop','writer-cancel','publish-order','publish-expiry','eof')
+    $trustedClientCases=@('owner','cleanup2','cleanup3','mcp','grant','grant-bad-proof','grant-repeat','codes','quota','receipts',
+        'readiness2','bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize',
+        'invalid-json','timeout','eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation',
+        'hello-build','hello-version','hello-shape','bootstrap-timeout')
     $tests=@{};$suites=@{};$failures=[Collections.Generic.List[object]]::new()
     $complete=$false;$status='missing-reporter'
     try {
@@ -99,10 +103,19 @@ function Write-NativeQualificationTestFailure {
                                 $declarationLine=Get-DiagnosticLine $file $test['line']
                             }
                             $frames=[Collections.Generic.List[object]]::new()
-                            foreach($frame in [regex]::Matches([string]$event.stackTrace,'(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
-                                $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
-                                $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
-                                if($frameFile -and $frameLine){$frames.Add(@{file=$frameFile;line=$frameLine});if($frames.Count -eq 3){break}}
+                            $frameKeys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+                            # Child stacks may be nested in expect's reason. Apply the
+                            # same source/hash/line checks and one total bound to both.
+                            foreach($trace in @($event.stackTrace,$event.error)) {
+                                foreach($frame in [regex]::Matches([string]$trace,'(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
+                                    $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+                                    $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+                                    if($frameFile -and $frameLine -and $frameKeys.Add($frameFile+':'+$frameLine)){
+                                        $frames.Add(@{file=$frameFile;line=$frameLine})
+                                        if($frames.Count -eq 3){break}
+                                    }
+                                }
+                                if($frames.Count -eq 3){break}
                             }
                             $native=[Collections.Generic.List[object]]::new()
                             foreach($match in [regex]::Matches([string]$event.error,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
@@ -137,6 +150,14 @@ function Write-NativeQualificationTestFailure {
                                     foreach($case in $gatewayCases) {
                                         if($test['name'] -is [string] -and $test['name'] -ceq ('actual native MCP gateway '+$case)) {
                                             $fixtureCase='gateway-'+$case
+                                            break
+                                        }
+                                    }
+                                }
+                                if($file -ceq 'packages/serverdeck_windows/test/trusted_client_native_test.dart') {
+                                    foreach($case in $trustedClientCases) {
+                                        if($test['name'] -is [string] -and $test['name'] -ceq ('actual format3 bootstrap and RPC client '+$case)) {
+                                            $fixtureCase='trusted-client-'+$case
                                             break
                                         }
                                     }

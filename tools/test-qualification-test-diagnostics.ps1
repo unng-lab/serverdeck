@@ -192,6 +192,101 @@ foreach($variant in @('known','known-pointer','known-commit','known-gateway','un
         (-not $expectTimeout -and $null -ne $failure.failureKind)) {throw ('Controlled timeout projection mismatch: '+$variant)}
 }
 'QUALIFICATION_REAL_TIMEOUT_FIXED_CASE_SOURCE_HASH_AND_PRIVACY_NEGATIVES_PASSED'
+
+# A real failing expect carries the child's stack in its reason rather than
+# the reporter stackTrace. Aliases below are controlled diagnostics, never
+# evidence that the native client scenarios themselves ran or passed.
+$clientModes=@('owner','cleanup2','cleanup3','mcp','grant','grant-bad-proof','grant-repeat','codes','quota','receipts',
+    'readiness2','bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize',
+    'invalid-json','timeout','eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation',
+    'hello-build','hello-version','hello-shape','bootstrap-timeout')
+$clientSource='packages/serverdeck_windows/test/trusted_client_native_test.dart'
+$actorSource='packages/serverdeck_windows/test/support/trusted_client_actor.dart'
+$clientUri=([Uri](Join-Path $NativeIsarRepository $clientSource)).AbsoluteUri
+$actorUri=([Uri](Join-Path $NativeIsarRepository $actorSource)).AbsoluteUri
+$assertProbe=Join-Path $fixture 'controlled-client-assert.dart'
+$assertReport=Join-Path $fixture 'controlled-client-assert.machine.jsonl'
+$assertDart=@'
+import 'package:test/test.dart';
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER nested client', () {
+    expect(1, 0, reason: 'SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER\n'
+      '#0 check (FIXTURE_ACTOR_URI:40:1)\n'
+      '#1 private (file:///C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart:9:2)');
+  });
+}
+'@
+[IO.File]::WriteAllText($assertProbe,$assertDart.Replace('FIXTURE_ACTOR_URI',$actorUri),[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_windows')
+try {
+    & $FoundationDart test $assertProbe --file-reporter "json:$assertReport" *> (Join-Path $fixture 'controlled-client-assert.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled assertion unexpectedly passed.'}
+} finally {Pop-Location}
+$rawAssert=[IO.File]::ReadAllLines($assertReport)
+foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type','invalid-line','changed-source','unknown-source','actor-changed','frames-bound','joint-frames','plain-assertion'))) {
+    $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($caseFixture)
+    $mode=if($variant -in $clientModes){$variant}else{'owner'}
+    $events=foreach($line in $rawAssert) {
+        $event=$line|ConvertFrom-Json -AsHashtable
+        if($event.type -ceq 'testStart' -and $event.test.name -ceq ($privateMarker+' nested client')) {
+            $event.test.name='actual format3 bootstrap and RPC client '+$mode
+            $event.test.url=$clientUri
+            $event.test.line=59
+            switch($variant) {
+                'unknown-client' {$event.test.name='actual format3 bootstrap and RPC client '+$privateMarker}
+                'unknown-name' {$event.test.name+=$privateMarker}
+                'name-type' {$event.test.name=@{private=$privateMarker}}
+                'invalid-line' {$event.test.line=999999}
+                'unknown-source' {$event.test.url='file:///C:/'+$privateMarker+'/private.dart'}
+            }
+        }
+        if($event.type -ceq 'error') {
+            if(-not $event.error.Contains('Expected: <0>') -or -not $event.error.Contains($actorUri)) {
+                throw 'Expected real Dart assertion with nested reason.'
+            }
+            if($variant -ceq 'plain-assertion') {$event.error='Expected: <0>\nActual: <1>\n'+$privateMarker}
+            if($variant -ceq 'frames-bound') {
+                $event.error+="`n"+((@(40,40,41,42,43,999999)|ForEach-Object{"#0 check (${actorUri}:$($_):1)"}) -join "`n")
+            }
+            if($variant -ceq 'joint-frames') {
+                $event.stackTrace="#0 parent (${clientUri}:84:1)`n#1 child (${actorUri}:40:1)"
+                $event.error+="`n#2 child (${actorUri}:41:1)`n#3 child (${actorUri}:42:1)"
+            }
+        }
+        $event|ConvertTo-Json -Depth 30 -Compress
+    }
+    [IO.File]::WriteAllLines((Join-Path $caseFixture 'serverdeck_windows-tests.machine.jsonl'),[string[]]$events,[Text.UTF8Encoding]::new($false))
+    $selected=$snapshot
+    if($variant -in @('changed-source','actor-changed')) {
+        $changed=if($variant -ceq 'changed-source'){$clientSource}else{$actorSource}
+        $selected=@{sha256=$snapshot.sha256;files=@($snapshot.files|ForEach-Object{
+            if($_.file -ceq $changed){@{file=$changed;sha256=('0'*64)}}else{$_}
+        })}
+    }
+    Write-NativeQualificationTestFailure -Directory $caseFixture -Phase 'serverdeck_windows-tests' -SourceSnapshot $selected -ControlledFixture
+    $casePath=Join-Path $caseFixture 'safe-test-failure-serverdeck_windows-tests.json'
+    $caseProof=Read-NativeIsarArtifactJson $casePath
+    $safe=[IO.File]::ReadAllText($casePath)
+    if($caseProof.status -cne 'failed-test-details' -or -not $caseProof.controlledFixture -or
+        -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1 -or
+        $safe.Contains($privateMarker) -or $safe.Contains('file:///') -or $safe.Contains('stackTrace') -or
+        $safe.Contains('Expected:') -or $safe.Contains('999999')){throw 'Client projection privacy/report mismatch.'}
+    $failure=$caseProof.failures[0]
+    $expectCase=$variant -notin @('unknown-client','unknown-name','name-type','invalid-line','changed-source','unknown-source')
+    if(($expectCase -and $failure.fixtureCase -cne ('trusted-client-'+$mode)) -or
+        (-not $expectCase -and $null -ne $failure.fixtureCase)){throw ('Client fixed case mismatch: '+$variant)}
+    $frameCount=if($variant -in @('actor-changed','plain-assertion')){0}elseif($variant -in @('frames-bound','joint-frames')){3}else{1}
+    if($failure.sourceFrames.Count -ne $frameCount -or $null -ne $failure.safeCode -or $null -ne $failure.failureKind){throw ('Client nested frame bounds mismatch: '+$variant)}
+    foreach($frame in $failure.sourceFrames){
+        if($variant -ceq 'joint-frames' -and $frame.file -ceq $clientSource -and $frame.line -eq 84){continue}
+        if($frame.file -cne $actorSource -or $frame.line -notin @(40,41,42)){throw 'Client nested source mismatch.'}
+    }
+    if($variant -ceq 'joint-frames' -and ($failure.sourceFrames[0].file -cne $clientSource -or
+        $failure.sourceFrames[1].line -ne 40 -or $failure.sourceFrames[2].line -ne 41)){throw 'Joint frame total cap/order/dedup mismatch.'}
+    if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled projection claimed qualification.'}
+}
+'QUALIFICATION_REAL_ASSERTION_TRUSTED_CLIENT_31_FIXED_CASES_NESTED_SOURCE_HASH_BOUNDS_PRIVACY_NEGATIVES_PASSED'
 $fixture
 $invalidFixture
 exit 0
