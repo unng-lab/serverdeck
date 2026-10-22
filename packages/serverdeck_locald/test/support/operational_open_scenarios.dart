@@ -22,6 +22,7 @@ import 'grant_capacity_scenarios.dart';
 import 'grant_key_loss_scenarios.dart';
 import 'grant_publication_scenarios.dart';
 import 'foundation_transaction_scenarios.dart';
+import 'profile_catalog_storage_scenarios.dart';
 
 Future<void> refusal(
   Future<Object?> Function() action, [
@@ -208,6 +209,7 @@ Future<void> verifyOwnedOperationalOpen({
     };
     if (!positive.contains(mode) &&
         !foundationWriteModes.contains(mode) &&
+        !profileCatalogModes.contains(mode) &&
         !grantBoundaryModes.contains(mode) &&
         !grantFaultModes.contains(mode) &&
         !grantKillModes.contains(mode) &&
@@ -357,6 +359,8 @@ Future<void> verifyOwnedOperationalOpen({
         key,
         mode,
       );
+    if (profileCatalogModes.contains(mode))
+      store = await verifyProfileCatalogStorage(store, open, mode, files);
     stdout.writeln('OWNED_OPERATIONAL_REOPEN_RESERVATION_PROVED');
   } finally {
     if (mode == 'open-throw') await lockFault.closeFixture();

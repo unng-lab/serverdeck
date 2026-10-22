@@ -9,6 +9,18 @@ import 'package:serverdeck_windows/security.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test(
+    'production refuses negative native release flag before native work',
+    () async {
+      await expectLater(
+        MutexLease.acquire('invalid', 'invalid', testWrongThreadRelease: true),
+        throwsA(
+          isA<StateError>().having((e) => e.message, 'code', 'UNSUPPORTED'),
+        ),
+      );
+    },
+    testOn: 'windows',
+  );
   test('failed setup leaves no live ports in a child process', () async {
     final child = await Process.start(
       p.join(p.dirname(Platform.resolvedExecutable), 'dartvm.exe'),

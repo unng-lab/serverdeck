@@ -70,6 +70,19 @@ final class OperationalSessions {
   int get targetChangeInterests => _targets?._interests.length ?? 0;
   bool get hasNativePublicationGate =>
       !_stopping && _targets != null && !_targets!.gate.isClosed;
+
+  OperationalNativeObservation observeNextAuthorityAcquisitionForTest() {
+    if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
+    if (!hasNativePublicationGate) throw StateError('NOT_READY');
+    return _targets!.gate.observeNextAcquireDeliveryForTest();
+  }
+
+  void failNextAuthorityLeaseReleaseForTest() {
+    if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
+    if (!hasNativePublicationGate) throw StateError('NOT_READY');
+    _targets!.gate.failNextLeaseReleaseForTest();
+  }
+
   bool get targetChangesBlocked =>
       _stopping ||
       (_targets?._interests.isNotEmpty ?? false) ||
@@ -91,11 +104,16 @@ final class OperationalSessions {
   Future<T> runAuthorityMutation<T>(
     Future<T> Function() effect, {
     Duration deadline = rpcDeadline,
+    void Function(Future<void>)? observeNativeCompletion,
   }) {
     if (_stopping) return Future.error(StateError('SERVICE_UNAVAILABLE'));
     final targets = _targets;
     if (targets == null) return Future.error(StateError('NOT_READY'));
-    return targets.runAuthority(effect, deadline);
+    return targets.runAuthority(
+      effect,
+      deadline,
+      observeNativeCompletion: observeNativeCompletion,
+    );
   }
 
   Future<void> close() {
@@ -207,7 +225,7 @@ final class OperationalSessions {
   Future<void> completeAdmission(OperationalSessionRequest request) {
     if (!request.belongsTo(this)) return Future.error(StateError('FORBIDDEN'));
     try {
-      request._live();
+      request._identityLive();
       return request._initialAdmission ??= _completeAdmission(request);
     } catch (error, stack) {
       return Future.error(error, stack);
@@ -218,22 +236,30 @@ final class OperationalSessions {
     try {
       try {
         if (ownerServiceProbesEnabled) {
-          final budget = request.rpcRemaining;
+          final budget = request.rpcBudgetRemaining;
           await OwnerServiceProbe.hit(
             OwnerServiceBoundary.beforeInitialProof,
             request.method,
           ).timeout(budget);
         }
-        final budget = request.rpcRemaining;
+        final budget = request.rpcBudgetRemaining;
         await request.revalidate().timeout(budget);
       } on TimeoutException {
         throw StateError('TIMEOUT');
       }
-      request.rpcRemaining;
-      request._session.expires = _clock() + sessionLease;
+      void admitted() {
+        request._live();
+        request._session.expires = _clock() + sessionLease;
+        request._initialAdmissionProved = true;
+      }
+
+      final authority = request._session.authority;
+      if (authority == null) {
+        admitted();
+      } else {
+        await authority._stable(admitted, request.rpcBudgetRemaining);
+      }
       _onChanged?.call();
-      request._live();
-      request._initialAdmissionProved = true;
     } catch (_) {
       request.complete();
       rethrow;
@@ -332,7 +358,7 @@ final class OperationalSessionRequest {
   bool _initialAdmissionProved = false;
   Future<void>? _initialAdmission;
   bool get initialAdmissionProved {
-    _live();
+    _identityLive();
     return _initialAdmissionProved;
   }
 
@@ -341,6 +367,12 @@ final class OperationalSessionRequest {
   OperationalOpenFailure? get openFailure => _openFailure;
   Duration get rpcRemaining {
     _live();
+    return rpcBudgetRemaining;
+  }
+
+  /// Bookkeeping only. Never authorizes an effect or an output frame.
+  Duration get rpcBudgetRemaining {
+    _identityLive();
     final value = _began + rpcDeadline - _registry._clock();
     if (value <= Duration.zero) throw StateError('TIMEOUT');
     return value;
@@ -361,14 +393,19 @@ final class OperationalSessionRequest {
     return _session.hello;
   }
 
-  void _live() {
+  void _identityLive() {
     if (_completed || !_registry._current(channel, _session))
       throw StateError('UNAUTHORIZED');
+  }
+
+  void _live() {
+    _identityLive();
     final grant = _session.grant;
     if (grant != null) {
       try {
         _session.authority!._exact(grant);
-      } catch (_) {
+      } catch (error) {
+        if (_session.authority!._publicationPause(error)) rethrow;
         _detach();
         rethrow;
       }
@@ -398,6 +435,41 @@ final class OperationalSessionRequest {
     authorizeMcp();
     return OperationalMcpContext._(_registry, channel, _session);
   }
+
+  /// Native binding gate before payload parsing; this supplies no permission.
+  void requireMcpInvocationBinding(
+    OperationalSessions registry,
+    OperationalMcpAuthority authority,
+  ) {
+    _identityLive();
+    if (!belongsTo(registry) ||
+        method != 'mcp.invoke' ||
+        _session.role != OperationalRole.mcp ||
+        _session.grant == null ||
+        !identical(_session.authority, authority)) {
+      throw StateError('FORBIDDEN');
+    }
+  }
+
+  Future<void> _stableLive() async {
+    _identityLive();
+    final authority = _session.authority;
+    if (authority == null) {
+      _live();
+      return;
+    }
+    await authority._stable(_live, rpcBudgetRemaining);
+  }
+
+  Future<OperationalMcpContext> mcpContextWhenStable() async {
+    _identityLive();
+    final authority = _session.authority;
+    if (authority == null) throw StateError('FORBIDDEN');
+    return authority._stable(mcpContext, rpcBudgetRemaining);
+  }
+
+  bool isAuthorityPublicationPause(Object error) =>
+      _session.authority?._publicationPause(error) ?? false;
 
   Future<McpOpenResult> openGrant(
     OperationalMcpAuthority authority,
@@ -430,7 +502,10 @@ final class OperationalSessionRequest {
         interest.future.then((_) => throw StateError('UNAUTHORIZED')),
       ]).timeout(budget);
       await _openVerify();
-      authority._exact(result.$1);
+      await authority._stable(
+        () => authority._exact(result.$1),
+        _openRemaining(),
+      );
       _openRemaining();
       _session.authority = authority;
       _session.grant = result.$1;
@@ -452,18 +527,35 @@ final class OperationalSessionRequest {
     }
   }
 
-  Future<void> revalidate() async {
-    _live();
-    try {
-      await _session.peer.revalidate().timeout(rpcDeadline);
-    } catch (error) {
-      if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
-      // Never remove a different session that subsequently reused a channel ID.
-      if (identical(_registry._sessions[channel], _session))
-        _registry.disconnect(channel);
-      throw StateError('UNAUTHORIZED');
+  Future<void> revalidate({
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
+    while (true) {
+      await _stableLive();
+      try {
+        final budget = rpcBudgetRemaining;
+        final actual = _session.peer.revalidate(
+          observeNativeCompletion: observeNativeCompletion,
+        );
+        actual.ignore();
+        await actual.timeout(budget);
+      } on TimeoutException {
+        throw StateError('TIMEOUT');
+      } catch (error) {
+        if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
+        // Never remove a different session that subsequently reused a channel ID.
+        if (identical(_registry._sessions[channel], _session))
+          _registry.disconnect(channel);
+        throw StateError('UNAUTHORIZED');
+      }
+      rpcBudgetRemaining;
+      try {
+        _live();
+        return;
+      } catch (error) {
+        if (!isAuthorityPublicationPause(error)) rethrow;
+      }
     }
-    _live();
   }
 
   void complete() {

@@ -22,6 +22,7 @@ export 'mcp_build_bundle.dart' show BundlePeerRole;
 
 part 'operational_pipe_worker.dart';
 part 'operational_publication_gate.dart';
+part 'operational_native_observation.dart';
 
 /// Only messages cross isolates; native pipe and process handles stay in worker.
 class PipeWorker {

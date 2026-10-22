@@ -28,7 +28,7 @@ Decision: apt module disallows cache refresh, dependency auto-install, downgrade
 
 ## Host identity and threat boundary
 
-Decision: one root-owned install UUID/state namespace per host OS, bound to checked SSH fingerprint; duplicate profiles share it. No raw machine-id output, no alternate per-profile spool/chroot namespace. [systemd machine-id](https://www.freedesktop.org/software/systemd/man/latest/machine-id.html) warns against publishing raw identifier. Root/full same-user compromise remains outside boundary; product never claims to firewall all independent SSH clients.
+Decision: one root-owned install UUID/state namespace per host OS, bound to checked SSH fingerprint; duplicate profiles share it. No raw machine-id output, no alternate per-profile spool/chroot namespace. [systemd machine-id](https://github.com/systemd/systemd/blob/main/man/machine-id.xml) warns against publishing raw identifier. Root/full same-user compromise remains outside boundary; product never claims to firewall all independent SSH clients.
 
 ## Existing implementation evidence
 

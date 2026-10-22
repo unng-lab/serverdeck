@@ -24,7 +24,8 @@ final class OperationalMcpContext {
       throw StateError('UNAUTHORIZED');
     try {
       return _session.authority!._exact(_session.grant!);
-    } catch (_) {
+    } catch (error) {
+      if (_session.authority!._publicationPause(error)) rethrow;
       if (identical(_registry._sessions[_channel], _session))
         _registry.disconnect(_channel);
       rethrow;
@@ -59,19 +60,54 @@ final class OperationalMcpContext {
       throw StateError('FORBIDDEN');
   }
 
-  Future<void> revalidate({Duration deadline = rpcDeadline}) async {
-    _current();
-    if (deadline <= Duration.zero) throw StateError('TIMEOUT');
-    try {
-      await _session.peer.revalidate().timeout(deadline);
-    } on TimeoutException {
-      throw StateError('TIMEOUT');
-    } catch (error) {
-      if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
-      if (identical(_registry._sessions[_channel], _session))
-        _registry.disconnect(_channel);
-      throw StateError('UNAUTHORIZED');
+  Future<void> authorizeWhenStable({
+    McpScope? scope,
+    String? serverId,
+    Duration deadline = rpcDeadline,
+  }) => _session.authority!._stable(
+    () => authorize(scope: scope, serverId: serverId),
+    deadline,
+  );
+
+  Future<GrantScopePolicy> policyWhenStable({
+    Duration deadline = rpcDeadline,
+  }) => _session.authority!._stable(() => policy, deadline);
+
+  Future<void> revalidate({
+    Duration deadline = rpcDeadline,
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
+    final watch = Stopwatch()..start();
+    Duration remaining() {
+      final left = deadline - watch.elapsed;
+      if (left <= Duration.zero) throw StateError('TIMEOUT');
+      return left;
     }
-    _current();
+
+    while (true) {
+      await _session.authority!._stable(_current, remaining());
+      try {
+        final budget = remaining();
+        final actual = _session.peer.revalidate(
+          observeNativeCompletion: observeNativeCompletion,
+        );
+        actual.ignore();
+        await actual.timeout(budget);
+      } on TimeoutException {
+        throw StateError('TIMEOUT');
+      } catch (error) {
+        if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
+        if (identical(_registry._sessions[_channel], _session))
+          _registry.disconnect(_channel);
+        throw StateError('UNAUTHORIZED');
+      }
+      remaining();
+      try {
+        _current();
+        return;
+      } catch (error) {
+        if (!_session.authority!._publicationPause(error)) rethrow;
+      }
+    }
   }
 }

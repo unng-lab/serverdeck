@@ -13,6 +13,17 @@ final class _PublicationAttempt {
   Timer? timer;
 }
 
+/// Logical acquisition and actual acquisition/late-release completion. Neither
+/// future grants authority; an issued lease still belongs to its recipient.
+final class OperationalPublicationAcquisition {
+  OperationalPublicationAcquisition._(this.result, this.settled) {
+    result.ignore();
+    settled.ignore();
+  }
+  final Future<OperationalPublicationLease> result;
+  final Future<void> settled;
+}
+
 /// Synchronization only: identity comes from a verified native endpoint.
 final class OperationalPublicationGate {
   OperationalPublicationGate._(
@@ -34,9 +45,29 @@ final class OperationalPublicationGate {
   final _leases = <OperationalPublicationLease>{};
   bool _closing = false, _failed = false;
   Future<void>? _closeFuture;
+  _NativeObservationPause? _testAcquirePause;
+  bool _testReleaseFailure = false;
   int get activeAcquisitions => _attempts.length;
   int get activeLeases => _leases.length;
   bool get isClosed => _closing || _failed;
+
+  void failNextLeaseReleaseForTest() {
+    if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
+    _check();
+    if (_testReleaseFailure || _attempts.isNotEmpty || _leases.isNotEmpty)
+      throw StateError('RESOURCE_LIMIT');
+    _testReleaseFailure = true;
+  }
+
+  OperationalNativeObservation observeNextAcquireDeliveryForTest() {
+    if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
+    _check();
+    if (_testAcquirePause != null) throw StateError('RESOURCE_LIMIT');
+    final pause = _testAcquirePause = _NativeObservationPause();
+    return OperationalNativeObservation._(pause.reached.future, () async {
+      pause.retire();
+    });
+  }
 
   static Future<OperationalPublicationGate> _open(
     List metadata,
@@ -130,16 +161,26 @@ final class OperationalPublicationGate {
   /// One absolute budget includes startup/contention; late work stays charged.
   Future<OperationalPublicationLease> acquire({
     Duration deadline = const Duration(seconds: 5),
+  }) => beginAcquire(deadline: deadline).result;
+
+  OperationalPublicationAcquisition beginAcquire({
+    Duration deadline = const Duration(seconds: 5),
   }) {
-    if (isClosed) return Future.error(StateError('SERVICE_UNAVAILABLE'));
-    if (deadline <= Duration.zero) return Future.error(StateError('TIMEOUT'));
+    OperationalPublicationAcquisition refused(String code) =>
+        OperationalPublicationAcquisition._(
+          Future.error(StateError(code)),
+          Future.value(),
+        );
+    if (isClosed) return refused('SERVICE_UNAVAILABLE');
+    if (deadline <= Duration.zero) return refused('TIMEOUT');
     if (_attempts.length + _leases.length >= 16)
-      return Future.error(StateError('RESOURCE_LIMIT'));
+      return refused('RESOURCE_LIMIT');
     final budget = deadline < const Duration(seconds: 5)
         ? deadline
         : const Duration(seconds: 5);
     final attempt = _PublicationAttempt();
     attempt.result.future.ignore();
+    attempt.settled.future.ignore();
     _attempts.add(attempt);
     attempt.timer = Timer(budget, () {
       attempt.retired = true;
@@ -178,10 +219,17 @@ final class OperationalPublicationGate {
         .whenComplete(() {
           attempt.timer?.cancel();
           _attempts.remove(attempt);
-          attempt.settled.complete();
+          if (_failed) {
+            attempt.settled.completeError(StateError('SERVICE_UNAVAILABLE'));
+          } else {
+            attempt.settled.complete();
+          }
         })
         .ignore();
-    return attempt.result.future;
+    return OperationalPublicationAcquisition._(
+      attempt.result.future,
+      attempt.settled.future,
+    );
   }
 
   Future<OperationalPublicationLease> _acquire(
@@ -195,7 +243,13 @@ final class OperationalPublicationGate {
         throw StateError('TIMEOUT');
       late final MutexLease native;
       try {
-        native = await MutexLease.acquire(_name, _sid);
+        native = await MutexLease.acquire(
+          _name,
+          _sid,
+          testWrongThreadRelease:
+              operationalNativeObservationEnabled && _testReleaseFailure,
+        );
+        if (native.acquired) _testReleaseFailure = false;
       } catch (_) {
         // Startup errors can include an uncertain native cleanup result. The
         // legacy helper does not distinguish them, so retire conservatively.
@@ -215,6 +269,19 @@ final class OperationalPublicationGate {
           final lease = OperationalPublicationLease._(this, native);
           _leases.add(lease);
           transferred = true;
+          if (operationalNativeObservationEnabled) {
+            final pause = _testAcquirePause;
+            _testAcquirePause = null;
+            if (pause != null) {
+              await pause.hit();
+              try {
+                _check();
+              } catch (_) {
+                await lease.close();
+                rethrow;
+              }
+            }
+          }
           return lease;
         }
       } finally {
@@ -244,6 +311,8 @@ final class OperationalPublicationGate {
     _closeFuture = done.future;
     done.future.ignore();
     _closing = true;
+    _testAcquirePause?.retire();
+    _testAcquirePause = null;
     for (final attempt in _attempts) {
       attempt.retired = true;
       attempt.timer?.cancel();

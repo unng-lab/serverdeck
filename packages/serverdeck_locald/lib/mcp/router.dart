@@ -33,6 +33,7 @@ final class _Operation {
   Future<String?>? cleanupAcknowledged;
   bool exposed = false, retired = false, timedOut = false;
   bool resultSettled = false, cleanupSettled = true;
+  bool finishing = false;
 }
 
 String _operationId() {
@@ -88,19 +89,23 @@ final class McpRouter {
     Object? params,
   ) async {
     _ready();
-    final context = request.mcpContext();
-    if (!context.belongsTo(sessions, authority)) throw StateError('FORBIDDEN');
+    request.requireMcpInvocationBinding(sessions, authority);
     // Snapshot original input before the first router await; do not canonicalize
     // decomposed Unicode or turn invalid float arguments into integers.
     final input = McpInvokeInput.fromJson(params);
-    await context.revalidate(deadline: request.rpcRemaining);
-    request.rpcRemaining;
+    final context = await request.mcpContextWhenStable();
+    if (!context.belongsTo(sessions, authority)) throw StateError('FORBIDDEN');
+    await context.revalidate(deadline: request.rpcBudgetRemaining);
+    request.rpcBudgetRemaining;
     sweep();
     _ready();
-    context.authorize();
+    await context.authorizeWhenStable(deadline: request.rpcBudgetRemaining);
     switch (input.kind) {
       case McpInvokeKind.catalog:
-        final reply = McpInvokeReply.catalog(mcpToolsFor(context.policy));
+        final policy = await context.policyWhenStable(
+          deadline: request.rpcBudgetRemaining,
+        );
+        final reply = McpInvokeReply.catalog(mcpToolsFor(policy));
         await _publication(request, context);
         return reply;
       case McpInvokeKind.request:
@@ -110,7 +115,10 @@ final class McpRouter {
           return McpInvokeReply.invalidParams();
         }
         for (final scope in tool.requiredScopes)
-          context.authorize(scope: scope);
+          await context.authorizeWhenStable(
+            scope: scope,
+            deadline: request.rpcBudgetRemaining,
+          );
         try {
           validateMcpArguments(tool, input.arguments!);
         } on FormatException {
@@ -118,7 +126,10 @@ final class McpRouter {
           return McpInvokeReply.invalidParams();
         }
         if (input.arguments!['serverId'] case final String serverId) {
-          context.authorize(serverId: serverId);
+          await context.authorizeWhenStable(
+            serverId: serverId,
+            deadline: request.rpcBudgetRemaining,
+          );
         }
         if (_charged.length >= workspaceLimit ||
             _charged
@@ -140,7 +151,7 @@ final class McpRouter {
             ),
           );
         } catch (_) {
-          _finish(op, McpToolResult.failure('INTERNAL'));
+          unawaited(_finish(op, McpToolResult.failure('INTERNAL')));
         }
         _wakeSoon();
         // Already-resolved results settle before this event turn. Slower work
@@ -162,20 +173,28 @@ final class McpRouter {
         op.exposed = true;
         return McpInvokeReply.pending(op.id);
       case McpInvokeKind.poll:
-        final op = _owned(context, input.operationId!);
+        final op = await _owned(
+          context,
+          input.operationId!,
+          request.rpcBudgetRemaining,
+        );
         if (op.retired) throw StateError('FORBIDDEN');
         await _publication(request, context);
         if (!identical(_records[op.id], op) || op.retired)
           throw StateError('FORBIDDEN');
         return op.result ?? McpInvokeReply.pending(op.id);
       case McpInvokeKind.cancel:
-        final op = _owned(context, input.operationId!);
+        final op = await _owned(
+          context,
+          input.operationId!,
+          request.rpcBudgetRemaining,
+        );
         _retire(op, retainHandle: true);
         final acknowledged = op.cleanupAcknowledged;
         if (acknowledged != null) {
           String? failure;
           try {
-            failure = await acknowledged.timeout(request.rpcRemaining);
+            failure = await acknowledged.timeout(request.rpcBudgetRemaining);
           } on TimeoutException {
             throw StateError('TIMEOUT');
           }
@@ -190,14 +209,25 @@ final class McpRouter {
     OperationalSessionRequest request,
     OperationalMcpContext context,
   ) async {
-    await context.revalidate(deadline: request.rpcRemaining);
-    request.rpcRemaining;
-    _ready();
-    context.authorize();
+    while (true) {
+      await context.revalidate(deadline: request.rpcBudgetRemaining);
+      try {
+        request.rpcRemaining;
+        _ready();
+        context.authorize();
+        return;
+      } catch (error) {
+        if (!request.isAuthorityPublicationPause(error)) rethrow;
+      }
+    }
   }
 
-  _Operation _owned(OperationalMcpContext context, String id) {
-    context.authorize();
+  Future<_Operation> _owned(
+    OperationalMcpContext context,
+    String id,
+    Duration deadline,
+  ) async {
+    await context.authorizeWhenStable(deadline: deadline);
     final op = _records[id];
     if (op == null ||
         op.context.sessionId != context.sessionId ||
@@ -207,16 +237,25 @@ final class McpRouter {
     return op;
   }
 
-  void _finish(_Operation op, McpToolResult result) {
-    if (op.resultSettled) return;
-    op.resultSettled = true;
+  Future<void> _finish(_Operation op, McpToolResult result) async {
+    if (op.resultSettled || op.finishing) return;
+    op.finishing = true;
     if (!_closed && !op.retired && !op.timedOut) {
       try {
-        op.context.authorize();
-      } catch (_) {
-        _retire(op);
+        await op.context.authorizeWhenStable(
+          deadline: op.started + operationLifetime - _clock(),
+        );
+      } catch (error) {
+        if (error is StateError &&
+            error.message == 'TIMEOUT' &&
+            !_closed &&
+            !op.retired) {
+          _timeout(op);
+        } else {
+          _retire(op);
+        }
       }
-      if (!op.retired) {
+      if (!op.retired && !op.timedOut) {
         if (_clock() >= op.started + operationLifetime) {
           _timeout(op);
         } else {
@@ -233,6 +272,8 @@ final class McpRouter {
         }
       }
     }
+    op.resultSettled = true;
+    op.finishing = false;
     _release(op);
     _wakeSoon();
   }

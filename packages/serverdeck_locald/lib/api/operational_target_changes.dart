@@ -10,20 +10,41 @@ final class _TargetChanges {
 
   Future<T> runAuthority<T>(
     Future<T> Function() effect,
-    Duration deadline,
-  ) async {
+    Duration deadline, {
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
     if (gate.isClosed) throw StateError('SERVICE_UNAVAILABLE');
     if (deadline <= Duration.zero) throw StateError('TIMEOUT');
     final budget = deadline < rpcDeadline ? deadline : rpcDeadline;
     final watch = Stopwatch()..start();
     OperationalPublicationLease? lease;
+    final acquiring = gate.beginAcquire(deadline: budget);
+    var observerFailed = false;
     try {
-      lease = await gate.acquire(deadline: budget);
+      observeNativeCompletion?.call(acquiring.settled);
+    } catch (_) {
+      observerFailed = true;
+    }
+    try {
+      lease = await acquiring.result;
+      try {
+        observeNativeCompletion?.call(lease.done);
+      } catch (_) {
+        observerFailed = true;
+      }
+      if (observerFailed) throw StateError('SERVICE_UNAVAILABLE');
       if (watch.elapsed >= budget) throw StateError('TIMEOUT');
       if (registry._stopping) throw StateError('SERVICE_UNAVAILABLE');
       return await effect();
+    } catch (_) {
+      if (observerFailed) throw StateError('SERVICE_UNAVAILABLE');
+      rethrow;
     } finally {
-      await lease?.close();
+      try {
+        await lease?.close();
+      } finally {
+        if (observerFailed) await acquiring.settled;
+      }
     }
   }
 

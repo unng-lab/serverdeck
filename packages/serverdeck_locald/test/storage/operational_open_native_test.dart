@@ -14,6 +14,8 @@ import '../support/grant_failure_scenarios.dart' show grantFaultModes;
 import '../support/grant_key_loss_scenarios.dart' show grantKeyLossModes;
 import '../support/grant_publication_scenarios.dart'
     show grantPublicationFaultModes;
+import '../support/profile_catalog_storage_scenarios.dart'
+    show profileCatalogModes;
 
 void main() {
   final modes = [
@@ -25,6 +27,7 @@ void main() {
     'reservation-race',
     'grant-basic',
     ...foundationWriteModes,
+    ...profileCatalogModes,
     ...grantBoundaryModes,
     ...grantFaultModes,
     ...grantKeyLossModes,
@@ -176,6 +179,7 @@ void main() {
                           }.contains(mode) ||
                           grantBoundaryModes.contains(mode) ||
                           foundationWriteModes.contains(mode) ||
+                          profileCatalogModes.contains(mode) ||
                           grantFaultModes.contains(mode) ||
                           grantKeyLossModes.contains(mode) ||
                           grantPublicationFaultModes.contains(mode) ||

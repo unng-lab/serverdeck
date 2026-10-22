@@ -10,6 +10,38 @@ final class OperationalMcpAuthority {
   bool _closed = false;
   int _working = 0;
   int get pendingOpens => _working;
+  bool belongsTo(StateStore store) => identical(_store, store) && !_closed;
+
+  bool _publicationPause(Object error) =>
+      !_closed &&
+      error is StateError &&
+      error.message == 'STORAGE_BLOCKED' &&
+      _store.hasPendingMcpAuthorityPublication;
+
+  // Only synchronous, side-effect-free authority checks enter this retry loop.
+  Future<T> _stable<T>(T Function() read, Duration deadline) async {
+    final watch = Stopwatch()..start();
+    while (true) {
+      if (_closed) throw StateError('UNAUTHORIZED');
+      final remaining = deadline - watch.elapsed;
+      if (remaining <= Duration.zero) throw StateError('TIMEOUT');
+      try {
+        return read();
+      } catch (error) {
+        if (!_publicationPause(error)) rethrow;
+        final closed = Completer<void>();
+        _interests.add(closed);
+        try {
+          await Future.any<void>([
+            _store.waitForMcpAuthority(deadline: remaining),
+            closed.future.then((_) => throw StateError('UNAUTHORIZED')),
+          ]);
+        } finally {
+          _interests.remove(closed);
+        }
+      }
+    }
+  }
 
   void Function() onGrantPublished(void Function(String, int) listener) =>
       _store.onMcpGrantPublished(listener);
@@ -61,14 +93,21 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
     McpGrantKey? owned;
     try {
       _openRemaining();
-      authority._current(input.grantId);
+      await authority._stable(
+        () => authority._current(input.grantId),
+        _openRemaining(),
+      );
       await _openVerify();
       owned = await authority._store.openMcpGrantKey(
         input.grantId,
         clock: authority._clock,
+        publicationDeadline: _openRemaining(),
       );
       _openRemaining();
-      authority._exact(owned.grant);
+      await authority._stable(
+        () => authority._exact(owned!.grant),
+        _openRemaining(),
+      );
       await _openVerify();
       final transcript = McpOpenTranscript(
         hello: _session.hello,
@@ -89,7 +128,10 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
         clientBytes.fillRange(0, clientBytes.length, 0);
       }
       _openRemaining();
-      authority._exact(owned.grant);
+      await authority._stable(
+        () => authority._exact(owned!.grant),
+        _openRemaining(),
+      );
       if (!valid) throw StateError('UNAUTHORIZED');
       final unsigned = McpOpenResult(
         workspaceId: owned.grant.workspaceId,
@@ -106,9 +148,15 @@ extension _OperationalGrantOpen on OperationalSessionRequest {
         serverBytes.fillRange(0, serverBytes.length, 0);
       }
       _openRemaining();
-      authority._exact(owned.grant);
+      await authority._stable(
+        () => authority._exact(owned!.grant),
+        _openRemaining(),
+      );
       await _openVerify();
-      authority._exact(owned.grant);
+      await authority._stable(
+        () => authority._exact(owned!.grant),
+        _openRemaining(),
+      );
       return (
         owned.grant,
         McpOpenResult(

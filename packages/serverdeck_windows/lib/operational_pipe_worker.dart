@@ -19,6 +19,17 @@ final class OperationalPipePeer {
   final BundlePeerRole localRole;
   final String buildId;
 
+  Future<OperationalNativeObservation> observeNextRevalidationForTest() async {
+    if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
+    final token = await _worker._call('testPeerObservationArm', _epoch) as int;
+    final reached = _worker
+        ._call('testPeerObservationReached', [_epoch, token])
+        .then<void>((_) {});
+    return OperationalNativeObservation._(reached, () async {
+      await _worker._call('testPeerObservationRelease', [_epoch, token]);
+    });
+  }
+
   /// Derive synchronization identity only from this actual verified endpoint.
   /// The gate itself grants no tool/session authority.
   Future<OperationalPublicationGate> publicationGate(String generation) async {
@@ -28,13 +39,32 @@ final class OperationalPipePeer {
     return OperationalPublicationGate._open(identity, generation, localRole);
   }
 
-  Future<void> revalidate() async {
-    final result = (await _worker._call('peerVerify', _epoch)) as List;
-    if (result[0] != _epoch ||
-        result[1] != role.name ||
-        result[2] != buildId ||
-        result[3] != localRole.name)
-      throw StateError('UNAUTHORIZED');
+  Future<void> revalidate({
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
+    // _call may refuse before issuing work (for example the pipe3 quota).
+    // Such a logical refusal is not a failed physical completion.
+    final response = _worker._call('peerVerify', _epoch);
+    final actual = () async {
+      final result = (await response) as List;
+      if (result[0] != _epoch ||
+          result[1] != role.name ||
+          result[2] != buildId ||
+          result[3] != localRole.name)
+        throw StateError('UNAUTHORIZED');
+    }();
+    actual.ignore();
+    try {
+      observeNativeCompletion?.call(actual);
+    } catch (_) {
+      try {
+        await actual;
+      } catch (_) {
+        /* Actual failure remains observed. */
+      }
+      throw StateError('SERVICE_UNAVAILABLE');
+    }
+    await actual;
   }
 
   Future<Uint8List> read({
@@ -102,9 +132,15 @@ final class _OperationalEndpoint {
   int epoch;
   bool failed = false;
   VerifiedBundlePeer? peer;
+  _NativeObservationPause? _proofPause;
+  bool _proofPauseConsumed = false;
+  int _proofObservationToken = 0;
   static const _maximumEpoch = 0x7fffffffffffffff;
 
   void advance(_OperationalSlot next) {
+    _proofPause?.retire();
+    _proofPause = null;
+    _proofPauseConsumed = false;
     if (epoch >= _maximumEpoch) {
       failed = true;
       peer = null;
@@ -191,8 +227,41 @@ final class _OperationalEndpoint {
           localRole.name,
         ];
       case 'peerVerify':
-        final role = verify(params as int?);
+        var role = verify(params as int?);
+        if (operationalNativeObservationEnabled &&
+            _proofPause != null &&
+            !_proofPauseConsumed) {
+          final pause = _proofPause!;
+          _proofPauseConsumed = true;
+          await pause.hit();
+          role = verify(params);
+        }
         return [epoch, role.name, bundle.manifest.buildId, localRole.name];
+      case 'testPeerObservationArm':
+        if (!operationalNativeObservationEnabled)
+          throw StateError('UNAUTHORIZED');
+        verify(params as int);
+        if (_proofPause != null) throw StateError('RESOURCE_LIMIT');
+        _proofPause = _NativeObservationPause();
+        _proofPauseConsumed = false;
+        return ++_proofObservationToken;
+      case 'testPeerObservationReached' || 'testPeerObservationRelease':
+        if (!operationalNativeObservationEnabled)
+          throw StateError('UNAUTHORIZED');
+        final probe = params as List;
+        if (probe[0] != epoch ||
+            probe[1] != _proofObservationToken ||
+            _proofPause == null)
+          throw StateError('UNAUTHORIZED');
+        final pause = _proofPause!;
+        if (method == 'testPeerObservationReached') {
+          await pause.reached.future;
+        } else {
+          _proofPause = null;
+          _proofPauseConsumed = false;
+          pause.retire();
+        }
+        return null;
       case 'peerRead':
         final values = params as List, count = values[1] as int;
         if (count < 1 || count > 65536) throw StateError('RESOURCE_LIMIT');
@@ -247,6 +316,8 @@ final class _OperationalEndpoint {
         }
         return null;
       case 'close':
+        _proofPause?.retire();
+        _proofPause = null;
         if (epoch < _maximumEpoch) epoch++;
         failed = true;
         peer = null;

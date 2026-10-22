@@ -207,7 +207,7 @@ final class OperationalApiServer {
         request = null;
         rethrow;
       }
-      request.rpcRemaining;
+      request.rpcBudgetRemaining;
       Map<String, Object?> result;
       switch (method) {
         case 'readiness.get':

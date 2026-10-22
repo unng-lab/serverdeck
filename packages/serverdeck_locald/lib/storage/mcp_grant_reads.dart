@@ -33,8 +33,27 @@ extension _McpGrantReads on StateStore {
   Future<McpGrantKey> _openMcpGrantKey(
     String id, {
     required DateTime Function() clock,
+    Duration? publicationDeadline,
   }) async {
-    final before = _currentMcpGrant(id, at: clock());
+    final watch = Stopwatch()..start();
+    Future<ClientGrantRecord> readCurrent() async {
+      while (true) {
+        try {
+          return _currentMcpGrant(id, at: clock());
+        } catch (error) {
+          if (publicationDeadline == null ||
+              error is! StateError ||
+              error.message != 'STORAGE_BLOCKED' ||
+              !hasPendingMcpAuthorityPublication)
+            rethrow;
+          await waitForMcpAuthority(
+            deadline: publicationDeadline - watch.elapsed,
+          );
+        }
+      }
+    }
+
+    final before = await readCurrent();
     late final McpClientKey key;
     try {
       key = await _grantFiles().openReferenced(_grantBinding(before));
@@ -44,7 +63,7 @@ extension _McpGrantReads on StateStore {
     }
     var transferred = false;
     try {
-      final after = _currentMcpGrant(id, at: clock());
+      final after = await readCurrent();
       if (after.revision != before.revision ||
           after.secretRef != before.secretRef ||
           after.workspaceId != before.workspaceId)

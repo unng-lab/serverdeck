@@ -8,6 +8,7 @@ import 'package:isar_community/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/automation/models.dart';
+import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/mcp_credentials.dart';
 import 'package:serverdeck_windows/mcp_credential_files.dart';
 import 'package:serverdeck_windows/mutex.dart';
@@ -16,6 +17,7 @@ import 'package:serverdeck_windows/security.dart';
 
 import '../bootstrap/native_runtime.dart';
 import '../automation/snapshot.dart';
+import '../automation/profile_commands.dart';
 import '../mcp/grants.dart';
 import 'credential_validation.dart';
 import 'automation_records.dart';
@@ -34,6 +36,7 @@ import 'workspace.dart';
 part 'owner_grant_writes.dart';
 part 'mcp_grant_reads.dart';
 part 'operational_foundation_writes.dart';
+part 'automation_profile_writes.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
 class StateStore {
@@ -55,7 +58,51 @@ class StateStore {
   WorkspaceState _state;
   OperationalSnapshot? _operational;
   final String? _operationalRoot;
-  bool _authorityUnavailable = false;
+  bool _authorityUnavailableValue = false;
+  Completer<void>? _authorityPublication;
+  bool get _authorityUnavailable => _authorityUnavailableValue;
+  set _authorityUnavailable(bool value) {
+    if (value == _authorityUnavailableValue) return;
+    _authorityUnavailableValue = value;
+    if (value) {
+      _authorityPublication = Completer<void>();
+    } else {
+      _settleAuthorityPublication();
+    }
+  }
+
+  void _settleAuthorityPublication() {
+    final pending = _authorityPublication;
+    _authorityPublication = null;
+    if (pending != null && !pending.isCompleted) pending.complete();
+  }
+
+  /// Classification only: never a permission or a cached grant fallback.
+  bool get hasPendingMcpAuthorityPublication =>
+      _authorityUnavailable &&
+      _authorityPublication != null &&
+      !_blocked &&
+      !_closing &&
+      !_closed &&
+      _lease.isHeld;
+
+  Future<void> waitForMcpAuthority({required Duration deadline}) async {
+    final watch = Stopwatch()..start();
+    while (true) {
+      _ensure();
+      final remaining = deadline - watch.elapsed;
+      if (remaining <= Duration.zero) throw StateError('TIMEOUT');
+      if (!_authorityUnavailable) return;
+      final pending = _authorityPublication;
+      if (pending == null) throw StateError('STORAGE_BLOCKED');
+      try {
+        await pending.future.timeout(remaining);
+      } on TimeoutException {
+        throw StateError('TIMEOUT');
+      }
+    }
+  }
+
   final _pendingAutomation = <String, _AutomationPending>{};
   int _pendingFoundation = 0;
   final _grantPublished = <void Function(String, int)>{};
@@ -76,7 +123,12 @@ class StateStore {
       _lease.isHeld;
   Future<void> _tail = Future.value();
   Future<void>? _closeOperation;
-  bool _blocked = false, _closing = false, _closed = false;
+  bool _blockedValue = false, _closing = false, _closed = false;
+  bool get _blocked => _blockedValue;
+  set _blocked(bool value) {
+    _blockedValue = value;
+    if (value) _settleAuthorityPublication();
+  }
 
   /// Trusted internal authority read; never exported by Local API or MCP.
   ClientGrantRecord currentMcpGrant(String id, {required DateTime at}) =>
@@ -85,7 +137,12 @@ class StateStore {
   Future<McpGrantKey> openMcpGrantKey(
     String id, {
     required DateTime Function() clock,
-  }) => _openMcpGrantKey(id, clock: clock);
+    Duration? publicationDeadline,
+  }) => _openMcpGrantKey(
+    id,
+    clock: clock,
+    publicationDeadline: publicationDeadline,
+  );
 
   /// Internal existing-schema2 opener. Product bootstrap/1.1 activation and
   /// mutation admission are separate gates; this neither initializes nor migrates.
@@ -304,6 +361,7 @@ class StateStore {
       final digest = mac.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       final existing = _pendingAutomation[command.requestId];
       if (existing != null) {
+        if (existing.originGrantId != null) throw StateError('FORBIDDEN');
         if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
         return existing.result.future;
       }
@@ -341,6 +399,7 @@ class StateStore {
       if (_operational != null &&
           !{
             'NOT_READY',
+            'FORBIDDEN',
             'IDEMPOTENCY_CONFLICT',
             'RESOURCE_LIMIT',
           }.contains(error.message)) {
@@ -350,6 +409,7 @@ class StateStore {
         StateError(
           {
                 'NOT_READY',
+                'FORBIDDEN',
                 'IDEMPOTENCY_CONFLICT',
                 'RESOURCE_LIMIT',
                 'STORAGE_BLOCKED',
@@ -598,6 +658,7 @@ class StateStore {
 
   Future<void> _close() async {
     _closing = true;
+    _settleAuthorityPublication();
     await _tail;
     try {
       if (!await _isar.close()) throw StateError('STORAGE_BLOCKED');

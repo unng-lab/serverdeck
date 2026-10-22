@@ -1,8 +1,9 @@
 part of 'state_store.dart';
 
 final class _AutomationPending {
-  _AutomationPending(this.digest);
+  _AutomationPending(this.digest, {this.originGrantId});
   final String digest;
+  final String? originGrantId;
   final result = Completer<Map<String, Object?>>();
 }
 

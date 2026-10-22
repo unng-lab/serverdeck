@@ -98,6 +98,20 @@ Future<void> scenario(String root, String mode) async {
     await pair.exchange();
     n.check(await pair.next() == 'AUTH:${mode == 'owner' ? 'owner' : 'mcp'}');
     gate = await pair.peer!.publicationGate(n.generation);
+    n.check(!operationalNativeObservationEnabled);
+    await failed(
+      Future.sync(() => gate!.observeNextAcquireDeliveryForTest()),
+      'UNSUPPORTED',
+    );
+    await failed(pair.peer!.observeNextRevalidationForTest(), 'UNSUPPORTED');
+    await failed(
+      Future.sync(() => gate!.failNextLeaseReleaseForTest()),
+      'UNSUPPORTED',
+    );
+    await failed(
+      Future.sync(() => registry.failNextAuthorityLeaseReleaseForTest()),
+      'UNSUPPORTED',
+    );
     n.check(
       gate.localRole == BundlePeerRole.locald &&
           gate.generation == n.generation,

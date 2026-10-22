@@ -4,7 +4,11 @@ const ownerServiceProbesEnabled = bool.fromEnvironment(
   'SERVERDECK_TEST_OWNER_SERVICE_PROBES',
 );
 
-enum OwnerServiceBoundary { beforeInitialProof, afterFoundationCommit }
+enum OwnerServiceBoundary {
+  beforeInitialProof,
+  afterFoundationCommit,
+  afterProfileCatalogSnapshot,
+}
 
 abstract final class OwnerServiceProbe {
   static Future<void> Function(OwnerServiceBoundary, String)? _handler;

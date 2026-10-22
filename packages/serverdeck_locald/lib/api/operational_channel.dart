@@ -146,21 +146,31 @@ final class OperationalServerChannel {
       return;
     }
     final bytes = frameBytes(reply.bytes!, maxBytes: maxResponseBytes);
-    final budget = _remaining(until);
-    try {
-      await reply.request.revalidate().timeout(budget);
-    } catch (_) {
+    while (true) {
+      final budget = _remaining(until);
+      try {
+        await reply.request.revalidate().timeout(budget);
+      } catch (_) {
+        if (_terminal != null && !identical(_terminal, reply)) return;
+        rethrow;
+      }
       if (_terminal != null && !identical(_terminal, reply)) return;
-      rethrow;
+      late final Duration original;
+      try {
+        // This guard and issuing I/O are synchronous; only preparation retries.
+        original = reply.request.rpcRemaining;
+      } catch (error) {
+        if (reply.request.isAuthorityPublicationPause(error)) continue;
+        rethrow;
+      }
+      final outer = _remaining(until);
+      _issuedUntil = until;
+      await handshake.peer.write(
+        bytes,
+        deadline: original < outer ? original : outer,
+      );
+      break;
     }
-    if (_terminal != null && !identical(_terminal, reply)) return;
-    // rpcRemaining performs the final synchronous current-policy check.
-    final original = reply.request.rpcRemaining, outer = _remaining(until);
-    _issuedUntil = until;
-    await handshake.peer.write(
-      bytes,
-      deadline: original < outer ? original : outer,
-    );
     _remaining(until);
   }
 
