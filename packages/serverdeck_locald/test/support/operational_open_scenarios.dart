@@ -21,6 +21,7 @@ import 'grant_failure_scenarios.dart';
 import 'grant_capacity_scenarios.dart';
 import 'grant_key_loss_scenarios.dart';
 import 'grant_publication_scenarios.dart';
+import 'foundation_transaction_scenarios.dart';
 
 Future<void> refusal(
   Future<Object?> Function() action, [
@@ -206,6 +207,7 @@ Future<void> verifyOwnedOperationalOpen({
       'grant-basic',
     };
     if (!positive.contains(mode) &&
+        !foundationWriteModes.contains(mode) &&
         !grantBoundaryModes.contains(mode) &&
         !grantFaultModes.contains(mode) &&
         !grantKillModes.contains(mode) &&
@@ -346,6 +348,14 @@ Future<void> verifyOwnedOperationalOpen({
         custody: custody,
         lease: lease,
         files: files,
+      );
+    if (foundationWriteModes.contains(mode))
+      store = await verifyFoundationTransactions(
+        store,
+        open,
+        custody,
+        key,
+        mode,
       );
     stdout.writeln('OWNED_OPERATIONAL_REOPEN_RESERVATION_PROVED');
   } finally {

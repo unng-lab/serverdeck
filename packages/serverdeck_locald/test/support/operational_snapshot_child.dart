@@ -29,6 +29,7 @@ import 'grant_transaction_scenarios.dart';
 import 'grant_failure_scenarios.dart';
 import 'grant_key_loss_scenarios.dart';
 import 'grant_publication_scenarios.dart';
+import 'foundation_transaction_scenarios.dart';
 
 void check(bool value) {
   if (!value) throw StateError('OPERATIONAL_FIXTURE_FAILED');
@@ -123,6 +124,7 @@ Future<void> main(List<String> args) async {
       custody: McpCredentialCustody(DpapiProtection()),
     );
     final data = await g.graph();
+    prepareFoundationJobs(data, mode);
     prepareGrantBoundaryGraph(data, mode, custody, key);
     if (grantFaultModes.contains(mode) ||
         grantKillModes.contains(mode) ||

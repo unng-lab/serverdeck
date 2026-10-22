@@ -33,6 +33,7 @@ import 'workspace.dart';
 
 part 'owner_grant_writes.dart';
 part 'mcp_grant_reads.dart';
+part 'operational_foundation_writes.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
 class StateStore {
@@ -56,6 +57,7 @@ class StateStore {
   final String? _operationalRoot;
   bool _authorityUnavailable = false;
   final _pendingAutomation = <String, _AutomationPending>{};
+  int _pendingFoundation = 0;
   final _grantPublished = <void Function(String, int)>{};
 
   /// Trusted same-isolate lifecycle subscription, never a wire operation.
@@ -305,7 +307,8 @@ class StateStore {
         if (existing.digest != digest) throw StateError('IDEMPOTENCY_CONFLICT');
         return existing.result.future;
       }
-      if (_pendingAutomation.length >= 32) throw StateError('RESOURCE_LIMIT');
+      if (_pendingAutomation.length + _pendingFoundation >= 32)
+        throw StateError('RESOURCE_LIMIT');
       final pending = _AutomationPending(digest);
       _pendingAutomation[command.requestId] = pending;
       final run = _tail.then((_) => _writeOwnerGrant(command, digest, clock));
@@ -465,9 +468,16 @@ class StateStore {
     return result;
   }
 
-  Future<void> _commit(WorkspaceState next) async {
+  Future<void> _commit(
+    WorkspaceState next, {
+    bool operationalFoundation = false,
+  }) async {
     _ensure();
     final current = _state;
+    final operational = operationalFoundation ? this.operational : null;
+    if (operational != null &&
+        next.storeRevision != nextRevision(current.storeRevision))
+      throw StateError('REVISION_CONFLICT');
     if (next.workspaceId != current.workspaceId ||
         next.receiptKeyId != current.receiptKeyId ||
         next.ownerSid != current.ownerSid ||
@@ -485,10 +495,19 @@ class StateStore {
         throw StateError('STORAGE_BLOCKED');
       }
     }
-    final rows = WorkspaceRecords.fromState(next);
+    if (operational != null)
+      _guardFoundationIdentities(current, next, operational.automation);
+    final rows = operational == null
+        ? WorkspaceRecords.fromState(next)
+        : WorkspaceRecords.fromOperationalState(next);
     var transactionStarted = false;
     try {
       await validateWorkspaceCredentials(next, _custody);
+      if (operational != null)
+        await AutomationSnapshot.load(
+          foundation: next,
+          collections: operational.rows,
+        );
       final oldProfiles = {
         for (final row in await _isar.storedProfiles.where().findAll())
           row.entityId: row,
@@ -538,6 +557,8 @@ class StateStore {
           await _isar.storedSettings.put(rows.settings);
         await _isar.storedWorkspaces.put(rows.workspace);
       });
+      if (operational != null)
+        _operational = await _verifyOperationalFoundation(next, operational);
       _state = next;
     } catch (error) {
       if (transactionStarted &&
@@ -545,11 +566,16 @@ class StateStore {
               (error is StateError && error.message == 'RESOURCE_LIMIT'))) {
         try {
           _ensure();
-          final persisted = (await readFoundationSnapshot(
-            _isar,
-            _receiptKey,
-            _custody,
-          )).state;
+          final persisted = operational == null
+              ? (await readFoundationSnapshot(
+                  _isar,
+                  _receiptKey,
+                  _custody,
+                )).state
+              : (await _verifyOperationalFoundation(
+                  current,
+                  operational,
+                )).foundation.state;
           if (!_equal(
             codec.canonical(persisted.toJson()),
             codec.canonical(current.toJson()),

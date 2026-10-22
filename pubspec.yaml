@@ -20,6 +20,9 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+dependency_overrides:
+  isar_community:
+    path: third_party/isar_community
 flutter:
   uses-material-design: true
   assets:

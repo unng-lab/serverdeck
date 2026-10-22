@@ -63,13 +63,21 @@ class WorkspaceRecords {
     this.receipts,
   );
   factory WorkspaceRecords.fromState(WorkspaceState state) {
+    return WorkspaceRecords._fromState(state, 1);
+  }
+
+  /// Explicit schema2 writer; the foundation compatibility model stays schema1.
+  factory WorkspaceRecords.fromOperationalState(WorkspaceState state) {
+    return WorkspaceRecords._fromState(state, 2);
+  }
+  factory WorkspaceRecords._fromState(WorkspaceState state, int schema) {
     final codec = StrictCodec();
     String document(Map<String, Object?> value, int maxBytes) =>
         utf8.decode(codec.encode(value, maxBytes: maxBytes));
     return WorkspaceRecords._(
       StoredWorkspace()
         ..payload = document({
-          'schemaVersion': 1,
+          'schemaVersion': schema,
           'workspaceId': state.workspaceId,
           'receiptKeyId': state.receiptKeyId,
           'ownerSid': state.ownerSid,
