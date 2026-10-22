@@ -5,6 +5,8 @@
 
 ## Summary
 
+The staged [SSH transport contract](contracts/ssh-transport.md) qualifies the pinned library, exact host-key verification before authentication and bounded physical connection ownership in T144. Persisted trust/native service integration remains T011 and does not reuse schema2 automation rows implicitly.
+
 Operational schema2 retained graph/reference validation and startup composition follow the [loading contract](contracts/loading.md); pure DTO parsing and migration's empty-automation view do not establish service readiness.
 
 Shared owner/MCP authorable catalog implementation follows the [profile catalog contract](contracts/profile-catalog.md), including origin-isolated receipts, native publication lifetime, immutable revisions and bounded cursor/diff/read semantics.

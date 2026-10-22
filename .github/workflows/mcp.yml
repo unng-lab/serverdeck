@@ -7,6 +7,22 @@ on:
 permissions:
   contents: read
 jobs:
+  ssh-transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.13.5'
+      - name: Locked dependencies and portable SSH tests
+        working-directory: packages/serverdeck_locald
+        run: |
+          dart pub get --enforce-lockfile
+          dart analyze lib/remote/ssh_transport.dart test/ssh_transport_test.dart test/ssh_transport_container_test.dart
+          dart test test/ssh_transport_test.dart --reporter expanded
+      - name: Real disposable OpenSSH qualification
+        run: bash tools/test-ssh-container.sh
   executor-prerequisites:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
