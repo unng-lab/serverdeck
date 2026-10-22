@@ -13,10 +13,13 @@ import 'package:serverdeck_protocol/validation.dart';
 import '../api/operational_auth.dart';
 import '../api/owner_service_probe.dart';
 import '../storage/key_custody.dart';
+import '../storage/models.dart';
 import '../storage/state_store.dart';
 import 'profile_commands.dart';
 import 'profile_diff.dart';
 import 'snapshot.dart';
+
+part 'profile_bindings.dart';
 
 const profileCatalogOperations = {
   'list',
@@ -100,37 +103,22 @@ final class ProfileCatalogInput {
 }
 
 /// No public constructor or caller-selected origin/role. Bound to one service.
-final class ProfileCatalogActor {
-  ProfileCatalogActor._(this._service, this._operation, this._owner, this._mcp);
-  final AutomationProfileService _service;
+sealed class _CatalogActor {
+  _CatalogActor._(this._service, this._operation, this._proof);
+  final _CatalogService _service;
   final String _operation;
-  final OperationalSessionRequest? _owner;
-  final OperationalMcpContext? _mcp;
-  String? get _origin => _mcp?.grantId;
-  int? get _revision => _mcp?.revision;
-  void _identityCheck() {
-    if (_owner case final request?) {
-      if (!request.belongsTo(_service.sessions) ||
-          request.role != OperationalRole.owner ||
-          request.method != 'automation.profiles.$_operation' ||
-          !request.initialAdmissionProved) {
-        throw StateError('FORBIDDEN');
-      }
-      request.rpcRemaining;
-    } else {
-      if (!_mcp!.belongsTo(_service.sessions, _service.authority))
-        throw StateError('FORBIDDEN');
-    }
-  }
-
+  final _CatalogProof _proof;
+  String? get _origin => _proof.origin();
+  int? get _revision => _proof.revision();
+  void _identityCheck() => _proof.identity();
   void _check() {
     _identityCheck();
-    _mcp?.authorize(scope: McpScope.author);
+    _proof.authorize();
   }
 
   Future<void> _checkWhenStable(Duration deadline) async {
     _identityCheck();
-    await _mcp?.authorizeWhenStable(scope: McpScope.author, deadline: deadline);
+    await _proof.authorizeStable(deadline);
     _identityCheck();
   }
 }
@@ -140,8 +128,8 @@ final class ProfileCatalogOperation {
     result = _run();
     result.ignore();
   }
-  final AutomationProfileService _service;
-  final ProfileCatalogActor _actor;
+  final _CatalogService _service;
+  final _CatalogActor _actor;
   ProfileCatalogInput _input;
   final _watch = Stopwatch()..start();
   late final Future<Map<String, Object?>> result;
@@ -150,7 +138,7 @@ final class ProfileCatalogOperation {
     if (!_admitted && (_service._closed || _retired))
       throw StateError('NOT_READY');
     final left =
-        _actor._owner?.rpcRemaining ??
+        _actor._proof.remaining() ??
         const Duration(seconds: 30) - _watch.elapsed;
     if (left <= Duration.zero) throw StateError('TIMEOUT');
     return left;
@@ -184,14 +172,10 @@ final class ProfileCatalogOperation {
 
     while (true) {
       await _scope(remaining());
-      final actual =
-          _actor._owner?.revalidate(
-            observeNativeCompletion: _service._observeNative,
-          ) ??
-          _actor._mcp!.revalidate(
-            deadline: remaining(),
-            observeNativeCompletion: _service._observeNative,
-          );
+      final actual = _actor._proof.revalidate(
+        remaining(),
+        _service._observeNative,
+      );
       _service._observeProof(actual);
       try {
         await actual.timeout(remaining());
@@ -244,13 +228,13 @@ final class ProfileCatalogOperation {
     }
     if (_input.mutation) {
       final budget = _proofBudget;
-      return _service.sessions.runAuthorityMutation(
+      return _service._runAuthority(
         () async {
           await _proof();
           _remaining;
           _actor._check();
           _admitted = true;
-          return _service.store.mutateAutomationProfile(
+          return _service._mutate(
             _input.command!,
             originGrantId: _actor._origin,
             expectedGrantRevision: _actor._revision,
@@ -309,7 +293,7 @@ final class ProfileCatalogOperation {
     final params = _input.params;
     final continuation = params.containsKey('cursor');
     final prepared = await _read(() {
-      final snapshot = _service.store.operational.automation;
+      final snapshot = _service._snapshot;
       final fingerprint = _service._metadataDigest(snapshot);
       late final Map<String, Object?> output;
       switch (_input.operation) {
@@ -344,9 +328,7 @@ final class ProfileCatalogOperation {
       ).timeout(budget);
     }
     return _read(() {
-      final current = _service._metadataDigest(
-        _service.store.operational.automation,
-      );
+      final current = _service._metadataDigest(_service._snapshot);
       if (current != prepared.$1)
         throw StateError(continuation ? 'CURSOR_EXPIRED' : 'REVISION_CONFLICT');
       return prepared.$2;
@@ -354,18 +336,15 @@ final class ProfileCatalogOperation {
   }
 }
 
-final class AutomationProfileService {
-  AutomationProfileService({
+sealed class _CatalogService {
+  _CatalogService({
     required this.store,
     required this.custody,
     required this.receiptKey,
-    required this.sessions,
-    required this.authority,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now {
-    if (!sessions.hasNativePublicationGate || !authority.belongsTo(store))
-      throw StateError('NOT_READY');
-    final state = store.operational.foundation.state;
+    if (!_hasGate || !_authorityBelongs) throw StateError('NOT_READY');
+    final state = _foundation;
     if (receiptKey.workspaceId != state.workspaceId ||
         receiptKey.receiptKeyId != state.receiptKeyId ||
         receiptKey.ownerSid != state.ownerSid ||
@@ -376,9 +355,22 @@ final class AutomationProfileService {
   final StateStore store;
   final KeyCustody custody;
   final ReceiptKeyMaterial receiptKey;
-  final OperationalSessions sessions;
-  final OperationalMcpAuthority authority;
   final DateTime Function() _clock;
+  bool get _hasGate;
+  bool get _authorityBelongs;
+  WorkspaceState get _foundation;
+  AutomationSnapshot get _snapshot;
+  Future<Map<String, Object?>> _mutate(
+    AutomationProfileCommand command, {
+    required String? originGrantId,
+    required int? expectedGrantRevision,
+    required DateTime Function() clock,
+  });
+  Future<T> _runAuthority<T>(
+    Future<T> Function() effect, {
+    required Duration deadline,
+    void Function(Future<void>)? observeNativeCompletion,
+  });
   final _active = <ProfileCatalogOperation>{};
   final _proofs = <Future<void>>{};
   final _nativeCompletions = <Future<void>>{};
@@ -389,28 +381,8 @@ final class AutomationProfileService {
     if (_closed) throw StateError('NOT_READY');
   }
 
-  ProfileCatalogActor ownerActor(
-    OperationalSessionRequest request,
-    String operation,
-  ) {
-    final actor = ProfileCatalogActor._(this, operation, request, null);
-    actor._check();
-    _ready();
-    return actor;
-  }
-
-  ProfileCatalogActor mcpActor(
-    OperationalMcpContext context,
-    String operation,
-  ) {
-    final actor = ProfileCatalogActor._(this, operation, null, context);
-    actor._identityCheck();
-    _ready();
-    return actor;
-  }
-
-  ProfileCatalogOperation start(
-    ProfileCatalogActor actor,
+  ProfileCatalogOperation _start(
+    _CatalogActor actor,
     ProfileCatalogInput input,
   ) {
     if (!identical(actor._service, this) || actor._operation != input.operation)
@@ -496,7 +468,7 @@ final class AutomationProfileService {
   Map<String, Object?> _list(
     AutomationSnapshot snapshot,
     String fingerprint,
-    ProfileCatalogActor actor,
+    _CatalogActor actor,
     Map<String, Object?> params,
   ) {
     final archived = params['includeArchived'] as bool? ?? false;
