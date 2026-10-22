@@ -6,6 +6,8 @@
 
 ## Phase 1: Setup
 
+- [ ] T149 [T144 hosted late-TCP cleanup] Actual GitHub SSH job119866778086 on41f722e failed portable early-cancel settlement at ssh_transport_test.dart316; actual Ubuntu/Dart3.13.5 isolated replay confirmed the same failure. Fixed-label trace in a separate scratch copy reached client done but waited forever on socket.done before SSHClient was constructed. Close the unclaimed native socket sink before destroy, preserve late TCP ownership and original5/15s limits; dedicated actual immediate-cancel/peer-close regression plus complete Windows/Linux portable suites, mandatory checks, fresh independent review and hosted acceptance before closure. No timeout increase or synthetic cleanup completion.
+
 - [ ] T148 [T146 code review2 monotonic parse deadline] Check real monotonic5s worker elapsed before accepting keys, independent of Timer callback ordering; preserve earlier cancel/close result. Test delayed parent event handling with actual worker: fixed VALIDATION_ERROR, zero TCP, actual exit/slot cleanup. Prior actual diagnostic .local/ssh-worker-deadline-before.txt reproduced TIMEOUT with one TCP after5.5s parent delay, without modifying reviewed source. Mandatory checks and fresh independent review before closure; full hosted transport acceptance remains separate.
 
 - [ ] T147 [T144 code review1 encrypted fixture authorization] Authorize both generated client.pub and encrypted.pub in the disposable OpenSSH fixture; keep untrusted-client.pub unauthorized. Actual three-algorithm hosted encrypted authentication and fresh independent review required before closure. Code review1 found the independently generated encrypted key absent from authorized_keys; this is an acceptance fixture defect, not a newly granted production capability.

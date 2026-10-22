@@ -16,6 +16,41 @@ Matcher _fails(SshTransportCode code) => throwsA(
 
 void main() {
   test(
+    'immediate cancel drains a real TCP success before SSH client claim',
+    () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final peerClosed = Completer<void>();
+      final subscription = server.listen((socket) {
+        sockets.add(socket);
+        socket.listen(
+          (_) {},
+          onError: (Object _) {},
+          onDone: () {
+            if (!peerClosed.isCompleted) peerClosed.complete();
+          },
+        );
+      });
+      final pool = SshTransportPool();
+      addTearDown(() async {
+        await pool.close();
+        for (final socket in sockets) {
+          socket.destroy();
+        }
+        await subscription.cancel();
+        await server.close();
+      });
+      final attempt = pool.probe(SshEndpoint('127.0.0.1', server.port, 'deck'));
+      attempt.cancel();
+      await expectLater(attempt.result, _fails(SshTransportCode.CANCELLED));
+      await attempt.settled.timeout(const Duration(seconds: 5));
+      await peerClosed.future.timeout(const Duration(seconds: 5));
+      expect(sockets.length, 1);
+      expect(pool.activeTransports, 0);
+    },
+  );
+
+  test(
     'expired worker result cannot open TCP before its due timer callback',
     () async {
       final directory = await Directory.systemTemp.createTemp(

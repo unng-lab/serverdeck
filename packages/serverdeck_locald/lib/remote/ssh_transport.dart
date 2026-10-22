@@ -356,6 +356,12 @@ final class _SshOperation {
       password = null;
       credential = null;
       _worker?.cancel();
+      // A late TCP success may never have been handed to SSHClient. Its native
+      // IOSink still needs close: destroy alone does not complete sink.done on
+      // Linux when no writer has ever attached to the sink.
+      if (_client == null && _socket != null) {
+        await _consume(_socket!.close());
+      }
       _socket?.destroy();
       final client = _client;
       if (client != null) await _consume(client.close());
