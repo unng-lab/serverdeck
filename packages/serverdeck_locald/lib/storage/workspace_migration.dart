@@ -14,6 +14,7 @@ import 'package:serverdeck_windows/security.dart';
 import '../bootstrap/native_runtime.dart';
 import 'automation_records.dart';
 import 'foundation_snapshot.dart';
+import 'host_trust_records.dart';
 import 'key_custody.dart';
 import 'migration_journal.dart';
 import 'migration_probe.dart';
@@ -34,6 +35,76 @@ Never _blocked() => throw StateError('STORAGE_BLOCKED');
 abstract final class WorkspaceMigration {
   static bool _reserved = false;
   static bool get hasOpenReservation => _reserved;
+
+  /// Explicit format3 startup migration. Both steps retain one reservation and
+  /// caller-owned lease. No service is activated by successful publication.
+  static Future<void> runTrusted({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+  }) async {
+    if (Workspace.hasOpenReservation || Isar.getInstance('workspace') != null)
+      _blocked();
+    _reserved = true;
+    final root = p.normalize(p.absolute(localAppData));
+    final legacy = _Migration(root, lease, custody),
+        trusted = _Migration(root, lease, custody, trustedStep: true);
+    var runtimeChecked = false;
+    try {
+      trusted.owner();
+      await initializeTrustedNativeRuntime(appRoot);
+      runtimeChecked = true;
+      var path = root;
+      for (final name in ['ServerDeckNext', 'v1', 'workspaces', 'default']) {
+        path = p.join(path, name);
+        trusted.protected(path, FileSystemEntityType.directory);
+      }
+      for (final stage in ['$path.creating', legacy.stage, trusted.stage])
+        requireSafePath(root, stage);
+      if (FileSystemEntity.typeSync('$path.creating', followLinks: false) !=
+          FileSystemEntityType.notFound)
+        _blocked();
+      final oldStage =
+          FileSystemEntity.typeSync(legacy.stage, followLinks: false) !=
+          FileSystemEntityType.notFound;
+      final newStage =
+          FileSystemEntity.typeSync(trusted.stage, followLinks: false) !=
+          FileSystemEntityType.notFound;
+      if (oldStage && newStage) _blocked();
+      final native = inspectTrustedNativeWorkspaceSchema(
+        await trusted.bytes(trusted.activeFile('workspace.isar'), 64 << 20),
+      );
+      final document = StrictCodec().decode(
+        await trusted.bytes(
+          trusted.activeFile('workspace.manifest.json'),
+          4096,
+        ),
+        maxBytes: 4096,
+      );
+      if (native == 1 || document['schema'] == 1 || oldStage) {
+        if (newStage || native == 3) _blocked();
+        await legacy.run();
+      }
+      await trusted.run();
+      await initializeTrustedNativeRuntime(appRoot);
+      trusted.owner();
+    } catch (error) {
+      if (error is StateError &&
+          legacy.nativeClosed &&
+          trusted.nativeClosed &&
+          (error.message == 'INCOMPATIBLE' ||
+              error.message == 'PREREQUISITE_UNAVAILABLE' ||
+              error.message == 'HOST_BUSY' ||
+              !runtimeChecked && error.message == 'UNAUTHORIZED'))
+        rethrow;
+      _blocked();
+    } finally {
+      legacy.key?.close();
+      trusted.key?.close();
+      if (legacy.nativeClosed && trusted.nativeClosed) _reserved = false;
+    }
+  }
 
   /// Initial schema2 inspection by the actual format3 locald, before staging
   /// or freezing recovery hashes. This is not migration permission or readiness;
@@ -113,26 +184,64 @@ abstract final class WorkspaceMigration {
 }
 
 final class _Migration {
-  _Migration(this.root, this.lease, this.custody)
+  _Migration(this.root, this.lease, this.custody, {this.trustedStep = false})
     : parent = p.join(root, 'ServerDeckNext', 'v1', 'workspaces');
   final String root, parent;
   final MutexLease lease;
   final KeyCustody custody;
+  final bool trustedStep;
+  int get sourceSchema => trustedStep ? 2 : 1;
+  int get targetSchema => sourceSchema + 1;
+  String get manifestName => 'manifest$targetSchema.json';
   String get sid => custody.ownerSid;
   String get active => p.join(parent, 'default');
-  String get stage => p.join(parent, 'default.upgrading-1-2');
+  String get stage =>
+      p.join(parent, 'default.upgrading-$sourceSchema-$targetSchema');
   String activeFile(String name) => p.join(active, name);
   String stageFile(String name) => p.join(stage, name);
-  static const names = {
+  Set<String> get names => {
     'migration.json',
     'migration.json.new',
     'workspace.isar',
     'workspace.isar-lck',
     'original.isar',
-    'manifest2.json',
+    manifestName,
   };
   ReceiptKeyMaterial? key;
   bool nativeClosed = true;
+
+  MigrationManifest parseManifest(Map<String, Object?> value) => trustedStep
+      ? MigrationManifest.fromTrustedJson(value)
+      : MigrationManifest.fromJson(value);
+  MigrationJournal parseJournal(Map<String, Object?> value) => trustedStep
+      ? MigrationJournal.fromTrustedJson(value)
+      : MigrationJournal.fromJson(value);
+  int inspect(Uint8List bytes) => trustedStep
+      ? inspectTrustedNativeWorkspaceSchema(bytes)
+      : inspectNativeWorkspaceSchema(bytes);
+  Future<String> sourceRows(Isar isar) async => trustedStep
+      ? (await readSchema2UpgradeSource(
+          isar,
+          key!,
+          custody,
+          localAppData: root,
+          lease: lease,
+        )).preservationDigest()
+      : (await readFoundationSnapshot(isar, key!, custody)).rows.digest();
+  Future<String> targetRows(Isar isar) async => trustedStep
+      ? (await readSchema3UpgradeTarget(
+          isar,
+          key!,
+          custody,
+          localAppData: root,
+          lease: lease,
+        )).preservationDigest()
+      : (await readFoundationSnapshot(
+          isar,
+          key!,
+          custody,
+          expectedSchema: 2,
+        )).rows.digest();
 
   void owner() {
     if (!lease.isHeld || sid != currentUserSid()) _blocked();
@@ -188,13 +297,9 @@ final class _Migration {
     return result;
   }
 
-  Future<MigrationJournal> journal(String name) async =>
-      MigrationJournal.fromJson(
-        StrictCodec().decode(
-          await bytes(stageFile(name), 4096),
-          maxBytes: 4096,
-        ),
-      );
+  Future<MigrationJournal> journal(String name) async => parseJournal(
+    StrictCodec().decode(await bytes(stageFile(name), 4096), maxBytes: 4096),
+  );
 
   void residueMatches(MigrationJournal current, MigrationJournal residue) {
     final left = current.toJson(), right = residue.toJson();
@@ -254,6 +359,7 @@ final class _Migration {
   }
 
   Future<T> database<T>(int schema, Future<T> Function(Isar) action) async {
+    if (schema != sourceSchema && schema != targetSchema) _blocked();
     owner();
     protected(stage, FileSystemEntityType.directory);
     protected(stageFile('workspace.isar'), FileSystemEntityType.file);
@@ -265,7 +371,11 @@ final class _Migration {
     nativeClosed = false;
     try {
       opened = await Isar.open(
-        schema == 1 ? workspaceSchemas : automationWorkspaceSchemas,
+        schema == 1
+            ? workspaceSchemas
+            : schema == 2
+            ? automationWorkspaceSchemas
+            : trustedWorkspaceSchemas,
         directory: stage,
         name: 'workspace',
         maxSizeMiB: 64,
@@ -275,7 +385,17 @@ final class _Migration {
       owner();
       return await action(opened);
     } finally {
-      final instance = opened ?? Isar.getInstance('workspace');
+      final registered = Isar.getInstance('workspace');
+      final instance =
+          opened ??
+          (registered != null &&
+                  registered.directory != null &&
+                  p.equals(
+                    p.normalize(p.absolute(registered.directory!)),
+                    p.normalize(p.absolute(stage)),
+                  )
+              ? registered
+              : null);
       if (instance != null)
         nativeClosed = await confirmNativeClose(
           migrationProbesEnabled
@@ -329,7 +449,7 @@ final class _Migration {
       activeFile('workspace.manifest.json'),
       4096,
     );
-    final manifest = MigrationManifest.fromJson(
+    final manifest = parseManifest(
       StrictCodec().decode(manifestBytes, maxBytes: 4096),
     );
     if (manifest.ownerSid != sid) _blocked();
@@ -339,11 +459,8 @@ final class _Migration {
       manifest.workspaceId,
       manifest.receiptKeyId,
     );
-    final snapshot = await bytes(activeFile('workspace.isar'), 64 << 20);
-    final schema = inspectNativeWorkspaceSchema(snapshot);
-    final dbHash = digest(snapshot),
-        manifestHash = digest(manifestBytes),
-        keyHash = digest(wrapper);
+    var snapshot = await bytes(activeFile('workspace.isar'), 64 << 20);
+    var schema = inspect(snapshot);
     requireSafePath(root, stage);
     final stageType = FileSystemEntity.typeSync(stage, followLinks: false);
     Set<String> files = {};
@@ -356,7 +473,32 @@ final class _Migration {
     } else if (files.isNotEmpty) {
       _blocked();
     }
-    final action = assessMigration(
+    if (trustedStep &&
+        schema == sourceSchema &&
+        manifest.schema == sourceSchema &&
+        current == null) {
+      // No recovery hashes exist yet. This sole initial active open must finish
+      // physical close before capturing the source bytes used by the journal.
+      final preflight = _TrustedSourcePreflight(root, lease, custody, key!);
+      try {
+        await preflight.run();
+      } finally {
+        nativeClosed = preflight.nativeClosed;
+      }
+      if (await fileDigest(activeFile('workspace.manifest.json'), 4096) !=
+              digest(manifestBytes) ||
+          await fileDigest(activeFile('receipt-key.dpapi'), 16384) !=
+              digest(wrapper))
+        _blocked();
+      snapshot = await bytes(activeFile('workspace.isar'), 64 << 20);
+      schema = inspect(snapshot);
+      if (schema != sourceSchema) _blocked();
+    }
+    final dbHash = digest(snapshot),
+        manifestHash = digest(manifestBytes),
+        keyHash = digest(wrapper);
+    final assess = trustedStep ? assessTrustedMigration : assessMigration;
+    final action = assess(
       dbSchema: schema,
       manifest: manifest,
       stage: current != null
@@ -389,10 +531,10 @@ final class _Migration {
         createProtectedDirectory(root, stage, sid);
       for (final name in inventory().where((name) => name != 'migration.json'))
         remove(name);
-      current = MigrationJournal.fromJson({
+      current = parseJournal({
         'format': 1,
-        'fromSchema': 1,
-        'toSchema': 2,
+        'fromSchema': sourceSchema,
+        'toSchema': targetSchema,
         'migrationId': current?.migrationId ?? _uuid(),
         'workspaceId': manifest.workspaceId,
         'receiptKeyId': manifest.receiptKeyId,
@@ -430,14 +572,10 @@ final class _Migration {
         stageFile('workspace.isar-lck'),
         sid,
       );
-      final sourceRows = await database(
-        1,
-        (isar) async =>
-            (await readFoundationSnapshot(isar, key!, custody)).rows.digest(),
-      );
+      final preservedRows = await database(sourceSchema, sourceRows);
       await probe(MigrationBoundary.sourceRowsValidated);
       await reserve();
-      await database(2, (isar) async {
+      await database(targetSchema, (isar) async {
         await probe(MigrationBoundary.nativeSchemaOpened);
         await isar.writeTxn(() async {
           owner();
@@ -447,40 +585,31 @@ final class _Migration {
             utf8.encode(row.payload),
             maxBytes: 4096,
           );
-          if (metadata['schemaVersion'] != 1) _blocked();
-          metadata['schemaVersion'] = 2;
+          if (metadata['schemaVersion'] != sourceSchema) _blocked();
+          metadata['schemaVersion'] = targetSchema;
           row.payload = utf8.decode(StrictCodec().canonical(metadata));
           await isar.storedWorkspaces.put(row);
           await probe(MigrationBoundary.uncommittedMarker);
         });
         await probe(MigrationBoundary.markerCommitted);
-        if ((await readFoundationSnapshot(
-              isar,
-              key!,
-              custody,
-              expectedSchema: 2,
-            )).rows.digest() !=
-            sourceRows)
-          _blocked();
+        if (await targetRows(isar) != preservedRows) _blocked();
       });
-      if (inspectNativeWorkspaceSchema(
-            await bytes(stageFile('workspace.isar'), 64 << 20),
-          ) !=
-          2)
+      if (inspect(await bytes(stageFile('workspace.isar'), 64 << 20)) !=
+          targetSchema)
         _blocked();
       await probe(MigrationBoundary.candidateClosed);
-      final targetManifest = _manifest2(manifest);
+      final targetManifest = _manifestTarget(manifest);
       await reserve();
       await writeNewProtectedFile(
         root,
-        stageFile('manifest2.json'),
+        stageFile(manifestName),
         sid,
         targetManifest,
       );
       current = current.prepare(
         targetDbDigest: await fileDigest(stageFile('workspace.isar')),
         targetManifestDigest: digest(targetManifest),
-        sourceRowsDigest: sourceRows,
+        sourceRowsDigest: preservedRows,
       );
       await writeJournal(current, replace: true);
       await probe(MigrationBoundary.preparedJournal);
@@ -518,27 +647,17 @@ final class _Migration {
         prepared.targetDbDigest)
       _blocked();
     await createProtectedEmptyFile(root, stageFile('workspace.isar-lck'), sid);
-    if (inspectNativeWorkspaceSchema(
-          await bytes(stageFile('workspace.isar'), 64 << 20),
-        ) !=
-        2)
+    if (inspect(await bytes(stageFile('workspace.isar'), 64 << 20)) !=
+        targetSchema)
       _blocked();
-    final targetRows = await database(
-      2,
-      (isar) async => (await readFoundationSnapshot(
-        isar,
-        key!,
-        custody,
-        expectedSchema: 2,
-      )).rows.digest(),
-    );
-    if (targetRows != prepared.sourceRowsDigest) _blocked();
+    final verifiedRows = await database(targetSchema, targetRows);
+    if (verifiedRows != prepared.sourceRowsDigest) _blocked();
     await verifyBindings(prepared, target: true);
     await probe(MigrationBoundary.targetVerified);
-    final expectedManifest = _manifest2(manifest);
+    final expectedManifest = _manifestTarget(manifest);
     if (digest(expectedManifest) != prepared.targetManifestDigest) _blocked();
-    final manifestPath = stageFile('manifest2.json');
-    if (!inventory().contains('manifest2.json')) {
+    final manifestPath = stageFile(manifestName);
+    if (!inventory().contains(manifestName)) {
       await reserve();
       await writeNewProtectedFile(root, manifestPath, sid, expectedManifest);
     }
@@ -557,10 +676,8 @@ final class _Migration {
     await verifyBindings(prepared, target: true);
     if (await fileDigest(activeFile('workspace.manifest.json'), 4096) !=
             prepared.targetManifestDigest ||
-        inspectNativeWorkspaceSchema(
-              await bytes(activeFile('workspace.isar'), 64 << 20),
-            ) !=
-            2)
+        inspect(await bytes(activeFile('workspace.isar'), 64 << 20)) !=
+            targetSchema)
       _blocked();
     for (final name in inventory().where((name) => name != 'migration.json')) {
       remove(name);
@@ -574,8 +691,12 @@ final class _Migration {
     await probe(MigrationBoundary.stageRemoved);
   }
 
-  List<int> _manifest2(MigrationManifest source) =>
-      StrictCodec().canonical({...source.toJson(), 'format': 2, 'schema': 2});
+  List<int> _manifestTarget(MigrationManifest source) =>
+      StrictCodec().canonical({
+        ...source.toJson(),
+        'format': targetSchema,
+        'schema': targetSchema,
+      });
 
   String _uuid() {
     final random = Random.secure();
