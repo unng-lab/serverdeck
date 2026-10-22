@@ -1,28 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:serverdeck_protocol/profile_validation.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
 
-enum SshTransportCode {
-  VALIDATION_ERROR,
-  RESOURCE_LIMIT,
-  TRUST_CHANGED,
-  AUTHENTICATION_FAILED,
-  CONNECTION_FAILED,
-  TIMEOUT,
-  CANCELLED,
-  SERVICE_UNAVAILABLE,
-}
-
-final class SshTransportFailure implements Exception {
-  const SshTransportFailure(this.code);
-  final SshTransportCode code;
-  @override
-  String toString() => 'SshTransportFailure(${code.name})';
-}
+export 'package:serverdeck_protocol/host_trust.dart'
+    show SshHostPin, SshTransportCode, SshTransportFailure;
 
 Never _invalid() =>
     throw const SshTransportFailure(SshTransportCode.VALIDATION_ERROR);
@@ -43,59 +27,6 @@ final class SshEndpoint {
   final String username;
   @override
   String toString() => 'SshEndpoint';
-}
-
-final class SshHostPin {
-  factory SshHostPin(String format, String fingerprint) {
-    if (!_formats.contains(format) ||
-        !RegExp(r'^SHA256:[A-Za-z0-9+/]{43}$').hasMatch(fingerprint)) {
-      _invalid();
-    }
-    try {
-      final bytes = base64.decode('${fingerprint.substring(7)}=');
-      if (bytes.length != 32 ||
-          'SHA256:${base64.encode(bytes).replaceAll('=', '')}' != fingerprint) {
-        _invalid();
-      }
-    } on FormatException {
-      _invalid();
-    }
-    return SshHostPin._(format, fingerprint);
-  }
-  factory SshHostPin.fromCallback(String algorithm, Uint8List fingerprint) {
-    try {
-      final format = switch (algorithm) {
-        'rsa-sha2-256' || 'rsa-sha2-512' => 'ssh-rsa',
-        'ssh-ed25519' ||
-        'ecdsa-sha2-nistp256' ||
-        'ecdsa-sha2-nistp384' ||
-        'ecdsa-sha2-nistp521' => algorithm,
-        _ => throw const FormatException(),
-      };
-      return SshHostPin(format, utf8.decode(fingerprint));
-    } catch (_) {
-      throw const SshTransportFailure(SshTransportCode.TRUST_CHANGED);
-    }
-  }
-  const SshHostPin._(this.format, this.fingerprint);
-  static const _formats = {
-    'ssh-ed25519',
-    'ssh-rsa',
-    'ecdsa-sha2-nistp256',
-    'ecdsa-sha2-nistp384',
-    'ecdsa-sha2-nistp521',
-  };
-  final String format;
-  final String fingerprint;
-  @override
-  bool operator ==(Object other) =>
-      other is SshHostPin &&
-      format == other.format &&
-      fingerprint == other.fingerprint;
-  @override
-  int get hashCode => Object.hash(format, fingerprint);
-  @override
-  String toString() => 'SshHostPin';
 }
 
 /// Ephemeral trusted-locald input. It is never a wire capability or a log DTO.
