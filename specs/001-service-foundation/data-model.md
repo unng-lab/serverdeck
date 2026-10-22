@@ -59,6 +59,8 @@ Serial coordinator: validate → receipt/inflight lookup → CAS/guards → clon
 
 ## Compatibility
 
+Remote stage021 extends this model only through explicit schema3 in its [persisted host trust contract](../021-mcp-control/contracts/host-trust.md): schema1/2 retain connectionRevision=trustRevision and exact closed records, while schema3 permits independent trust increments and atomically stores the pin with the profile/receipt. Its protected migration preserves this implementation's own existing data. A copied schema2 profile is never treated as having confirmed host trust.
+
 API major1/storage schema1/credential wrapper1/receipt-key wrapper1. Старый ServerDeck не читается. Прежний экспериментальный StateEnvelope не принимается и не мигрируется автоматически. Неизвестный формат даёт incompatible с сохранением bytes; no downgrade/rewrite/new empty database. Следующие этапы обязаны создать migration/additive API design до Tasks. Согласованная подмена/откат обычных данных не покрывается.
 
 ## Native build artifact — T232/T233

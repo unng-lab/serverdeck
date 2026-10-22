@@ -4,6 +4,8 @@
 
 ## Responsibility and exclusive ownership
 
+This contract's ErrorCode/LocalError decoder remains exact for format2. An explicit verified format3 client uses the separate closed owner [TrustedLocalError codec](host-trust.md); a request cannot select a broader code vocabulary and format2 peer verification still rejects format3. MCP tool results keep their own existing domain representation.
+
 `packages/serverdeck_windows/lib/operational_api_client.dart`, part of `operational_auth_client.dart`, implements OperationalApiClient over an actual OperationalClientSession from the native1.1 bootstrap. It does not accept caller-provided raw transport callbacks, roles, generation or credentials, select bootstrap mode, launch locald or connect to servers. It is usable by the owner UI and MCP bridge; their method authority remains server-enforced. Legacy client/bootstrap and API1.0 remain unchanged.
 
 Construction claims one ordinary-RPC reader/writer owner on that exact session. Closed/already-claimed sessions fail local SERVICE_UNAVAILABLE before I/O. A started protected open with no successfully assigned grant is also refused before claim/I/O; this refusal must leave that original open intact. For MCP, protected `session.openGrant` finishes before attachment when configured; after attachment direct openGrant is refused SERVICE_UNAVAILABLE before I/O without disturbing its owner. The claim is one-way; never attach a replacement reader after close/failure. Direct public peer access remains a trusted internal primitive, not an external tool; production composition must use the claimed client exclusively. Closing either the bootstrap/session or client invalidates that same transport. No session/key clone or alternate role is minted.
