@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'native_registry.dart';
 import 'automation_records.dart';
+import 'host_trust_records.dart';
 import 'records.dart';
 
 /// Read-only schema preflight, not a complete database integrity check.
@@ -20,8 +21,22 @@ void validateNativeSnapshot(Uint8List snapshot) {
 /// application marker/manifest/journal and semantic rows are validated later.
 /// Normal legacy open continues using validateNativeSnapshot (schema1 only).
 int inspectNativeWorkspaceSchema(Uint8List snapshot) {
+  return _inspect(snapshot, trusted: false);
+}
+
+/// Explicit schema3 structural reader; no migration, row validation, native
+/// initialization or permission to open is implied by the returned version.
+int inspectTrustedNativeWorkspaceSchema(Uint8List snapshot) {
+  return _inspect(snapshot, trusted: true);
+}
+
+int _inspect(Uint8List snapshot, {required bool trusted}) {
   try {
-    final parsed = _Snapshot(snapshot, recognizeVersions: true)..validate();
+    final parsed = _Snapshot(
+      snapshot,
+      recognizeVersions: true,
+      trusted: trusted,
+    )..validate();
     return parsed.schema;
   } on RangeError {
     throw StateError('STORAGE_BLOCKED');
@@ -36,10 +51,11 @@ Never _incompatible() => throw StateError('INCOMPATIBLE');
 // Pinned MDBX v0.13.8-temp-upstream-fix layout-dxb.h, little endian.
 // No native call, file access, schema migration or writable open occurs here.
 class _Snapshot {
-  _Snapshot(this.bytes, {this.recognizeVersions = false})
+  _Snapshot(this.bytes, {this.recognizeVersions = false, this.trusted = false})
     : data = ByteData.sublistView(bytes);
   final Uint8List bytes;
   final bool recognizeVersions;
+  final bool trusted;
   int schema = 1;
   final ByteData data;
   late int pageSize;
@@ -96,13 +112,19 @@ class _Snapshot {
     if (info.flags != 0 || info.duplicateSize != 0) _blocked();
     final documents = _entries(info, namedTrees: false);
     if (recognizeVersions) {
-      schema = recognizeNativeRegistry(documents);
+      schema = trusted
+          ? recognizeTrustedNativeRegistry(documents)
+          : recognizeNativeRegistry(documents);
     } else {
       validateNativeRegistry(documents);
     }
     final expected = <String, int>{'_info': 0};
-    for (final collection
-        in schema == 2 ? automationWorkspaceSchemas : workspaceSchemas) {
+    final schemas = switch (schema) {
+      3 => trustedWorkspaceSchemas,
+      2 => automationWorkspaceSchemas,
+      _ => workspaceSchemas,
+    };
+    for (final collection in schemas) {
       expected[collection.name] = 8; // MDBX_INTEGERKEY for native Id.
       for (final index in collection.indexes.values) {
         expected['_i_${collection.name}_${index.name}'] = 0;

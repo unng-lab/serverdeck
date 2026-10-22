@@ -4,6 +4,7 @@ import 'package:isar_community/isar.dart';
 import 'package:serverdeck_protocol/codec.dart';
 
 import 'automation_records.dart';
+import 'host_trust_records.dart';
 import 'records.dart';
 
 /// Validates native _info documents before the caller may open Isar.
@@ -15,7 +16,19 @@ void validateNativeRegistry(Map<String, List<int>> documents) {
 /// Recognizes only complete supported registries; never authorizes Isar open.
 /// The legacy validator above intentionally continues to reject schema2.
 int recognizeNativeRegistry(Map<String, List<int>> documents) {
-  final decoded = _decode(documents);
+  return _recognize(_decode(documents), trusted: false);
+}
+
+/// Schema3 preflight only. Legacy schema2 readers retain their closed entry.
+/// Recognition never authorizes a writable open or validates application rows.
+int recognizeTrustedNativeRegistry(Map<String, List<int>> documents) {
+  return _recognize(_decode(documents), trusted: true);
+}
+
+int _recognize(
+  Map<String, Map<String, Object?>> decoded, {
+  required bool trusted,
+}) {
   if (_matches(decoded, workspaceSchemas)) {
     _validateRegistry(decoded, workspaceSchemas);
     return 1;
@@ -23,6 +36,10 @@ int recognizeNativeRegistry(Map<String, List<int>> documents) {
   if (_matches(decoded, automationWorkspaceSchemas)) {
     _validateRegistry(decoded, automationWorkspaceSchemas);
     return 2;
+  }
+  if (trusted && _matches(decoded, trustedWorkspaceSchemas)) {
+    _validateRegistry(decoded, trustedWorkspaceSchemas);
+    return 3;
   }
   throw StateError('INCOMPATIBLE');
 }
