@@ -20,6 +20,7 @@ import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
 import 'mcp_runtime_actor.dart' show check, ownRoot;
 import 'mcp_runtime_actor.dart' as runtime show refusal;
 import 'trusted_schema_child.dart' as raw show capture;
+import 'trusted_write_fixture.dart';
 
 Future<void> refusal(
   Future<Object?> Function() action, [
@@ -90,20 +91,34 @@ Future<void> main(List<String> args) async {
           sid,
           mode == 'wrapper' ? [1, 2, 3] : key.wrapper,
         );
+        final initialDocument = {
+          ...WorkspaceState.empty(
+            workspaceId: workspace,
+            receiptKeyId: keyId,
+            ownerSid: sid,
+          ).toJson(),
+          'schemaVersion': 3,
+        };
+        final seededWrite = mode == 'write-seeded' || mode == 'write-overflow';
         final state = WorkspaceState.fromTrustedJson(
-          {
-            ...WorkspaceState.empty(
-              workspaceId: workspace,
-              receiptKeyId: keyId,
-              ownerSid: sid,
-            ).toJson(),
-            'schemaVersion': 3,
-          },
+          seededWrite ? seededTrustedWrite(initialDocument) : initialDocument,
           workspaceId: workspace,
           receiptKeyId: keyId,
           ownerSid: sid,
         );
         final records = WorkspaceRecords.fromTrustedState(state);
+        if (mode.startsWith('write-'))
+          records.settings.payload = ' \n${records.settings.payload}\n ';
+        if (seededWrite) {
+          records.profiles.single.id = 29;
+          records.profiles.single.payload =
+              ' ${records.profiles.single.payload} ';
+          records.receipts.single.id = mode == 'write-overflow'
+              ? 9223372036854775807
+              : 47;
+          records.receipts.single.payload =
+              ' \n${records.receipts.single.payload}\n ';
+        }
         if (mode == 'marker2')
           records.workspace.payload = records.workspace.payload.replaceFirst(
             '"schemaVersion":3',
@@ -130,6 +145,10 @@ Future<void> main(List<String> args) async {
         await db.writeTxn(() async {
           await db.storedWorkspaces.put(records.workspace);
           await db.storedSettings.put(records.settings);
+          if (seededWrite) {
+            await db.storedProfiles.putAll(records.profiles);
+            await db.storedReceipts.putAll(records.receipts);
+          }
           if (mode == 'bad-trust')
             await db.storedHostTrusts.put(
               StoredHostTrust()
@@ -157,7 +176,42 @@ Future<void> main(List<String> args) async {
           File(p.join(directory, 'workspace.isar-lck')).deleteSync();
         if (mode == 'closed-key') key.close();
         if (mode == 'closed-lease') await lease.close();
-        if (mode == 'good' || mode == 'concurrent') {
+        if (mode.startsWith('write-')) {
+          store = await open();
+          await exerciseTrustedWrite(store, custody, key, mode);
+          await store.close();
+          store = null;
+          if (mode == 'write-corrupt') {
+            await refusal(open);
+            seed = await Isar.open(
+              trustedWorkspaceSchemas,
+              directory: directory,
+              name: 'workspace',
+              maxSizeMiB: 64,
+              relaxedDurability: false,
+              inspector: false,
+            );
+            final repair = seed;
+            await repair.writeTxn(() => repair.storedAutomationEvents.clear());
+            check(await repair.close());
+            seed = null;
+          }
+          store = await open();
+          check(
+            store.state.storeRevision ==
+                (mode == 'write-overflow'
+                    ? '1'
+                    : mode == 'write-corrupt'
+                    ? '2'
+                    : '7'),
+          );
+          check(
+            store.trustedOperational.foundation.trust.isEmpty ==
+                (mode != 'write-corrupt'),
+          );
+          await store.close();
+          store = null;
+        } else if (mode == 'good' || mode == 'concurrent') {
           if (mode == 'concurrent') {
             final first = open();
             await refusal(open);

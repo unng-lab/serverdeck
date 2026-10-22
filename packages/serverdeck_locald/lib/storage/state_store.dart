@@ -24,6 +24,8 @@ import 'automation_records.dart';
 import 'foundation_snapshot.dart';
 import 'grant_write_probe.dart';
 import 'host_trust_records.dart';
+import 'host_trust_models.dart';
+import 'migration_rows.dart';
 import 'key_custody.dart';
 import 'migration_journal.dart';
 import 'models.dart';
@@ -38,6 +40,7 @@ import 'workspace.dart';
 part 'owner_grant_writes.dart';
 part 'mcp_grant_reads.dart';
 part 'operational_foundation_writes.dart';
+part 'trusted_foundation_writes.dart';
 part 'automation_profile_writes.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
@@ -60,7 +63,7 @@ class StateStore {
   final ReceiptKeyMaterial _receiptKey;
   WorkspaceState _state;
   OperationalSnapshot? _operational;
-  final TrustedOperationalSnapshot? _trustedOperational;
+  TrustedOperationalSnapshot? _trustedOperational;
   final String? _operationalRoot;
   bool _authorityUnavailableValue = false;
   Completer<void>? _authorityPublication;
