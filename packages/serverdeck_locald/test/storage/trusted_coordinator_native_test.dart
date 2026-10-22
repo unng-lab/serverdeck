@@ -31,6 +31,7 @@ void main() {
     'writer-coordinator-reservation',
     'writer-coordinator-running',
     'writer-coordinator-trust',
+    'writer-coordinator-trust-preparation',
     'writer-coordinator-key',
   ]) {
     test(

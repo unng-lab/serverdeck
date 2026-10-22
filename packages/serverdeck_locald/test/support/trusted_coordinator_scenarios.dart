@@ -7,6 +7,7 @@ import 'package:serverdeck_protocol/host_trust.dart';
 import 'package:serverdeck_windows/mutex.dart';
 
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
+import 'package:serverdeck_locald/profiles/host_trust.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_locald/storage/state_store.dart';
 import 'package:serverdeck_protocol/models.dart';
@@ -172,6 +173,94 @@ Future<void> exerciseTrustedCoordinator(
           'STORAGE_BLOCKED',
         );
         check(store.isTrustedSnapshotLoaded);
+      } else if (mode == 'coordinator-trust-preparation') {
+        final profile = store.state.profiles.values.single;
+        final pin = {
+          'format': 'ssh-ed25519',
+          'fingerprint':
+              'SHA256:${base64.encode(List.filled(32, 6)).replaceAll('=', '')}',
+        };
+        int? nativeId;
+        var sequence = 0;
+        // Internal transition/storage qualification, without owner admission
+        // or challenge consumption. The production coordinator is not wired.
+        for (final method in [
+          'servers.trust.confirm',
+          'servers.trust.revoke',
+          'servers.trust.revoke',
+          'servers.trust.confirm',
+        ]) {
+          final current = store.state.profiles[profile.id]!;
+          final body = <String, Object?>{
+            'profileId': profile.id,
+            'expectedRevision': current.revision,
+            if (method == 'servers.trust.confirm') ...{
+              'challengeId': g.id(67010),
+              'key': pin,
+            },
+          };
+          final prepared = prepareHostTrustMutation(
+            store.trustedOperational.foundation,
+            method,
+            body,
+            g.finished,
+          );
+          final request = g.id(67000 + sequence++);
+          (prepared.value['receipts'] as Map)[request] = {
+            'requestId': request,
+            'inputDigest': custody.receiptDigestSync(key, {
+              'operation': method,
+              'params': body,
+            }),
+            'operation': method,
+            'profileId': profile.id,
+            'result': prepared.result.toJson(),
+            'committedAt': g.finished,
+          };
+          await store.commitTrustedFoundation(
+            HostTrustState.fromRecords(
+              WorkspaceState.fromTrustedJson(
+                prepared.value,
+                workspaceId: key.workspaceId,
+                receiptKeyId: key.receiptKeyId,
+                ownerSid: key.ownerSid,
+              ),
+              prepared.trust,
+            ),
+          );
+          final row = store.trustedOperational.rows['StoredHostTrust']!.single;
+          nativeId ??= row.nativeId;
+          check(row.nativeId == nativeId);
+          final trusted =
+              store.trustedOperational.foundation.trust[profile.id]!;
+          check(trusted.createdAt == g.finished);
+          check(
+            trusted.status ==
+                (method == 'servers.trust.confirm'
+                    ? HostTrustStatus.trusted
+                    : HostTrustStatus.revoked),
+          );
+          check(
+            store.state.profiles[profile.id]!.connectionRevision ==
+                profile.connectionRevision,
+          );
+          check(
+            store.state.profiles[profile.id]!.credentialRevision ==
+                profile.credentialRevision,
+          );
+          sameJson(pin, trusted.key.toJson(), 'prepared-pin');
+          await store.close();
+          store = await open();
+          check(
+            store.trustedOperational.rows['StoredHostTrust']!.single.nativeId ==
+                nativeId,
+          );
+          sameJson(
+            trusted.toJson(),
+            store.trustedOperational.foundation.trust[profile.id]!.toJson(),
+            'prepared-reopen',
+          );
+        }
       } else if (mode == 'coordinator-trust') {
         final profile = store.state.profiles.values.single;
         final stamp = g.finished;
