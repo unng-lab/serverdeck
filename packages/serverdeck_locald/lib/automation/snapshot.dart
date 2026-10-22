@@ -4,6 +4,7 @@ import 'package:serverdeck_protocol/automation/models.dart';
 import 'package:serverdeck_protocol/codec.dart';
 
 import '../storage/models.dart';
+import '../storage/host_trust_models.dart';
 
 Never _blocked() => throw StateError('STORAGE_BLOCKED');
 T _get<T>(Map<String, T> values, String key) => values[key] ?? _blocked();
@@ -37,10 +38,28 @@ final class AutomationSnapshot {
     required WorkspaceState foundation,
     required Map<String, List<AutomationSnapshotRow>> collections,
   }) async {
+    // Schema2 native loading uses its closed schema1 foundation compatibility
+    // model. A schema3 state must never silently select a different plan parser.
+    if (foundation.schemaVersion != 1) throw StateError('INCOMPATIBLE');
+    return _load(foundation, collections, trusted: false);
+  }
+
+  /// Schema3 retained history only. The supplied foundation/trust graph is
+  /// already structurally bound; native custody and live authority are separate.
+  static Future<AutomationSnapshot> loadTrusted({
+    required HostTrustState foundation,
+    required Map<String, List<AutomationSnapshotRow>> collections,
+  }) => _load(foundation.foundation, collections, trusted: true);
+
+  static Future<AutomationSnapshot> _load(
+    WorkspaceState foundation,
+    Map<String, List<AutomationSnapshotRow>> collections, {
+    required bool trusted,
+  }) async {
     try {
       // Capture the complete caller-owned input and foundation identity sets
       // synchronously before any async body/capsule/plan digest validation.
-      final loader = _Loader(foundation, collections);
+      final loader = _Loader(foundation, collections, trusted: trusted);
       await loader.parse();
       loader.references();
       return AutomationSnapshot._(loader);
@@ -66,9 +85,10 @@ final class AutomationSnapshot {
 final class _Loader {
   _Loader(
     WorkspaceState foundation,
-    Map<String, List<AutomationSnapshotRow>> input,
-  ) : workspace = foundation.workspaceId,
-      currentServers = Set.of(foundation.profiles.keys) {
+    Map<String, List<AutomationSnapshotRow>> input, {
+    required this.trusted,
+  }) : workspace = foundation.workspaceId,
+       currentServers = Set.of(foundation.profiles.keys) {
     knownServers.addAll(currentServers);
     for (final receipt in foundation.receipts.values) {
       if (receipt.operation == 'profiles.delete' && receipt.result.deleted) {
@@ -142,6 +162,7 @@ final class _Loader {
   final desired = <String, AutomationDesiredStateRecord>{};
   final events = <String, AutomationJobEventRecord>{};
   final receipts = <String, AutomationMutationReceiptRecord>{};
+  final bool trusted;
 
   void parseSync<T>(
     String name,
@@ -167,10 +188,15 @@ final class _Loader {
         revisions,
         '${entry.value['profileId']}:${entry.value['profileRevision']}',
       );
-      plans[entry.key] = await AutomationPlanRecord.fromJson(
-        entry.value,
-        revision: revision,
-      );
+      plans[entry.key] = trusted
+          ? await AutomationPlanRecord.fromTrustedJson(
+              entry.value,
+              revision: revision,
+            )
+          : await AutomationPlanRecord.fromJson(
+              entry.value,
+              revision: revision,
+            );
     }
     parseSync('approvals', approvals, AutomationApprovalRecord.fromJson);
     parseSync('jobs', jobs, AutomationJobRecord.fromJson);
