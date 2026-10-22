@@ -46,6 +46,7 @@ void main() {
   });
   for (final mode in [
     'basic',
+    'tool-router',
     'cursor',
     'revoke',
     'replace',

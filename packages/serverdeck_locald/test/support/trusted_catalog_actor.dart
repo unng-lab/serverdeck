@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:serverdeck_locald/api/operational_auth.dart';
 import 'package:serverdeck_locald/automation/profiles.dart';
+import 'package:serverdeck_locald/mcp/router.dart';
+import 'package:serverdeck_locald/mcp/profile_services.dart';
+import 'package:serverdeck_protocol/mcp/operations.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_windows/dpapi.dart';
 import 'package:serverdeck_windows/paths.dart';
@@ -62,6 +65,7 @@ Future<void> scenario(String root, String mode) => g.scenario(
     );
     a.Pair? mcp;
     TrustedAutomationProfileService? service;
+    TrustedMcpRouter? toolRouter;
     var expectGateCloseFailure = false;
     var now = DateTime.now().toUtc(), next = 0;
     String requestId() =>
@@ -123,6 +127,13 @@ Future<void> scenario(String root, String mode) => g.scenario(
       );
       final context = await invocation.mcpContextWhenStable();
       invocation.complete();
+      if (mode == 'tool-router') {
+        toolRouter = TrustedMcpRouter(
+          sessions: sessions,
+          authority: authority,
+          services: TrustedProfileCatalogMcpServices(catalog),
+        );
+      }
       Future<Map<String, Object?>> asOwner(
         String operation,
         Map<String, Object?> input,
@@ -148,8 +159,43 @@ Future<void> scenario(String root, String mode) => g.scenario(
       Future<Map<String, Object?>> asMcp(
         String operation,
         Map<String, Object?> input,
-      ) {
+      ) async {
         _stage = 'mcp:$operation';
+        if (toolRouter case final router?) {
+          Future<McpInvokeReply> invoke(Map<String, Object?> params) async {
+            final request = await sessions.begin(
+              peer.channel,
+              peer.response!.sessionId,
+              'mcp.invoke',
+            );
+            try {
+              return await router.invoke(request, params);
+            } finally {
+              request.complete();
+            }
+          }
+
+          var reply = await invoke({
+            'request': {
+              'name': 'serverdeck_profiles_$operation',
+              'arguments': input,
+            },
+          });
+          final watch = Stopwatch()..start();
+          while (reply.kind == McpInvokeReplyKind.pending) {
+            a.check(watch.elapsed < const Duration(seconds: 3));
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+            reply = await invoke({
+              'poll': {'operationId': reply.toJson()['operationId']},
+            });
+          }
+          a.check(reply.kind == McpInvokeReplyKind.done);
+          final result =
+              (reply.toJson()['result'] as Map)['structuredContent'] as Map;
+          if (result['ok'] != true)
+            throw StateError((result['error'] as Map)['code']);
+          return Map<String, Object?>.from(result['data'] as Map);
+        }
         return catalog
             .start(
               catalog.mcpActor(context, operation),
@@ -324,7 +370,7 @@ Future<void> scenario(String root, String mode) => g.scenario(
       a.check(
         (await asOwner('validate', {'body': invalidBody}))['valid'] == false,
       );
-      await asOwner('archive', {
+      await (mode == 'tool-router' ? asMcp : asOwner)('archive', {
         'requestId': requestId(),
         'profileId': id,
         'expectedRevision': 2,
@@ -341,6 +387,7 @@ Future<void> scenario(String root, String mode) => g.scenario(
       a.check(store.isTrustedSnapshotLoaded);
     } finally {
       await _cleanup([
+        () async => toolRouter?.close(),
         () async => service?.close(),
         () async {
           if (expectGateCloseFailure) {

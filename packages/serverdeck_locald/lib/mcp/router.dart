@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:serverdeck_protocol/automation/models.dart';
 import 'package:serverdeck_protocol/mcp/catalog.dart';
 import 'package:serverdeck_protocol/mcp/operations.dart';
 
 import '../api/operational_auth.dart';
+
+part 'router_bindings.dart';
 
 /// All implementations are shared with the trusted owner service. This interface
 /// cannot create an authenticated context, select an origin or export a key.
@@ -25,7 +28,7 @@ final class McpServiceOperation {
 final class _Operation {
   _Operation(this.id, this.context, this.started);
   final String id;
-  final OperationalMcpContext context;
+  final _RouterContext context;
   final Duration started;
   McpServiceOperation? service;
   McpInvokeReply? result;
@@ -46,19 +49,16 @@ String _operationId() {
 
 /// One same-isolate router for one native registry/workspace generation.
 /// Unfinished work keeps its quota after response interest is retired.
-final class McpRouter {
-  McpRouter({
-    required this.sessions,
-    required this.authority,
-    required this.services,
+sealed class _McpRouter {
+  _McpRouter({
+    required void Function() Function(void Function(String)) onDetach,
+    required void Function() Function(void Function(String, int)) onGrant,
     Duration Function()? elapsed,
   }) {
     _clock = elapsed ?? () => _watch.elapsed;
-    _removeDetach = sessions.onSessionDetached(_detach);
+    _removeDetach = onDetach(_detach);
     try {
-      _removeGrant = authority.onGrantPublished(
-        (id, _) => _invalidateGrant(id),
-      );
+      _removeGrant = onGrant((id, _) => _invalidateGrant(id));
     } catch (_) {
       _removeDetach();
       rethrow;
@@ -67,9 +67,6 @@ final class McpRouter {
   static const workspaceLimit = 32, sessionLimit = 16;
   static const operationLifetime = Duration(seconds: 30);
   static const completionLifetime = Duration(seconds: 60);
-  final OperationalSessions sessions;
-  final OperationalMcpAuthority authority;
-  final McpToolServices services;
   final _watch = Stopwatch()..start();
   late final Duration Function() _clock;
   late final void Function() _removeDetach, _removeGrant;
@@ -84,17 +81,14 @@ final class McpRouter {
     if (_closed) throw StateError('NOT_READY');
   }
 
-  Future<McpInvokeReply> invoke(
-    OperationalSessionRequest request,
-    Object? params,
-  ) async {
+  Future<McpInvokeReply> _invoke(_RouterRequest request, Object? params) async {
     _ready();
-    request.requireMcpInvocationBinding(sessions, authority);
+    request.requireBinding();
     // Snapshot original input before the first router await; do not canonicalize
     // decomposed Unicode or turn invalid float arguments into integers.
     final input = McpInvokeInput.fromJson(params);
     final context = await request.mcpContextWhenStable();
-    if (!context.belongsTo(sessions, authority)) throw StateError('FORBIDDEN');
+    if (!context.belongs()) throw StateError('FORBIDDEN');
     await context.revalidate(deadline: request.rpcBudgetRemaining);
     request.rpcBudgetRemaining;
     sweep();
@@ -141,7 +135,7 @@ final class McpRouter {
         _charged.add(op);
         _records[op.id] = op;
         try {
-          op.service = services.start(context, tool, input.arguments!);
+          op.service = context.start(tool, input.arguments!);
           if (op.retired) _cleanup(op);
           unawaited(
             op.service!.result.then<void>(
@@ -206,8 +200,8 @@ final class McpRouter {
   }
 
   Future<void> _publication(
-    OperationalSessionRequest request,
-    OperationalMcpContext context,
+    _RouterRequest request,
+    _RouterContext context,
   ) async {
     while (true) {
       await context.revalidate(deadline: request.rpcBudgetRemaining);
@@ -223,7 +217,7 @@ final class McpRouter {
   }
 
   Future<_Operation> _owned(
-    OperationalMcpContext context,
+    _RouterContext context,
     String id,
     Duration deadline,
   ) async {
