@@ -28,6 +28,7 @@ import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
 import '../automation/snapshot_test.dart' as g;
 import 'trusted_snapshot_child.dart' show seedAutomation;
 import 'trusted_schema_child.dart' as raw show retained;
+import 'trusted_graph_write_fixture.dart';
 import 'mcp_runtime_actor.dart' show check, ownRoot;
 
 final class FaultProtection implements UserProtection {
@@ -443,6 +444,25 @@ Future<void> main(List<String> args) async {
             check(
               result.preservationDigest() == expected['rowsDigest'] &&
                   result.foundation.trust.isEmpty,
+            );
+          }
+          if (mode == 'writer-graph' || mode.startsWith('writer-busy-')) {
+            final expected = jsonDecode(
+              File(p.join(root, 'fixture-expected.json')).readAsStringSync(),
+            ) as Map;
+            key = await custody.openReceiptKey(
+              File(p.join(active, 'receipt-key.dpapi')).readAsBytesSync(),
+              expected['workspaceId'] as String,
+              expected['receiptKeyId'] as String,
+            );
+            await exerciseTrustedGraphWrite(
+              root,
+              custody,
+              key,
+              lease,
+              busyState: mode.startsWith('writer-busy-')
+                  ? mode.substring('writer-busy-'.length)
+                  : null,
             );
           }
         }

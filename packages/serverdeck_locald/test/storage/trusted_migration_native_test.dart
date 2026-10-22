@@ -136,6 +136,31 @@ void main() {
       testOn: 'windows',
       timeout: const Timeout(Duration(minutes: 2)),
     );
+  for (final mode in [
+    'writer-graph',
+    for (final state in [
+      'queued',
+      'running',
+      'cancel-requested',
+      'unknown',
+      'reconciling',
+    ])
+      'writer-busy-$state',
+  ])
+    test(
+      'trusted writes preserve full automation graph $mode',
+      () async {
+        final f = fixture();
+        try {
+          await run(f, 'prepare2');
+          await run(f, mode);
+        } finally {
+          await f.close();
+        }
+      },
+      testOn: 'windows',
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
   test(
     'trusted migration holds one reservation across both steps',
     () async {
