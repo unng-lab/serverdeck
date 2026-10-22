@@ -20,7 +20,10 @@ import 'migration_probe.dart';
 import 'native_close.dart';
 import 'native_schema.dart';
 import 'records.dart';
+import 'trusted_snapshot.dart';
 import 'workspace.dart';
+
+part 'trusted_source_preflight.dart';
 
 Never _blocked() => throw StateError('STORAGE_BLOCKED');
 
@@ -31,6 +34,53 @@ Never _blocked() => throw StateError('STORAGE_BLOCKED');
 abstract final class WorkspaceMigration {
   static bool _reserved = false;
   static bool get hasOpenReservation => _reserved;
+
+  /// Initial schema2 inspection by the actual format3 locald, before staging
+  /// or freezing recovery hashes. This is not migration permission or readiness;
+  /// the future full controller keeps this reservation across its next steps.
+  /// Caller retains key/lease ownership, including on failure. An unconfirmed
+  /// native close retains the global reservation and requires lease until exit.
+  static Future<UpgradeSnapshot> preflightTrustedSource({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    required ReceiptKeyMaterial receiptKey,
+  }) async {
+    if (Workspace.hasOpenReservation || Isar.getInstance('workspace') != null)
+      _blocked();
+    _reserved = true;
+    final operation = _TrustedSourcePreflight(
+      localAppData,
+      lease,
+      custody,
+      receiptKey,
+    );
+    var runtimeChecked = false;
+    try {
+      operation.owner();
+      await initializeTrustedNativeRuntime(appRoot);
+      runtimeChecked = true;
+      final result = await operation.run();
+      // No stale format/root/process proof is returned after async native/DPAPI
+      // work. The database has already been confirmed closed by run's finally.
+      await initializeTrustedNativeRuntime(appRoot);
+      await operation.live();
+      await operation.settled();
+      return result;
+    } catch (error) {
+      if (error is StateError &&
+          operation.nativeClosed &&
+          (error.message == 'INCOMPATIBLE' ||
+              error.message == 'PREREQUISITE_UNAVAILABLE' ||
+              error.message == 'HOST_BUSY' ||
+              !runtimeChecked && error.message == 'UNAUTHORIZED'))
+        rethrow;
+      _blocked();
+    } finally {
+      if (operation.nativeClosed) _reserved = false;
+    }
+  }
 
   /// The caller owns and retains the workspace lease. If native close cannot be
   /// confirmed, the reservation remains held and the process must retain its
