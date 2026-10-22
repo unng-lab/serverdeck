@@ -29,6 +29,7 @@ void main() {
     'owner',
     'codes',
     'catalog',
+    'foundation',
     'readiness-bad',
     'owner-blocked',
     'mcp-builtin-errors',

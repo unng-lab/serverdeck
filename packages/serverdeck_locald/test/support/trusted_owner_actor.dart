@@ -17,6 +17,7 @@ import 'trusted_auth_actor.dart' as a;
 import 'trusted_grant_actor.dart' as g;
 import 'profile_catalog_actor.dart' show cleanupCatalogFixture;
 import 'profile_catalog_storage_scenarios.dart' show catalogBody;
+import 'trusted_foundation_owner_scenarios.dart';
 
 Future<void> scenario(String root, String mode) => g.scenario(
   root,
@@ -65,6 +66,18 @@ Future<void> scenario(String root, String mode) => g.scenario(
     try {
       await owner.exchange();
       a.check(await owner.next() == 'AUTH:owner');
+      if (mode.startsWith('foundation-')) {
+        await exerciseTrustedFoundationOwner(
+          root,
+          mode,
+          store,
+          custody,
+          key,
+          owner,
+          plain,
+        );
+        return;
+      }
       if (mode == 'gate') {
         await a.fails(
           Future.sync(

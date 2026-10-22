@@ -8,6 +8,8 @@ import 'package:serverdeck_locald/api/operational_auth.dart';
 import 'package:serverdeck_locald/api/trusted_server.dart';
 import 'package:serverdeck_locald/api/trusted_channel.dart';
 import 'package:serverdeck_locald/api/owner_profiles.dart';
+import 'package:serverdeck_locald/api/trusted_owner_foundation.dart';
+import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
 import 'package:serverdeck_locald/automation/profiles.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_locald/mcp/profile_services.dart';
@@ -60,6 +62,7 @@ int wireDepth(Object? value) {
 }
 
 bool ownerMode(String mode) => const {
+  'foundation',
   'owner',
   'codes',
   'owner-blocked',
@@ -347,6 +350,84 @@ Future<void> client(List<String> args) async {
     n.check((denied['error'] as Map)['code'] == 'FORBIDDEN');
     final invalidReadiness = await rpc.call('readiness.get', {'extra': true});
     n.check((invalidReadiness['error'] as Map)['code'] == 'VALIDATION');
+    if (mode == 'foundation') {
+      final api = TrustedApiClient(session);
+      try {
+        const mutation = '62345678-1234-4234-8234-000000090001';
+        const profile = '62345678-1234-4234-8234-000000090002';
+        final current = await api.call('settings.get', {});
+        final input = <String, Object?>{
+          'expectedRevision': (current['settings'] as Map)['revision'],
+          'theme': 'dark',
+          'reduceMotion': true,
+          'selectedProfileId': null,
+        };
+        final saved = await api.call(
+          'settings.update',
+          input,
+          requestId: mutation,
+        );
+        n.check(
+          jsonEncode(
+                await api.call('settings.update', input, requestId: mutation),
+              ) ==
+              jsonEncode(saved),
+        );
+        n.check(
+          (await api.call('mutations.get', {'requestId': mutation}))['state'] ==
+              'committed',
+        );
+        final body = <String, Object?>{
+          'profileId': profile,
+          'name': 'Typed foundation wire',
+          'address': 'wire.invalid',
+          'port': 22,
+          'sshUser': 'fixture',
+          'tags': <String>[],
+          'credential': {'action': 'remove'},
+        };
+        n.check(
+          (await api.call('profiles.create', body))['entityRevision'] == '1',
+        );
+        n.check(
+          ((await api.call('profiles.list', {}))['profiles'] as List).length ==
+              1,
+        );
+        n.check(
+          ((await api.call('profiles.get', {'profileId': profile}))['profile']
+                  as Map)['trustRevision'] ==
+              '1',
+        );
+        await api.call('profiles.update', {
+          ...body,
+          'expectedRevision': '1',
+          'address': 'changed.invalid',
+          'credential': {'action': 'keep'},
+        });
+        n.check(
+          ((await api.call('profiles.get', {'profileId': profile}))['profile']
+                  as Map)['trustRevision'] ==
+              '2',
+        );
+        await api.call('profiles.delete', {
+          'profileId': profile,
+          'expectedRevision': '2',
+        });
+        n.check(
+          ((await api.call('mutations.recent', {}))['receipts'] as List)
+                  .length ==
+              4,
+        );
+        n.check(
+          ((await api.call('profiles.list', {}))['profiles'] as List).isEmpty,
+        );
+        await api.call('session.close', {});
+      } finally {
+        await api.close();
+      }
+      stdout.writeln('CLIENT_PASS');
+      return;
+    }
     if (const {
       'malformed',
       'duplicate',
@@ -707,8 +788,9 @@ Future<void> main(List<String> args) async {
         ReceiptKeyMaterial? key;
         TrustedAutomationProfileService? catalog;
         TrustedProfileOwnerApi? profileOwner;
+        TrustedFoundationOwnerApi? foundationOwner;
         try {
-          if (mode == 'catalog') {
+          if (mode == 'catalog' || mode == 'foundation') {
             keeper = await n.Pair.start(
               root,
               'serverdeck.exe',
@@ -737,14 +819,22 @@ Future<void> main(List<String> args) async {
               g.workspaceId,
               g.keyId,
             );
-            catalog = TrustedAutomationProfileService(
-              store: store,
-              custody: custody,
-              receiptKey: key,
-              sessions: registry,
-              authority: authority,
-            );
-            profileOwner = TrustedProfileOwnerApi(catalog);
+            if (mode == 'foundation') {
+              foundationOwner = TrustedFoundationOwnerApi(
+                store: store,
+                coordinator: TrustedMutationCoordinator(store, custody, key),
+                sessions: registry,
+              );
+            } else {
+              catalog = TrustedAutomationProfileService(
+                store: store,
+                custody: custody,
+                receiptKey: key,
+                sessions: registry,
+                authority: authority,
+              );
+              profileOwner = TrustedProfileOwnerApi(catalog);
+            }
           }
           final services = Services(mode);
           final owner = Owner(mode);
@@ -763,6 +853,7 @@ Future<void> main(List<String> args) async {
             authority: authority,
             router: router,
             owner:
+                foundationOwner ??
                 profileOwner ??
                 (ownerMode(mode) && mode != 'owner' ? owner : null),
             readiness: () {
@@ -937,7 +1028,8 @@ Future<void> main(List<String> args) async {
               await running.timeout(const Duration(seconds: 10));
             }
             n.check(
-              registry.count == (mode == 'catalog' ? 1 : 0) &&
+              registry.count ==
+                      (mode == 'catalog' || mode == 'foundation' ? 1 : 0) &&
                   router.retainedOperations == 0,
             );
             if (mode == 'eof' || mode == 'reentrant-close') {
@@ -984,6 +1076,7 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           await cleanupCatalogFixture([
+            () async => foundationOwner?.close(),
             () async => profileOwner?.close(),
             () async => catalog?.close(),
             () async {
