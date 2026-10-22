@@ -67,6 +67,84 @@ class BuildManifest {
 /// so the old role-less bootstrap cannot accidentally activate a new bundle.
 class McpBuildManifest {
   factory McpBuildManifest.fromJson(Object? value, {bool testOnly = false}) {
+    final fields = _OperationalBuildFields.fromJson(
+      value,
+      format: 2,
+      schema: 2,
+      testOnly: testOnly,
+      invalidCode: 'INVALID_MCP_BUILD_MANIFEST',
+    );
+    return McpBuildManifest._(
+      fields.buildId,
+      fields.configuration,
+      fields.testOnly,
+      fields.appRoot,
+      fields.sha256,
+    );
+  }
+
+  McpBuildManifest._(
+    this.buildId,
+    this.configuration,
+    this.testOnly,
+    this.appRoot,
+    this.sha256,
+  );
+  final String buildId, configuration, appRoot;
+  final bool testOnly;
+  final Map<String, String> sha256;
+  int get apiMajor => 1;
+  int get apiMinor => 1;
+  int get workspaceSchema => 2;
+}
+
+/// Remote schema3 bundle metadata. Its explicit entry cannot create format2
+/// metadata/proofs or silently select a new mode in older clients.
+final class TrustedBuildManifest {
+  factory TrustedBuildManifest.fromJson(
+    Object? value, {
+    bool testOnly = false,
+  }) {
+    final fields = _OperationalBuildFields.fromJson(
+      value,
+      format: 3,
+      schema: 3,
+      testOnly: testOnly,
+      invalidCode: 'INVALID_TRUSTED_BUILD_MANIFEST',
+    );
+    return TrustedBuildManifest._(
+      fields.buildId,
+      fields.configuration,
+      fields.testOnly,
+      fields.appRoot,
+      fields.sha256,
+    );
+  }
+  TrustedBuildManifest._(
+    this.buildId,
+    this.configuration,
+    this.testOnly,
+    this.appRoot,
+    this.sha256,
+  );
+  final String buildId, configuration, appRoot;
+  final bool testOnly;
+  final Map<String, String> sha256;
+  int get apiMajor => 1;
+  int get apiMinor => 1;
+  int get workspaceSchema => 3;
+}
+
+// Shared closed-field validation; only the two explicit constructors above
+// choose their constant format/schema. No input option selects a parser mode.
+final class _OperationalBuildFields {
+  factory _OperationalBuildFields.fromJson(
+    Object? value, {
+    required int format,
+    required int schema,
+    required bool testOnly,
+    required String invalidCode,
+  }) {
     const fields = {
       'format',
       'product',
@@ -80,19 +158,19 @@ class McpBuildManifest {
       'sha256',
     };
     const files = {'serverdeck.exe', 'locald.exe', 'mcp.exe', 'libisar.dll'};
-    const invalid = FormatException('INVALID_MCP_BUILD_MANIFEST');
+    final invalid = FormatException(invalidCode);
     if (value is! Map<String, Object?> ||
         value.length != fields.length ||
         !value.keys.toSet().containsAll(fields) ||
         value['format'] is! int ||
-        value['format'] != 2 ||
+        value['format'] != format ||
         value['product'] != 'serverdeck-next' ||
         value['apiMajor'] is! int ||
         value['apiMajor'] != 1 ||
         value['apiMinor'] is! int ||
         value['apiMinor'] != 1 ||
         value['workspaceSchema'] is! int ||
-        value['workspaceSchema'] != 2 ||
+        value['workspaceSchema'] != schema ||
         value['testOnly'] is! bool ||
         value['testOnly'] != testOnly) {
       throw invalid;
@@ -122,7 +200,7 @@ class McpBuildManifest {
         throw invalid;
       checked[name] = hash;
     }
-    return McpBuildManifest._(
+    return _OperationalBuildFields._(
       buildId,
       configuration,
       testOnly,
@@ -131,7 +209,7 @@ class McpBuildManifest {
     );
   }
 
-  McpBuildManifest._(
+  _OperationalBuildFields._(
     this.buildId,
     this.configuration,
     this.testOnly,
@@ -141,7 +219,4 @@ class McpBuildManifest {
   final String buildId, configuration, appRoot;
   final bool testOnly;
   final Map<String, String> sha256;
-  int get apiMajor => 1;
-  int get apiMinor => 1;
-  int get workspaceSchema => 2;
 }

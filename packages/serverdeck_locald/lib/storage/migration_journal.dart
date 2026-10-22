@@ -83,6 +83,48 @@ final class MigrationManifest {
 
 enum MigrationPhase { preparing, prepared }
 
+/// Strict schema3 workspace identity. Never accepted by the old1→2 journal or
+/// manifest parser; this metadata alone does not authorize migration or open.
+final class TrustedWorkspaceManifest {
+  TrustedWorkspaceManifest._(
+    this.workspaceId,
+    this.receiptKeyId,
+    this.ownerSid,
+  );
+  factory TrustedWorkspaceManifest.fromJson(Map<String, Object?> value) {
+    _document(value);
+    if (value['schema'] is! int ||
+        value['schema'] != 3 ||
+        value['format'] is! int ||
+        value['format'] != 3)
+      _incompatible();
+    _fields(value, {
+      'product',
+      'schema',
+      'format',
+      'workspaceId',
+      'receiptKeyId',
+      'ownerSid',
+    });
+    if (value['product'] != 'serverdeck-next') _blocked();
+    return TrustedWorkspaceManifest._(
+      _uuid(value['workspaceId']),
+      _uuid(value['receiptKeyId']),
+      _sid(value['ownerSid']),
+    );
+  }
+  final String workspaceId, receiptKeyId, ownerSid;
+  int get schema => 3;
+  Map<String, Object?> toJson() => {
+    'product': 'serverdeck-next',
+    'format': 3,
+    'schema': 3,
+    'workspaceId': workspaceId,
+    'receiptKeyId': receiptKeyId,
+    'ownerSid': ownerSid,
+  };
+}
+
 /// Strict private recovery metadata. Contains no caller paths or authority to
 /// open a DB. The native migrator must bind identity to verified key custody.
 final class MigrationJournal {

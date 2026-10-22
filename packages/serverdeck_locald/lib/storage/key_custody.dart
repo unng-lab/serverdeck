@@ -9,6 +9,8 @@ import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_protocol/profile_validation.dart';
 import 'package:serverdeck_windows/security.dart';
 
+import 'migration_journal.dart' show TrustedWorkspaceManifest;
+
 /// A keyed receipt digest protects access secrets against offline guessing.
 /// This material never encrypts ordinary workspace records.
 class ReceiptKeyMaterial {
@@ -202,6 +204,35 @@ class KeyCustody {
       'receiptKeyId': material.receiptKeyId,
       'ownerSid': ownerSid,
     };
+  }
+
+  /// Format3 retains the existing receipt-key wrapper/entropy. Only the exact
+  /// workspace manifest version changes; no key rotation or fallback occurs.
+  Future<Map<String, Object?>> createTrustedWorkspaceManifest(
+    ReceiptKeyMaterial material,
+  ) async {
+    _material(material);
+    return {
+      'product': 'serverdeck-next',
+      'format': 3,
+      'schema': 3,
+      'workspaceId': material.workspaceId,
+      'receiptKeyId': material.receiptKeyId,
+      'ownerSid': ownerSid,
+    };
+  }
+
+  Future<void> verifyTrustedWorkspaceManifest(
+    Map<String, Object?> manifest,
+    ReceiptKeyMaterial material,
+  ) async {
+    _material(material);
+    final parsed = TrustedWorkspaceManifest.fromJson(manifest);
+    if (parsed.workspaceId != material.workspaceId ||
+        parsed.receiptKeyId != material.receiptKeyId ||
+        parsed.ownerSid != ownerSid) {
+      throw StateError('STORAGE_BLOCKED');
+    }
   }
 
   Future<void> verifyWorkspaceManifest(

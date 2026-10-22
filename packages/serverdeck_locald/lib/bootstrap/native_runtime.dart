@@ -93,3 +93,38 @@ Future<McpBuildBundle> initializeMcpNativeRuntime(
     self?.close();
   }
 }
+
+/// Separate schema3/format3 entry. A genuine current locald peer must prove its
+/// format3 bundle before DLL initialization. Existing entries never select it.
+Future<TrustedBuildBundle> initializeTrustedNativeRuntime(
+  String appRoot, {
+  bool testOnly = false,
+}) async {
+  final bundle = await verifyTrustedBuildBundle(appRoot, testOnly: testOnly);
+  RetainedProcessIdentity? self;
+  try {
+    late final VerifiedTrustedBundlePeer proof;
+    try {
+      self = RetainedProcessIdentity.open(pid);
+      proof = bundle.verifyPeer(self, currentUserSid());
+      if (proof.role != BundlePeerRole.locald) throw StateError('UNAUTHORIZED');
+      proof.revalidate();
+    } catch (_) {
+      throw StateError('UNAUTHORIZED');
+    }
+    final root = p.normalize(appRoot), manifest = bundle.manifest;
+    final identity =
+        'format3\nschema3\n$root\n${manifest.buildId}\n${manifest.testOnly}\n${manifest.sha256['libisar.dll']}';
+    try {
+      await _load(identity, root);
+    } on _RuntimeConflict {
+      throw StateError('INCOMPATIBLE');
+    } catch (_) {
+      throw StateError('PREREQUISITE_UNAVAILABLE');
+    }
+    proof.revalidate();
+    return bundle;
+  } finally {
+    self?.close();
+  }
+}

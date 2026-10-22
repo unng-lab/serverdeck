@@ -36,63 +36,108 @@ final class McpBuildBundle {
   final McpBuildManifest manifest;
   final String _manifestHash;
 
-  void _current() {
-    final root = manifest.appRoot;
-    requireSafePath(root, root);
-    final path = p.join(root, 'foundation.manifest.json');
-    requireSafePath(root, path);
-    if (_digest(_manifestBytes(path)) != _manifestHash)
-      throw StateError('UNAUTHORIZED');
-  }
-
-  /// Caller obtains PID from the actual pipe and owns the retained identity on
-  /// its pipe worker. Neither a claimed PID nor a requested role is accepted.
+  /// Identity belongs to the caller's real pipe worker; no claimed role/PID.
   VerifiedBundlePeer verifyPeer(
     RetainedProcessIdentity identity,
     String expectedOwnerSid,
-  ) {
-    try {
-      final name = switch (p.basename(identity.imagePath).toLowerCase()) {
-        'serverdeck.exe' => 'serverdeck.exe',
-        'mcp.exe' => 'mcp.exe',
-        'locald.exe' => 'locald.exe',
-        _ => throw StateError('UNAUTHORIZED'),
-      };
-      final role = switch (name) {
-        'serverdeck.exe' => BundlePeerRole.owner,
-        'mcp.exe' => BundlePeerRole.mcp,
-        _ => BundlePeerRole.locald,
-      };
-      final proof = VerifiedBundlePeer._(
-        this,
-        identity,
-        expectedOwnerSid,
-        name,
-        role,
-      );
-      proof.revalidate();
-      return proof;
-    } catch (_) {
-      throw StateError('UNAUTHORIZED');
-    }
+  ) => VerifiedBundlePeer._(
+    _bindPeer(
+      manifest.appRoot,
+      _manifestHash,
+      manifest.sha256,
+      identity,
+      expectedOwnerSid,
+    ),
+  );
+}
+
+/// Separate format3 bundle/proof types cannot authorize a format2 composition.
+final class TrustedBuildBundle {
+  TrustedBuildBundle._(this.manifest, this._manifestHash);
+  final TrustedBuildManifest manifest;
+  final String _manifestHash;
+
+  VerifiedTrustedBundlePeer verifyPeer(
+    RetainedProcessIdentity identity,
+    String expectedOwnerSid,
+  ) => VerifiedTrustedBundlePeer._(
+    _bindPeer(
+      manifest.appRoot,
+      _manifestHash,
+      manifest.sha256,
+      identity,
+      expectedOwnerSid,
+    ),
+  );
+}
+
+/// Private construction binds format2 metadata to genuine retained identity.
+/// The caller retains/ultimately closes the identity; no ownership swap.
+final class VerifiedBundlePeer {
+  VerifiedBundlePeer._(this._binding);
+  final _PeerBinding _binding;
+  BundlePeerRole get role => _binding.role;
+  void revalidate() => _binding.revalidate();
+}
+
+/// Format3 only. There is no public constructor or conversion to an old proof.
+final class VerifiedTrustedBundlePeer {
+  VerifiedTrustedBundlePeer._(this._binding);
+  final _PeerBinding _binding;
+  BundlePeerRole get role => _binding.role;
+  void revalidate() => _binding.revalidate();
+}
+
+_PeerBinding _bindPeer(
+  String root,
+  String manifestHash,
+  Map<String, String> hashes,
+  RetainedProcessIdentity identity,
+  String ownerSid,
+) {
+  try {
+    final name = switch (p.basename(identity.imagePath).toLowerCase()) {
+      'serverdeck.exe' => 'serverdeck.exe',
+      'mcp.exe' => 'mcp.exe',
+      'locald.exe' => 'locald.exe',
+      _ => throw StateError('UNAUTHORIZED'),
+    };
+    final role = switch (name) {
+      'serverdeck.exe' => BundlePeerRole.owner,
+      'mcp.exe' => BundlePeerRole.mcp,
+      _ => BundlePeerRole.locald,
+    };
+    final binding = _PeerBinding(
+      root,
+      manifestHash,
+      identity,
+      ownerSid,
+      name,
+      hashes[name]!,
+      role,
+    );
+    binding.revalidate();
+    return binding;
+  } catch (_) {
+    throw StateError('UNAUTHORIZED');
   }
 }
 
-/// Private construction binds role to verified bytes and an actual retained
-/// process. The caller retains/ultimately closes the identity; no ownership swap.
-final class VerifiedBundlePeer {
-  VerifiedBundlePeer._(
-    this._bundle,
+// Shared actual hash/path/retained-handle checks, with only fixed constructors
+// above supplying verified metadata. Neither JSON nor a callback chooses role.
+final class _PeerBinding {
+  _PeerBinding(
+    this._root,
+    this._manifestHash,
     this._identity,
     this._ownerSid,
     this._name,
+    this._expectedHash,
     this._role,
   );
-  final McpBuildBundle _bundle;
+  final String _root, _manifestHash, _ownerSid, _name, _expectedHash;
   final RetainedProcessIdentity _identity;
-  final String _ownerSid, _name;
   final BundlePeerRole _role;
-
   BundlePeerRole get role {
     revalidate();
     return _role;
@@ -101,19 +146,67 @@ final class VerifiedBundlePeer {
   void revalidate() {
     try {
       if (currentUserSid() != _ownerSid) throw StateError('UNAUTHORIZED');
-      _bundle._current();
-      final root = _bundle.manifest.appRoot, path = p.join(root, _name);
-      requireSafePath(root, path);
-      verifyProcessImage(
-        _identity,
-        _ownerSid,
-        path,
-        _bundle.manifest.sha256[_name]!,
-      );
+      requireSafePath(_root, _root);
+      final manifestPath = p.join(_root, 'foundation.manifest.json');
+      requireSafePath(_root, manifestPath);
+      if (_digest(_manifestBytes(manifestPath)) != _manifestHash)
+        throw StateError('UNAUTHORIZED');
+      final path = p.join(_root, _name);
+      requireSafePath(_root, path);
+      verifyProcessImage(_identity, _ownerSid, path, _expectedHash);
     } catch (_) {
       throw StateError('UNAUTHORIZED');
     }
   }
+}
+
+final class _ManifestSource {
+  const _ManifestSource(this.root, this.bytes, this.hash);
+  final String root, hash;
+  final List<int> bytes;
+}
+
+_ManifestSource _readManifest(String appRoot) {
+  if (!Platform.isWindows ||
+      Abi.current() != Abi.windowsX64 ||
+      !p.isAbsolute(appRoot))
+    throw StateError('PREREQUISITE_UNAVAILABLE');
+  final root = p.normalize(appRoot);
+  requireSafePath(root, root);
+  final path = p.join(root, 'foundation.manifest.json');
+  requireSafePath(root, path);
+  final bytes = _manifestBytes(path);
+  return _ManifestSource(root, bytes, _digest(bytes));
+}
+
+void _verifyContents(
+  _ManifestSource source,
+  String declaredRoot,
+  Map<String, String> hashes,
+) {
+  if (!p.isAbsolute(declaredRoot) ||
+      !p.equals(p.normalize(declaredRoot), source.root))
+    throw StateError('INCOMPATIBLE');
+  for (final entry in hashes.entries) {
+    final path = p.join(source.root, entry.key);
+    requireSafePath(source.root, path);
+    if (fileSha256(path) != entry.value) throw StateError('INCOMPATIBLE');
+  }
+  // Same bound and exact bytes before/after all four actual artifact hashes.
+  if (_digest(
+        _manifestBytes(p.join(source.root, 'foundation.manifest.json')),
+      ) !=
+      source.hash)
+    throw StateError('INCOMPATIBLE');
+}
+
+Never _verificationFailed(Object error) {
+  if (error is FormatException) throw StateError('INCOMPATIBLE');
+  if (error is StateError &&
+      (error.message == 'INCOMPATIBLE' ||
+          error.message == 'PREREQUISITE_UNAVAILABLE'))
+    throw error;
+  throw StateError('PREREQUISITE_UNAVAILABLE');
 }
 
 Future<McpBuildBundle> verifyMcpBuildBundle(
@@ -121,42 +214,31 @@ Future<McpBuildBundle> verifyMcpBuildBundle(
   bool testOnly = false,
 }) async {
   try {
-    if (!Platform.isWindows ||
-        Abi.current() != Abi.windowsX64 ||
-        !p.isAbsolute(appRoot))
-      throw StateError('PREREQUISITE_UNAVAILABLE');
-    final root = p.normalize(appRoot);
-    requireSafePath(root, root);
-    final path = p.join(root, 'foundation.manifest.json');
-    requireSafePath(root, path);
-    final bytes = _manifestBytes(path);
+    final source = _readManifest(appRoot);
     final manifest = McpBuildManifest.fromJson(
-      StrictCodec().decode(bytes),
+      StrictCodec().decode(source.bytes),
       testOnly: testOnly,
     );
-    if (!p.isAbsolute(manifest.appRoot) ||
-        !p.equals(p.normalize(manifest.appRoot), root)) {
-      throw StateError('INCOMPATIBLE');
-    }
-    for (final entry in manifest.sha256.entries) {
-      final file = p.join(root, entry.key);
-      requireSafePath(root, file);
-      if (fileSha256(file) != entry.value) throw StateError('INCOMPATIBLE');
-    }
-    final bundle = McpBuildBundle._(manifest, _digest(bytes));
-    // Re-read with the same bound: source bytes cannot silently change while
-    // checking the executable hashes, and the proof keeps the original digest.
-    if (_digest(_manifestBytes(path)) != bundle._manifestHash)
-      throw StateError('INCOMPATIBLE');
-    return bundle;
-  } on FormatException {
-    throw StateError('INCOMPATIBLE');
-  } on StateError catch (error) {
-    if (error.message == 'INCOMPATIBLE' ||
-        error.message == 'PREREQUISITE_UNAVAILABLE')
-      rethrow;
-    throw StateError('PREREQUISITE_UNAVAILABLE');
-  } catch (_) {
-    throw StateError('PREREQUISITE_UNAVAILABLE');
+    _verifyContents(source, manifest.appRoot, manifest.sha256);
+    return McpBuildBundle._(manifest, source.hash);
+  } catch (error) {
+    _verificationFailed(error);
+  }
+}
+
+Future<TrustedBuildBundle> verifyTrustedBuildBundle(
+  String appRoot, {
+  bool testOnly = false,
+}) async {
+  try {
+    final source = _readManifest(appRoot);
+    final manifest = TrustedBuildManifest.fromJson(
+      StrictCodec().decode(source.bytes),
+      testOnly: testOnly,
+    );
+    _verifyContents(source, manifest.appRoot, manifest.sha256);
+    return TrustedBuildBundle._(manifest, source.hash);
+  } catch (error) {
+    _verificationFailed(error);
   }
 }
