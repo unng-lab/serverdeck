@@ -9,22 +9,26 @@ final class McpGrantKey {
 }
 
 extension _McpGrantReads on StateStore {
-  void _mcpReady() {
+  void _mcpReady([_AutomationFormat format = _AutomationFormat.operational]) {
     _ensure();
     // Publication is a temporary gate, not evidence of corrupt custody.
-    if (_authorityUnavailable || _operational == null)
+    if (_authorityUnavailable || !_hasAutomation(format))
       throw StateError('STORAGE_BLOCKED');
     try {
-      _grantLive();
+      _grantLive(format);
     } catch (_) {
       _blocked = true;
       throw StateError('STORAGE_BLOCKED');
     }
   }
 
-  ClientGrantRecord _currentMcpGrant(String id, {required DateTime at}) {
-    _mcpReady();
-    final grant = _operational!.automation.grants[id];
+  ClientGrantRecord _currentMcpGrant(
+    String id, {
+    required DateTime at,
+    _AutomationFormat format = _AutomationFormat.operational,
+  }) {
+    _mcpReady(format);
+    final grant = _automationView(format).automation.grants[id];
     if (grant == null || !grant.isCurrentAt(at))
       throw StateError('UNAUTHORIZED');
     return grant;
@@ -34,12 +38,13 @@ extension _McpGrantReads on StateStore {
     String id, {
     required DateTime Function() clock,
     Duration? publicationDeadline,
+    _AutomationFormat format = _AutomationFormat.operational,
   }) async {
     final watch = Stopwatch()..start();
     Future<ClientGrantRecord> readCurrent() async {
       while (true) {
         try {
-          return _currentMcpGrant(id, at: clock());
+          return _currentMcpGrant(id, at: clock(), format: format);
         } catch (error) {
           if (publicationDeadline == null ||
               error is! StateError ||

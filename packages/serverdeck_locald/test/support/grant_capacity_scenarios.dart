@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:isar_community/isar.dart';
@@ -7,6 +8,8 @@ import 'package:serverdeck_locald/mcp/grants.dart';
 import 'package:serverdeck_locald/storage/automation_records.dart';
 import 'package:serverdeck_locald/storage/foundation_snapshot.dart';
 import 'package:serverdeck_locald/storage/key_custody.dart';
+import 'package:serverdeck_locald/storage/native_failure.dart';
+import 'package:serverdeck_locald/storage/records.dart';
 import 'package:serverdeck_locald/storage/state_store.dart';
 import 'package:serverdeck_windows/mcp_credential_files.dart';
 import 'package:serverdeck_windows/mutex.dart';
@@ -17,8 +20,8 @@ import '../automation/snapshot_test.dart' as g;
 import 'grant_transaction_scenarios.dart';
 import 'operational_snapshot_child.dart' show check, sameJson;
 
-/// Real accepted replacements plus a real retained native reader fill the pinned
-/// 64MiB map. No fake capacity code or reduced production map/file quota.
+/// Real replacements and settings maintenance with a retained native reader fill
+/// the unchanged 64MiB map. No fake capacity code or reduced production quota.
 Future<void> verifyActualGrantMapCapacity(
   StateStore store,
   McpCredentialFiles files, {
@@ -39,6 +42,45 @@ Future<void> verifyActualGrantMapCapacity(
     await release.future;
   });
   await pinned.future;
+  Future<void> fillRetainedPages() async {
+    final original = (await native.storedSettings.get(1))!.payload;
+    final parsed = jsonDecode(original) as Map;
+    final alternate = jsonEncode({
+      ...parsed,
+      'reduceMotion': !(parsed['reduceMotion'] as bool),
+    });
+    var full = false;
+    for (var n = 0; n < 20000; n++) {
+      try {
+        // Owned fixture maintenance restores the exact row in every commit.
+        // Only the real pinned reader prevents native page reclamation.
+        await native.writeTxn(() async {
+          await native.storedSettings.put(
+            StoredSettings()..payload = alternate,
+          );
+          await native.storedSettings.put(StoredSettings()..payload = original);
+        });
+      } catch (error) {
+        if (!isNativeCapacityFailure(error)) rethrow;
+        full = true;
+        break;
+      }
+    }
+    check(full && (await native.storedSettings.get(1))!.payload == original);
+    final fresh = await readOperationalSnapshot(
+      native,
+      key,
+      custody,
+      localAppData: files.localAppData,
+      lease: lease,
+    );
+    baselineRetained(store.operational, fresh);
+    for (final group in store.operational.rows.entries) {
+      check(fresh.rows[group.key]!.length == group.value.length);
+    }
+    stdout.writeln('ACTUAL_GRANT_NATIVE_MAINTENANCE_MAP_FULL_PROVED');
+  }
+
   Map<String, Object?>? failed;
   var committed = 0;
   final retired = <String>{};
@@ -87,7 +129,10 @@ Future<void> verifyActualGrantMapCapacity(
   }
 
   try {
-    for (var i = 0; i < 4090; i++) {
+    for (var i = 0; i < 128; i++) {
+      // Exercise real successful key/receipt replacements first, then fill with
+      // native maintenance rather than thousands of quadratic full-graph loads.
+      if (i == 8) await fillRetainedPages();
       final before = store.operational;
       final request = {
         ...grantCreate(20000 + i, 901),
@@ -121,7 +166,7 @@ Future<void> verifyActualGrantMapCapacity(
         break;
       }
     }
-    check(failed != null && committed > 0);
+    check(failed != null && committed >= 8);
   } finally {
     release.complete();
     await reader;

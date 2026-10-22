@@ -42,6 +42,7 @@ part 'mcp_grant_reads.dart';
 part 'operational_foundation_writes.dart';
 part 'trusted_foundation_writes.dart';
 part 'automation_profile_writes.dart';
+part 'automation_store_view.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
 class StateStore {
@@ -150,6 +151,20 @@ class StateStore {
   /// Trusted internal authority read; never exported by Local API or MCP.
   ClientGrantRecord currentMcpGrant(String id, {required DateTime at}) =>
       _currentMcpGrant(id, at: at);
+
+  ClientGrantRecord currentTrustedMcpGrant(String id, {required DateTime at}) =>
+      _currentMcpGrant(id, at: at, format: _AutomationFormat.trusted);
+
+  Future<McpGrantKey> openTrustedMcpGrantKey(
+    String id, {
+    required DateTime Function() clock,
+    Duration? publicationDeadline,
+  }) => _openMcpGrantKey(
+    id,
+    clock: clock,
+    publicationDeadline: publicationDeadline,
+    format: _AutomationFormat.trusted,
+  );
 
   Future<McpGrantKey> openMcpGrantKey(
     String id, {
@@ -434,11 +449,23 @@ class StateStore {
   Future<Map<String, Object?>> mutateOwnerGrant(
     OwnerGrantCommand command, {
     required DateTime Function() clock,
-  }) {
+  }) => _mutateOwnerGrant(command, clock, _AutomationFormat.operational);
+
+  /// Explicit native schema3 entry; owner/session/gate admission is separate.
+  Future<Map<String, Object?>> mutateTrustedOwnerGrant(
+    OwnerGrantCommand command, {
+    required DateTime Function() clock,
+  }) => _mutateOwnerGrant(command, clock, _AutomationFormat.trusted);
+
+  Future<Map<String, Object?>> _mutateOwnerGrant(
+    OwnerGrantCommand command,
+    DateTime Function() clock,
+    _AutomationFormat format,
+  ) {
     try {
       if (_closing) throw StateError('NOT_READY');
       _ensure();
-      if (_operational == null || _operationalRoot == null)
+      if (!_hasAutomation(format) || _operationalRoot == null)
         throw StateError('STORAGE_BLOCKED');
       final mac = base64.decode(
         _custody.receiptDigestSync(_receiptKey, command.canonicalRequest),
@@ -454,7 +481,9 @@ class StateStore {
         throw StateError('RESOURCE_LIMIT');
       final pending = _AutomationPending(digest);
       _pendingAutomation[command.requestId] = pending;
-      final run = _tail.then((_) => _writeOwnerGrant(command, digest, clock));
+      final run = _tail.then(
+        (_) => _writeOwnerGrant(command, digest, clock, format),
+      );
       _tail = run.then<void>(
         (result) {
           _pendingAutomation.remove(command.requestId);
@@ -481,7 +510,7 @@ class StateStore {
       );
       return pending.result.future;
     } on StateError catch (error) {
-      if (_operational != null &&
+      if (_hasAutomation(format) &&
           !{
             'NOT_READY',
             'FORBIDDEN',
@@ -504,7 +533,7 @@ class StateStore {
         ),
       );
     } catch (_) {
-      if (_operational != null) _blocked = true;
+      if (_hasAutomation(format)) _blocked = true;
       return Future.error(StateError('STORAGE_BLOCKED'));
     }
   }

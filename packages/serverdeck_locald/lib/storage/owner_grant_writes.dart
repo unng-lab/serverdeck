@@ -8,20 +8,23 @@ final class _AutomationPending {
 }
 
 extension _OwnerGrantWrites on StateStore {
-  void _grantLive() {
+  void _grantLive([_AutomationFormat format = _AutomationFormat.operational]) {
     // Already accepted work drains during close; intake rejects new work.
     if (_blocked ||
         _closed ||
         !_lease.isHeld ||
         _custody.ownerSid != currentUserSid() ||
-        _operational == null)
+        !_hasAutomation(format))
       throw StateError('STORAGE_BLOCKED');
     _custody.receiptDigestSync(_receiptKey, {
       'purpose': 'grant-write-liveness',
     });
   }
 
-  DateTime _grantInstant(DateTime Function() clock) {
+  DateTime _grantInstant(
+    DateTime Function() clock, [
+    _AutomationFormat format = _AutomationFormat.operational,
+  ]) {
     var at = DateTime.fromMillisecondsSinceEpoch(
       clock().millisecondsSinceEpoch,
       isUtc: true,
@@ -33,10 +36,10 @@ extension _OwnerGrantWrites on StateStore {
     for (final receipt in _state.receipts.values) {
       floor(DateTime.parse(receipt.committedAt));
     }
-    for (final receipt in _operational!.automation.receipts.values) {
+    for (final receipt in _automationView(format).automation.receipts.values) {
       floor(receipt.createdAt);
     }
-    for (final grant in _operational!.automation.grants.values) {
+    for (final grant in _automationView(format).automation.grants.values) {
       floor(grant.issuedAt);
       if (grant.revokedAt != null) floor(grant.revokedAt!);
     }
@@ -79,9 +82,8 @@ extension _OwnerGrantWrites on StateStore {
         issuedAt: grant.issuedAt.toIso8601String(),
       );
 
-  bool _sameGrantSnapshot(OperationalSnapshot left, OperationalSnapshot right) {
-    if (left.foundation.rows.digest() != right.foundation.rows.digest() ||
-        left.rows.length != right.rows.length)
+  bool _sameGrantSnapshot(_AutomationView left, _AutomationView right) {
+    if (!left.sameFoundation(right) || left.rows.length != right.rows.length)
       return false;
     for (final group in left.rows.entries) {
       final retained = {
@@ -99,26 +101,14 @@ extension _OwnerGrantWrites on StateStore {
     return true;
   }
 
-  Future<OperationalSnapshot> _reloadGrants() async {
-    _grantLive();
-    final current = await readOperationalSnapshot(
-      _isar,
-      _receiptKey,
-      _custody,
-      localAppData: _operationalRoot!,
-      lease: _lease,
-    );
-    _grantLive();
-    return current;
-  }
-
   Future<Map<String, Object?>> _writeOwnerGrant(
     OwnerGrantCommand command,
     String digest,
     DateTime Function() clock,
+    _AutomationFormat format,
   ) async {
-    _grantLive();
-    final previous = _operational!, graph = previous.automation;
+    _grantLive(format);
+    final previous = _automationView(format), graph = previous.automation;
     final receipt = graph.receipts[command.requestId];
     if (receipt != null) {
       if (receipt.originGrantId != null) throw StateError('FORBIDDEN');
@@ -127,10 +117,10 @@ extension _OwnerGrantWrites on StateStore {
         throw StateError('IDEMPOTENCY_CONFLICT');
       _authorityUnavailable = true;
       try {
-        final loaded = await _reloadGrants();
+        final loaded = await _reloadGrants(format);
         if (!_sameGrantSnapshot(previous, loaded))
           throw StateError('STORAGE_BLOCKED');
-        _operational = loaded;
+        _publishAutomation(loaded);
         _authorityUnavailable = false;
         return Map.unmodifiable(receipt.result);
       } catch (_) {
@@ -165,7 +155,7 @@ extension _OwnerGrantWrites on StateStore {
     final receiptId = _nextGrantNativeId(previous.rows['receipts']!);
     late final DateTime at;
     try {
-      at = _grantInstant(clock);
+      at = _grantInstant(clock, format);
     } catch (_) {
       _blocked = true;
       throw StateError('STORAGE_BLOCKED');
@@ -237,7 +227,7 @@ extension _OwnerGrantWrites on StateStore {
       candidate['grants']![candidate['grants']!.indexOf(oldRow)] = grantRow;
     }
     candidate['receipts']!.add(receiptRow);
-    var bytes = 0;
+    var bytes = previous.foundationPayloadBytes;
     for (final rows in candidate.values) {
       for (final row in rows) {
         bytes += utf8.encode(row.payload).length;
@@ -245,8 +235,8 @@ extension _OwnerGrantWrites on StateStore {
       }
     }
     try {
-      await AutomationSnapshot.load(foundation: _state, collections: candidate);
-      _grantLive();
+      await previous.validate(candidate);
+      _grantLive(format);
     } catch (_) {
       _blocked = true;
       throw StateError('STORAGE_BLOCKED');
@@ -255,21 +245,21 @@ extension _OwnerGrantWrites on StateStore {
     try {
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.beforeStage);
-      _grantLive();
+      _grantLive(format);
       if (!revoke) {
         await _grantFiles().stage(_grantBinding(next));
-        _grantLive();
+        _grantLive(format);
       }
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.afterStage);
-      _grantLive();
+      _grantLive(format);
       _authorityUnavailable = true;
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.beforeTransaction);
-      _grantLive();
+      _grantLive(format);
       await _isar.writeTxn(() async {
         entered = true;
-        _grantLive();
+        _grantLive(format);
         final actual = await _isar.storedMcpGrants.getByEntityId(next.id);
         final consumed = await _isar.storedAutomationReceipts.getByEntityId(
           command.requestId,
@@ -285,7 +275,7 @@ extension _OwnerGrantWrites on StateStore {
                       actual.payload != oldRow.payload) ||
             await _isar.storedAutomationReceipts.get(receiptId) != null)
           throw StateError('STORAGE_BLOCKED');
-        _grantLive();
+        _grantLive(format);
         if (await _isar.storedMcpGrants.put(
               StoredMcpGrant()
                 ..id = grantRow.nativeId
@@ -306,15 +296,15 @@ extension _OwnerGrantWrites on StateStore {
           throw StateError('STORAGE_BLOCKED');
         if (grantWriteProbesEnabled)
           await GrantWriteProbe.hit(GrantWriteBoundary.afterReceiptWrite);
-        _grantLive();
+        _grantLive(format);
       });
       committed = true;
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.afterCommit);
-      _grantLive();
+      _grantLive(format);
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.beforePublication);
-      final loaded = await _reloadGrants();
+      final loaded = await _reloadGrants(format);
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.afterPublication);
       // Check exact expected raw delta, including every unaffected collection.
@@ -332,12 +322,11 @@ extension _OwnerGrantWrites on StateStore {
             throw StateError('STORAGE_BLOCKED');
         }
       }
-      if (loaded.foundation.rows.digest() != previous.foundation.rows.digest())
-        throw StateError('STORAGE_BLOCKED');
+      if (!previous.sameFoundation(loaded)) throw StateError('STORAGE_BLOCKED');
       if (grantWriteProbesEnabled)
         await GrantWriteProbe.hit(GrantWriteBoundary.beforeAcknowledgement);
-      _grantLive();
-      _operational = loaded;
+      _grantLive(format);
+      _publishAutomation(loaded);
       // Listeners synchronously retire interests before authority reopens or an
       // acknowledgement escapes. A throw takes the existing blocked path while
       // retaining the committed receipt; it cannot undo the durable mutation.
@@ -357,10 +346,10 @@ extension _OwnerGrantWrites on StateStore {
         rethrow;
       if (entered && !committed && isNativeCapacityFailure(error)) {
         try {
-          final restored = await _reloadGrants();
+          final restored = await _reloadGrants(format);
           if (!_sameGrantSnapshot(previous, restored))
             throw StateError('STORAGE_BLOCKED');
-          _operational = restored;
+          _publishAutomation(restored);
           _authorityUnavailable = false;
         } catch (_) {
           _blocked = true;

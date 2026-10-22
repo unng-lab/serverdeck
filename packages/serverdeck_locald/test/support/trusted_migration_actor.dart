@@ -30,6 +30,7 @@ import 'trusted_snapshot_child.dart' show seedAutomation;
 import 'trusted_schema_child.dart' as raw show retained;
 import 'trusted_graph_write_fixture.dart';
 import 'trusted_migration_capacity_fixture.dart';
+import 'trusted_automation_write_fixture.dart';
 import 'mcp_runtime_actor.dart' show check, ownRoot;
 
 final class FaultProtection implements UserProtection {
@@ -459,7 +460,9 @@ Future<void> main(List<String> args) async {
                   result.foundation.trust.isEmpty,
             );
           }
-          if (mode == 'writer-graph' || mode.startsWith('writer-busy-')) {
+          if (mode == 'writer-graph' ||
+              mode.startsWith('writer-busy-') ||
+              mode.startsWith('writer-automation')) {
             final expected = jsonDecode(
               File(p.join(root, 'fixture-expected.json')).readAsStringSync(),
             ) as Map;
@@ -468,15 +471,25 @@ Future<void> main(List<String> args) async {
               expected['workspaceId'] as String,
               expected['receiptKeyId'] as String,
             );
-            await exerciseTrustedGraphWrite(
-              root,
-              custody,
-              key,
-              lease,
-              busyState: mode.startsWith('writer-busy-')
-                  ? mode.substring('writer-busy-'.length)
-                  : null,
-            );
+            if (mode.startsWith('writer-automation')) {
+              await exerciseTrustedAutomationWrite(
+                root,
+                custody,
+                key,
+                lease,
+                mode,
+              );
+            } else {
+              await exerciseTrustedGraphWrite(
+                root,
+                custody,
+                key,
+                lease,
+                busyState: mode.startsWith('writer-busy-')
+                    ? mode.substring('writer-busy-'.length)
+                    : null,
+              );
+            }
           }
         }
       }

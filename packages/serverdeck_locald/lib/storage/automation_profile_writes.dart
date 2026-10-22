@@ -35,11 +35,39 @@ extension AutomationProfileWrites on StateStore {
     required String? originGrantId,
     required int? expectedGrantRevision,
     required DateTime Function() clock,
-  }) {
+  }) => _mutateAutomationProfile(
+    command,
+    originGrantId,
+    expectedGrantRevision,
+    clock,
+    _AutomationFormat.operational,
+  );
+
+  /// Explicit schema3 catalog write; native actor/gate admission stays separate.
+  Future<Map<String, Object?>> mutateTrustedAutomationProfile(
+    AutomationProfileCommand command, {
+    required String? originGrantId,
+    required int? expectedGrantRevision,
+    required DateTime Function() clock,
+  }) => _mutateAutomationProfile(
+    command,
+    originGrantId,
+    expectedGrantRevision,
+    clock,
+    _AutomationFormat.trusted,
+  );
+
+  Future<Map<String, Object?>> _mutateAutomationProfile(
+    AutomationProfileCommand command,
+    String? originGrantId,
+    int? expectedGrantRevision,
+    DateTime Function() clock,
+    _AutomationFormat format,
+  ) {
     try {
       if (_closing) throw StateError('NOT_READY');
       _ensure();
-      if (_operational == null || _operationalRoot == null)
+      if (!_hasAutomation(format) || _operationalRoot == null)
         throw StateError('STORAGE_BLOCKED');
       if (originGrantId != null) {
         requireUuid(originGrantId);
@@ -77,6 +105,7 @@ extension AutomationProfileWrites on StateStore {
           expectedGrantRevision,
           digest,
           clock,
+          format,
         ),
       );
       _tail = run.then<void>(
@@ -96,7 +125,7 @@ extension AutomationProfileWrites on StateStore {
       return Future.error(StateError('VALIDATION'));
     } catch (error) {
       final code = _profileWriteError(error);
-      if (code == 'STORAGE_BLOCKED' && _operational != null) _blocked = true;
+      if (code == 'STORAGE_BLOCKED' && _hasAutomation(format)) _blocked = true;
       return Future.error(StateError(code));
     }
   }
@@ -115,10 +144,15 @@ extension AutomationProfileWrites on StateStore {
       ? error.message
       : 'STORAGE_BLOCKED';
 
-  void _profileInitiator(String? origin, int? revision, DateTime at) {
-    _grantLive();
+  void _profileInitiator(
+    String? origin,
+    int? revision,
+    DateTime at,
+    _AutomationFormat format,
+  ) {
+    _grantLive(format);
     if (origin == null) return;
-    final grant = _operational!.automation.grants[origin];
+    final grant = _automationView(format).automation.grants[origin];
     if (grant == null ||
         grant.revision != revision ||
         !grant.isCurrentAt(at) ||
@@ -132,14 +166,15 @@ extension AutomationProfileWrites on StateStore {
     int? grantRevision,
     String digest,
     DateTime Function() clock,
+    _AutomationFormat format,
   ) async {
-    _grantLive();
-    final previous = _operational!, graph = previous.automation;
-    var at = _grantInstant(clock);
+    _grantLive(format);
+    final previous = _automationView(format), graph = previous.automation;
+    var at = _grantInstant(clock, format);
     for (final revision in graph.revisions.values) {
       if (revision.createdAt.isAfter(at)) at = revision.createdAt;
     }
-    _profileInitiator(origin, grantRevision, at);
+    _profileInitiator(origin, grantRevision, at, format);
     final receipt = graph.receipts[command.requestId];
     if (receipt != null) {
       if (receipt.originGrantId != origin) throw StateError('FORBIDDEN');
@@ -150,10 +185,10 @@ extension AutomationProfileWrites on StateStore {
       // Replay still validates actual retained/native storage, never rewrites it.
       _authorityUnavailable = true;
       try {
-        final loaded = await _reloadGrants();
+        final loaded = await _reloadGrants(format);
         if (!_sameGrantSnapshot(previous, loaded))
           throw StateError('STORAGE_BLOCKED');
-        _operational = loaded;
+        _publishAutomation(loaded);
         _authorityUnavailable = false;
         return Map.unmodifiable(receipt.result);
       } catch (_) {
@@ -262,7 +297,7 @@ extension AutomationProfileWrites on StateStore {
     }
     if (versionRow != null) candidate['revisions']!.add(versionRow);
     candidate['receipts']!.add(receiptRow);
-    var bytes = 0;
+    var bytes = previous.foundationPayloadBytes;
     for (final rows in candidate.values) {
       for (final value in rows) {
         bytes += utf8.encode(value.payload).length;
@@ -270,8 +305,13 @@ extension AutomationProfileWrites on StateStore {
       }
     }
     try {
-      await AutomationSnapshot.load(foundation: _state, collections: candidate);
-      _profileInitiator(origin, grantRevision, _grantInstant(clock));
+      await previous.validate(candidate);
+      _profileInitiator(
+        origin,
+        grantRevision,
+        _grantInstant(clock, format),
+        format,
+      );
     } catch (error) {
       if (error is StateError && error.message == 'FORBIDDEN') rethrow;
       _blocked = true;
@@ -280,10 +320,15 @@ extension AutomationProfileWrites on StateStore {
     var entered = false, committed = false;
     try {
       _authorityUnavailable = true;
-      _grantLive();
+      _grantLive(format);
       await _isar.writeTxn(() async {
         entered = true;
-        _profileInitiator(origin, grantRevision, _grantInstant(clock));
+        _profileInitiator(
+          origin,
+          grantRevision,
+          _grantInstant(clock, format),
+          format,
+        );
         final actual = await _isar.storedAutomationProfiles.getByEntityId(id!);
         if ((oldRow == null
                 ? actual != null
@@ -340,10 +385,10 @@ extension AutomationProfileWrites on StateStore {
             1) {
           throw StateError('STORAGE_BLOCKED');
         }
-        _grantLive();
+        _grantLive(format);
       });
       committed = true;
-      final loaded = await _reloadGrants();
+      final loaded = await _reloadGrants(format);
       for (final group in candidate.entries) {
         final actual = {
           for (final value in loaded.rows[group.key]!) value.nativeId: value,
@@ -359,10 +404,9 @@ extension AutomationProfileWrites on StateStore {
           }
         }
       }
-      if (loaded.foundation.rows.digest() != previous.foundation.rows.digest())
-        throw StateError('STORAGE_BLOCKED');
-      _grantLive();
-      _operational = loaded;
+      if (!previous.sameFoundation(loaded)) throw StateError('STORAGE_BLOCKED');
+      _grantLive(format);
+      _publishAutomation(loaded);
       _authorityUnavailable = false;
       return Map.unmodifiable(nextReceipt.result);
     } catch (error) {
@@ -371,10 +415,10 @@ extension AutomationProfileWrites on StateStore {
           !committed &&
           (isNativeCapacityFailure(error) || policyDenied)) {
         try {
-          final restored = await _reloadGrants();
+          final restored = await _reloadGrants(format);
           if (!_sameGrantSnapshot(previous, restored))
             throw StateError('STORAGE_BLOCKED');
-          _operational = restored;
+          _publishAutomation(restored);
           _authorityUnavailable = false;
         } catch (_) {
           _blocked = true;

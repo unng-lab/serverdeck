@@ -16,6 +16,7 @@ import 'grant_transaction_scenarios.dart' show grantCreate;
 
 const profileCatalogModes = {
   'catalog-basic',
+  'catalog-trusted-refusal',
   'catalog-origin',
   'catalog-queue',
   'catalog-revisions',
@@ -57,6 +58,35 @@ Future<StateStore> verifyProfileCatalogStorage(
     clock: clock,
   );
   final command = createCatalogCommand(72000);
+  if (mode == 'catalog-trusted-refusal') {
+    final original = store.operational;
+    await refusal(
+      () => store.mutateTrustedOwnerGrant(
+        OwnerGrantCommand.parse('grant.create', grantCreate(78000, 78001)),
+        clock: clock,
+      ),
+      'STORAGE_BLOCKED',
+    );
+    await refusal(
+      () => store.mutateTrustedAutomationProfile(
+        command,
+        originGrantId: null,
+        expectedGrantRevision: null,
+        clock: clock,
+      ),
+      'STORAGE_BLOCKED',
+    );
+    await refusal(
+      () async => store.currentTrustedMcpGrant(g.grantId, at: clock()),
+      'STORAGE_BLOCKED',
+    );
+    await refusal(
+      () => store.openTrustedMcpGrantKey(g.grantId, clock: clock),
+      'STORAGE_BLOCKED',
+    );
+    check(store.isAutomationReady && identical(store.operational, original));
+    check(store.currentMcpGrant(g.grantId, at: clock()).id == g.grantId);
+  }
   final first = write(command);
   first.ignore();
   check(identical(first, write(command)));
