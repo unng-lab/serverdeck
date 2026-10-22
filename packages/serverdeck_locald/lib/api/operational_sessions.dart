@@ -11,7 +11,7 @@ const _mcpMethods = {
 
 /// Same owner-isolate registry for all operational owner/MCP channels. Public
 /// methods cannot create a session or change its verified role.
-final class OperationalSessions {
+final class OperationalSessions extends _Sessions<OperationalPipePeer> {
   /// Trusted locald composition creates its generation keeper before intake.
   /// The caller still owns the peer; this registry owns only the derived gate.
   static Future<OperationalSessions> withNativePublicationGate({
@@ -46,6 +46,91 @@ final class OperationalSessions {
   }
 
   OperationalSessions({
+    required super.generation,
+    super.elapsed,
+    super.onDetached,
+    super.onExpiredChannel,
+    super.onChanged,
+  });
+  @override
+  OperationalSessionRequest _makeRequest(
+    String channel,
+    _Session<OperationalPipePeer> session,
+    String method,
+  ) => OperationalSessionRequest._(this, channel, session, method);
+  Future<OperationalSessionRequest> begin(
+    String channel,
+    String id,
+    String method,
+  ) async => await _begin(channel, id, method) as OperationalSessionRequest;
+  OperationalSessionRequest reserve(String channel, String id, String method) =>
+      _reserve(channel, id, method) as OperationalSessionRequest;
+}
+
+/// Native format3 registry, closed to format2 bootstrap/service types.
+final class TrustedSessions extends _Sessions<TrustedPipePeer> {
+  static Future<TrustedSessions> withNativePublicationGate({
+    required String generation,
+    required TrustedPipePeer peer,
+    Duration Function()? elapsed,
+    void Function(String)? onDetached,
+    void Function(String)? onExpiredChannel,
+    void Function()? onChanged,
+  }) async {
+    requireUuid(generation);
+    _nativeClientRole(
+      _ServerPeer.trusted(peer),
+    ); // Requires an actual locald-side native peer.
+    final creating = peer.publicationGate(generation);
+    creating.ignore();
+    try {
+      final gate = await creating.timeout(rpcDeadline);
+      final registry = TrustedSessions(
+        generation: generation,
+        elapsed: elapsed,
+        onDetached: onDetached,
+        onExpiredChannel: onExpiredChannel,
+        onChanged: onChanged,
+      );
+      registry._targets = _TargetChanges(registry, gate);
+      return registry;
+    } catch (error) {
+      creating.then<void>((gate) => gate.close()).ignore();
+      throw StateError(
+        error is TimeoutException ? 'TIMEOUT' : 'SERVICE_UNAVAILABLE',
+      );
+    }
+  }
+
+  TrustedSessions({
+    required super.generation,
+    super.elapsed,
+    super.onDetached,
+    super.onExpiredChannel,
+    super.onChanged,
+  });
+  @override
+  TrustedSessionRequest _makeRequest(
+    String channel,
+    _Session<TrustedPipePeer> session,
+    String method,
+  ) => TrustedSessionRequest._(this, channel, session, method);
+  Future<TrustedSessionRequest> begin(
+    String channel,
+    String id,
+    String method,
+  ) async => await _begin(channel, id, method) as TrustedSessionRequest;
+  TrustedSessionRequest reserve(String channel, String id, String method) =>
+      _reserve(channel, id, method) as TrustedSessionRequest;
+}
+
+sealed class _Sessions<P> {
+  _SessionRequest<P> _makeRequest(
+    String channel,
+    _Session<P> session,
+    String method,
+  );
+  _Sessions({
     required this.generation,
     Duration Function()? elapsed,
     void Function(String)? onDetached,
@@ -62,7 +147,7 @@ final class OperationalSessions {
   late final Duration Function() _clock;
   final void Function(String)? _onDetached, _onExpiredChannel;
   final void Function()? _onChanged;
-  final _sessions = <String, _OperationalSession>{};
+  final _sessions = <String, _Session<P>>{};
   final _detachListeners = <void Function(String)>{};
   _TargetChanges? _targets;
   Future<void>? _closeFuture;
@@ -162,14 +247,15 @@ final class OperationalSessions {
     String channel,
     String id,
     OperationalHello hello,
-    OperationalPipePeer peer,
+    P peer,
+    _ServerPeer binding,
   ) {
     if (_stopping) throw StateError('NOT_READY');
     expire();
     if (_stopping) throw StateError('NOT_READY');
     if (hello.generation != generation ||
-        hello.buildId != peer.buildId ||
-        hello.clientRole != _clientRole(peer) ||
+        hello.buildId != binding.buildId ||
+        hello.clientRole != _nativeClientRole(binding) ||
         _sessions.containsKey(channel) ||
         _sessions.values.any((s) => s.id == id))
       throw StateError('UNAUTHORIZED');
@@ -177,10 +263,11 @@ final class OperationalSessions {
         hello.clientRole == OperationalRole.mcp && mcpCount >= 4) {
       throw StateError('RESOURCE_LIMIT');
     }
-    final session = _OperationalSession(
+    final session = _Session<P>(
       id,
       hello,
       peer,
+      binding,
       _clock() + sessionLease,
     );
     _sessions[channel] = session;
@@ -189,24 +276,24 @@ final class OperationalSessions {
     if (!_current(channel, session)) throw StateError('UNAUTHORIZED');
   }
 
-  bool _current(String channel, _OperationalSession session) =>
+  bool _current(String channel, _Session<P> session) =>
       !_stopping &&
       identical(_sessions[channel], session) &&
       _clock() < session.expires;
 
   /// Reserve bounded interest synchronously before awaiting a native proof.
   /// The method gate runs before any method-specific payload/object lookup.
-  Future<OperationalSessionRequest> begin(
+  Future<_SessionRequest<P>> _begin(
     String channel,
     String id,
     String method,
   ) async {
-    final request = reserve(channel, id, method);
+    final request = _reserve(channel, id, method);
     await completeAdmission(request);
     return request;
   }
 
-  OperationalSessionRequest reserve(String channel, String id, String method) {
+  _SessionRequest<P> _reserve(String channel, String id, String method) {
     expire();
     final session = _sessions[channel];
     if (session == null || session.id != id || !_current(channel, session))
@@ -219,10 +306,10 @@ final class OperationalSessions {
     if (session.pending >= maxPendingPerSession)
       throw StateError('RESOURCE_LIMIT');
     session.pending++;
-    return OperationalSessionRequest._(this, channel, session, method);
+    return _makeRequest(channel, session, method);
   }
 
-  Future<void> completeAdmission(OperationalSessionRequest request) {
+  Future<void> completeAdmission(_SessionRequest<P> request) {
     if (!request.belongsTo(this)) return Future.error(StateError('FORBIDDEN'));
     try {
       request._identityLive();
@@ -232,7 +319,7 @@ final class OperationalSessions {
     }
   }
 
-  Future<void> _completeAdmission(OperationalSessionRequest request) async {
+  Future<void> _completeAdmission(_SessionRequest<P> request) async {
     try {
       try {
         if (ownerServiceProbesEnabled) {
@@ -327,11 +414,12 @@ final class OperationalSessions {
   }
 }
 
-final class _OperationalSession {
-  _OperationalSession(this.id, this.hello, this.peer, this.expires);
+final class _Session<P> {
+  _Session(this.id, this.hello, this.peer, this.binding, this.expires);
   final String id;
   final OperationalHello hello;
-  final OperationalPipePeer peer;
+  final P peer;
+  final _ServerPeer binding;
   OperationalRole get role => hello.clientRole;
   Duration expires;
   int pending = 0;
@@ -341,19 +429,14 @@ final class _OperationalSession {
   ClientGrantRecord? grant;
 }
 
-final class OperationalSessionRequest {
-  OperationalSessionRequest._(
-    this._registry,
-    this.channel,
-    this._session,
-    this.method,
-  ) : _began = _registry._clock();
-  final OperationalSessions _registry;
-  final _OperationalSession _session;
+sealed class _SessionRequest<P> {
+  _SessionRequest._(this._registry, this.channel, this._session, this.method)
+    : _began = _registry._clock();
+  final _Sessions<P> _registry;
+  final _Session<P> _session;
   final String channel, method;
   final Duration _began;
-  bool belongsTo(OperationalSessions registry) =>
-      identical(_registry, registry);
+  bool belongsTo(_Sessions<P> registry) => identical(_registry, registry);
   bool _completed = false;
   bool _initialAdmissionProved = false;
   Future<void>? _initialAdmission;
@@ -362,9 +445,6 @@ final class OperationalSessionRequest {
     return _initialAdmissionProved;
   }
 
-  bool _firstOpen = false;
-  OperationalOpenFailure? _openFailure;
-  OperationalOpenFailure? get openFailure => _openFailure;
   Duration get rpcRemaining {
     _live();
     return rpcBudgetRemaining;
@@ -417,6 +497,78 @@ final class OperationalSessionRequest {
       _registry.disconnect(channel);
   }
 
+  Future<void> _stableLive() async {
+    _identityLive();
+    final authority = _session.authority;
+    if (authority == null) {
+      _live();
+      return;
+    }
+    await authority._stable(_live, rpcBudgetRemaining);
+  }
+
+  bool isAuthorityPublicationPause(Object error) =>
+      _session.authority?._publicationPause(error) ?? false;
+
+  Future<void> revalidate({
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
+    while (true) {
+      await _stableLive();
+      try {
+        final budget = rpcBudgetRemaining;
+        final actual = _session.binding.revalidate(
+          observeNativeCompletion: observeNativeCompletion,
+        );
+        actual.ignore();
+        await actual.timeout(budget);
+      } on TimeoutException {
+        throw StateError('TIMEOUT');
+      } catch (error) {
+        if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
+        // Never remove a different session that subsequently reused a channel ID.
+        if (identical(_registry._sessions[channel], _session))
+          _registry.disconnect(channel);
+        throw StateError('UNAUTHORIZED');
+      }
+      rpcBudgetRemaining;
+      try {
+        _live();
+        return;
+      } catch (error) {
+        if (!isAuthorityPublicationPause(error)) rethrow;
+      }
+    }
+  }
+
+  void complete() {
+    if (_completed) return;
+    _completed = true;
+    _session.pending--;
+  }
+}
+
+final class OperationalSessionRequest
+    extends _SessionRequest<OperationalPipePeer> {
+  OperationalSessionRequest._(
+    OperationalSessions registry,
+    String channel,
+    _Session<OperationalPipePeer> session,
+    String method,
+  ) : super._(registry, channel, session, method);
+  @override
+  OperationalSessions get _registry => super._registry as OperationalSessions;
+  bool _firstOpen = false;
+  OperationalOpenFailure? _openFailure;
+  OperationalOpenFailure? get openFailure => _openFailure;
+
+  Future<OperationalMcpContext> mcpContextWhenStable() async {
+    _identityLive();
+    final authority = _session.authority;
+    if (authority == null) throw StateError('FORBIDDEN');
+    return authority._stable(mcpContext, rpcBudgetRemaining);
+  }
+
   /// Consult live policy before object lookup and again before publishing results.
   ClientGrantRecord authorizeMcp({McpScope? scope, String? serverId}) {
     _live();
@@ -450,26 +602,6 @@ final class OperationalSessionRequest {
       throw StateError('FORBIDDEN');
     }
   }
-
-  Future<void> _stableLive() async {
-    _identityLive();
-    final authority = _session.authority;
-    if (authority == null) {
-      _live();
-      return;
-    }
-    await authority._stable(_live, rpcBudgetRemaining);
-  }
-
-  Future<OperationalMcpContext> mcpContextWhenStable() async {
-    _identityLive();
-    final authority = _session.authority;
-    if (authority == null) throw StateError('FORBIDDEN');
-    return authority._stable(mcpContext, rpcBudgetRemaining);
-  }
-
-  bool isAuthorityPublicationPause(Object error) =>
-      _session.authority?._publicationPause(error) ?? false;
 
   Future<McpOpenResult> openGrant(
     OperationalMcpAuthority authority,
@@ -526,41 +658,15 @@ final class OperationalSessionRequest {
       authority._interests.remove(interest);
     }
   }
+}
 
-  Future<void> revalidate({
-    void Function(Future<void>)? observeNativeCompletion,
-  }) async {
-    while (true) {
-      await _stableLive();
-      try {
-        final budget = rpcBudgetRemaining;
-        final actual = _session.peer.revalidate(
-          observeNativeCompletion: observeNativeCompletion,
-        );
-        actual.ignore();
-        await actual.timeout(budget);
-      } on TimeoutException {
-        throw StateError('TIMEOUT');
-      } catch (error) {
-        if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
-        // Never remove a different session that subsequently reused a channel ID.
-        if (identical(_registry._sessions[channel], _session))
-          _registry.disconnect(channel);
-        throw StateError('UNAUTHORIZED');
-      }
-      rpcBudgetRemaining;
-      try {
-        _live();
-        return;
-      } catch (error) {
-        if (!isAuthorityPublicationPause(error)) rethrow;
-      }
-    }
-  }
-
-  void complete() {
-    if (_completed) return;
-    _completed = true;
-    _session.pending--;
-  }
+/// Native format3 admission/interest only. No format2 MCP authority or context
+/// can be installed here; production format3 grant composition is separate.
+final class TrustedSessionRequest extends _SessionRequest<TrustedPipePeer> {
+  TrustedSessionRequest._(
+    TrustedSessions registry,
+    String channel,
+    _Session<TrustedPipePeer> session,
+    String method,
+  ) : super._(registry, channel, session, method);
 }

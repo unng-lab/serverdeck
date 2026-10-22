@@ -22,12 +22,16 @@ part 'operational_grants.dart';
 part 'operational_context.dart';
 part 'operational_open_failure.dart';
 part 'operational_target_changes.dart';
+part 'server_peer.dart';
 
 String _randomNonce() => base64Url
     .encode(List<int>.generate(32, (_) => Random.secure().nextInt(256)))
     .replaceAll('=', '');
 
-OperationalRole _clientRole(OperationalPipePeer peer) {
+OperationalRole _clientRole(OperationalPipePeer peer) =>
+    _nativeClientRole(_ServerPeer.operational(peer));
+
+OperationalRole _nativeClientRole(_ServerPeer peer) {
   if (peer.localRole != BundlePeerRole.locald) throw StateError('UNAUTHORIZED');
   return switch (peer.role) {
     BundlePeerRole.owner => OperationalRole.owner,
@@ -46,44 +50,81 @@ bool _sameMac(List<int> a, List<int> b) {
 
 /// Operational server bootstrap. Only a private native peer can supply a role;
 /// the registry has no public registration or caller-selected role API.
-final class OperationalServerHandshake {
-  factory OperationalServerHandshake({
+final class OperationalServerHandshake
+    extends _ServerHandshake<OperationalPipePeer, OperationalSessions> {
+  OperationalServerHandshake({
     required OperationalPipePeer peer,
     required List<int> token,
     required String channel,
     required OperationalSessions sessions,
     Duration Function()? elapsed,
-  }) {
-    if (token.length != 32 ||
-        token.any((b) => b < 0 || b > 255) ||
-        channel.isEmpty) {
-      throw ArgumentError('INVALID_HANDSHAKE_CONFIGURATION');
-    }
-    final role = _clientRole(peer);
-    return OperationalServerHandshake._(
-      peer,
-      Uint8List.fromList(token),
-      channel,
-      sessions,
-      role,
-      elapsed,
-    );
-  }
-  OperationalServerHandshake._(
+  }) : super._(
+         peer,
+         _ServerPeer.operational(peer),
+         token,
+         channel,
+         sessions,
+         elapsed,
+       );
+}
+
+/// The format3 entry accepts only its actual native proof and registry types.
+final class TrustedServerHandshake
+    extends _ServerHandshake<TrustedPipePeer, TrustedSessions> {
+  TrustedServerHandshake({
+    required TrustedPipePeer peer,
+    required List<int> token,
+    required String channel,
+    required TrustedSessions sessions,
+    Duration Function()? elapsed,
+  }) : super._(
+         peer,
+         _ServerPeer.trusted(peer),
+         token,
+         channel,
+         sessions,
+         elapsed,
+       );
+}
+
+OperationalRole _bootstrapRole(
+  List<int> token,
+  String channel,
+  _ServerPeer peer,
+) {
+  if (token.length != 32 ||
+      token.any((b) => b < 0 || b > 255) ||
+      channel.isEmpty)
+    throw ArgumentError('INVALID_HANDSHAKE_CONFIGURATION');
+  // Preserve configuration validation first, but reject a wrong native side
+  // before allocating any owned secret buffer in a constructor that can fail.
+  return _nativeClientRole(peer);
+}
+
+sealed class _ServerHandshake<P, R extends _Sessions<P>> {
+  _ServerHandshake._(
     this.peer,
-    this._token,
+    this._binding,
+    List<int> token,
     this.channel,
     this.sessions,
-    this.role,
     Duration Function()? elapsed,
-  ) {
-    _clock = elapsed ?? () => _watch.elapsed;
-    _deadline = _clock() + rpcDeadline;
+  ) : role = _bootstrapRole(token, channel, _binding),
+      _token = Uint8List.fromList(token) {
+    try {
+      _clock = elapsed ?? () => _watch.elapsed;
+      _deadline = _clock() + rpcDeadline;
+    } catch (_) {
+      _token.fillRange(0, _token.length, 0);
+      _watch.stop();
+      rethrow;
+    }
   }
 
-  final OperationalPipePeer peer;
+  final P peer;
+  final _ServerPeer _binding;
   final String channel;
-  final OperationalSessions sessions;
+  final R sessions;
   final OperationalRole role;
   final Uint8List _token;
   final _watch = Stopwatch()..start();
@@ -102,9 +143,9 @@ final class OperationalServerHandshake {
 
   Future<void> _verify() async {
     try {
-      await peer.revalidate().timeout(_remaining());
+      await _binding.revalidate().timeout(_remaining());
       _remaining();
-      if (_clientRole(peer) != role) throw StateError('UNAUTHORIZED');
+      if (_nativeClientRole(_binding) != role) throw StateError('UNAUTHORIZED');
     } on TimeoutException {
       throw StateError('TIMEOUT');
     } on StateError catch (error) {
@@ -148,7 +189,7 @@ final class OperationalServerHandshake {
       return _hello = OperationalHello(
         generation: sessions.generation,
         serverNonce: _randomNonce(),
-        buildId: peer.buildId,
+        buildId: _binding.buildId,
         clientRole: role,
       );
     } catch (_) {
@@ -174,7 +215,8 @@ final class OperationalServerHandshake {
       final frozen = Uint8List.fromList(frame);
       await _verify();
       final input = OperationalAuthenticate.decode(frozen);
-      if (input.clientBuildId != peer.buildId) throw StateError('INCOMPATIBLE');
+      if (input.clientBuildId != _binding.buildId)
+        throw StateError('INCOMPATIBLE');
       final transcript = OperationalBootstrapTranscript(
         hello: _hello!,
         clientNonce: input.clientNonce,
@@ -200,7 +242,7 @@ final class OperationalServerHandshake {
       await _verify();
       _remaining();
       _issuedSessionId = response.sessionId;
-      sessions._register(channel, response.sessionId, _hello!, peer);
+      sessions._register(channel, response.sessionId, _hello!, peer, _binding);
       registered = true;
       return response;
     } on FormatException {

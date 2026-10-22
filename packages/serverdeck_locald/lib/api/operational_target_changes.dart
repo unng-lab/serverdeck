@@ -3,7 +3,7 @@ part of 'operational_auth.dart';
 /// Internal owner-service synchronization; never a wire or authority capability.
 final class _TargetChanges {
   _TargetChanges(this.registry, this.gate);
-  final OperationalSessions registry;
+  final _Sessions<Object?> registry;
   final OperationalPublicationGate gate;
   final _interests = <_TargetChangeInterest>{};
   Future<void>? _closeFuture;

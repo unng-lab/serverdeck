@@ -6,7 +6,7 @@ final class OperationalMcpContext {
   OperationalMcpContext._(this._registry, this._channel, this._session);
   final OperationalSessions _registry;
   final String _channel;
-  final _OperationalSession _session;
+  final _Session<OperationalPipePeer> _session;
 
   String get sessionId => _session.id;
   String get grantId => _session.grant!.id;
