@@ -8,6 +8,9 @@ import 'package:serverdeck_locald/api/operational_auth.dart';
 import 'package:serverdeck_locald/api/operational_channel.dart';
 import 'package:serverdeck_locald/api/operational_server.dart';
 import 'package:serverdeck_locald/api/owner_grants.dart';
+import 'package:serverdeck_locald/api/owner_foundation.dart';
+import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
+import 'package:serverdeck_locald/storage/key_custody.dart';
 import 'package:serverdeck_locald/mcp/router.dart';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/errors.dart';
@@ -20,6 +23,8 @@ import 'package:serverdeck_windows/operational_auth_client.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 import 'package:serverdeck_windows/security.dart';
 import 'package:serverdeck_windows/mutex.dart';
+import 'package:serverdeck_windows/dpapi.dart';
+import 'package:serverdeck_windows/paths.dart';
 
 import '../../../serverdeck_mcp/lib/src/local_gateway.dart';
 import '../../../serverdeck_mcp/lib/src/server.dart';
@@ -176,8 +181,9 @@ final class Control {
 }
 
 final class Services implements McpToolServices {
-  Services(this.mode);
+  Services(this.mode, {this.targetAddress});
   final String mode;
+  final String Function()? targetAddress;
   int calls = 0, cancels = 0;
   final results = <Completer<McpToolResult>>[];
   final inputs = <Map<String, Object?>>[];
@@ -185,6 +191,10 @@ final class Services implements McpToolServices {
     ...wire.data(),
     'ordinal': ordinal,
     if (mode.startsWith('stdout-')) 'large': 'x' * (1024 * 1024),
+    if (targetAddress != null) ...{
+      'serverId': '32345678-1234-4234-8234-123456789abc',
+      'address': targetAddress!(),
+    },
   });
   @override
   McpServiceOperation start(
@@ -297,15 +307,36 @@ final class PublicationPause implements McpGateway {
 /// Select the owner's mutation before the second actual guard competes for
 /// the mutex. The first stdout write/flush and every real guard remain intact.
 final class QueuedPublicationPause implements McpGateway {
-  QueuedPublicationPause(this.delegate, this.root);
+  QueuedPublicationPause(
+    this.delegate,
+    this.root, {
+    this.requireTarget = false,
+  });
   final LocalMcpGateway delegate;
   final String root;
+  final bool requireTarget;
   int calls = 0;
   @override
   McpInvocation start(String method, Map<String, Object?> params) {
     final call = delegate.start(method, params), ordinal = ++calls;
+    final result = call.result.then((result) {
+      if (requireTarget && ordinal == 2) {
+        final content = result['structuredContent'] as Map;
+        final data = content['data'] as Map;
+        n.check(
+          result['isError'] == false &&
+              content['ok'] == true &&
+              data['ordinal'] == 2 &&
+              data['address'] == '127.0.0.1' &&
+              data['serverId'] == '32345678-1234-4234-8234-123456789abc',
+        );
+        File(p.join(root, 'publication.result-ready'))
+            .writeAsStringSync('ready');
+      }
+      return result;
+    });
     return McpInvocation(
-      call.result,
+      result,
       call.cancelInterest,
       beforePublish: () async {
         if (ordinal == 2) {
@@ -447,7 +478,9 @@ Future<void> bridge(List<String> args) async {
       return;
     }
     final output = stdout.nonBlocking;
-    final code = !mode.startsWith('publish-') && mode != 'stdout-revoke'
+    final queuedPublication =
+        mode == 'stdout-revoke' || mode.startsWith('stdout-target-');
+    final code = !mode.startsWith('publish-') && !queuedPublication
         ? await serveMcpStdio(gateway)
         : await McpServer(
             input: stdin,
@@ -455,8 +488,12 @@ Future<void> bridge(List<String> args) async {
               output.add(bytes);
               await output.flush();
             },
-            gateway: mode == 'stdout-revoke'
-                ? QueuedPublicationPause(gateway, root)
+            gateway: queuedPublication
+                ? QueuedPublicationPause(
+                    gateway,
+                    root,
+                    requireTarget: mode.startsWith('stdout-target-'),
+                  )
                 : mode.startsWith('publish-')
                 ? PublicationPause(gateway, root)
                 : gateway,
@@ -517,16 +554,19 @@ final class Wire {
     send('notifications/initialized', null);
   }
 
-  void call(Object id) => send('tools/call', id, {
-    'name': 'serverdeck_profiles_create',
-    'arguments': {
-      'requestId': g.requestId,
-      'name': 'e\u0301😀',
-      'body': (wire.validationCall()['request'] as Map)['arguments'] is Map
-          ? (((wire.validationCall()['request'] as Map)['arguments']
-                as Map)['body'])
-          : null,
-    },
+  void call(Object id, {bool target = false}) => send('tools/call', id, {
+    'name': target ? 'serverdeck_server_get' : 'serverdeck_profiles_create',
+    'arguments': target
+        ? {'serverId': '32345678-1234-4234-8234-123456789abc'}
+        : {
+            'requestId': g.requestId,
+            'name': 'e\u0301😀',
+            'body':
+                (wire.validationCall()['request'] as Map)['arguments'] is Map
+                ? (((wire.validationCall()['request'] as Map)['arguments']
+                      as Map)['body'])
+                : null,
+          },
     '_meta': {'ignored': 'NEVER_FORWARD'},
   });
 }
@@ -562,13 +602,76 @@ Future<void> main(List<String> args) async {
           currentUserSid(),
           root,
         );
-        final services = Services(mode);
+        final targetMode = mode.startsWith('stdout-target-');
+        const targetId = '32345678-1234-4234-8234-123456789abc';
+        final services = Services(
+          mode,
+          targetAddress: targetMode
+              ? () =>
+                    store.state.profiles[targetId]!.toJson()['address']
+                        as String
+              : null,
+        );
         final control = Control(mode)..root = root;
         late final McpRouter router;
         var routerReady = false;
         OperationalSessions? nativeRegistry;
         n.Pair? mutationOwner;
         var mutationEntered = false;
+        OperationalFoundationOwnerApi? foundation;
+        ReceiptKeyMaterial? foundationKey;
+        Future<void> changeTargetThroughOwner() async {
+          final owner = mutationOwner ??= await n.Pair.start(
+            root,
+            'serverdeck.exe',
+            registry,
+          );
+          await owner.exchange();
+          n.check(await owner.next() == 'AUTH:owner');
+          final local = p.join(root, 'private'), sid = currentUserSid();
+          final custody = KeyCustody(DpapiProtection(), sid);
+          final key = foundationKey = await custody.openReceiptKey(
+            await readProtectedFile(
+              local,
+              p.join(g.files(root).directory, 'receipt-key.dpapi'),
+              sid,
+              maxBytes: 16384,
+            ),
+            g.workspaceId,
+            g.keyId,
+          );
+          final adapter = foundation = OperationalFoundationOwnerApi(
+            store: store,
+            coordinator: MutationCoordinator.operational(store, custody, key),
+            sessions: registry,
+          );
+          final request = await registry.begin(
+            owner.channel,
+            owner.response!.sessionId,
+            'profiles.update',
+          );
+          try {
+            final pending = adapter.dispatch(request, 'profiles.update', {
+              'profileId': targetId,
+              'expectedRevision': mode == 'stdout-target-failure' ? '999' : '1',
+              'name': 'Synthetic target',
+              'address': '127.0.0.2',
+              'port': 22,
+              'sshUser': 'fixture',
+              'tags': <String>[],
+              'credential': {'action': 'keep'},
+            }, requestId: '92345678-1234-4234-8234-123456789abc');
+            mutationEntered = true;
+            if (mode == 'stdout-target-failure') {
+              await n.fails(pending, 'REVISION_CONFLICT');
+            } else {
+              await pending;
+            }
+          } finally {
+            request.complete();
+          }
+        }
+
         Future<void> revokeThroughOwner() async {
           final owner = mutationOwner ??= await n.Pair.start(
             root,
@@ -982,22 +1085,53 @@ Future<void> main(List<String> args) async {
               File(p.join(root, 'gateway-fixture-phase'))
                   .writeAsStringSync('gate-close');
               await n.fails(ownerGate.close(), 'SERVICE_UNAVAILABLE');
-            } else if (mode == 'stdout-revoke') {
-              client.call('first');
+            } else if (mode == 'stdout-revoke' || targetMode) {
+              final grantBefore = jsonEncode(
+                store.operational.automation.grants[g.grantId]!.toJson(),
+              );
+              final storeRevisionBefore = store.state.storeRevision;
+              client.call('first', target: targetMode);
               await until(() => services.calls == 1);
               await publicationHeld(root);
-              client.call('stale');
+              client.call('stale', target: targetMode);
               await until(() => services.calls == 2);
+              n.check(services.results.every((result) => result.isCompleted));
+              if (targetMode) {
+                await until(
+                  () =>
+                      File(p.join(root, 'publication.result-ready'))
+                          .existsSync(),
+                );
+              }
               var changed = false;
               final mutation = Future<void>(() async {
-                await revokeThroughOwner();
+                if (targetMode) {
+                  await changeTargetThroughOwner();
+                } else {
+                  await revokeThroughOwner();
+                }
                 changed = true;
               });
               mutation.ignore();
               await until(() => mutationEntered);
               await Future<void>.delayed(const Duration(milliseconds: 80));
               n.check(!changed);
+              if (targetMode) {
+                n.check(
+                  store.state.profiles[targetId]!.toJson()['address'] ==
+                          '127.0.0.1' &&
+                      store.state.storeRevision == storeRevisionBefore,
+                );
+              }
               final first = await client.next();
+              if (targetMode) {
+                n.check(
+                  ((((first['result'] as Map)['structuredContent']
+                              as Map)['data']
+                          as Map)['address']) ==
+                      '127.0.0.1',
+                );
+              }
               n.check(
                 first['id'] == 'first' &&
                     (((first['result'] as Map)['structuredContent']
@@ -1009,6 +1143,36 @@ Future<void> main(List<String> args) async {
               );
               await mutation;
               n.check(changed);
+              if (targetMode) {
+                final failed = mode == 'stdout-target-failure';
+                n.check(
+                  store.state.receipts.containsKey(
+                        '92345678-1234-4234-8234-123456789abc',
+                      ) ==
+                      !failed,
+                );
+                n.check(
+                  store.state.profiles[targetId]!.toJson()['address'] ==
+                      (failed ? '127.0.0.1' : '127.0.0.2'),
+                );
+                n.check(
+                  store.state.storeRevision ==
+                      (failed
+                          ? storeRevisionBefore
+                          : (BigInt.parse(storeRevisionBefore) + BigInt.one)
+                                .toString()),
+                );
+                n.check(
+                  jsonEncode(
+                        store.operational.automation.grants[g.grantId]!
+                            .toJson(),
+                      ) ==
+                      grantBefore,
+                );
+                n.check(
+                  registry.mcpCount == 0 && !registry.targetChangesBlocked,
+                );
+              }
               await until(
                 () => File(p.join(root, 'publication.queued')).existsSync(),
               );
@@ -1018,8 +1182,41 @@ Future<void> main(List<String> args) async {
               n.check(
                 second['id'] == 'stale' &&
                     (second['result'] as Map)['isError'] == true &&
-                    !jsonEncode(second).contains('ordinal'),
+                    !jsonEncode(second).contains('ordinal') &&
+                    !jsonEncode(second).contains('127.0.0.1') &&
+                    !jsonEncode(second).contains('address') &&
+                    !jsonEncode(second).contains('large'),
               );
+              if (targetMode) {
+                client.call('retired', target: true);
+                final retired = await client.next();
+                n.check(
+                  retired['id'] == 'retired' &&
+                      (retired['result'] as Map)['isError'] == true &&
+                      services.calls == 2,
+                );
+                final fresh = await n.Pair.start(root, 'mcp.exe', registry);
+                try {
+                  await fresh.exchange();
+                  n.check(await fresh.next() == 'AUTH:mcp');
+                  final open = await registry.begin(
+                    fresh.channel,
+                    fresh.response!.sessionId,
+                    'mcp.open',
+                  );
+                  try {
+                    await open.openGrant(
+                      authority,
+                      await g.signedParams(root, fresh),
+                    );
+                  } finally {
+                    open.complete();
+                  }
+                  n.check(registry.mcpCount == 1);
+                } finally {
+                  await fresh.close();
+                }
+              }
             } else if (mode == 'revoke') {
               held = await ownerGate.acquire();
               client.call('queued');
@@ -1092,6 +1289,8 @@ Future<void> main(List<String> args) async {
                   .writeAsStringSync('cleanup-lines');
             await transport?.lines.cancel();
             await mutationOwner?.close();
+            await foundation?.close();
+            foundationKey?.close();
             try {
               try {
                 if (mode == 'stdout-stop')

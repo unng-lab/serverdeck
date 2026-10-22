@@ -338,11 +338,12 @@ Future<void> scenario(
   )?
   readyRun,
 }) async {
+  final withTarget =
+      mode == 'router-targets' ||
+      mode == 'channel-all' ||
+      mode.startsWith('gateway-stdout-target-');
   await initializeMcpNativeRuntime(root);
-  await r.existingStore(
-    root,
-    withTarget: mode == 'router-targets' || mode == 'channel-all',
-  );
+  await r.existingStore(root, withTarget: withTarget);
   final local = p.join(root, 'private'), sid = currentUserSid();
   final protection = PausedProtection();
   inspectProtection?.call(protection);
@@ -399,15 +400,12 @@ Future<void> scenario(
         if (op != 'grant.revoke') ...{
           'label': 'native fixture',
           'scopes': [
-            if (mode == 'router-targets' || mode == 'channel-all') 'read',
+            if (withTarget) 'read',
             if (mode == 'channel-all') 'logs',
             'author',
             if (mode == 'channel-all') ...['plan', 'apply'],
           ],
-          'serverIds': [
-            if (mode == 'router-targets' || mode == 'channel-all')
-              '32345678-1234-4234-8234-123456789abc',
-          ],
+          'serverIds': [if (withTarget) '32345678-1234-4234-8234-123456789abc'],
           'lifetimeSeconds': 300,
         },
       };

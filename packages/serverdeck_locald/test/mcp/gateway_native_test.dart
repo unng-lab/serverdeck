@@ -44,6 +44,8 @@ void main() {
     'expiry',
     'revoke',
     'stdout-revoke',
+    'stdout-target-change',
+    'stdout-target-failure',
     'stdout-stop',
     'writer-cancel',
     'publish-order',
