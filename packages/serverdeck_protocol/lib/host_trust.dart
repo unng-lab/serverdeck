@@ -319,6 +319,13 @@ Map<String, Object?> captureTrustedMethodResult(
   }
   if (method != 'mutations.recent') {
     validateMethodResult(method, value);
+    if (method == 'profiles.get') {
+      _capturedTrustCounters(_map(value['profile']), 'revision');
+    } else if (method == 'profiles.list') {
+      for (final profile in value['profiles'] as List) {
+        _capturedTrustCounters(_map(profile), 'revision');
+      }
+    }
     return _freezeTrustResult(value) as Map<String, Object?>;
   }
   requireFields(value, {'receipts', 'truncated'});

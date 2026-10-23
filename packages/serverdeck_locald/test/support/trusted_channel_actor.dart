@@ -361,7 +361,23 @@ Future<void> client(List<String> args) async {
       const profile = '62345678-1234-4234-8234-000000090003';
       const operation = '62345678-1234-4234-8234-000000090004';
       const mutation = '62345678-1234-4234-8234-000000090006';
+      Future<void> checkProfileReads(String revision) async {
+        final got = await api.call('profiles.get', {'profileId': profile});
+        final listed = await api.call('profiles.list', {});
+        final item = got['profile'] as Map;
+        final same = (listed['profiles'] as List).single as Map;
+        n.check(
+          jsonEncode(item) == jsonEncode(same) &&
+              got['storeRevision'] == listed['storeRevision'] &&
+              item['revision'] == revision &&
+              item['connectionRevision'] == '1' &&
+              item['credentialRevision'] == '1' &&
+              item['trustRevision'] == revision,
+        );
+      }
+
       try {
+        await checkProfileReads('1');
         try {
           await api.call('servers.trust.revoke', {
             'profileId': profile,
@@ -399,6 +415,7 @@ Future<void> client(List<String> args) async {
           requestId: mutation,
         );
         n.check(confirmed['entityRevision'] == '2');
+        await checkProfileReads('2');
         n.check(
           (await api.call('servers.trust.probeCancel', {
                 'operationId': operation,
@@ -410,6 +427,7 @@ Future<void> client(List<String> args) async {
           'expectedRevision': '2',
         });
         n.check(revoked['entityRevision'] == '3');
+        await checkProfileReads('3');
         n.check(
           jsonEncode(
                 await api.call(
