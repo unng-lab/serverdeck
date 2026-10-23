@@ -31,9 +31,17 @@ def check(value):
         raise ValueError('RECIPE_PREPARATION_REFUSED')
 
 
-def command(arguments, *, data=None, maximum=1024 * 1024, timeout=30):
+def command(arguments, *, data=None, maximum=1024 * 1024, timeout=30, preparation_diagnostics=False):
     result = subprocess.run(arguments, input=data, env=ENV, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, timeout=timeout, check=True)
+                            stderr=subprocess.PIPE if preparation_diagnostics else subprocess.DEVNULL,
+                            timeout=timeout, check=False)
+    if preparation_diagnostics and result.returncode != 0:
+        # Only the explicit administrator CLI's bounded public source positions.
+        # Arbitrary stderr and exception messages are never forwarded.
+        for line in result.stderr[:4096].decode('ascii', errors='ignore').splitlines()[:12]:
+            if re.fullmatch(r'APT_PREPARE_LOCATION (?:packaging/prepare-apt|serverdeck_executor/(?:apt|apt_gate|codec|journal|probes))\.py:[0-9]{1,5}', line):
+                print(line, file=sys.stderr)
+    check(result.returncode == 0)
     check(len(result.stdout) <= maximum)
     return result.stdout
 
@@ -111,7 +119,7 @@ def main():
     command(['/usr/bin/python3', '-I', str(SOURCE / 'packaging/prepare-apt.py'),
              '--sources', str(OUTPUT / 'sources.list'), '--keyring', str(OUTPUT / 'trusted.gpg'),
              '--request', str(OUTPUT / 'request.json'), '--output', str(OUTPUT / 'catalog.json'),
-             '--refresh'], timeout=180)
+             '--refresh', '--diagnostic-codes'], timeout=180, preparation_diagnostics=True)
     check(package_snapshot() == before)
     catalog_bytes = regular_file(OUTPUT / 'catalog.json', maximum=512 * 1024)[0]
     catalog = validate_catalog(decode(catalog_bytes, 512 * 1024))
