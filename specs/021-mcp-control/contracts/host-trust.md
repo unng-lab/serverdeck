@@ -4,6 +4,10 @@
 [owner foundation](owner-foundation.md), [target fence](target-fence.md),
 [model](../data-model.md), [tasks](../tasks.md).
 
+The internal [shared control composition](trusted-services.md) binds the
+schema3 owner/trust/grant/catalog instances and their shutdown ownership.
+It does not activate installed startup or unfinished remote services.
+
 ## Components and compatibility
 
 Extend the existing single workspace to schema3 before activating remote

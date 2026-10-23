@@ -60,3 +60,11 @@ Windows native owner trust probe tests additionally use a disposable loopback SS
 
 
 First hosted prerequisite result: [run39555867561](https://github.com/unng-lab/serverdeck/actions/runs/39555867561), source ecf8d534efd2dbea85a0b5546cb450d4a6484066, job119075366238 succeeded in34seconds. The real Docker job reports ansible-core2.21.5, pip check clean, systemd=true, containerRestart=true, kernelReboot=false, executorAcceptance=false. Windows job was still running when this result was recorded. This result closes no executor/recipe/bridge acceptance gate.
+
+## Shared format3 control composition qualification (T168)
+
+This is the expected validation procedure for the [composition contract](contracts/trusted-services.md), not a claim that its implementation or startup is complete. Use only owned temporary same-build format3 native fixtures and the protected schema3 store; no saved server profiles. The existing loopback SSH fixture requires the hash-locked Python environment prepared by `tools/prepare-trust-probe-fixture.ps1`.
+
+From `packages/serverdeck_locald`, run the new `dart test test/mcp/trusted_services_native_test.dart` and the existing production wire suite `dart test test/mcp/trusted_channel_native_test.dart`. The implementation adds the first command; absence of that test is incomplete T168. Verify shared owner/MCP catalog state, all25 owner routes, custody/role/attach refusals, no effect from stopped prepared grants, common foundation/trust receipts and real drain boundaries. Existing gate observation/owner-service probe builds must retain their explicit compile-time-only selection and ordinary-build refusal. Source-qualified DLL and full Windows/Linux startup/executor acceptance remain separate gates.
+
+Run affected analyzers/component regressions, literal root `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `lychee "specs/**/*.md"` and independent review per AGENTS.md. A failed close must leave outer storage/key/mutex ownership retained; a successful component result does not qualify the full021 product.

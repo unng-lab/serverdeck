@@ -32,6 +32,30 @@ Decision: one root-owned install UUID/state namespace per host OS, bound to chec
 
 ## Existing implementation evidence
 
+### Shared format3 services ownership
+
+Decision: compose the implemented schema3 owner foundation/grant/catalog/trust
+services in one locald resource owner before installing product startup. Use
+one actual native registry/gate, one store and receipt key, one shared
+foundation/trust coordinator and one catalog backend for owner and MCP.
+The [composition contract](contracts/trusted-services.md) fixes ownership,
+identity claims, rollback and ordered stop/drain.
+
+Rationale: independently assembled adapters can accidentally use different
+registries, duplicate mutation admission or release borrowed storage while
+late grant-open key work, catalog native proofs or probe claims are still
+owned. Existing primitives already implement their own effects and physical
+completion; the composition must retain those completions rather than
+replace them with RPC timeouts.
+
+Alternatives considered: keeping shutdown entirely in fixtures leaves no
+production service owner; borrowing the registry without a single stopping
+owner permits prepared grant invocations to start during teardown. Instead,
+successful composition owns registry and created services; outer runtime
+retains native channel workers, storage, key and mutex and closes them only
+after service drain and its separate native channel cleanup. No product
+permission, wire schema or readiness flag changes.
+
 001 is not complete remote functionality: current API handles readiness/profile/settings mutations; SSH/jobs and installation require new implementation. Existing completed task/check evidence preserved; it does not qualify MCP or executor. Backend repo currently has only README and is unnecessary for this local feature.
 
 ## Apt lock race correction
