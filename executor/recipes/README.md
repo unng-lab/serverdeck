@@ -130,3 +130,13 @@ source identifiers and line numbers (`APT_PREPARE_LOCATION`), never exception
 text, local variables, input values or arbitrary stderr. Ordinary CLI diagnostics
 remain unchanged unless that explicit option is supplied. Source positions are
 diagnostic evidence only; they cannot satisfy signature/dependency acceptance.
+
+For python3-apt2.7.7, a newly marked package can report both `marked_install`
+and `marked_upgrade`. The [libapt state predicates](https://raw.githubusercontent.com/Debian/apt/2.8.0/apt-pkg/depcache.h)
+overlap for new installations; the
+[Ubuntu python-apt source](https://archive.ubuntu.com/ubuntu/pool/main/p/python-apt/python-apt_2.7.7ubuntu5.3.tar.xz)
+maps them directly. Catalog and runtime preparation share the same new-install
+guard: actual installed/conffile state, new-install mark, destructive flags,
+protected packages and candidate trust still govern admission. The overlapping
+upgrade flag alone cannot classify a fresh addition as an existing-package
+upgrade. Real resolver/gate qualification remains required.

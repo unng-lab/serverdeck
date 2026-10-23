@@ -205,6 +205,20 @@ def _prepared_files(recipe):
     return files + indexes
 
 
+def _new_install_candidate(package, code="QUALIFICATION_REQUIRED"):
+    # libapt Upgrade() includes NewInstall(): Status2 satisfies Status>0.
+    # python-apt exposes both flags for new packages. marked_install is the
+    # NewInstall flag; installed/config-file state below still forbids upgrades.
+    candidate = package.candidate
+    require(not protected_package(package.shortname) and not package.is_installed and
+            not package.has_config_files and package.marked_install and
+            not any((package.marked_delete, package.marked_downgrade,
+                     package.marked_reinstall)) and candidate is not None and candidate.downloadable and
+            candidate.architecture in ("amd64", "all") and candidate.origins and
+            all(origin.trusted for origin in candidate.origins), code)
+    return candidate
+
+
 def build_prepared_catalog(request):
     """Materialize real immutable pins from prepared signed indexes, root only.
 
@@ -246,13 +260,7 @@ def build_prepared_catalog(request):
         require(cache.broken_count == 0, "PREFLIGHT_FAILED")
         pins = []
         for package in cache.get_changes():
-            candidate = package.candidate
-            require(not protected_package(package.shortname) and not package.is_installed and
-                    not package.has_config_files and package.marked_install and
-                    not any((package.marked_delete, package.marked_upgrade, package.marked_downgrade,
-                             package.marked_reinstall)) and candidate is not None and candidate.downloadable and
-                    candidate.architecture in ("amd64", "all") and candidate.origins and
-                    all(origin.trusted for origin in candidate.origins), "QUALIFICATION_REQUIRED")
+            candidate = _new_install_candidate(package)
             pins.append({"name": package.shortname, "architecture": candidate.architecture,
                          "version": candidate.version, "sha256": sha(candidate.record.get("SHA256", "").lower())})
         pins.sort(key=lambda pin: (pin["name"], pin["architecture"]))
@@ -353,10 +361,8 @@ def prepare_many(recipes):
         require(cache.broken_count == 0 and len(changes) == len(cumulative) and
                 {package.shortname for package in changes} == cumulative, "CONFLICT")
         for package in changes:
-            require(not package.is_installed and package.marked_install and
-                    not any((package.marked_delete, package.marked_upgrade, package.marked_downgrade,
-                             package.marked_reinstall)), "CONFLICT")
-            version, pin = package.candidate, qualified[package.shortname]
+            version = _new_install_candidate(package, "CONFLICT")
+            pin = qualified[package.shortname]
             require(version.version == pin["version"] and version.architecture == pin["architecture"] and
                     version.record.get("SHA256", "").lower() == pin["sha256"], "CONFLICT")
         pins = sorted((qualified[name] for name in additions), key=lambda row: (row["name"], row["architecture"]))
