@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import traceback
@@ -25,6 +26,49 @@ KEY_PRIMARY = '3A9EA1193A97B548BE1457D48919F6BD2B48D754'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
        'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8'}
 phase = 'fixture'
+MAX_INDEX_BYTES = 512 * 1024 * 1024
+MAX_INDEX_TOTAL = 1024 * 1024 * 1024
+COPY_CHUNK = 1024 * 1024
+
+
+def copy_index_stream(source, target, expected_size, expected_digest):
+    """Bounded copy of already custody-checked signed public evidence."""
+    from serverdeck_executor.journal import _write_all
+    check(type(expected_size) is int and 0 <= expected_size <= MAX_INDEX_BYTES)
+    count, checksum = 0, hashlib.sha256()
+    while chunk := os.read(source, min(COPY_CHUNK, expected_size + 1 - count)):
+        count += len(chunk)
+        check(count <= expected_size)
+        checksum.update(chunk)
+        _write_all(target, chunk)
+    check(count == expected_size and checksum.hexdigest() == expected_digest)
+    os.fsync(target)
+    return count
+
+
+def retain_index(original, target, evidence, remaining):
+    from serverdeck_executor.journal import _file
+    check(0 <= evidence['size'] <= min(MAX_INDEX_BYTES, remaining))
+    source = os.open(original, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        before = os.fstat(source)
+        check(stat.S_ISREG(before.st_mode) and before.st_uid == 0 and before.st_nlink == 1 and
+              not before.st_mode & 0o022 and before.st_size == evidence['size'] and
+              before.st_uid == evidence['uid'] and before.st_gid == evidence['gid'] and
+              stat.S_IMODE(before.st_mode) == evidence['mode'])
+        destination = _file(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            count = copy_index_stream(source, destination, evidence['size'], evidence['sha256'])
+        finally:
+            os.close(destination)
+        after = os.fstat(source)
+        check((before.st_ino, before.st_mtime_ns, before.st_size, before.st_uid,
+               before.st_gid, before.st_mode, before.st_nlink) ==
+              (after.st_ino, after.st_mtime_ns, after.st_size, after.st_uid,
+               after.st_gid, after.st_mode, after.st_nlink))
+        return count
+    finally:
+        os.close(source)
 
 
 def diagnostic_locations(error):
@@ -147,18 +191,11 @@ def main():
         original = Path(entry['path'])
         if original.parent != Path('/var/lib/apt/lists'):
             continue
-        data = regular_file(original, maximum=64 * 1024 * 1024)[0]
-        total += len(data)
-        check(total <= 256 * 1024 * 1024 and hashlib.sha256(data).hexdigest() == entry['sha256'])
         # Existing APT-generated basenames only, never an operator pathname.
         check('/' not in original.name and original.name not in ('.', '..'))
-        descriptor = _file(indexes / original.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        try:
-            _write_all(descriptor, data)
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        retained.append({'name': original.name, 'sha256': entry['sha256'], 'size': len(data),
+        count = retain_index(original, indexes / original.name, entry, MAX_INDEX_TOTAL - total)
+        total += count
+        retained.append({'name': original.name, 'sha256': entry['sha256'], 'size': count,
                          'uid': entry['uid'], 'gid': entry['gid'], 'mode': entry['mode']})
     check(retained)
     program = source_inputs(source_bytes)

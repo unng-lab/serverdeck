@@ -132,6 +132,11 @@ remain unchanged unless that explicit option is supplied. Source positions are
 diagnostic evidence only; they cannot satisfy signature/dependency acceptance.
 The Docker-only helper applies the same registered-source-position policy to
 its own failures with `RECIPE_PREPARE_LOCATION`, including artifact retention.
+Signed index retention streams at most1MiB per read, accepts at most512MiB per
+index (the existing verification limit) and1GiB in total. Before/after custody,
+exact byte count and SHA256 must match the verified metadata. This public export
+budget is separate from the executor's private journal quota; increasing export
+capacity neither changes accepted package transactions nor bypasses verification.
 
 For python3-apt2.7.7, a newly marked package can report both `marked_install`
 and `marked_upgrade`. The [libapt state predicates](https://raw.githubusercontent.com/Debian/apt/2.8.0/apt-pkg/depcache.h)
