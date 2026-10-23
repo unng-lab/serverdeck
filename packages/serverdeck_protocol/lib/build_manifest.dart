@@ -157,7 +157,20 @@ final class _OperationalBuildFields {
       'workspaceSchema',
       'sha256',
     };
-    const files = {'serverdeck.exe', 'locald.exe', 'mcp.exe', 'libisar.dll'};
+    final files = <String>{
+      'serverdeck.exe',
+      'locald.exe',
+      'mcp.exe',
+      'libisar.dll',
+    };
+    if (format == 3 &&
+        value is Map<String, Object?> &&
+        value['sha256'] is Map<String, Object?> &&
+        (value['sha256'] as Map<String, Object?>).containsKey(
+          'executor-release.json',
+        )) {
+      files.add('executor-release.json');
+    }
     final invalid = FormatException(invalidCode);
     if (value is! Map<String, Object?> ||
         value.length != fields.length ||

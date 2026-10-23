@@ -10,6 +10,8 @@ import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/protocol.dart';
 import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_protocol/wire.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
+import 'package:serverdeck_windows/operational_auth_client.dart';
 
 typedef CancelDeadline = void Function();
 typedef ScheduleDeadline = CancelDeadline Function(Duration, void Function());
@@ -141,13 +143,39 @@ class LocalApiClient {
     ScheduleDeadline schedule = _defaultSchedule,
     Set<Capability>? capabilities,
   }) : _connector = connect,
+       _trustedConnector = null,
        _schedule = schedule,
        _capabilities = Set.unmodifiable(
          capabilities ?? Capability.values.toSet(),
        ) {
     _elapsed = elapsed ?? () => _watch.elapsed;
   }
-  final Future<ClientEndpoint> Function() _connector;
+  LocalApiClient.trusted({
+    required Future<(TrustedApiClient, String)> Function() connect,
+    ScheduleDeadline schedule = _defaultSchedule,
+  }) : _connector = null,
+       _trustedConnector = connect,
+       _schedule = schedule,
+       _capabilities = const {} {
+    _elapsed = () => _watch.elapsed;
+  }
+  final Future<ClientEndpoint> Function()? _connector;
+  final Future<(TrustedApiClient, String)> Function()? _trustedConnector;
+  TrustedApiClient? _trustedClient;
+  String? _trustedGeneration;
+  Future<TrustedApiClient>? _trustedConnecting;
+  TrustedApiClient? get trustedClient => _trustedClient;
+
+  /// Revalidate presentation data with the codec belonging to this client.
+  /// No native identity or authorization is synthesized by this projection.
+  void captureResult(String method, Map<String, Object?> value) {
+    if (_trustedConnector != null) {
+      captureTrustedMethodResult(method, value);
+    } else {
+      validateMethodResult(method, value);
+    }
+  }
+
   final ScheduleDeadline _schedule;
   final Set<Capability> _capabilities;
   final _watch = Stopwatch()..start();
@@ -170,9 +198,114 @@ class LocalApiClient {
   Stream<ClientConnectionState> get states => _states.stream;
   Stream<ClientSnapshot> get snapshots => _snapshots.stream;
   Stream<ErrorCode> get snapshotErrors => _snapshotErrors.stream;
-  String? get generation => _session?.generation;
+  String? get generation =>
+      _trustedConnector != null ? _trustedGeneration : _session?.generation;
 
-  Future<void> connect() async => await _connected();
+  Future<void> connect() async {
+    if (_trustedConnector != null) {
+      await _connectedTrusted();
+    } else {
+      await _connected();
+    }
+  }
+
+  Future<TrustedApiClient> _connectedTrusted() {
+    if (_disposed)
+      return Future.error(
+        const LocalApiException(ErrorCode.serviceUnavailable),
+      );
+    final current = _trustedClient;
+    if (current != null && !current.isClosed) return Future.value(current);
+    return _trustedConnecting ??= _openTrusted().whenComplete(
+      () => _trustedConnecting = null,
+    );
+  }
+
+  Future<TrustedApiClient> _openTrusted() async {
+    _states.add(ClientConnectionState.connecting);
+    TrustedApiClient? client;
+    try {
+      await _retiring;
+      if (_disposed)
+        throw const LocalApiException(ErrorCode.serviceUnavailable);
+      final connection = await _trustedConnector!();
+      client = connection.$1;
+      requireUuid(connection.$2);
+      if (_disposed || client.isClosed)
+        throw const LocalApiException(ErrorCode.serviceUnavailable);
+      _trustedClient = client;
+      _trustedGeneration = connection.$2;
+      final owned = client;
+      owned.done
+          .then(
+            (_) => _trustedFailed(owned),
+            onError: (Object error) => _trustedFailed(owned),
+          )
+          .ignore();
+      _states.add(ClientConnectionState.connected);
+      _heartbeatTrusted(owned);
+      return owned;
+    } on Object catch (error) {
+      if (client != null) {
+        _retiring = client.close();
+        try {
+          await _retiring;
+        } on Object catch (cleanup) {
+          throw _safe(cleanup);
+        }
+      }
+      if (!_disposed) _states.add(ClientConnectionState.disconnected);
+      throw _safe(error);
+    }
+  }
+
+  void _trustedFailed(TrustedApiClient client) {
+    if (!identical(client, _trustedClient)) return;
+    _trustedClient = null;
+    _trustedGeneration = null;
+    _heartbeatTimer?.call();
+    _retiring = client.close();
+    _retiring.ignore();
+    if (!_disposed) _states.add(ClientConnectionState.disconnected);
+  }
+
+  void _heartbeatTrusted(TrustedApiClient client) {
+    _heartbeatTimer?.call();
+    if (_disposed || !identical(client, _trustedClient) || client.isClosed)
+      return;
+    _heartbeatTimer = _schedule(heartbeatInterval, () async {
+      try {
+        await client.call('session.ping', {});
+      } on Object catch (error) {
+        if (_safe(error).code != ErrorCode.resourceLimit) {
+          await client.close();
+          _trustedFailed(client);
+        }
+      } finally {
+        _heartbeatTrusted(client);
+      }
+    });
+  }
+
+  Future<ApiReply> _trustedCall(
+    ApiMethod method,
+    Map<String, Object?> params,
+    String id,
+  ) async {
+    try {
+      final client = await _connectedTrusted();
+      final currentGeneration = _trustedGeneration!;
+      final result = await client.call(method.wireName, params, requestId: id);
+      if (_disposed ||
+          !identical(client, _trustedClient) ||
+          currentGeneration != _trustedGeneration)
+        throw const LocalApiException(ErrorCode.serviceUnavailable);
+      return ApiReply(currentGeneration, result);
+    } on Object catch (error) {
+      throw _safe(error);
+    }
+  }
+
   Future<_ClientSession> _connected() {
     if (_disposed)
       return Future.error(
@@ -190,7 +323,7 @@ class LocalApiClient {
       await _retiring;
       if (_disposed)
         throw const LocalApiException(ErrorCode.serviceUnavailable);
-      endpoint = await _connector();
+      endpoint = await _connector!();
       if (_disposed)
         throw const LocalApiException(ErrorCode.serviceUnavailable);
       final session = await _authenticate(endpoint);
@@ -344,12 +477,25 @@ class LocalApiClient {
     final frozen = StrictCodec().decode(
       StrictCodec().encode(params, maxBytes: maxRequestBytes),
     );
+    if (_trustedConnector != null)
+      return _trustedCall(method, frozen, newRequestId());
     final session = await _connected();
     return session.request(method, frozen, newRequestId());
   }
 
   Future<ApiReply> mutate(MutationIntent intent) async {
     final params = intent._copyParams();
+    if (_trustedConnector != null) {
+      try {
+        final result = await _trustedCall(intent.method, params, intent.id);
+        if (_polling) _refreshAfterMutation();
+        return result;
+      } on LocalApiException catch (error) {
+        if (_polling && error.code == ErrorCode.revisionConflict)
+          _refreshAfterMutation();
+        rethrow;
+      }
+    }
     final session = await _connected();
     try {
       final reply = await session.request(intent.method, params, intent.id);
@@ -470,6 +616,22 @@ class LocalApiClient {
     _disposed = true;
     stopPolling();
     _heartbeatTimer?.call();
+    try {
+      await _trustedConnecting;
+    } on Object {
+      /* Opening owns cleanup. */
+    }
+    final trusted = _trustedClient;
+    if (trusted != null) {
+      try {
+        await trusted.call('session.close', {});
+      } on Object {
+        /* Physical close below still retires the session. */
+      }
+      await trusted.close();
+      _trustedClient = null;
+      _trustedGeneration = null;
+    }
     final session = _session;
     if (session != null && !session.closed) {
       try {
@@ -497,6 +659,17 @@ class LocalApiClient {
 
 LocalApiException _safe(Object error) => switch (error) {
   LocalApiException() => error,
+  TrustedRpcException() => LocalApiException(
+    ErrorCode.values.where((code) => code.wireName == error.code).firstOrNull ??
+        ErrorCode.serviceUnavailable,
+    field: error.field,
+  ),
+  StateError() => LocalApiException(
+    ErrorCode.values
+            .where((code) => code.wireName == error.message)
+            .firstOrNull ??
+        ErrorCode.serviceUnavailable,
+  ),
   TimeoutException() => const LocalApiException(ErrorCode.timeout),
   FormatException() => const LocalApiException(ErrorCode.incompatible),
   _ => const LocalApiException(ErrorCode.serviceUnavailable),

@@ -16,6 +16,10 @@ import 'models.dart';
 import 'records.dart';
 import 'state_store.dart';
 import 'workspace_migration.dart';
+import 'host_trust_records.dart';
+import 'trusted_snapshot.dart';
+
+part 'trusted_workspace.dart';
 
 /// Owns creation/promotion and receipt-key lifetime; the caller owns the lease.
 class Workspace {
@@ -35,6 +39,20 @@ class Workspace {
   final StateStore _store;
   final ReceiptKeyMaterial _receiptKey;
   Future<void>? _closing;
+
+  static Future<Workspace> openTrusted({
+    required String localAppData,
+    required String appRoot,
+    required MutexLease lease,
+    required KeyCustody custody,
+    void Function()? checkStartup,
+  }) => _openTrustedWorkspace(
+    localAppData: localAppData,
+    appRoot: appRoot,
+    lease: lease,
+    custody: custody,
+    checkStartup: checkStartup,
+  );
 
   static Future<Workspace> open({
     required String localAppData,

@@ -27,6 +27,49 @@ import 'client_cleanup_fixture.dart' as cleanup;
 const generation = '10000000-0000-4000-8000-000000000001';
 const workspace = '10000000-0000-4000-8000-000000000002';
 const grantId = '10000000-0000-4000-8000-000000000003';
+const connectionBadMethods = {
+  'bad-connection': 'servers.connection',
+  'bad-connect': 'servers.connect',
+  'bad-connect-status': 'servers.connectStatus',
+  'bad-connect-cancel': 'servers.connectCancel',
+  'bad-disconnect': 'servers.disconnect',
+};
+Map<String, Object?> connectionResult(String method) {
+  final connected = <String, Object?>{
+    'profileId': workspace,
+    'state': 'connected',
+    'interested': true,
+    'identity': {
+      'profileId': workspace,
+      'connectionRevision': '1',
+      'credentialRevision': '3',
+      'trustRevision': '2',
+      'key': {
+        'format': 'ssh-ed25519',
+        'fingerprint':
+            'SHA256:${base64.encode(List.filled(32, 7)).replaceAll('=', '')}',
+      },
+    },
+  };
+  return switch (method) {
+    'servers.connection' => connected,
+    'servers.connect' => {'operationId': grantId, 'state': 'running'},
+    'servers.connectStatus' => {
+      'operationId': grantId,
+      'state': 'succeeded',
+      'connection': connected,
+    },
+    'servers.connectCancel' => {'operationId': grantId, 'cancelled': false},
+    'servers.disconnect' => {
+      'profileId': workspace,
+      'state': 'disconnected',
+      'interested': false,
+      'identity': null,
+    },
+    _ => throw StateError('UNSUPPORTED'),
+  };
+}
+
 McpCredentialFiles files(String root) => McpCredentialFiles(
   localAppData: p.join(root, 'private'),
   workspaceId: workspace,
@@ -235,6 +278,28 @@ Future<void> client(List<String> args) async {
         results.every((r) => r['leaseSeconds'] == 60) &&
             api.pendingRequests == 0,
       );
+    } else if (mode == 'connection') {
+      for (final method in connectionBadMethods.values) {
+        final result = await api.call(method, {
+          if (method == 'servers.connectStatus' ||
+              method == 'servers.connectCancel')
+            'operationId': grantId
+          else
+            'profileId': workspace,
+        });
+        check(jsonEncode(result) == jsonEncode(connectionResult(method)));
+        try {
+          if (method == 'servers.connection') {
+            ((result['identity'] as Map)['key'] as Map).clear();
+          } else {
+            result.clear();
+          }
+          throw StateError('EXPECTED_FROZEN_RESULT');
+        } on UnsupportedError {
+          /* Expected actual client immutable capture. */
+        }
+      }
+      check((await api.call('session.ping', {}))['leaseSeconds'] == 60);
     } else if (mode == 'receipts') {
       final result = await api.call('mutations.recent', {});
       check(jsonEncode(result) == jsonEncode(recent()));
@@ -245,7 +310,8 @@ Future<void> client(List<String> args) async {
         /* Expected immutable capture. */
       }
       check((await api.call('session.ping', {}))['leaseSeconds'] == 60);
-    } else if (const {
+    } else if ({
+      ...connectionBadMethods.keys,
       'readiness2',
       'bad-receipt',
       'bad-retry',
@@ -258,11 +324,13 @@ Future<void> client(List<String> args) async {
       'timeout',
       'eof',
     }.contains(mode)) {
-      final method = mode == 'readiness2'
-          ? 'readiness.get'
-          : mode == 'bad-receipt'
-          ? 'mutations.recent'
-          : 'session.ping';
+      final method =
+          connectionBadMethods[mode] ??
+          (mode == 'readiness2'
+              ? 'readiness.get'
+              : mode == 'bad-receipt'
+              ? 'mutations.recent'
+              : 'session.ping');
       await domain(
         api.call(method, {}),
         mode == 'timeout'
@@ -542,6 +610,26 @@ Future<void> server(List<String> args) async {
                 );
               }
               await write(response(await read()));
+            } else if (mode == 'connection') {
+              for (final method in connectionBadMethods.values) {
+                final request = await read();
+                check(request['method'] == method);
+                await write(
+                  response(request, result: connectionResult(method)),
+                );
+              }
+              await write(response(await read()));
+            } else if (connectionBadMethods.containsKey(mode)) {
+              final request = await read();
+              final method = connectionBadMethods[mode]!;
+              check(request['method'] == method);
+              final result = connectionResult(method);
+              if (mode == 'bad-connection') {
+                result['identity'] = null;
+              } else {
+                result['unexpected'] = true;
+              }
+              await write(response(request, result: result));
             } else if (mode == 'receipts') {
               await write(response(await read(), result: recent()));
               await write(response(await read()));

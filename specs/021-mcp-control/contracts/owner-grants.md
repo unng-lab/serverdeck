@@ -22,6 +22,43 @@ Once the store write is admitted, the helper retains its actual lease through tr
 
 ## Acceptance scope
 
+The format3 TrustedGrantOwnerApi additionally provides grants.list{}, optional
+serverId filter, grants.get{grantId} and grants.configuration{grantId}. The
+schema2 adapter and its three write methods remain unchanged. List result is
+exactly `{items:[<public grant>]}` with all at most32 workspace grants sorted by
+ID (including expired/revoked history); filter selects membership in serverIds.
+Get returns exactly `{grant:<public grant>}` or NOT_FOUND. Public metadata is
+exactly `{id,workspaceId,label,revision,scopes,serverIds,createdAt,issuedAt,
+expiresAt,revokedAt}`; credential wrappers, keys and secretRef are excluded.
+Protocol grant_owner capture validates exact fields/types/counters/timestamps,
+scope policy, unique IDs and the full bounded512KiB result. The real format3
+client selects this parser for both reads and stable mutation acknowledgements.
+
+Reads hold the same actual registry publication gate and original5s native owner
+proof before/after snapshot capture. They neither rotate credentials nor retire
+sessions. Configuration requires a current grant again immediately before
+return, a supplied opaque TrustedBuildBundle and matching native endpoint root
+and build ID from the actual retained peer. The owning Windows worker returns
+that normalized endpoint root only after current peer verification; neither RPC
+params nor a role/path string can mint it. Missing verified bundle is NOT_READY,
+foreign root/build is INCOMPATIBLE, expired/revoked grant is FORBIDDEN.
+TrustedBuildBundle generates only its fixed mcp.exe command and fixed app-root/
+grant-id argument vector after current MCP binary/manifest hash validation.
+This read contains no secret and does not itself connect a client. Shared
+composition accepts the verified bundle from installed startup; metadata and
+write-only fixtures may omit it but cannot generate a launch configuration.
+
+The Flutter automation panel reads this public list, explicitly creates/replaces
+or revokes grants through the existing permanent-receipt transactions and can
+display/copy the verified command/args. Initial scopes are read/logs/author/plan;
+apply requires explicit policy selection and subsequent delegation/approval.
+Replacement is shown as both a policy change and credential reissue. Delegation
+uses an explicit choice of a live plan+apply client allowed on the current server,
+then displays the captured exact profile/revision/digest and parameter predicates.
+No grant ID is entered manually for that flow. The captured revision cannot
+follow a later UI selection before submission. Installed activation and final
+native/UI qualification remain required.
+
 Actual format2 AOT/native owner and MCP clients use schema2 Isar/CurrentUser DPAPI and the normal OperationalApiServer/Channel/ApiClient. Qualify create/replace/revoke and stable receipt replay; no effect while an independently held native publication gate blocks the adapter; MCP rejection before owner dispatch; same-registry/method/role checks; immutable input across the gate wait; conflicting replay without a new revision; and registry close retaining a real committed grant callback's lease until it settles. No synthetic role or transaction provider substitutes for these paths.
 
 The gateway native fixture creates its registry generation keeper before channel intake. Its blocked1MiB stdout/queued revoke and post-successful-ping ordering cases invoke this actual adapter with a real independently bootstrapped owner request, not a manually guarded storage callback. A fixed scheduling marker is set only after actual adapter dispatch has entered its gate acquisition. Require no grant commit/acknowledgement before the prior publication finishes, then deny queued stale data with unchanged wire semantics. These fixtures qualify the owner write/publication composition, not an installed owner UI, every production mutator, real target identity changes or executor/SSH effects.

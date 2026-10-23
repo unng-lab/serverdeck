@@ -109,3 +109,20 @@ The concrete [owner grant write adapter](contracts/owner-grants.md) routes nativ
 Operational foundation mutation storage uses explicit StateStore.commitOperationalFoundation / WorkspaceRecords.fromOperationalState in the existing storage library, preserving physicalschema2 and complete retained automation with actual readback; see [loading](contracts/loading.md). Legacy commit/coordinator stays schema1-only pending native owner-service composition T109/T110. Foundation/grant writes share the same total32 admission budget before the existing durable queue. Real commit-time native capacity qualification additionally requires the repository-owned pinned Dart binding source under third_party/isar_community with active-transaction abort guards and actual native-reply-port cleanup; see [native transactions](contracts/native-transactions.md), T122 before closing T121 capacity acceptance. ABI, generator3.3.2, native-source qualification and installed startup gates remain unchanged.
 
 Operational owner foundation composition follows [owner foundation services](contracts/owner-foundation.md): explicit schema2 coordinator, immutable commands, envelope-ID preservation, native gate before queue, target fence and common owner adapter composition. Installed startup and remaining services remain separate gates.
+
+Shared state/log and owner asynchronous read contracts are now specified in
+[remote observations](contracts/observations.md). The owner routes and MCP
+adapters use one connection/read service and one source sampler; their native
+context/result boundary is separate from the existing format2 foundation API.
+The root preflight target binding is specified in the [executor contract](contracts/executor.md).
+Current implementation work follows the user-requested whole-feature functional
+implementation before full validation; component source presence does not close
+runtime readiness or final review gates.
+
+The fixed helper transport and owner confirmation custody are specified in
+[executor enrollment](contracts/executor-enrollment.md). One existing workspace
+is one persistent root controller. Whole-runtime source identity is carried in
+the existing immutable preflight runtimeVersion, while observed values preserve
+verbatim Unicode on wire and in retained evidence. Enrollment metadata is a
+protected HMAC-bound sidecar, never a replacement for current native/grant/target
+or per-step plan/delegation authority.

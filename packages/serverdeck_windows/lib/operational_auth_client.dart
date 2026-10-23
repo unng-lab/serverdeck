@@ -6,7 +6,18 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:cryptography/dart.dart';
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/connections.dart'
+    show connectionOwnerMethods;
+import 'package:serverdeck_protocol/remote_reads.dart'
+    show remoteReadOwnerMethods;
 import 'package:serverdeck_protocol/errors.dart';
+import 'package:serverdeck_protocol/executor_owner.dart'
+    show executorOwnerMethods;
+import 'package:serverdeck_protocol/grant_owner.dart' show grantOwnerMethods;
+import 'package:serverdeck_protocol/automation/authority_owner.dart'
+    show automationAuthorityOwnerMethods;
+import 'package:serverdeck_protocol/automation/owner_operations.dart'
+    show ownerAutomationMethods;
 import 'package:serverdeck_protocol/host_trust.dart';
 import 'package:serverdeck_protocol/mcp/readiness.dart';
 import 'package:serverdeck_protocol/mcp/handshake.dart';
@@ -325,8 +336,75 @@ final class TrustedClientSession extends _ClientSession<TrustedPipePeer> {
     OperationalHello hello,
     String id,
   ) : super._(pipe, peer, _ClientPeer.trusted(peer), hello, id);
-  Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) =>
-      _openGrant(files, grantId);
+  bool _preGrantBusy = false;
+  Future<McpOpenResult> openGrant(McpCredentialFiles files, String grantId) {
+    if (_preGrantBusy) return Future.error(StateError('SERVICE_UNAVAILABLE'));
+    return _openGrant(files, grantId);
+  }
+
+  /// A newly authenticated MCP process may wait for storage/service activation
+  /// without claiming the ordinary RPC reader needed after grant proof.
+  Future<TrustedReadiness> readinessBeforeGrant() async {
+    if (_preGrantBusy || _ordinaryClaimed || _grantAttempted || _closed)
+      throw StateError('SERVICE_UNAVAILABLE');
+    _preGrantBusy = true;
+    final clock = Stopwatch()..start();
+    Duration remaining() {
+      if (_closed) throw StateError('SERVICE_UNAVAILABLE');
+      final left = rpcDeadline - clock.elapsed;
+      if (left <= Duration.zero) throw StateError('TIMEOUT');
+      return left;
+    }
+
+    try {
+      await revalidate().timeout(remaining());
+      final requestId = _requestId();
+      final io = _HandshakeIo(_binding);
+      await io.write({
+        'v': 1,
+        'id': requestId,
+        'sessionId': id,
+        'method': 'readiness.get',
+        'params': <String, Object?>{},
+      }, remaining);
+      final response = StrictCodec().decode(
+        await io.read(remaining),
+        maxBytes: maxHandshakeBytes,
+      );
+      validateTrustedResponseEnvelope(response);
+      if (response['id'] != requestId ||
+          response['generation'] != hello.generation)
+        throw StateError('INCOMPATIBLE');
+      if (response['error'] case final Map<String, Object?> error) {
+        final code = error['code'];
+        throw StateError(
+          const {
+                'NOT_READY',
+                'STORAGE_BLOCKED',
+                'INCOMPATIBLE',
+                'SERVICE_UNAVAILABLE',
+                'FORBIDDEN',
+                'RESOURCE_LIMIT',
+                'TIMEOUT',
+              }.contains(code)
+              ? code as String
+              : 'UNAUTHORIZED',
+        );
+      }
+      final result = TrustedReadiness.fromJson(response['result']);
+      if (result.generation != hello.generation)
+        throw StateError('INCOMPATIBLE');
+      await revalidate().timeout(remaining());
+      remaining();
+      return result;
+    } on Object {
+      await close();
+      rethrow;
+    } finally {
+      clock.stop();
+      _preGrantBusy = false;
+    }
+  }
 }
 
 sealed class _ClientSession<P> {

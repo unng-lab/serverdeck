@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:cryptography/dart.dart';
 import 'package:serverdeck_protocol/build_manifest.dart';
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/executor_release.dart';
+import 'package:serverdeck_protocol/validation.dart';
 
 import 'paths.dart';
 import 'process.dart';
@@ -57,6 +59,53 @@ final class TrustedBuildBundle {
   final TrustedBuildManifest manifest;
   final String _manifestHash;
 
+  /// Launch metadata from this actual verified bundle. No caller path, token
+  /// export or shell command is accepted or generated.
+  Map<String, Object?> mcpConfiguration(String grantId) {
+    requireUuid(grantId);
+    final root = manifest.appRoot,
+        command = p.join(manifest.appRoot, 'mcp.exe');
+    requireSafePath(root, command);
+    if (_digest(_manifestBytes(p.join(root, 'foundation.manifest.json'))) !=
+            _manifestHash ||
+        fileSha256(command) != manifest.sha256['mcp.exe'] ||
+        _digest(_manifestBytes(p.join(root, 'foundation.manifest.json'))) !=
+            _manifestHash)
+      throw StateError('INCOMPATIBLE');
+    return {
+      'command': command,
+      'args': ['--app-root', root, '--grant-id', grantId],
+    };
+  }
+
+  VerifiedExecutorRelease loadExecutorRelease() {
+    final expected = manifest.sha256['executor-release.json'];
+    if (expected == null) throw StateError('EXECUTOR_UNAVAILABLE');
+    final root = manifest.appRoot;
+    final path = p.join(root, 'executor-release.json');
+    void verify() {
+      requireSafePath(root, path);
+      if (fileSha256(path) != expected ||
+          _digest(_manifestBytes(p.join(root, 'foundation.manifest.json'))) !=
+              _manifestHash)
+        throw StateError('INCOMPATIBLE');
+    }
+
+    verify();
+    final reader = File(path).openSync();
+    late final ExecutorRelease release;
+    try {
+      final bytes = reader.readSync(64 * 1024 + 1);
+      release = ExecutorRelease.fromJson(
+        StrictCodec().decode(bytes, maxBytes: 64 * 1024),
+      );
+    } finally {
+      reader.closeSync();
+    }
+    verify();
+    return VerifiedExecutorRelease._(release, verify);
+  }
+
   VerifiedTrustedBundlePeer verifyPeer(
     RetainedProcessIdentity identity,
     String expectedOwnerSid,
@@ -69,6 +118,20 @@ final class TrustedBuildBundle {
       expectedOwnerSid,
     ),
   );
+}
+
+/// Only a verified format3 manifest can create this descriptor. A caller JSON
+/// parser cannot mint it; each use rechecks its manifest/file binding.
+final class VerifiedExecutorRelease {
+  VerifiedExecutorRelease._(this._release, this._verify);
+  final ExecutorRelease _release;
+  final void Function() _verify;
+  ExecutorRelease get descriptor {
+    _verify();
+    return _release;
+  }
+
+  void revalidate() => _verify();
 }
 
 /// Private construction binds format2 metadata to genuine retained identity.

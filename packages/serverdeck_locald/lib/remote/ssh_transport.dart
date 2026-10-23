@@ -1,12 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:serverdeck_protocol/profile_validation.dart';
 import 'package:serverdeck_protocol/host_trust.dart';
+import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/executor.dart';
 
 export 'package:serverdeck_protocol/host_trust.dart'
     show SshHostPin, SshTransportCode, SshTransportFailure;
+
+part 'ssh_reads.dart';
+part 'ssh_executor.dart';
 
 Never _invalid() =>
     throw const SshTransportFailure(SshTransportCode.VALIDATION_ERROR);
@@ -78,9 +85,52 @@ final class SshLease {
   SshLease._(this._operation);
   final _SshOperation _operation;
   Future<void> get done => _operation.settled;
+  SshAttempt<SshReadOutput> read(
+    SshReadRequest request, {
+    Duration deadline = const Duration(seconds: 30),
+  }) {
+    if (_operation._stopped || _operation._client == null)
+      throw const SshTransportFailure(SshTransportCode.SERVICE_UNAVAILABLE);
+    if (_operation._reads.length + _operation._executors.length >= 4)
+      throw const SshTransportFailure(SshTransportCode.RESOURCE_LIMIT);
+    if (deadline <= Duration.zero)
+      throw const SshTransportFailure(SshTransportCode.TIMEOUT);
+    final work = _SshReadOperation(
+      _operation,
+      request,
+      deadline < const Duration(seconds: 30)
+          ? deadline
+          : const Duration(seconds: 30),
+    );
+    _operation._reads.add(work);
+    work.run().ignore();
+    return SshAttempt._(
+      work.result,
+      work.done,
+      () => work.stop(SshTransportCode.CANCELLED),
+    );
+  }
+
   Future<void> close() {
     _operation.stop(SshTransportCode.CANCELLED);
     return done;
+  }
+
+  /// Fixed privileged helper only. This transport method grants no admission;
+  /// the shared service owns current policy/target checks for every root call.
+  SshAttempt<SshExecutorChannel> openExecutor() {
+    if (_operation._stopped || _operation._client == null)
+      throw const SshTransportFailure(SshTransportCode.SERVICE_UNAVAILABLE);
+    if (_operation._reads.length + _operation._executors.length >= 4)
+      throw const SshTransportFailure(SshTransportCode.RESOURCE_LIMIT);
+    final work = _SshExecutorOperation(_operation);
+    _operation._executors.add(work);
+    work.run().ignore();
+    return SshAttempt._(
+      work.ready,
+      work.done,
+      () => work.stop(SshTransportCode.CANCELLED),
+    );
   }
 
   @override
@@ -90,16 +140,29 @@ final class SshLease {
 /// One shared instance per locald. No wire caller can create a private pool.
 final class SshTransportPool {
   final _operations = <_SshOperation>{};
+  final _reservations = <SshTransportReservation>{};
   bool _closed = false;
   Future<void>? _closing;
-  int get activeTransports => _operations.length;
+  int get activeTransports => _operations.length + _reservations.length;
+
+  /// Charges the shared physical budget while trusted custody work is pending.
+  SshTransportReservation reserve() {
+    if (_closed)
+      throw const SshTransportFailure(SshTransportCode.SERVICE_UNAVAILABLE);
+    if (activeTransports >= 2)
+      throw const SshTransportFailure(SshTransportCode.RESOURCE_LIMIT);
+    final reservation = SshTransportReservation._(this);
+    _reservations.add(reservation);
+    return reservation;
+  }
 
   SshAttempt<SshLease> connect(
     SshEndpoint endpoint,
     SshHostPin pin,
-    SshCredential credential,
-  ) {
-    final operation = _admit(endpoint, pin, credential);
+    SshCredential credential, {
+    Duration deadline = const Duration(seconds: 15),
+  }) {
+    final operation = _admit(endpoint, pin, credential, deadline: deadline);
     return SshAttempt._(
       operation.result.then((value) => value as SshLease),
       operation.settled,
@@ -119,15 +182,27 @@ final class SshTransportPool {
   _SshOperation _admit(
     SshEndpoint endpoint,
     SshHostPin? pin,
-    SshCredential? credential,
-  ) {
+    SshCredential? credential, {
+    Duration deadline = const Duration(seconds: 15),
+    SshTransportReservation? reservation,
+  }) {
     if (_closed) {
       throw const SshTransportFailure(SshTransportCode.SERVICE_UNAVAILABLE);
     }
-    if (_operations.length >= 2) {
+    if (reservation == null && activeTransports >= 2) {
       throw const SshTransportFailure(SshTransportCode.RESOURCE_LIMIT);
     }
-    final operation = _SshOperation(this, endpoint, pin, credential);
+    if (deadline <= Duration.zero)
+      throw const SshTransportFailure(SshTransportCode.TIMEOUT);
+    if (reservation != null &&
+        (!identical(reservation._pool, this) ||
+            !_reservations.contains(reservation)))
+      throw const SshTransportFailure(SshTransportCode.SERVICE_UNAVAILABLE);
+    final budget = deadline < const Duration(seconds: 15)
+        ? deadline
+        : const Duration(seconds: 15);
+    final operation = _SshOperation(this, endpoint, pin, credential, budget);
+    reservation?.close();
     _operations.add(operation);
     unawaited(operation.run());
     return operation;
@@ -140,7 +215,42 @@ final class SshTransportPool {
     for (final operation in pending) {
       operation.stop(SshTransportCode.SERVICE_UNAVAILABLE);
     }
-    await Future.wait(pending.map((operation) => operation.settled));
+    await Future.wait([
+      ...pending.map((operation) => operation.settled),
+      for (final reservation in _reservations.toList()) reservation.done,
+    ]);
+  }
+}
+
+/// Opaque locald-only slot, not authentication or a wire capability.
+final class SshTransportReservation {
+  SshTransportReservation._(this._pool);
+  final SshTransportPool _pool;
+  final _done = Completer<void>();
+  Future<void> get done => _done.future;
+  SshAttempt<SshLease> connect(
+    SshEndpoint endpoint,
+    SshHostPin pin,
+    SshCredential credential, {
+    required Duration deadline,
+  }) {
+    final operation = _pool._admit(
+      endpoint,
+      pin,
+      credential,
+      deadline: deadline,
+      reservation: this,
+    );
+    return SshAttempt._(
+      operation.result.then((value) => value as SshLease),
+      operation.settled,
+      () => operation.stop(SshTransportCode.CANCELLED),
+    );
+  }
+
+  void close() {
+    if (_pool._reservations.remove(this) && !_done.isCompleted)
+      _done.complete();
   }
 }
 
@@ -157,8 +267,14 @@ Future<void> _consume(Future<dynamic> future) =>
     future.then<void>((_) {}, onError: (Object _, StackTrace _) {});
 
 final class _SshOperation {
-  _SshOperation(this.pool, this.endpoint, this.pin, this.credential) {
-    _timer = Timer(const Duration(seconds: 15), () {
+  _SshOperation(
+    this.pool,
+    this.endpoint,
+    this.pin,
+    this.credential,
+    this._budget,
+  ) {
+    _timer = Timer(_budget, () {
       stop(SshTransportCode.TIMEOUT);
     });
     _consume(result);
@@ -167,6 +283,9 @@ final class _SshOperation {
   final SshEndpoint endpoint;
   final SshHostPin? pin;
   SshCredential? credential;
+  final _reads = <_SshReadOperation>{};
+  final _executors = <_SshExecutorOperation>{};
+  final Duration _budget;
   final _clock = Stopwatch()..start();
   final _result = Completer<Object>();
   final _settled = Completer<void>();
@@ -180,12 +299,14 @@ final class _SshOperation {
   SshHostPin? _observed;
   Future<Object> get result => _result.future;
   Future<void> get settled => _settled.future;
-  Duration get _remaining => const Duration(seconds: 15) - _clock.elapsed;
+  Duration get _remaining => _budget - _clock.elapsed;
 
   void stop(SshTransportCode code) {
     if (_stopped) return;
     _stopped = true;
     _timer.cancel();
+    for (final read in _reads.toList()) read.stop(code);
+    for (final executor in _executors.toList()) executor.stop(code);
     if (!_result.isCompleted) {
       _result.completeError(SshTransportFailure(code), StackTrace.empty);
     }
@@ -286,6 +407,10 @@ final class _SshOperation {
     } finally {
       password = null;
       credential = null;
+      for (final read in _reads.toList())
+        read.stop(SshTransportCode.CONNECTION_FAILED);
+      for (final executor in _executors.toList())
+        executor.stop(SshTransportCode.CONNECTION_FAILED);
       _worker?.cancel();
       // A late TCP success may never have been handed to SSHClient. Its native
       // IOSink still needs close: destroy alone does not complete sink.done on
@@ -311,6 +436,10 @@ final class _SshOperation {
         }
       }
       _timer.cancel();
+      await Future.wait([for (final read in _reads.toList()) read.done]);
+      await Future.wait([
+        for (final executor in _executors.toList()) executor.done,
+      ]);
       pool._operations.remove(this);
       _settled.complete();
     }

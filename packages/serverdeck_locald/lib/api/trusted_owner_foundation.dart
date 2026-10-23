@@ -7,6 +7,7 @@ import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_protocol/host_trust.dart';
 
 import '../profiles/mutation_coordinator.dart';
+import '../remote/connections.dart';
 import '../storage/state_store.dart';
 import 'operational_auth.dart';
 import 'owner_api.dart';
@@ -19,14 +20,31 @@ final class TrustedFoundationOwnerApi implements TrustedOwnerApi {
     required this.store,
     required this.coordinator,
     required this.sessions,
+  }) : connections = null {
+    _initialize();
+  }
+  TrustedFoundationOwnerApi.withConnections({
+    required this.store,
+    required this.coordinator,
+    required this.sessions,
+    required this.connections,
   }) {
+    _initialize();
+  }
+  final TrustedConnectionService? connections;
+  void _initialize() {
     if (!identical(coordinator.store, store))
       throw ArgumentError('INVALID_CHANNEL_CONFIGURATION');
     if (!coordinator.isTrusted || !sessions.hasNativePublicationGate)
       throw StateError('NOT_READY');
     store.trustedOperational;
+    if (connections != null &&
+        (!identical(connections!.store, store) ||
+            !identical(connections!.sessions, sessions)))
+      throw ArgumentError('INVALID_CHANNEL_CONFIGURATION');
     _unsubscribe = sessions.onSessionDetached(_detachSession);
   }
+
   final StateStore store;
   final TrustedMutationCoordinator coordinator;
   final TrustedSessions sessions;
@@ -135,6 +153,8 @@ final class TrustedFoundationOwnerApi implements TrustedOwnerApi {
         return result;
       }
 
+      if (connections != null)
+        return connections!.runOwnerMutation(request, effect);
       if (operation == ApiMethod.settingsUpdate)
         return sessions.runAuthorityMutation(
           effect,

@@ -137,7 +137,7 @@ void main() {
       }
 
       Future<Map<String, Object?>> owner() => Isolate.run(() async {
-        final environment = await ClientBootstrapEnvironment.verify();
+        final environment = await TrustedClientBootstrapEnvironment.verify();
         final descriptor = await environment.discovery();
         if (descriptor == null) throw StateError('OWNER_MISSING');
         try {

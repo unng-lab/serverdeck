@@ -35,7 +35,7 @@ void main() {
   }
 
   Future<Map<String, Object?>> owner() => Isolate.run(() async {
-    final environment = await ClientBootstrapEnvironment.verify();
+    final environment = await TrustedClientBootstrapEnvironment.verify();
     final descriptor = await environment.discovery();
     if (descriptor == null) throw StateError('OWNER_MISSING');
     try {
@@ -116,7 +116,7 @@ void main() {
     try {
       if (role == 'primary') {
         await Isolate.run(() async {
-          final environment = await ClientBootstrapEnvironment.verify();
+          final environment = await TrustedClientBootstrapEnvironment.verify();
           final namespace = await DiscoveryNamespace.forOwner(environment.sid);
           final lease = await MutexLease.acquire(
             namespace.mutexName,

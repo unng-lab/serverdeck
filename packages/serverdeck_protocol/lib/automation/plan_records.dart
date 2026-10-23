@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:cryptography/dart.dart';
 
 import '../codec.dart';
 import '../validation.dart';
@@ -27,7 +28,9 @@ final class QualifiedRecipeDescriptor {
 
   static Future<QualifiedRecipeDescriptor> fromJson(
     Map<String, Object?> input,
-  ) async {
+  ) async => capture(input);
+
+  static QualifiedRecipeDescriptor capture(Map<String, Object?> input) {
     // Make a private, verbatim snapshot before any await. Canonicalization
     // validates Unicode/depth/types; field validation separately rejects NFC
     // and executable-text violations instead of silently normalizing them.
@@ -35,23 +38,27 @@ final class QualifiedRecipeDescriptor {
     final json = jsonEncode(input);
     if (utf8.encode(json).length > 128 * 1024) invalidAutomationValue();
     final value = jsonDecode(json) as Map<String, Object?>;
-    requireFields(value, {
-      'format',
-      'id',
-      'version',
-      'revision',
-      'digest',
-      'environment',
-      'packagePins',
-      'dependencyTransactionDigest',
-      'repositoryFingerprints',
-      'aptIndexDigests',
-      'expectedAbsentPaths',
-      'ownedResources',
-      'prechecks',
-      'postchecks',
-      'licenseNotices',
-    });
+    requireFields(
+      value,
+      {
+        'format',
+        'id',
+        'version',
+        'revision',
+        'digest',
+        'environment',
+        'packagePins',
+        'dependencyTransactionDigest',
+        'repositoryFingerprints',
+        'aptIndexDigests',
+        'expectedAbsentPaths',
+        'ownedResources',
+        'prechecks',
+        'postchecks',
+        'licenseNotices',
+      },
+      {'initialSettings'},
+    );
     if (value['format'] is! int ||
         value['format'] != 1 ||
         !const {'postgresql16', 'clickhouse'}.contains(value['id']) ||
@@ -102,6 +109,22 @@ final class QualifiedRecipeDescriptor {
       return raw;
     });
     final prefix = id == 'postgresql16' ? 'postgresql' : 'clickhouse';
+    if (value.containsKey('initialSettings')) {
+      final settings = _object(value['initialSettings']);
+      final memory = id == 'postgresql16'
+          ? 'shared_buffers_mb'
+          : 'max_server_memory_usage_mb';
+      requireFields(settings, {'max_connections', memory});
+      final connections = settings['max_connections'],
+          amount = settings[memory];
+      if (connections is! int ||
+          connections < 10 ||
+          connections > (id == 'postgresql16' ? 1000 : 10000) ||
+          amount is! int ||
+          amount < (id == 'postgresql16' ? 16 : 128) ||
+          amount > (id == 'postgresql16' ? 16384 : 1048576))
+        invalidAutomationValue();
+    }
     if (!resources.toSet().containsAll({
       '$prefix.service',
       '$prefix.settings',
@@ -115,7 +138,9 @@ final class QualifiedRecipeDescriptor {
       _public(notice, max: 2000, multiline: true);
     }
     final hashInput = Map<String, Object?>.of(value)..remove('digest');
-    final hash = await Sha256().hash(StrictCodec().canonical(hashInput));
+    final hash = const DartSha256().hashSync(
+      StrictCodec().canonical(hashInput),
+    );
     final computed = hash.bytes
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join();
@@ -137,6 +162,13 @@ final class QualifiedRecipeDescriptor {
   final List<String> ownedResources, aptIndexDigests;
 
   Map<String, Object?> toJson() => jsonDecode(_json) as Map<String, Object?>;
+
+  /// Frozen in the descriptor digest. Historical descriptors without this
+  /// field remain readable, but cannot be used by the current install runtime.
+  Map<String, Object?>? get initialSettings {
+    final raw = toJson()['initialSettings'];
+    return raw == null ? null : Map.unmodifiable(raw as Map<String, Object?>);
+  }
 
   /// Structural selection equality only. Does not qualify a caller's recipe.
   bool matchesSelection({

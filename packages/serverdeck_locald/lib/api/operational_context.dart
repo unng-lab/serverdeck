@@ -20,6 +20,8 @@ final class TrustedMcpContext extends _McpContext<TrustedPipePeer> {
     String channel,
     _Session<TrustedPipePeer> session,
   ) : super._(registry, channel, session);
+  Object get connectionInterest => _session.connectionInterest;
+  Future<void> get detached => _session.detached.future;
   bool belongsTo(TrustedSessions sessions, TrustedMcpAuthority authority) =>
       _belongsTo(sessions, authority);
 }

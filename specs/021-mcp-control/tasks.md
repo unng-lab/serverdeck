@@ -999,3 +999,701 @@ T170 design starts from accepted d380b57/865864b. Existing KeyCustody.openCreden
 T170 design review1 completed with one confirmed P1: eager beginTargetChange detaches MCP before effects for all profile mutations; removing its last interest closes a transport that post-effect reconciliation promised to preserve. No code was changed. Added exact separate reconciled native lease/retirement ordering and updated existing target-fence/owner-foundation/host-trust contracts plus T174; no existing completed task evidence erased or authority revived. Design remains unaccepted until fresh independent review.
 
 T170 design accepted after connections_design_review_2 FINAL0/scopedready on exact9specfiles againstd380b57. Actual lychee807OK0 .local/connections-design-review2-links.txt, gitdiffcheck0; reviewer independently inspected normative requirements, all9 changes and actual composition/coordinator/store/session/context/gate/router/custody/transport interfaces, independently diffcheck0. No application code/tests changed or runtime acceptance claimed. The first confirmed P1 is closed at design level by the explicit reconciled native lease path and MCP-only/disjoint acceptance; T171/T172/T173/T174 implementation and actual native qualification remainOPEN. Earlier pending/unaccepted design text is retained history. Full021/sourcequalified release remainOPEN.
+
+T171 implementation adds strict immutable ConnectionIdentity/ConnectionSnapshot and exact five owner params/results capture in protocol connections.dart, selected only by captureTrustedMethodResult; legacy format2 method validation remains closed. Independent connection/credential/trust counters and canonical pin are retained, malformed/contradictory/unknown union data rejected. Adds opaque TrustedOwnerConnectionContext issued only after actual initial proof for a live servers.connect owner request, requiring original RPC budget at issuance; its15second service budget starts at original admission, not issuance/completion. Real native proofs remain physically tracked after logical timeout. Probe30second context unchanged. Pure test-first missingAPI red .local/connections-protocol-red.txt then new4/full165 protocol tests passed; actual AOT missingAPI red .local/connections-context-red.txt then six native context scenarios passed15s .local/connections-context-native.txt parent97778terminal0. Those native bundle fixtures verify actual process/pipe/gate identity only; they do not load or qualify Isar/DPAPI/SSH connection service. Full native authentication/client regression and mandatory checks/review still pending; no service or startup activated.
+
+T171 current final checks before independent review: full native authentication26/49s including all existing owner-probe30s scenarios and new connection cases, then full strict native client31/53s, serialparent77979terminal0; .local/connections-{auth-full,client-full}.txt. Full protocol165 and protocol/locald/Windows analyzers all0, .local/connections-{protocol-full,protocol-analyze,locald-analyze,windows-analyze}.txt. Root literalformat548/0changes (existing ignored-work include warnings), Flutteranalyze0/test253 parent93406terminal0; .local/connections-{root-format,flutter-analyze,flutter-test}.txt. lychee807OK0 .local/connections-t171-links.txt, diffcheck0; prerequisites report021 docs and requirements checklist15/15. No native runner remains active; independent review still required. These scoped identity/protocol checks do not establish real connection-service/DPAPI/Isar/source-DLL qualification.
+
+- [ ] T175 [T171 code review1 correction] Connect all five connectionOwnerMethods to actual TrustedApiClient strict format3 decoding in packages/serverdeck_windows/lib/operational_api_client.dart and library import. Add actual native trusted client wire cases covering valid immutable replies for all5 methods and terminal UNAUTHORIZED for malformed reply to each; preserve format2. Extend the existing safe diagnostic fixed-case inventory/tests for the six new fixtures without exporting arbitrary text. Mandatory checks and fresh independent review before T171 acceptance.
+
+T171 code review1 completed with one confirmed P2: the actual native client's decoder predicate omitted connection methods, bypassing the new protocol capture via generic freeze. Added real malformed servers.connection wire regression; initial test-only const spread of map.keys failed AOT compilation and was corrected before behavioral test. Actual red .local/connections-decoder-red.txt then failed EXPECTED_TRUSTED_RPC_ERROR, proving the response was wrongly accepted. After connecting actual decoder, focused six native cases passed11s .local/connections-decoder-native-fixed.txt parent83690terminal0: valid all5 typed results plus malformed result for each method. Updated safe fixed-case inventories31→37 and controlled declaration metadata65. No runtime deadline or error-policy relaxation; full updated checks and fresh review pending. Earlier31-case/root checks above are historical and do not qualify the expanded client path.
+
+T171/T175 corrected-source final checks: full strict native client37/68s then full native auth26/45s, serialparent31797terminal0; .local/connections-{client-final,auth-final}.txt. Current rootliteralformat548/0changes, Flutteranalyze0/test253 parent9797terminal0 .local/connections-final-{root-format,flutter-analyze,flutter-test}.txt. Current Windowsanalyze0 .local/connections-final-windows-analyze.txt; unchanged protocol/locald source retains full165/analyzers0 evidence above. Full safe realreporter diagnostics with37fixedcases/privacy/frame/source/range negatives passed parent81801terminal0 .local/connections-final-safe-diagnostics.txt; twoPSparses0/diffcheck0/lychee807OK0 .local/connections-final-links.txt. No active native test; fresh independent review required on expanded14-file scope. Product connection/read/executor/UI readiness remains unclaimed.
+
+User workflow steering: implement the complete agreed functional scope first, report code implementation, then perform full checks. From this instruction onward full regression suites and repeated independent review cycles are deferred, not waived or reported passed. connections_protocol_context_review_2 was interrupted while running and is NOT a clean review. Earlier checks qualify only their recorded historical source. Keep implementation tasks open pending final verification; no release/full-goal completion claim follows from code presence. Fast formatting/selected compiler analysis during editing is distinct from full validation.
+
+T172/T174 implementation in progress: added actual separate reconciled native lease with affected-grant/unbound retirement, preserved eager standalone path; opaque session identity tokens; shared TrustedConnectionService with scoped DPAPI reads, bounded owner handles/interests, physical reservation/cleanup and15second connect; exact owner ConnectionOwnerApi and MCP connect/disconnect backend; same-pool connection composition and connection-aware foundation/trust adapters perform stable pre/post reconciliation under held native gate. Added SshTransportReservation so pending custody work consumes the same two-slot budget as probes and authenticated transports, transferring ownership atomically at connect. Selected compiler analysis of these actual service/adapter/composition files passed (.local/connections-functional-compile.txt), after fixing missing McpScope/unused import. No new runtime/full regression qualification has been run or claimed; T172/T174 remain open. State/logs, compiler/plan/delegation/executor/install/UI/startup still require implementation.
+
+T012/T172/T174 functional implementation advanced under the user-requested functionality-first workflow. The shared RemoteReadService now serves sanitized server list/get, explicit state refresh/cache and bounded journald reads through owner and MCP adapters; owner reads use original30s native contexts,16 scoped handles/60s retention and actual cleanup. One sampler per target shares concurrent refreshes,5s minimum interval, inventory5min, metrics stale15s,120 scalar history points/10min, bounded caches/rings and signed principal/filter/identity-bound cursors. Logs normalize default filter values and use the canonical PostgreSQL16 unit. Added the actual trusted client strict owner read response path in protocol/remote_reads.dart and Windows decoder. State scalar percentages and uptime use integers compatible with the common canonical Local API; absent facts remain null. Remote configuration still reports EXECUTOR_UNAVAILABLE pending root adapter. Selected source analyzers passed for read service/protocol/client before subsequent edits; these are compile checks only, no runtime acceptance and no T012/T171/T172/T174 closure.
+
+T019/T024/T025/T026/T028 functional code in progress: added executor/serverdeck_executor/{codec,compiler,journal,probes,runner,jobs,preflight,bridge,supervisor}.py plus isolated launchers/systemd unit in executor/packaging/. The closed format1 compiler resolves typed parameters and emits deterministic effects/checks and one literal Ansible effect; locald independently derives matching output in automation/compiler.dart. Root journal has fsynced length/checksum/hash-chain records, occupied-host/plan mapping, fixed patch/event vocabulary, storage quota and fail-closed damaged tails. Runner prepares exclusive root workdirs and tracks one systemd effect without killing unsafe package operations on timeout. Jobs persist queued/step challenge/launch commitment, scope by enrolled controller/workspace/UID, bind one-use5s challenges to actual root socket streams, stop at cancellation/session boundaries, preserve uncertain occupancy and do not auto-resume committed effects after restart. Root preflight persists full baseline evidence and fixed fingerprints for motd/qualified services; bridge/supervisor framing and root custody/enrollment/runtime hash checks are present. Python3.12 py_compile succeeded on all nine implementation modules; no root service, Ansible effect, Docker test or saved server operation was run. Provisioning, locald executor adapter, full safe outcome reconciliation/retention, effective DB settings, real APT gate/qualified recipes, delegation/plans/jobs/UI/startup integration and all final qualification remain open. Existing component callbacks are still being connected; code presence is not full runtime readiness.
+
+- [ ] T176 [Preflight target binding] Carry the exact captured workspace/server/revision target through root preflight and locald executor requests. The preflight contract now explicitly includes target because resource fingerprints include these fields and root cannot derive them from profileBody/expectedHostId alone. Root validates UUID/counter shapes, schema3 ordering and enrolled workspace, computes fingerprints from actual values, and retains that target in cached/full admitted evidence. Complete locald binding/current-target checks and negative coverage as part of final functional integration/qualification. This metadata never substitutes for native authorization, SSH trust or root factual probes. Mandatory specification link check and independent review remain deferred with the user's whole-feature checks sequencing.
+
+Further functional-first implementation: root preflight cache now persists checksummed full baseline evidence with immutable5min expiry, restores valid cached results after supervisor restart and copies full facts into admitted job receipts. Added explicit administrator provisioning in executor/packaging/install.py (fixed root paths, existing prepared hash-locked venv, preserved hostUUID, enrolled UID/controller/workspace, exact no-argument sudo rule, active/occupied-host refusal, no dependency download or automatic service start). Added fixed effective PostgreSQL/ClickHouse settings probes based on their primary documentation; DB settings admission still blocks until parent/config/no-start/memory qualification is implemented. Root runner records proved child exit before postchecks. Read/probe-only job reconciliation can now classify a retained proved exit and full postchecks, preserving unknown occupancy when evidence is missing and never authorizing a subsequent effect; remaining steps become cancelled-partial after recovery. Cancel request results are durably retained/idempotent, bounded128 IDs/job. Full terminal retention/GC and APT qualification remain open. Source filenames in the T019/T025 plan are implemented as compiler.py/journal.py rather than the initial profiles.py/store.py suggestions; responsibility and contracts are unchanged.
+
+Added [shared observations contract](contracts/observations.md) and plan reference for actual owner read routes, typed result boundary, shared sampler/cache/filter/cursor semantics and integer public metric scalars. Counter summation avoids int64 overflow and failed nested owner reads accept the closed MCP domain-code vocabulary without broadening the native Local API error envelope. Latest selected Dart analyze passed for locald compiler/reads/observations/owner_reads, protocol remote_reads/host_trust and Windows operational_auth_client. Python3.12 py_compile passed for all nine root implementation modules and installer. These are syntax/static checks only, not full tests or runtime qualification. No mandatory full suite, lychee, new review, push, Docker/Ansible/root service run or real server operation since the functionality-first instruction.
+
+- [ ] T177 [Shared executor adapter/enrollment] Complete owner inspection/confirmation/revoke and qualified native descriptor delivery around [executor enrollment](contracts/executor-enrollment.md). Implemented strict protocol ExecutorRequest (closed methods, exact parameters,256KiB), fixed persistent SSH sudo bridge with BE framing/8MiB response/5s requests and same four-channel budget as reads; native target/session/cleanup-owned ConnectionExecutorWork, same total48 operations, fresh native/current scope before and after each root response/error. Added signed owner-only executor-enrollments.json storage under existing protected workspace, same StateStore writer tail/32 budget,250 bindings/1MiB, workspace/key HMAC and protected atomic readback. Public binding parser is structural only; owner confirmation/admission still unbuilt. ControllerId uses existing persistent workspaceId, shared UI/MCP; no AI-selected or process-generated controller identity. Root hello now binds compiler and bridge hashes, and runtimeVersion includes complete10-module/bridge/lock program digest so a changed runtime invalidates old plans even if compiler alone is unchanged. Descriptor builder is tools/build-executor-release.py; qualified manifest delivery remains open. Root observe returns exact managed observations through fixed probes, locald RemoteExecutorService compares protected enrollment/current connection/full runtime handshake and captured target before publishing. RemoteReadService configuration_get is now wired to this actual adapter (cache-only default, explicit refresh,15s stale/64MiB bounded cache); no enrollment means EXECUTOR_UNAVAILABLE on refresh, not a fake configuration. Parent read cancellation owns pending protected-file/root channel work and physical cleanup; existing owner read context cannot send root plan/apply methods. Root wire/spool serialization preserves observed Unicode verbatim while hashes retain canonical NFC. None of this grants source/runtime acceptance or completes T019/T023–T028/T154.
+
+Latest T177 editing evidence: selected protocol analyze(executor/executor_enrollment/remote_reads)0; selected locald analyze(executor/read/connection/SSH/store/enrollment)0 after removing one unnecessary assertion, plus executor_connections0 after adding fresh native proof before propagating root failures. Python3.12 py_compile0 on changed root codec/journal/preflight/supervisor/installer/descriptor-builder. No full tests/lychee/review/CI push or root/Ansible/Docker execution since functional-first steering. Owner inspect/confirm/revoke UI+native strict DTO routes, qualified artifact wiring, enrollment preservation in workspace operations, locald plans/delegation/jobs, root DB/APT/retention and startup remain required implementation work before final checks.
+
+- [ ] T178 [Executor owner lifecycle completion] Complete durable request-ID/result replay for executor.confirm/revoke and sidecar preservation in workspace migration/backup, plus native bundle descriptor staging/startup delivery and actual owner client/UI activation. Current owner service code now uses real fresh owner proof/native reconciled fence, volatile owner-bound16/60s inspection challenges, exact current connection comparison, affected MCP retirement, physical root-channel drain and protected metadata readback. Same binding preserves createdAt and avoids needless retirement; metadata changes stale the managed-observation cache. Add actual success/replay/foreign/expired/changed-target/native deadline/revoke/drain/manifest artifact-negative coverage only at the final whole-feature validation phase. T177/T178 are not accepted solely from these implementations.
+
+Functional-first T177/T178 progress: added protocol ExecutorRelease (complete fixed source/bridge/lock build identity recomputation) and ExecutorOwner result DTOs. Only explicit format3 manifest parsing admits optional executor-release.json, old format2 stays exact4 files; actual Windows verifier creates opaque VerifiedExecutorRelease with before/after file/manifest binding checks. Shared composition accepts that verified type and root handshake now requires it; missing descriptor never self-qualifies a root runtime. Added owner servers.executorInspect to the original30s native context/16-handle read status flow, private owner-only inspector tool (absent from MCP catalog), and native executor.enrollment/confirm/revoke adapters plus actual strict client predicate/capture. Owner confirmation challenge derives only from real root hello, source-qualified bundle descriptor/current SSH pin and actual owner session, not a caller JSON flag. Native source/runtime/UI activation still open.
+
+Flutter functional code now includes lib/servers/server_controller.dart and server_panel.dart: genuine borrowed TrustedApiClient only; bounded async polling/cancel and epoch checks; explicit fingerprint trust confirmation, connect/disconnect, source state, managed observations, journald filtering/pagination/full record view, executor hostUUID+fingerprint confirmation/revoke and localized source failure/empty distinction. State sampling stops with panel/disconnected interest and never reconnects. ProfileList accepts the actual format3 control client for that panel; main app still must switch to the verified trusted startup/client, so no installed UI-readiness claim. All root/grant/plan/job/app installation feature work and final qualification remain open.
+
+Additional functional code: owner-read cancellation now wins before native-start publication as well as during work, retains a failed CANCELLED handle without starting late IO, keeps quota until reservations/physical work settle, and rejects a late successful result after cancellation. Nested owner read failure DTOs accept the closed union of trusted transport/domain codes without changing the outer21-code native envelope. The Flutter controller assigns the actual owner operation envelope UUID before sending start, so cancellation can address pending/late acknowledgements; no reconnect/effect retry is introduced. Public journal rendering distinguishes denied/incomplete from a known empty result. Added bounded MetricsHistory painter for actual up-to120 CPU/RAM/rootdisk observations, preserving null/time gaps. All panels still require native format3 startup/client activation before product use.
+
+Latest selected editing checks: protocol analyze(executor_release/executor_owner/build_manifest/remote_reads/host_trust)0, Windows analyze(mcp_build_bundle/operational_auth_client)0, locald analyze(executor/reads/owner_executor/owner_reads/executor_enrollments/trusted_services)0, root selected Flutter source analyze(server_controller/server_panel/metrics_history/profile_list)0. Only changed-source formatting/static checks were run. Full required root format/analyze/test, native/integration suites, specification links and independent review remain deferred until ALL agreed functional code is implemented, per user instruction; no checks/review/acceptance claim from old source is reused.
+
+- [ ] T179 [T023 concrete shared plans] Complete/qualify the actual TrustedPlanService and automation_plan_writes introduced during functional-first work. The service now powers serverdeck_plan_create/plans_get in the shared MCP composition: immutable exact source revision/defaults, current native plan+server scope, verified protected enrollment/root build, full root observations/fingerprints/capsule bindings, independently derived complete effect/check comparison, original30s operation/5s proof budget, safe explicit blocked plans and original request replay. Native StateStore writes plan+permanent receipt atomically on the same32 queue, preserves/validates all10 automation groups plus schema3 foundation16 payloads, checks current grant revision/target counters,64MiB/1000plan/10000receipt limits, actual complete native readback and unchanged rollback on known capacity/policy abort. Replay performs actual native graph reload under the native authority gate rather than re-running remote preflight or renewing expiry. Owner planning/desired/drift views, complete negative/runtime/native tests and final independent review still required; T023/T179 remain open.
+
+T179 functional code added automation/{plan_commands,plans}.dart, storage/automation_plan_writes.dart and mcp/plan_services.dart; shared services now construct/drain plans over the identical store/connections/root facade. The generic trusted metadata queue also serves protected enrollment operations. Original parameter text is captured verbatim through strict wire JSON and validated before NFC digesting, so non-NFC/templates/invalid scalar types do not become a replay alias. Private program references are never accepted as permission. Root preflight now exposes full managed observations with individual actual completion timestamps, allowing locald to recompute capsule fingerprints without issuing a second hidden read. Same runtime immutable source-version hash binds this root response program. Known prerequisite failures produce blocked/no-program plans; authorization/storage/cancellation does not turn into success. plans_get includes current expired flag beside immutable historical plan. Derived>32 step failure is detected before remote IO; remote capacity is not mislabeled as profile step count.
+
+T179 editing evidence only: selected locald analyze(plan service/command/store/MCP dispatch/shared composition)0 after fixing missing validator import/unused state field, Python3.12 py_compile preflight.py0. No full native/portable/Flutter/lychee/review/CI checks since the whole-feature functionality-first instruction, no actual root/SSH/Ansible/Docker/server execution. Original source-qualified native build gates, owner/UI/startup integration, delegation/approval/job admission+executor/installation/retention and all final qualification remain open. Next implementation priority is actual delegation/approval/job domain and MCP apply/status/cancel/reconcile, not another infrastructure-only review loop.
+
+- [ ] T180 [Shared delegation and approval functional code] Complete and qualify [automation authority](contracts/automation-authority.md): exact owner delegation create/revoke/list/get, approval request/decide/list/get and MCP approval_request over the same TrustedAutomationAuthorityService/store/native actors; actual owner/client result boundary, permanent receipt transaction and later job-driver authority consumption. Functional code now includes authority commands/service, fixed native automation delta writer, authority persistence, owner/MCP adapters, shared lifecycle composition and strict protocol/Windows result selection. Delegation predicates narrow complete immutable revision parameter domains; no delegation replacement or AI decision route. Approval requests bind current exact runnable plan/target/expiry/origin, owner decisions bind displayed digest and preserve prior result. Current live grant checks run inside transaction, approval expiry rejection proves unchanged rollback; accepted transactions survive response cancellation with original receipts. Native result/body shape is closed, PLAN_EXPIRED/PLAN_STALE owner failures remain nested data without expanding the native error vocabulary. Job admission/step checks/UI are still open; code presence does not accept T024/T180.
+
+T180 editing evidence: selected locald analyze(authority service/commands/owner adapter/MCP dispatch/composition/store/delta)0, protocol analyze(authority_owner/host_trust)0, Windows analyze(operational_auth_client)0. Formatting only touched source files. Corrected plan_create/replay output to the exact documented `{planId,planDigest}` acknowledgement. No full tests, links, independent review, CI push, root/Docker/Ansible/server operation since functional-first steering. All mandatory final checks/reviews remain deferred until the whole agreed feature is implemented; next implementation work is durable job admission and actual root execution driver.
+
+- [ ] T181 [Durable jobs and actual execution driver] Complete and qualify the [native job admission](contracts/job-admission.md) plus actual shared root driver and all six MCP job tools. Functional metadata code now includes immutable job_commands.dart and StateStore automation_job_writes.dart on the shared native delta/32 queue: current actor/object grant and exact target, selected full-tuple delegation or consumed one-plan approval, immutable one-job-per-plan/attempt identity, first queued event and permanent receipt in one transaction, same/different request aliases without execution replay, active/unknown host occupancy and quotas, persisted cancel/reconcile intent and per-step current authority validation. Full factual/compiler/native service validation and driver integration remain necessary; internal verifiedPlanDigest is a substitution check, never permission. Driver must persist running before any root submit so queued cancellation cannot conceal an already submitted remote effect. Reconcile is observational only. Root status/event/outcome persistence, desired state, startup recovery, owner/MCP/UI wiring remain unfinished; no job feature completion claim.
+
+T181 editing evidence only: selected locald analyze(job_commands/automation_job_writes/automation_authority_writes/state_store)0, changed source formatting. Corrected delegation tuple mismatch to the specified REVISION_CONFLICT; repeated cancel intent does not allocate another state event. No full validation/review/links/CI push or actual root operation. T181 stays open until the whole functional implementation and deferred final qualification complete.
+
+T181 subsequent functional progress: added actual automation/jobs.dart TrustedJobService and mcp/job_services.dart for all six apply/jobs tools in the shared native composition; original receipt replay, qualified full-program/root-cached-capsule comparison plus fresh full observation fingerprints before new admission, native-gated root submit/authorize, persistent root epoch+1, owned background driver after response cancellation,1s polls, explicit cancel/reconcile and exact status/check validation. Added protocol executor_jobs.dart and native automation_job_progress.dart: checked state/outcome and successful desired records publish atomically, no failed/unknown desired overwrite. Queued→running persists before root submit; new generation local-only recovery cancels unsubmitted queued and marks other unfinished states unknown, never resumes an Ansible step. Root jobs.status now exposes persisted authorizationEpoch; observational reconcile closes a waiting/no-child receipt without another effect. Event quota refuses new jobs but does not conceal cancellation/outcome: sequence gaps are explicit jobs_events.dropped counts. Job list cursors are bounded64/original5min, session/grant/revision/filter bound. Duplicate concurrent apply session transfer and shutdown's late driver transfer are owned/drained. Temporary native publication waits avoid falsely poisoning current authority.
+
+Latest T181 editing evidence: selected locald analyze(jobs/automation_job_progress/automation_job_writes/state_store/trusted_services/job_services/connection_services)0; protocol analyze(executor_jobs)0; Python3.12 py_compile jobs.py0. Only touched-source formatting/static syntax checks. No full tests/links/review/CI push, root/SSH/Ansible/Docker execution or saved-server operation. Owner plans/jobs, desired/drift read/UI projection, recipes_list and actual DB/APT installation runtime, enrollment lifecycle/startup/client/bundle activation and final qualification remain open. T181 and original feature readiness are not accepted by these scoped results.
+
+- [ ] T182 [Desired/observed projection] Complete and qualify the concrete configurationView and strict configuration_view DTO wired into shared configuration_get/owner server reads and Flutter ServerPanel. Last successful native desired record resolves exact immutable renderer/service intent, actual timestamps, file/service basis and per-field differences; stale/unknown/changed-target never matched, raw observed Unicode retained, file comparison does not claim fresh effective SQL state, no auto-repair. Recipe-owned desired state is explicitly unknown until qualified recipe evidence/defaults are implemented. Full UI/native/source cases and recipe comparison still open; code presence is not acceptance.
+
+- [ ] T183 [Owner plan/job automation] Complete and qualify [owner automation](contracts/owner-automation.md): native-only fixed-intent owner automation contexts with original30s/2h budgets, same enrolled root adapter/pool, explicit root method set and existing read context confinement; shared owner plan create/get plus bounded16-handle native owner status/cancel projection,60s response cache, before-start/late-result cancellation and physical drain. Actual Windows client selects strict result parser. Owner job service/adapters, automation UI and installed format3 activation remain open. New owner plans have null origin; owner historical get does not relabel old grant-origin plans.
+
+T182/T183 editing evidence so far: selected locald analyze(owner_automation/plans/trusted_services/operational_auth/connections/executor/executor_connections/configuration/reads)0, protocol analyze(owner_operations/configuration_view/host_trust/remote_reads)0 after removing unused observation import, Windows analyze(operational_auth_client)0, selected Flutter analyze(server_panel)0. Only source editing checks; mandatory full format/analyze/test, links and independent review remain deferred until ALL functionality per user. No runtime/server/root operation or CI push.
+
+Subsequent T183 functional progress: all eight owner plan/job endpoints now dispatch into the same real services. Job actor is a private typed union over actual admitted native owner/MCP contexts; owner history may include all workspace jobs while MCP remains own-origin/current-server only. Owner execution of G-origin plan preserves G and the same current object-grant/authority/target checks; there is no owner bypass. Native owner metadata reads return inline done envelopes without allocating retained60s handles, preventing live status/event polling from exhausting cache; max16 physically unfinished inline reads stay charged and close drains them. Mutations retain async handles; cancelling response interest does not cancel accepted jobs. Fixed method-scoped helper contexts constrain every root request and actual proof drain. T183 still awaits Flutter automation management/installed startup plus all deferred qualification.
+
+T178 subsequent functional progress: executor.confirm/revoke now publish durable request-result receipts and the enrollment change in one protected format2 sidecar replacement. Existing format1 files remain readable. Actual owner replay under the native fence precedes challenge lookup, so lost ACKs survive restart/challenge expiry without reopening SSH or restoring revoked bindings. Changed input/method under the same requestId conflicts; no-change confirmations retain createdAt and still record their ACK, missing-binding revocations also record false. At most10000 permanent receipts/250 bindings/64MiB, no receipt eviction. Fresh queued writes revalidate native owner, current target and challenge before publication. Failed/ambiguous replacement or authenticated readback blocks further store work. Sidecar migration/backup preservation, UI/startup delivery and final native/runtime negative cases remain open; T178 is not accepted.
+
+- [ ] T184 [Concrete database qualification and package gate integration] Finish the actual installation path over qualification.py, apt.py and apt_gate.py: batch resolution for both supported recipes with shared dependencies and intermediate complete package snapshots; private aptTransactions evidence produced by root preflight and consumed by runner/gate; fixed trusted recipe tasks, effective defaults and owned-resource provenance; complete package/version/NetBird/listener/SQL postchecks; root recipes read and locald recipes_list; administrator preparation and safe terminal temporary-file retention. Existing source blocks installation until this end-to-end path is connected. Do not remove the runtime/preflight guard merely because the resolver and gate are present.
+
+T184 functional source so far: actual PostgreSQL canonical parent/includes/ALTER SYSTEM/sourcefile qualification, ClickHouse bounded no-external-input XML parent hashing and effective settings probes, root/service memory budget; isolated python-apt new-only exact resolver with signed fresh fixed indexes/pins and no download/update; protocol3 one-use gate validates kernel cgroup, real apt-get frontend lock holder, original package/config/index/policy snapshots and exact archive digests/transaction. Gate proof is committed to the root journal via private PID/cgroup-checked socket admission before dpkg; this reserves one connection independently of the normal16-client budget. Runner writes private gate context only after launch commitment. The producer, fixed recipe tasks and complete installation postchecks remain unbuilt, so no executable installation claim. Source/release inventory now includes thirteen modules and actual runtime checks Ubuntu24.04 amd64/systemd/cgroupv2; provisioning includes fixed APT launchers and explicit no-start preparation. Qualified database parent fingerprints still require administrator enrollment; unknown/custom configuration remains blocked.
+
+Latest editing evidence only: selected locald analyze(executor_enrollments/state_store/owner_executor/plans)0 and three touched enrollment source files formatted0; Python3.12 py_compile(codec/qualification/apt/apt_gate/preflight/probes/jobs/journal/runner/supervisor/install/release-builder)0. No root/SSH/Ansible/Docker execution, full tests, link checker, independent review, CI push or saved-server operation. All mandatory final checks remain deferred until the agreed entire functional code is complete. No task acceptance checkbox follows from these syntax/static results.
+
+T184 subsequent functional progress: apt.prepare_many now resolves both recipes
+in ordered cumulative marks in one isolated read-only python-apt process. Shared
+pins must match exactly and are assigned once to their first effect; every
+cumulative change set must equal the declared union with no installed-package
+alterations. Private probe response is checked for exact ordered chained
+transactions. Root preflight now produces aptTransactions keyed by compiled
+effect IDs, public original/final package digests and full selected descriptors.
+Root pre-step revalidation uses each expected intermediate package state and
+rechecks fixed source/index/policy hashes and target absence. Single-recipe
+wrappers use the same batch implementation. Syntax editing check only:
+Python3.12 py_compile(apt.py,preflight.py)0; no actual resolver/root/Ansible/Docker
+execution. Runtime nonempty-catalog guard remains: fixed recipe configuration,
+postchecks, adoption/provenance, catalog read/UI/startup and full qualification
+are still required before installation can be enabled.
+
+T182/T184 subsequent functional progress: current executable recipe descriptors
+require digest-bound initialSettings. Protocol retains optional old descriptors
+verbatim; historical desired comparison uses frozen settings/file digest and
+active+enabled intent only for new descriptors, older recipe evidence stays
+unknown. The fixed compiler install play now includes noninteractive APT,
+root-owned fixed directories, local-only PG peer/CH read-only initial parent and
+auth files, typed managed fragment, private recipe-check and canonical service
+start+enable. The source-bound private launcher is provisioned and byte-checked
+by runtime. It derives actual cgroup identity, checks launch/gate/program/boot,
+post-package digest, catalog and exact files/modes, inactive service/memory,
+no NetBird dependency and actual PG no-start parser. Preflight checks host memory,
+CH SSE4.2 and absent administrator/runtime overrides. Runtime catalog guard
+remains; live postchecks, durable ownership/adoption and actual catalog delivery
+must finish before it is removed. Selected editing checks only: protocol
+analyze(plan_records)0, locald analyze(configuration)0, both touched Dart files
+formatted, Python3.12 py_compile(compiler/qualification/apt/apt_gate/runner/jobs/
+supervisor/install)0. No real executor/Ansible/DB operation, full checks, links,
+review or CI push; all acceptance remains pending.
+
+T184 subsequent functional progress: root installation postchecks now require
+matching durable APT admission/launch/program/transaction, boot/runtime/registry,
+complete expected packages and NetBird hash, exact initial file bytes/modes,
+active+enabled canonical service, actual process UID/executable/config/cgroup,
+owned loopback kernel TCP listeners, SQL/effective settings/version/memory and
+stable main PID/start/parent/unit evidence. Listener inspection has a5s budget
+and bounded proc data. General CH settings validation also checks canonical
+process/config and ownership of its fixed local HTTP endpoint. Root journal now
+atomically publishes the checked recipe step and two provenance/baseline
+bindings; failure/unknown cannot publish them. Observations and preflight use
+only current host/runtime/static-registry matching recovered bindings and still
+recompute actual fingerprints. Explicit observational reconcile uses the same
+checks/publication without another effect and preserves cancellation intent.
+Selected Python3.12 syntax checks of qualification/probes/preflight/jobs/journal/
+supervisor passed; no actual executor/SQL/Ansible/DB/Docker execution, full checks,
+links, review or CI push. Catalog read/preparation/delivery, terminal retention,
+UI/startup and final qualification remain open; installation guard remains.
+
+T184 subsequent functional progress: root recipes read is now strict target/host
+bound and returns immutable catalog metadata, explicit unavailable product
+reasons, source/runtime identity and declared fresh-install/preflight/no-refresh
+prerequisites without any package-manager work. Shared RemoteReadService powers
+serverdeck_recipes_list with current plan scope/server policy and qualified
+enrolled helper, bounded owned IO, complete digest parsing and response identity
+checks. Native owner servers.recipes uses the same service and existing bounded
+async owner-read handles with a narrowly allowed metadata-only root request.
+Protocol executor_recipes capture is closed/immutable and used by actual owner
+client result selection. QualifiedRecipeDescriptor.capture performs the existing
+complete validation and SHA synchronously for that boundary; async fromJson
+remains compatible. Disabled installation returns both programs unavailable;
+catalog membership is never a runnable plan. Selected protocol analyze4 files0,
+locald analyze4 files0, changed-source format8 files, Python3.12 py_compile
+supervisor0. Full checks/reviews/links/runtime/CI remain deferred per user.
+
+T183 subsequent functional progress: Flutter AutomationController/AutomationPanel
+now borrow the genuine native owner client and are wired into ProfileList beside
+ServerPanel when that client is supplied. Actual owner routes support profile
+list/page/get/version/body authoring/create/update/archive; plan create/get with
+resolved parameters and exact full review/digest approval/denial; explicit apply,
+jobs list/page/get/events (last200/source drop count), step-boundary cancel and
+observational reconcile; catalog reads and exact-version delegation create/revoke
+with complete constraints and bounded lifetime. Initial predicate defaults allow
+only exact parameter defaults. Approval/delegation lists now support serverId
+before sorted offset pagination without changing record/result shape, and UI
+provides separate continuation controls. Selected jobs poll local metadata1s
+only while open/unfinished; no auto-resume/connect. Mutation closures retain
+original durable IDs/input across explicit retries, async handle assigned before
+send, late/retired results rejected, response cancellation distinct from job
+cancel. Archived profiles clear selection rather than reading a missing new head
+revision. Plan/job reads verify the displayed server binding. Full grant/client
+management, installed trusted startup and final UI/native qualification remain
+open. Selected Dart analyze(root3changedfiles)0/locald authority0; touched-source
+format4files0. No full Flutter format/analyze/test, specs links, independent
+review, runtime/Docker or CI push since user requested all functionality first.
+
+T183 subsequent grant-management functional progress: strict format3 grants.list
+(optional serverId)/get/configuration now complement existing native create/
+replace/revoke. Public records exclude secretRef and keys, max32 sorted records/
+512KiB; actual TrustedApiClient uses closed full result capture for all six.
+Reads share the native publication gate/original5s owner proof. Configuration
+requires current grant at return, opaque verified bundle, matching actual worker
+endpoint root/build and current MCP/manifest hashes; optional absent bundle
+refuses NOT_READY rather than inventing a path. Shared composition accepts the
+verified startup bundle. Flutter panel now creates/replaces/revokes access,
+shows/copies nonsecret command+args, and delegation chooses a current plan+apply
+grant on this server with frozen displayed revision/constraints; no manual UUID.
+Mutation retries retain original request and grant IDs. Startup activation still
+must supply actual bundle/client; no installed grant/UI readiness claim. Selected
+protocol analyze(grant_owner/host_trust)0; Windows analyze(operational_pipe_worker/
+mcp_build_bundle/operational_api_client/operational_auth_client)0; locald analyze
+(owner_grants/operational_sessions/trusted_services)0; selected Flutter controller/
+panel analyze0. Touched-source format only. No full checks, link checker, native
+runtime execution, independent review, Docker or CI push; those remain deferred.
+
+- [ ] T185 [Actual trusted startup/cutover] Complete the production locald/UI
+  format3 entry/environment/discovery/lifecycle, source-qualified bundle and
+  descriptor delivery, native owner client and complete counters/readiness path.
+  Use [trusted workspace](contracts/trusted-workspace.md), exact shared services
+  and genuine native peers; never adapt trust counters through a legacy DTO,
+  manufacture an owner role or fall back to old runtime after a format3 failure.
+  Complete source activation before the deferred final full/native/UI checks.
+
+T185 functional progress: Workspace.openTrusted now creates schema3 directly in
+the fixed protected default.creating path with actual DPAPI receipt key/format3
+manifest/native16-collection transaction. Added explicit emptyTrusted foundation
+factory and a narrowly fixed initial-stage full snapshot validator accepting
+only default workspace/settings and no other rows; exact4-file custody/inventory
+and confirmed close precede promotion and ordinary active full loader. Complete
+empty stage recovery is supported; partial/foreign/nonempty/upgrade-residue
+creation refuses without deleting evidence. Existing current format3 goes
+straight to ordinary loader so unfinished jobs can recover; old/residual stores
+use existing actual migration under the same mutex. Reservation transfers are
+synchronous, ambiguous native open/close retains ownership and only attributable
+stage instances may be closed. Production entry/native client activation is
+still unbuilt. Selected locald analyze(models/trusted_snapshot/workspace/
+trusted_workspace)0 after final fixes; touched4files formatted. No full tests,
+links, native/Docker execution, independent review or CI push per functional-first
+instruction. These source changes do not accept startup or whole-feature readiness.
+
+T185 additional functional source progress: actual production locald entry now
+selects TrustedLocaldEnvironment/TrustedLocaldBootstrap, deferred TrustedApiServer
+and TrustedServiceLifecycle. They own the original startup deadline, real native
+peer publication gate/session registry, protected discovery/8 trusted slots,
+Workspace.openTrusted, real shared composition with verified bundle/descriptor,
+job recovery and ordered physical shutdown. No fabricated keeper/owner session;
+locald contenders cannot bind owner services; channel disconnect is joined once.
+The normal Flutter entry now uses TrustedNativeBootstrapHost and the explicit
+LocalApiClient.trusted constructor. It reuses actual TrustedApiClient RPC,
+snapshot/recovery projection with the correct codec and all trust counters,
+immutable mutation IDs and stale-generation guards; server/automation panels
+borrow that same actual client. Ordinary legacy client remains only an explicit
+separate constructor, with no fallback after format3 failure.
+
+MCP now has bin/mcp.dart and actual verified MCP environment/startup. Configured
+arguments bind the actual MCP image, protected discovery, matching locald child
+when needed, native bootstrap, serialized pre-grant typed readiness, DPAPI grant
+proof and LocalMcpGateway.connectTrusted. Original 30-second startup budget;
+no authenticated-session/effect replay or configured-to-unconfigured fallback.
+The gateway keeps real publication gate, current grant, quota/drain/cancellation
+behavior and preserves trusted domain failure codes. No-argument mode exposes
+only unconfigured negotiation. Added build-mcp.ps1/run-serverdeck.ps1; normal
+run-foundation delegates to format3 assembly with five hash-bound artifacts and
+five lockfiles, including generated executor descriptor. Historical acceptance
+targets still require source migration/qualification during deferred final work.
+See [trusted startup](contracts/trusted-startup.md).
+
+Actual selected analysis only: Flutter client/host/app/projection/recovery five
+files0; Windows client-bootstrap/auth/API three files0; MCP bootstrap/gateway/bin
+three files0; locald entry/bootstrap/lifecycle/server/bin five files0. Three
+PowerShell source files parsed without errors, no build executed. Touched Dart
+files formatted. No full Flutter/tests/links/native/build/Docker/CI/review run.
+T185 remains open until installed activation and final qualification; root
+installation/catalog and enrollment preservation remain unfinished. No whole
+implementation or readiness claim.
+
+Further functional source progress: unit_baseline binds resolved systemd
+Environment/PassEnvironment/UnsetEnvironment and EACH repeated EnvironmentFiles
+entry, normalized literal /etc paths<=16, root custody/64KiB and optional absence.
+PostgreSQL baseline also binds fixed optional cluster environment independently.
+Values remain private; changed inputs invalidate qualification/plans. Explicit
+root install.py --recipe-catalog now validates a protected pinned map, stages
+fixed catalog-candidate.json under actual journal writer lock, and runs the
+source-bound apt-probe --qualify-catalog in actual system Python for singleton
+and both two-recipe orders. Parent independently verifies unchanged complete
+packages/candidate digest before selecting registry+release content. No package
+or network/service preparation added to read/apply. INSTALL_ENABLED remains
+false until remaining complete recipe path and qualification. Selected actual
+Python py_compile five changed files0; no actual provisioning, root/package
+action, tests, full checks, links, CI or independent review run.
+
+Further T184 source progress: EffectRunner cleanup_terminal and ExecutionJobs
+single-owner background scheduling now reclaim only generated work directories
+for durably finished/released terminal receipts, with no task/reconciliation or
+physical drain. Actual unit/cgroup stop is proved twice; fd-pinned parent,
+unchanged target identity, Linux mount IDs, root custody/type/hardlink checks,
+4096-entry/128MiB/16-depth bounds and symlink-resistant fd-based deletion protect
+other files. Walk errors abort; permanent receipts/execution/resource proofs and
+unknown/orphan work remain. Failure retries60s without changing outcome;
+cancellation joins actual worker. No production cleanup has been executed.
+Also protected NetBird package family now includes netbird-* clients: catalog
+pins and actual APT protocol actions refuse them and preflight/postcheck package
+digest covers all family members. Selected actual py_compile six changed root
+files0 only; full checks/native/root execution/CI/review remain deferred.
+
+Further source progress superseding the earlier disabled-code notes: production
+migration now captures protected executor sidecar digest/absence under the same
+writer lease before upgrades and requires identical state after both. No backup
+API exists; the contract explicitly distinguishes the internal DB recovery copy
+from an operator whole-workspace backup retaining all custody and sidecars.
+Selected Dart migration analysis0; touched file formatted, no migration executed.
+
+Root NetBird private preservation fence now captures unit start/static files,
+resolved environment inputs, standard config/state trees and sysconfig file;
+it checks active daemon actual config/state selectors remain within captured
+trees and bounds custody/data. Preflight, per-step revalidate, actual APT native
+lock gate, post-APT prestart checker and factual postcheck compare the same
+immutable private digest. Actual protected package family already includes
+netbird-* clients. Optional missing environment ancestors are handled as absent
+only after preceding ancestors passed custody validation. Full install path now
+has catalog provisioning/delivery, fixed tasks/gate/postchecks/owned bindings,
+retention and NetBird/environment fences connected, so INSTALL_ENABLED is true;
+empty catalog still advertises unavailable and all runtime qualification and
+per-effect authority/prerequisite gates remain. This changes source capability,
+not acceptance status. Actual selected py_compile six root files0 only; no
+executor/provisioning/package/SSH action, full checks, CI or review run.
+
+## Phase 7: Convergence
+
+Source-only functional convergence after implementation, before the human-
+requested full-check stage. This is not runtime acceptance or a clean review.
+The requirement inventory includes16 FR and10 AC; the concrete gaps below are
+confirmed from current source. All original unchecked qualification gates remain
+open and completed history is preserved. No extension hooks are installed.
+
+- [ ] T186 HIGH — Make native grant management and automation authoring reachable
+  without a server, in lib/profiles/profile_list.dart and lib/automation/. Current
+  AutomationPanel is nested only beneath an existing server card, so an empty
+  workspace cannot issue an author-only grant or create a profile. Provide a
+  workspace entry using the same genuine native owner client and shared service;
+  server-less author/no-scope grants keep serverIds empty; target operations
+  remain unavailable until an explicit server is selected. Trace FR-MCP-003/006/
+  014, AC-MCP-2A and T013/T018 (partial).
+- [ ] T187 HIGH — Expose profile validation and immutable version comparison in
+  the owner UI/controller through the existing exact profile service methods.
+  Current automation_panel.dart permits editing/selecting a revision but has no
+  diff/validation controls; do not implement validation by saving/executing.
+  Display structured validation and bounded diff against explicit versions,
+  preserving stale-selection and borrowed-client ownership rules. Trace
+  FR-MCP-006/007/014 and T018 (partial).
+- [ ] T188 HIGH — Materialize pinned PostgreSQL16/ClickHouse recipe artifacts and
+  a reproducible administrator preparation/qualification path in executor/recipes/
+  and tools. The directory/artifacts are absent; --recipe-catalog currently
+  consumes an operator-authored map only. Generate exact candidate/package/
+  archive/index/repository data from prepared signed metadata, never latest or
+  fabricated digests. Qualify both recipes through actual disposable runtime
+  during the later full-check stage before accepting T028 or install readiness.
+  Trace FR-MCP-010/013/016, AC-MCP-3A and T028 (partial).
+- [ ] T189 HIGH — Implement the missing tools/test-mcp.ps1 and
+  tools/test-mcp-vm.ps1 (Docker fixture permitted by the human), including actual
+  native bootstrap/shared service, independent standard clients, recipe jobs,
+  duplicate/loss/unknown/revoke/cancel/recovery and safe source-bound artifacts.
+  Existing unit/prerequisite fixtures do not provide the specified full MCP
+  acceptance path. Build this source harness now; execute it only after the
+  functional-code completion announcement, then record actual outcomes. Trace
+  FR-MCP-016, SC-MCP-001..004, T014/T020/T030/T031/T034 (missing).
+- [ ] T190 HIGH — Port explicit historical acceptance assembly and affected
+  fixtures to the actual format3 UI/locald/MCP bundle. Ordinary run-foundation
+  delegates to run-serverdeck, but acceptance branches still emit format1 while
+  the production app/locald now require format3. Preserve fixture isolation,
+  native source qualification and prior assertions; no legacy fallback or
+  weakened checks. Trace FR-MCP-015/016, T008/T034 and T185 (contradicts).
+- [ ] T191 MEDIUM — Finish README/development/quickstart instructions with actual
+  normal build/runtime/owner-grant configuration, standard vendor-independent
+  client examples, pinned operator prerequisites/recipes and honest current
+  acceptance evidence. Existing documentation still describes incomplete entry
+  points and missing harnesses. Trace FR-MCP-001/013/016 and T033 (partial).
+
+T186/T187 functional source progress: the loaded server-list header now exposes
+a scrollable workspace automation/access dialog even with zero servers. The
+actual borrowed native client is unchanged; nullable server context skips
+job/authority target reads and hides target controls. Default workspace grant
+is author-only with serverIds empty, while server-scoped controls retain explicit
+target guards. Profile editor has draft validation through the real read-only
+native profile method, structured result and stale draft/client checks; selected
+revision validation and explicit from/to comparison use the same service and
+display bounded result/truncation. Switching revisions clears old results; new
+version explicitly warns that its execution permission is separate. Validation
+does not save, execute or mint authority. Selected Flutter analyze three files0
+after correcting a misplaced dialog-local variable declaration; touched source
+formatted. Full checks/widgets/native/runtime/review remain deferred per human.
+
+T188 source progress: apt.build_prepared_catalog now materializes actual package
+pins/architecture/version/archive SHA256, signer/index hashes and transaction
+digests from the prepared isolated APT cache. Explicit operator request supplies
+exact primary versions/revision/initial settings/notices; no latest/default or
+fake hash. It rejects existing/protected packages/untrusted origins/changes and
+resolves all singleton/two-recipe orders read-only, then verifies unchanged full
+packages and all prepared bytes. New root-only packaging/catalog.py reads a
+protected request and exclusively writes/fsyncs a root-owned result; no MCP
+route, package/network/service effects or overwrite. Added executor/recipes
+request schema and generation/provisioning instructions, plus root .dockerignore
+to exclude local secrets/artifacts from fixture build contexts. Actual selected
+Python py_compile two sources0; generator was not executed. Concrete generated
+PostgreSQL/ClickHouse catalogs and runtime qualification still remain T028/T188;
+the schema/README are explicitly not acceptance artifacts.
+
+T190 additional source progress: run-foundation now only maps its eight explicit
+fixture switches to the production run-serverdeck assembly; every branch emits
+the same format3/API1.1/schema3 five-artifact manifest and lockfile set. The
+production assembler accepts only the enumerated integration entry targets.
+UiActor and foundation/credential/owner-recovery helpers now verify actual
+TrustedClientBootstrapEnvironment (typed trusted metadata aliases only). Selected
+Dart analysis six touched sources0 and format0; two PowerShell assembly sources
+parsed0, no build/run. The old raw loss_client and loss/unknown-inflight host
+fixtures still need porting; no loss/recovery assertion is accepted or removed.
+
+T189 client-source progress: tools/mcp_clients now contains an independent
+stdlib JSON-RPC/stdio actor and an official MCP Python SDK2.0.0 actor. Both launch
+the actual bundled mcp.exe, enforce an owned ignored mcp-acceptance fixture and
+separate profile, exchange controls over private pipes and scan known secret
+markers before forwarding results. Bounded stdout/stderr, fixed errors and owned
+child cleanup are retained; the SDK runs its own negotiation/transport/parsers,
+not ServerDeck protocol code. requirements.lock binds29 actual downloaded PyPI
+Windows-amd64/Python3.12 wheels with SHA256; no dependency was installed and no
+client/scenario executed. Selected py_compile three actor sources0 only. Actual
+owner seed, Docker manifest/setup and full orchestration/scenarios still remain.
+
+- [ ] T192 HIGH — Qualify safe shared locald startup under a caller Job Object
+  per FR-MCP-001/002/012/016 (partial). Independent SDK source shows a kill-on-
+  close Windows job, so an inherited cold-launched daemon could be killed while
+  other clients remain. Source now requests CREATE_BREAKAWAY_FROM_JOB for MCP
+  cold launch only, never falls back to inheritance and reports fixed
+  PREREQUISITE_UNAVAILABLE if host policy refuses; an independently started
+  UI/locald is then required. Existing service connection needs no breakaway.
+  Source-selected native analysis0; actual native job-policy/lifecycle cases and
+  independent SDK shutdown assertions still require the deferred final checks.
+
+T190 further source progress: loss/unknown-inflight integration targets now use
+actual TrustedNativeBootstrapHost and TrustedClientBootstrapEnvironment. Their
+owner-UI fault fixture delegates every delivered request to the real format3
+client: it suppresses an authenticated result at the UI-interest boundary or
+holds an original intent unsent until explicit retry, then delivers that exact
+original again and requires identical actual replay result. Existing receipt,
+counter, other-window, no-autosave and fresh-process assertions remain intact.
+Fault waits are bounded/cancellable and close retires actual client+host; no
+production transport, native proof/role/provider or fabricated transaction is
+injected. This fixture intentionally proves UI response-interest/intent recovery,
+not dropped native bytes; actual native channel/process-loss acceptance remains
+mandatory in T189/T192. Selected Flutter analysis three files0 and touched
+format0. No scenario/native/full checks/review executed yet.
+
+- [ ] T193 HIGH — Qualify actual delegated-systemd cgroup identity per the
+  human Docker requirement, FR-MCP-010/016 and T030/T189 (partial). Source
+  inspection found hardcoded root /system.slice membership in runner, gate,
+  gate-peer and DB proof. They now resolve actual system.slice ControlGroup from
+  the same manager and compare exact prefix+fixed unit against kernel/receipt
+  facts. No caller namespace override or basename-only match. Selected Python
+  py_compile five files0, no runtime test. CI image now creates the real fixed
+  executor venv (old CI alias retained), carries source and root-only preparation
+  tools, and has a fixed ephemeral test account with no baked secret; context
+  excludes bytecode/private artifacts. Actual container/qualification still open.
+
+Local environment observation only: docker.exe exists; initial docker info
+failed because the Linux engine pipe was absent. Authorized docker desktop
+start --detach returned a start acknowledgement, but the later same status/info
+session53506 completed exit1 with no engine, and no Docker Desktop/backend
+process was present. No container, image build, package action or full check was
+executed. This does not block independent source work or establish a live wait.
+
+T189 further source progress: tools/test-mcp-vm.ps1 now implements explicit
+Create/Enroll/Remove over a validated owned mcp-acceptance fixture and local
+Docker Linux pipe only (saved remote Docker contexts refused before API calls).
+It builds a nonce-labelled image/container, requires an otherwise idle engine,
+publishes SSH only on loopback, verifies labels/immutable IDs, and generates
+ephemeral host key/login with no baked secret. Shared mcp-fixture.ps1 provides
+owner-only Windows custody, protected identity, atomic metadata and DPAPI seed
+storage, bounded hidden child invocation and fixed diagnostics. Docker removal
+revalidates exact container/image ownership and never targets another resource.
+executor/ci/fixture.py prepares actual SSH and enrolls/starts the actual root
+runtime using the authenticated workspace UUID supplied later by the UI fixture;
+it is never an installed/MCP tool. No setup/fixture/provisioning was executed.
+Selected Python py_compile one source0 and PowerShell parser three sources0.
+
+Qualification source snapshot now includes executor, independent clients/locks,
+021 artifacts and descriptor builder, excluding derived bytecode, so a changed
+root program or client cannot reuse an old native-suite source proof. Actual
+source-snapshot regression cases still require the deferred full checks.
+The top-level test-mcp.ps1 and owner integration scenario remain unbuilt; this
+setup source is not full MCP acceptance and produces no passing feature claim.
+
+T191 source progress: docs/development/mcp.md now documents the actual complete
+format3 assembly command, five bound artifacts, owner grant/configuration flow,
+standard stdio client example, protected credentials, exact-version authority,
+Job Object prerequisite, separate executor provisioning and fail-closed empty
+recipe catalog. Root README and MCP/executor READMEs no longer describe the
+pre-MCP source state; old foundation instructions link to current setup.
+Quickstart uses the implemented Create/Enroll/Remove Docker interface and
+explicitly distinguishes setup from unfinished full acceptance. Foundation
+native-artifact contract now matches source snapshot coverage of all four
+packages plus executor, independent clients/locks, descriptor builder and the
+complete021 package. Links/full checks/review remain deferred; T191 stays open.
+
+T189 source progress: independent clients now have a fixed Python-isolated
+launcher and a private Dart owner-fixture actor controller. The controller
+requires actual initialization from the real executable, serial matching
+JSON-RPC IDs, bounded messages, decoded secret-marker scans and actual process/
+pipe completion. EOF gives the client normal stdio-child cleanup first; a
+forced actor kill remains failed cleanup, not a passing scenario. Selected
+Dart analysis one helper succeeded before the final cleanup edit; no actor,
+native scenario, Docker setup or full suite has run. Top-level orchestration
+and real owner integration scenario remain required.
+
+T189 further source progress: integration_test/mcp_test.dart now uses the normal
+app entry, actual ready ProfileList/TrustedApiClient and common production
+ServerController/AutomationController. It publishes only the authenticated
+workspace UUID for owned Docker enrollment, decrypts the synthetic DPAPI seed,
+verifies actual SSH fingerprint and executor host identity, then drives both
+independent clients. Required core cases include empty-workspace authoring,
+immutable revisions/CAS/replay, server scope, actual reads/logs, owner approval,
+real job/events/replay, metadata-equal revision delegation refusal, exact new
+delegation, UI/MCP lastJobId desired-state agreement, SDK-close isolation and
+grant revocation. No role/provider/writer or transport is fabricated.
+tools/run-mcp-scenario.ps1 creates a new protected fixture, private hash-locked
+SDK venv, real integration bundle and owned Docker setup, retains a hidden
+Flutter-drive process with private bounded log files, enrolls only the UUID from
+the real UI, requires the exact completed-case proof and unchanged source hash,
+scans credentials and removes only revalidated owned Docker resources on success.
+tools/mcp-drive.ps1 is its fixed actual driver; run-serverdeck accepts this
+integration target. The fixture account has journal-reader groups for real logs.
+Core proof explicitly has fullAcceptance=false; the full test-mcp.ps1 aggregator,
+actual recipe/fault/recovery matrix, native runs and final checks/review remain
+required. Selected Dart analyze two files0 and PowerShell parse three files0
+were run before the final path/result guard edits; no scenario/build/Docker or
+full tests ran. These source additions do not close T189/T192/T193 acceptance.
+
+After final core path/result guards: selected Dart analysis of mcp_test.dart
+and mcp_actor.dart succeeded (no issues), touched integration formatting
+succeeded, and PowerShell parser accepted run-mcp-scenario.ps1. The desired-state
+assertion uses actual lastJobId and requires it to equal the second admitted job,
+not equality of absent fields. Scenario completion is emitted only after owned
+cleanup succeeds. No runtime scenario or full acceptance result is implied.
+
+- [ ] T194 HIGH — Qualify signed APT release date semantics and explicit
+  administrator metadata preparation (T028/T188, FR-MCP-010/016). Confirmed
+  source defect: the unconditional seven-day Date limit rejected the actual
+  immutable Ubuntu noble base Release dated2024-04-25. apt.py now respects
+  signed expiry: unique aware Date, <=300s future skew, unique aware unexpired
+  Valid-Until later than Date when present, no invented expiry when absent;
+  malformed/empty/duplicate fields refuse case-insensitively. Exact signed/index
+  hashes and all package/plan/gate checks remain required. Added regression
+  source for base release, strict expiry boundary, future skew and bad headers.
+  New source-only administrator prepare-apt.py validates protected inputs,
+  fixed HTTPS signed-by rows/public keyring/no-start/config; optional explicit
+  --refresh alone runs bounded isolated apt-get update Error-Mode=any, then
+  generates exact catalog. No package install, runtime route, service start or
+  automatic version/key selection. Require actual Linux refresh failure/partial
+  index rejection, immutable base success, expired release denial and unchanged
+  package snapshot. No runtime acceptance or full checks yet.
+
+- [ ] T195 HIGH — Qualify APT sandbox access to its public keyring (T028/T188,
+  FR-MCP-010/016). Official sources.list requires _apt-readable Signed-By keys;
+  previous /etc/serverdeck-executor/trusted.gpg under root0700 was inaccessible.
+  Source now uses fixed /etc/apt/keyrings/serverdeck-executor.gpg root0644 in
+  root0755 parent, keeping private config/enrollment/journal closed. Root APT
+  config, source parser, signature probe and native gate pin exactly this path;
+  gate whitelist/hash evidence changed together. No sandbox/signature/lock
+  disabling. Prove actual sandboxed refresh and package verification, reject
+  changed/writable/symlink/foreign/oversize keyring and show non-root cannot read
+  private enrollment. The source path change alone is not qualified acceptance.
+
+T194/T195 source follow-up: disposable Docker image now explicitly installs
+the exact fixed deny-start policy after image provisioning, avoiding reliance
+on a different base-image policy script. Added public fixture sources.list for
+Ubuntu noble/updates/security and vendor ClickHouse lts; no key download or
+version selection is implied. Python py_compile accepted apt.py, apt_gate.py,
+prepare-apt.py and five date-boundary regression methods in one test file.
+No regression test, APT refresh, Docker build, catalog materialization,
+full check or review ran; acceptance tasks remain unchecked.
+
+After final access guard, selected py_compile of all four changed Python
+sources succeeded again. Prepared-file checks now also run the fixed read-only
+`runuser -u _apt -- /usr/bin/test -r <fixed-public-keyring>` probe, so parent
+search permissions/ACLs are actually required rather than inferred from mode.
+No sandbox user override or permissions relaxation on private config is used.
+
+- [ ] T196 HIGH — Close independent review1 owner recovery finding. For
+  accepted grant-origin jobs, owner-only cancel/reconcile and their replay/
+  precommit checks no longer depend on the original grant remaining current.
+  MCP actor/object policy and all owner apply/approval/step authority remain
+  strict; receipt origin/objectGrantId and old job grant never change. Source
+  centralizes the three mutation checks in _jobMutationAuthority. The actual
+  owner/MCP core scenario now requires terminal owner stop/reconcile after
+  revoke to preserve the entire job, while a separate genuine owner apply is
+  forbidden. Actual unknown/root-terminal, expiry/scope and replay scenarios
+  plus checks/fresh review remain required before acceptance.
+
+- [ ] T197 HIGH — Close independent review1 changed-connection recovery finding.
+  Current genuine owner-confirmed same-workspace/profile/hostId session may
+  stop/reconcile the historical attempt despite changed target/access/trust or
+  registry epochs. Admission/effect matching remains exact and admission boot
+  checks remain; no control mode submits/authorizes a playbook. Actual session
+  authenticity/enrollment/target checks and immutable receipt/outcome checks
+  remain mandatory. Different host/missing proof retains unknown occupancy.
+  Source routes the real driver through this comparison and adds regression
+  tests for rotated credentials/trust/registry, other workspace/profile/host,
+  strict individual effect epochs and admission reboot boundary. Actual root
+  recovery with changed credentials/trust, all checks and fresh review remain
+  open; source comparison tests alone cannot establish physical recovery.
+
+- [X] T198 HIGH — Port compiled production bootstrap acceptance to current
+  format3/API1.1/schema3 and genuine typed native clients. First full locald run
+  reached182passed/1failed before explicit termination for fixes; it is not a
+  passing full suite. bootstrap_native_test still compiles current bin/locald.dart
+  but emits a format1 bundle and uses the legacy handshake. Preserve its real
+  startup/watchdog, ordinary RPC, session quotas/reuse, explicit lost-interest/
+  owner-crash recovery, blocked storage and damaged bundle/data-preservation
+  cases. No product legacy fallback, skipped case, fabricated native capability
+  or old component entry substituted for the production entry. Source first
+  improves diagnostics: await actual owner exit alongside readiness and retain
+  the original failure if cleanup writes meet an already closed peer. Actual
+  format3 port and rerun remain open.
+
+T198 source progress: compiled bundle now uses format3/API1.1/schema3 and a real
+separate MCP image for owner-route denial. Ordinary clients use the genuine
+TrustedBootstrapClient/TrustedApiClient; malformed authentication and expiry
+use the actual epoch-bound native peer. Shared test-only owner result-interest
+faults operate above the genuine client, not as a claim of native frame loss.
+Owner crash still kills only the retained actual fixture owner. Failed cleanup
+preserves the original error and fixture, and joins owned peers before removal.
+Actual diagnostic first exposed INCOMPATIBLE from the legacy format1 bundle;
+after the port it reached contender startup, exposing T199 below. No successful
+complete bootstrap run or fresh review is claimed yet.
+
+- [X] T199 HIGH — Fix actual compiled production contender TIMEOUT exposed by
+  the T198 port. The format3 worker previously rejected a locald peer before
+  its declared ownership-only probe could complete. Permit native identification
+  of the same verified locald only in trusted format3; the production serving
+  loop answers the closed, bounded serverdeckOwnerProbeV1 message before any
+  service/session binding and drains it before disconnect. The contender must
+  verify the actual native owner and exact build response inside existing
+  startup and RPC budgets. Native2 rejection, owner/MCP bootstrap role checks,
+  no tokens/sessions/storage effects for contenders and normal physical reuse
+  remain strict. Accept only after actual compiled loser exits0 while winner
+  and discovery survive, native role/bootstrap regressions, mandatory checks
+  and fresh independent review. Source exists; acceptance remains open.
+
+T198/T199 actual port6 passed all six normal-owner cycles, both pre-session
+and active-session contenders, native owner/MCP denial, genuine client quotas,
+the original startup watchdog and 60-second lease, actual owned owner kill
+(219ms observed) and persisted profile/receipt recovery. The full test still
+failed on its first damaged-workspace case, so neither task is accepted yet.
+The owner-crash fixture now uses a separate profile UUID from the earlier
+deleted loss-case profile, preserving the existing no-resurrection rule.
+
+- [X] T200 HIGH — Fix actual blocked production startup dispatch. Before
+  activation, TrustedApiServer has no owner adapter; checking adapter support
+  before readiness incorrectly returned UNSUPPORTED for ordinary owner calls
+  instead of the actual STORAGE_BLOCKED/INCOMPATIBLE/NOT_READY reason. After
+  native role admission, apply the current readiness gate before consulting
+  domain route support. MCP owner-route denial still precedes readiness, and
+  readiness/ping/close remain usable. The compiled damaged-workspace test must
+  verify the exact error envelope for all ordinary foundation routes, preserve
+  damaged files byte-for-byte and read the original committed profile/receipt
+  after restoration. Source reordered; actual rerun, mandatory checks and fresh
+  independent review remain open.
+
+- [X] T201 HIGH — Close full source review2 P1: deferred PostgreSQL/ClickHouse
+  settings postchecks run only at their own config source's derived restart.
+  Explicit service-before-config must not inspect future values; service-after-
+  config must not duplicate a checkId. Keep both valid source orders and each
+  explicit service's independent state/restart/SQL checks. Real compiler plus
+  real postcheck regression with isolated probe doubles reproduced both bugs
+  before the fix (2errors/2failures across both DBs); config-only control passed.
+  Source filters by config effectId and matching sourceStepId. Pure ordered
+  regression, mandatory checks and fresh review are required; these doubles do
+  not establish real Linux/SQL/Ansible/recipe qualification.
+
+- [X] T202 HIGH — Close full source review2 P2: retain the first startup failure
+  through authenticated readiness inspection and physical cleanup, then throw
+  its fixed code after lifecycle waitForExit. Port7 passed all6 normal cycles,
+  native owner kill225ms/recovery and blocked-route error checks, but a failed
+  workspace open exited0 instead of1. Preserve exact failure stderr/exit1 and
+  byte-for-byte damaged workspace, plus successful recovery after each restored
+  manifest/schema/receipt/native-page case. Source retains startupFailure;
+  actual compiled full bootstrap rerun, mandatory checks and fresh review remain
+  required. No lower timeout or legacy fallback is introduced.
+
+T201/T202 progress after completed fresh fix review3: real ordered postcheck
+regressions8tests passed and compiled bootstrap port8 passed in3m01s, including
+all6normalcycles, actual owned kill213ms, all4damaged-workspace/restoration
+cases and damaged-bundle/missing-DLL checks. Mandatory rootformat607/analyze0/
+Flutter253/links855OK0 passed; native role/auth suites14+26 and session-policy4
+passed. Review3 confirmed the postcheck fix but found the remaining T203 path
+below; review loop is not clean and acceptance remains open.
+
+- [X] T203 HIGH — Close fix review3 P2: after a known failed workspace open
+  without diagnostic authentication, the unchanged30s watchdog used to throw
+  TIMEOUT from waitForExit before the retained first failure could be returned.
+  Await actual lifecycle.finished cleanup first, propagate any real cleanup
+  failure, then return the retained startup failure before applying an ordinary
+  shutdown reason. Add actual compiled schema4/no-client case: exit1 and exact
+  INCOMPATIBLE after watchdog29..40s, discovery removed, all damaged workspace
+  bytes preserved and original data recovered after restoration. Ordinary
+  successful-workspace/no-client startup still returns TIMEOUT. Source and
+  compiled regression exist; full scenario rerun, mandatory checks and fresh
+  independent review remain required. Never shorten the watchdog or fabricate
+  cleanup completion.
+
+
+T198–T203 scoped acceptance: completed full source review2 (176 inputs,
+2 findings) followed by fresh fix review3 (6 changed inputs, 1 remaining
+watchdog finding) and fresh watchdog review4 FINAL0 (4 changed inputs,
+177-input final hash drift0) closes these source/compiled-bootstrap fixes.
+Current actual production bootstrap port9 passed in3m33s, including six normal
+cycles, cold/active contenders, typed owner/MCP role boundaries, session quota
+and reuse, original30s startup watchdog, lease60s, actual owned owner kill256ms,
+abandoned-mutex/data/receipt recovery, all four damaged-workspace/restoration
+cases, damaged bundle/missing DLL, and failed-schema4/no-auth watchdog retaining
+INCOMPATIBLE after physical cleanup. Its new fixed proof marker was observed.
+Current mandatory root format607/0changes, Flutter analyze0/tests253, lychee
+855OK/0errors and diffcheck0 passed. Selected current native role/auth regressions
+14+26 passed, full locald/Windows analyze passed, job session policy4 passed.
+Real compiler/postcheck ordered pure regressions and release-date policy total
+8 tests passed, independently rerun by fix reviewer3. Probe doubles do not
+qualify real Linux/SQL/Ansible; UI result-interest loss is not native frame-loss
+qualification. Development DLL bootstrap is not a source-qualified release.
+No full locald suite, actual independent wire/SDK/UI core, Docker/root/recipe
+catalog, full aggregator or full021 acceptance is inferred. T196/T197 physical
+unknown-outcome recovery and the existing full qualification tasks remain open.
+Only this acceptance evidence and checkbox state were recorded after review;
+no reviewed product code or product contract changed.

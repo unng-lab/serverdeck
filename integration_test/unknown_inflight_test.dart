@@ -11,7 +11,7 @@ import 'package:integration_test/integration_test.dart';
 import '../lib/app.dart';
 import '../lib/main.dart' as app;
 import '../lib/bootstrap/bootstrap_controller.dart';
-import '../lib/bootstrap/native_bootstrap_host.dart';
+import '../lib/bootstrap/trusted_native_bootstrap_host.dart';
 import '../lib/profiles/profile_list.dart';
 import '../lib/profiles/mutation_controller.dart';
 import '../lib/profiles/mutation_status.dart';
@@ -46,7 +46,7 @@ void main() {
     jsonDecode(signal(name).readAsStringSync()) as Map,
   );
   Future<Map<String, Object?>> owner() => Isolate.run(() async {
-    final environment = await ClientBootstrapEnvironment.verify();
+    final environment = await TrustedClientBootstrapEnvironment.verify();
     final descriptor = await environment.discovery();
     if (descriptor == null) throw StateError('OWNER_MISSING');
     try {
@@ -63,7 +63,7 @@ void main() {
   testWidgetsWithRuntimeHooks('actual unknown inflight UI crash role=$role', (
     tester,
   ) async {
-    NativeBootstrapHost? host;
+    TrustedNativeBootstrapHost? host;
     BootstrapController? supplied;
     LossClient? controlled;
     UiActor? child;
@@ -130,7 +130,7 @@ void main() {
     try {
       if (role == 'observer') {
         UiActor.positionObserverWindow();
-        final nativeHost = NativeBootstrapHost();
+        final nativeHost = TrustedNativeBootstrapHost();
         host = nativeHost;
         final fixture = LossClient();
         controlled = fixture;

@@ -40,6 +40,8 @@ void main() {
       StreamIterator<String>? observerOutput;
       Future<String>? observerErrors;
       DiscoveryDescriptor? crashedDescriptor;
+      var failed = false;
+      final peers = <Process>[];
       try {
         final bundle = Directory(p.join(root, 'bundle'))..createSync();
         final local = Directory(p.join(root, 'local'))..createSync();
@@ -61,13 +63,19 @@ void main() {
           );
         }
         final nativeLibrary = nativeArtifactForTest();
+        File(p.join(bundle.path, 'serverdeck.exe'))
+            .copySync(p.join(bundle.path, 'mcp.exe'));
         File(nativeLibrary).copySync(p.join(bundle.path, 'libisar.dll'));
         final manifestFile = File(
           p.join(bundle.path, 'foundation.manifest.json'),
         );
         manifestFile.writeAsStringSync(
           jsonEncode({
-            'format': 1,
+            'format': 3,
+            'product': 'serverdeck-next',
+            'apiMajor': 1,
+            'apiMinor': 1,
+            'workspaceSchema': 3,
             'buildId': '${'a' * 40}+Debug+${'b' * 64}',
             'configuration': 'Debug',
             'testOnly': false,
@@ -76,6 +84,7 @@ void main() {
               for (final name in [
                 'locald.exe',
                 'serverdeck.exe',
+                'mcp.exe',
                 'libisar.dll',
               ])
                 name: fileSha256(p.join(bundle.path, name)),
@@ -125,6 +134,24 @@ void main() {
           );
           final stdoutResult = owner.stdout.transform(utf8.decoder).join();
           final stderrResult = owner.stderr.transform(utf8.decoder).join();
+          if (run == 0) {
+            // A contender must not bind the service before its first actual
+            // owner/MCP session, nor acquire a keeper session of its own.
+            final coldLocal = Directory(p.join(root, 'cold-contender-local'))
+              ..createSync();
+            final contender = await Process.run(
+              p.join(bundle.path, 'locald.exe'),
+              ['--workspace', 'default', '--app-root', bundle.path],
+              environment: {'LOCALAPPDATA': coldLocal.path},
+            ).timeout(const Duration(seconds: 35));
+            expect(
+              contender.exitCode,
+              0,
+              reason: '${contender.stdout}\n${contender.stderr}',
+            );
+            expect(contender.stderr, isEmpty);
+            expect(coldLocal.listSync(), isEmpty);
+          }
           if (run == 4 || run == 5) {
             // Protected publication follows owner mutex acquisition. Confirm
             // this launched owner before observer setup and the pending timer.
@@ -165,7 +192,7 @@ void main() {
               await Future<void>.delayed(const Duration(milliseconds: 100));
             }
           }
-          ProcessResult client;
+          late final ProcessResult client;
           if (run == 0 || run >= 4) {
             if (run == 4) {
               observer = await Process.start(Platform.resolvedExecutable, [
@@ -198,6 +225,7 @@ void main() {
                     : 'hold',
               ],
             );
+            peers.add(peer);
             final ready = Completer<void>(), lines = <String>[];
             Stopwatch? ownerLossWatch;
             final stdoutDone = Completer<void>();
@@ -221,10 +249,6 @@ void main() {
                   onError: (Object error) => stdoutFailure = error,
                   onDone: () {
                     stdoutDone.complete();
-                    if (!ready.isCompleted)
-                      ready.completeError(
-                        StateError('FIXTURE_PEER_EXITED_BEFORE_READY'),
-                      );
                   },
                 );
             final peerErrors = peer.stderr.transform(utf8.decoder).join();
@@ -236,7 +260,23 @@ void main() {
               }),
             );
             try {
-              await ready.future.timeout(const Duration(seconds: 30));
+              final launchedOwner = owner;
+              await Future.any<void>([
+                ready.future,
+                peer.exitCode.then((code) async {
+                  if (!ready.isCompleted)
+                    throw StateError(
+                      'FIXTURE_PEER_BEFORE_READY:$code:${(await peerErrors).trim()}',
+                    );
+                }),
+                launchedOwner.exitCode.then((code) async {
+                  if (!ready.isCompleted) {
+                    throw StateError(
+                      'COMPILED_OWNER_BEFORE_READY:$code:${(await stderrResult).trim()}',
+                    );
+                  }
+                }),
+              ]).timeout(const Duration(seconds: 30));
               final discovery = File(
                 p.join(
                   local.path,
@@ -347,9 +387,13 @@ void main() {
                   'client-sessions',
                 ]) {
                   final probe = await Process.start(
-                    p.join(bundle.path, 'serverdeck.exe'),
+                    p.join(
+                      bundle.path,
+                      mode == 'read-only' ? 'mcp.exe' : 'serverdeck.exe',
+                    ),
                     [local.path, bundle.path, mode],
                   );
+                  peers.add(probe);
                   final probeOutput = probe.stdout
                       .transform(utf8.decoder)
                       .join();
@@ -416,10 +460,18 @@ void main() {
               scenarioCompleted = true;
             } finally {
               try {
-                peer.stdin.writeln(run == 4 ? 'crash' : 'close');
-                await peer.stdin.close();
+                try {
+                  peer.stdin.writeln(run == 4 ? 'crash' : 'close');
+                  await peer.stdin.close();
+                } on SocketException {
+                  // A failed startup may already have closed the peer. Retain
+                  // its original failure instead of masking it during cleanup.
+                  if (scenarioCompleted) rethrow;
+                }
                 final peerExit = await peer.exitCode.timeout(
-                  const Duration(seconds: 10),
+                  // An unauthenticated peer has a bounded 25-second discovery
+                  // loop. Join it even when the owner failed before publishing.
+                  const Duration(seconds: 35),
                 );
                 if (scenarioCompleted)
                   expect(peerExit, 0, reason: await peerErrors);
@@ -432,6 +484,10 @@ void main() {
                   lines.join('\n'),
                   await peerErrors,
                 );
+              } catch (_) {
+                // Preserve the startup/scenario failure. The outer cleanup
+                // retries joins and retains evidence if ownership is unresolved.
+                if (scenarioCompleted) rethrow;
               } finally {
                 await subscription.cancel();
               }
@@ -470,6 +526,7 @@ void main() {
             expect(generation, isNot(previousGeneration));
           workspace = id;
           previousGeneration = generation;
+          stdout.writeln('COMPILED_BOOTSTRAP_RUN_${run}_COMPLETED');
           if (run == 5)
             expect(output, contains('COMPILED_BOOTSTRAP_RECOVERY_DATA_PROVED'));
           if (run == 4) {
@@ -563,7 +620,7 @@ void main() {
                 damagedFile.writeAsStringSync('{');
               case 'manifest-schema':
                 final changed = jsonDecode(utf8.decode(originalBytes)) as Map;
-                changed['schema'] = 2;
+                changed['schema'] = 4;
                 damagedFile.writeAsStringSync(jsonEncode(changed));
               case 'receipt-dpapi':
                 final changed = List<int>.of(originalBytes);
@@ -610,6 +667,37 @@ void main() {
             await output;
             expect((await errors).trim(), expectedCode);
             owner = null;
+            if (fault == 'manifest-schema') {
+              // No diagnostic authentication this time: the original startup
+              // watchdog must still close the owner, preserving INCOMPATIBLE
+              // rather than replacing it with its later TIMEOUT reason.
+              final failedWatch = Stopwatch()..start();
+              owner = await Process.start(
+                p.join(bundle.path, 'locald.exe'),
+                ['--workspace', 'default', '--app-root', bundle.path],
+                environment: {'LOCALAPPDATA': local.path},
+              );
+              final failedOutput = owner.stdout.transform(utf8.decoder).join();
+              final failedErrors = owner.stderr.transform(utf8.decoder).join();
+              expect(
+                await owner.exitCode.timeout(const Duration(seconds: 40)),
+                1,
+              );
+              expect((await failedErrors).trim(), expectedCode);
+              await failedOutput;
+              expect(
+                failedWatch.elapsed,
+                greaterThanOrEqualTo(const Duration(seconds: 29)),
+              );
+              expect(
+                failedWatch.elapsed,
+                lessThan(const Duration(seconds: 40)),
+              );
+              owner = null;
+              stdout.writeln(
+                'COMPILED_FAILED_WORKSPACE_NO_AUTH_WATCHDOG_PROVED',
+              );
+            }
             expect(snapshotWorkspace(), damagedWorkspace);
             expect(
               File(
@@ -714,19 +802,54 @@ void main() {
         } finally {
           dll.writeAsBytesSync(dllBytes);
         }
+      } catch (_) {
+        failed = true;
+        rethrow;
       } finally {
-        if (observer != null) {
-          await observer.stdin.close();
-          await observer.exitCode.timeout(const Duration(seconds: 10));
-          await observerErrors;
+        var cleanupFailed = false;
+        Future<void> clean(Future<void> Function() action) async {
+          try {
+            await action();
+          } catch (_) {
+            cleanupFailed = true;
+          }
         }
-        await observerOutput?.cancel();
+
+        for (final peer in peers) {
+          await clean(() async {
+            try {
+              await peer.stdin.close();
+            } on IOException {
+              // The retained child may already have exited.
+            }
+            await peer.exitCode.timeout(const Duration(seconds: 35));
+          });
+        }
+        await clean(() async {
+          final observed = observer;
+          if (observed != null) {
+            await observed.stdin.close();
+            await observed.exitCode.timeout(const Duration(seconds: 10));
+            await observerErrors;
+          }
+          await observerOutput?.cancel();
+        });
         crashedDescriptor?.close();
-        if (owner != null) {
-          // Await the real bounded startup watchdog; do not kill a resource owner.
-          await owner.exitCode.timeout(const Duration(seconds: 40));
+        await clean(() async {
+          if (owner != null) {
+            // Join the actual startup watchdog; never kill an external owner.
+            await owner.exitCode.timeout(const Duration(seconds: 40));
+          }
+        });
+        if (!failed && !cleanupFailed) {
+          await clean(() async => fixture.deleteSync(recursive: true));
         }
-        fixture.deleteSync(recursive: true);
+        if (cleanupFailed) {
+          if (!failed) throw StateError('FIXTURE_CLEANUP_UNCONFIRMED');
+          stderr.writeln('FIXTURE_CLEANUP_UNCONFIRMED');
+        }
+        if (failed || cleanupFailed)
+          stderr.writeln('FIXTURE_EVIDENCE_RETAINED:$root');
       }
     },
     testOn: 'windows',

@@ -99,7 +99,9 @@ Reserve before asynchronous work; refuse excess RESOURCE_LIMIT. Completed
 records expire after 60 seconds of monotonic time. Detach discards publication
 and completion retention immediately, but physical work stays charged until
 settled. Owner status/cancel uses exact same session/generation and fresh native
-proof; foreign/expired handles are NOT_FOUND. MCP uses its existing router
+proof; status of foreign/expired/absent handles is NOT_FOUND. Cancel of foreign,
+expired, absent or completed handles uniformly returns cancelled:false, never
+reveals foreign ownership and never restores an operation. MCP uses its existing router
 32-workspace/16-session/60-second operation retention, not owner handles. Neither
 operation cache is durable or restorable after locald restart.
 

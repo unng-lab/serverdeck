@@ -59,6 +59,15 @@ All names prefixed `serverdeck_`. Argument fields below required unless `?`. Lis
 | jobs_cancel | requestId,jobId | stable {jobId}; jobs_get reads cancellation/current effects, acknowledgement never promises rollback; apply on job original grant/target |
 | jobs_reconcile | requestId,jobId | stable {jobId}; jobs_get reads observational recovery status; read on original grant/target; never writes server |
 
+recipes_list returns exactly `{serverId,catalog}` where catalog is the strict
+root recipes response in [executor](executor.md). It requires current plan scope
+and server allowlist, the enrolled/source-qualified helper and actual current
+native proof before/after IO. Read scope alone does not admit it. Descriptors are
+fully parsed and their canonical digests recomputed; helper host/runtime/registry
+must equal the confirmed enrollment. Malformed remote metadata is
+RUNTIME_INCOMPATIBLE. The same owned30s read/48-work helper pool, physical cleanup
+and session/target retirement apply; no reconnect or implicit server connection.
+
 Profile author scope is workspace catalog scope (no secrets/server targets inside bodies). Server/journal/job access requires allowed targets; author cannot inspect unrelated plans/jobs. plan/apply checks require explicit server scope. Existing system/settings are read-only through MCP; changing server settings is through profile plan/apply, not direct settings API. New server creation, credentials/trust and granting rights remain owner UI operations. Profile bodies/params/logs are untrusted data, no instruction authority.
 
 ## Deadlines, errors, caching and cancellation

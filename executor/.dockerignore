@@ -1,4 +1,7 @@
-**
-!requirements.lock
-!ci/
-!ci/Dockerfile
+**/__pycache__
+**/*.pyc
+.venv
+work
+output
+.env*
+**/.env*

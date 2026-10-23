@@ -63,6 +63,21 @@ abstract final class WorkspaceMigration {
       }
       for (final stage in ['$path.creating', legacy.stage, trusted.stage])
         requireSafePath(root, stage);
+      Future<String?> executorSidecarDigest() async {
+        trusted.owner();
+        final sidecar = trusted.activeFile('executor-enrollments.json');
+        requireSafePath(root, sidecar);
+        if (FileSystemEntity.typeSync(sidecar, followLinks: false) ==
+            FileSystemEntityType.notFound)
+          return null;
+        final result = await trusted.fileDigest(sidecar, 64 << 20);
+        trusted.owner();
+        return result;
+      }
+
+      // DB replacement/rollback copies never own this authenticated file.
+      // Preserve both exact bytes and absence under the same writer lease.
+      final executorSidecar = await executorSidecarDigest();
       if (FileSystemEntity.typeSync('$path.creating', followLinks: false) !=
           FileSystemEntityType.notFound)
         _blocked();
@@ -88,6 +103,7 @@ abstract final class WorkspaceMigration {
         await legacy.run();
       }
       await trusted.run();
+      if (await executorSidecarDigest() != executorSidecar) _blocked();
       await initializeTrustedNativeRuntime(appRoot);
       trusted.owner();
     } catch (error) {

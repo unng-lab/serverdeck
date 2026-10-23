@@ -1,0 +1,22 @@
+[Unit]
+Description=ServerDeck root execution supervisor
+After=local-fs.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+UMask=0077
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LANG=C.UTF-8
+WorkingDirectory=/var/lib/serverdeck-executor
+ExecStart=/opt/serverdeck-executor/venv/bin/python -I /usr/lib/serverdeck-executor/run-supervisor
+Restart=on-failure
+RestartSec=5
+KillMode=process
+TimeoutStopSec=5
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

@@ -111,7 +111,7 @@ String _preservationDigest(Map<String, List<MigrationRow>> rows) {
       .join();
 }
 
-enum _CaptureKind { trusted, preflight, source, target }
+enum _CaptureKind { trusted, initial, preflight, source, target }
 
 /// Existing-open source2 capture before stage/hash bindings. The caller owns
 /// verified format3 runtime, exact schema2 native open/file identity, global
@@ -198,6 +198,30 @@ Future<TrustedOperationalSnapshot> readTrustedOperationalSnapshot(
   );
 }
 
+/// Read-only validation of the one fixed protected fresh schema3 creation stage.
+/// Only the default empty graph is accepted; it cannot import grants or jobs.
+Future<TrustedOperationalSnapshot> readTrustedInitialWorkspace(
+  Isar isar,
+  ReceiptKeyMaterial key,
+  KeyCustody custody, {
+  required String localAppData,
+  required MutexLease lease,
+}) async {
+  final result = await _readCapture(
+    isar,
+    key,
+    custody,
+    localAppData: localAppData,
+    lease: lease,
+    kind: _CaptureKind.initial,
+  );
+  return TrustedOperationalSnapshot._(
+    result.trust!,
+    result.upgrade.automation,
+    result.upgrade.rows,
+  );
+}
+
 Future<_Capture> _readCapture(
   Isar isar,
   ReceiptKeyMaterial key,
@@ -206,8 +230,10 @@ Future<_Capture> _readCapture(
   required MutexLease lease,
   required _CaptureKind kind,
 }) async {
-  final schema3 = kind == _CaptureKind.trusted || kind == _CaptureKind.target;
-  final migration = kind != _CaptureKind.trusted;
+  final initial = kind == _CaptureKind.initial;
+  final schema3 =
+      initial || kind == _CaptureKind.trusted || kind == _CaptureKind.target;
+  final migration = kind != _CaptureKind.trusted && !initial;
   final staged = kind == _CaptureKind.source || kind == _CaptureKind.target;
   void owner() {
     if (!lease.isHeld ||
@@ -234,20 +260,26 @@ Future<_Capture> _readCapture(
       ownerSid: key.ownerSid,
       custody: McpCredentialCustody(custody.protection),
     );
-    final expected = staged
+    final expected = initial
+        ? '${files.directory}.creating'
+        : staged
         ? '${files.directory}.upgrading-2-3'
         : files.directory;
     if (isar.name != 'workspace' ||
         isar.directory == null ||
         !p.equals(p.normalize(p.absolute(isar.directory!)), expected))
       _blocked();
-    if (migration) {
+    if (migration || initial) {
       var path = p.normalize(p.absolute(localAppData));
       for (final name in [
         'ServerDeckNext',
         'v1',
         'workspaces',
-        staged ? 'default.upgrading-2-3' : 'default',
+        initial
+            ? 'default.creating'
+            : staged
+            ? 'default.upgrading-2-3'
+            : 'default',
       ]) {
         path = p.join(path, name);
         requireSafePath(localAppData, path);
@@ -487,6 +519,17 @@ Future<_Capture> _readCapture(
       );
     });
     await live();
+    if (initial &&
+        (!state.isInitialEmpty ||
+            raw.entries.any(
+              (entry) =>
+                  !{
+                    StoredWorkspaceSchema.name,
+                    StoredSettingsSchema.name,
+                  }.contains(entry.key) &&
+                  entry.value.isNotEmpty,
+            )))
+      _blocked();
     for (final credential in state.credentials.values) {
       await live();
       final secret = await custody.openCredential(
@@ -510,7 +553,7 @@ Future<_Capture> _readCapture(
           )
         : await AutomationSnapshot.load(foundation: state, collections: groups);
     await live();
-    await files.validateInventory();
+    if (!initial) await files.validateInventory();
     await live();
     McpCredentialBinding binding(ClientGrantRecord grant) =>
         McpCredentialBinding(

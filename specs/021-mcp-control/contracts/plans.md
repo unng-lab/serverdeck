@@ -26,6 +26,19 @@ Observation fingerprint is SHA256 of foundation canonical `{workspaceId,serverId
 
 Exactly `{format:1,id,version,revision,digest,environment,packagePins,dependencyTransactionDigest,repositoryFingerprints,aptIndexDigests,expectedAbsentPaths,ownedResources,prechecks,postchecks,licenseNotices}`. Maximum128KiB/depth16. id `postgresql16|clickhouse`, version exact selected catalog product version (non-template NFC public string1..256, not case-insensitive latest), revision positive31bit, environment `ubuntu24.04-amd64-systemd`. This version is independent of individual dependency package versions; qualification binds it to the exact package transaction. Source install_recipe.version, derived effect.version and descriptor.version must match exactly; a correct descriptor digest with a different version is invalid. digest SHA256 canonical descriptor excluding only digest. Structural parser recomputes it. It never marks a descriptor qualified merely because it hashes correctly.
 
+Current descriptors additionally contain optional `initialSettings`, included in
+that digest. It is exactly the matching resource's two numeric settings:
+PostgreSQL `{max_connections:10..1000,shared_buffers_mb:16..16384}`; ClickHouse
+`{max_connections:10..10000,max_server_memory_usage_mb:128..1048576}`. All values
+are integers without parameter references. The current root catalog REQUIRES
+this field for executable recipes; the structural parser retains historical
+descriptors without it unchanged. There is no runtime fallback to today's
+defaults when reading an old plan. Fresh-install compilation renders these
+frozen values into the owned fragment, starts and enables the canonical service,
+and postchecks must prove them effective before the recipe succeeds. Desired
+comparison can use the historical frozen renderer output/service intent only
+when this field is present; older recipes remain unknown with recipe-evidence.
+
 packagePins list1..256 unique `(name,architecture)` entries exactly `{name,architecture,version,sha256}`; name `[a-z0-9][a-z0-9+.-]{0,127}`, architecture `amd64|all`, version non-template NFC public string1..256, exact SHA. No `latest` version (case-insensitive). repositoryFingerprints unique1..16 lowercase40hex or64hex; aptIndexDigests unique1..64 SHA. expectedAbsentPaths unique1..32 normalized absolute Linux paths1..256 characters, no empty/dot/dotdot segments, NUL/control/template/backslash; these are trusted catalog metadata, never caller execution paths. ownedResources exactly the matching DB service/settings pair, unique, not NetBird/motd/another program. prechecks/postchecks unique1..32 identifier strings; actual accepted IDs are only bundled compiler/probe IDs from the exact qualified release, unknown IDs fail runtime validation. licenseNotices list1..16 non-template NFC public strings1..2000, LF/TAB allowed. Shared parser establishes shape/digest only; signed repository/dependency/CPU/SQL/absence/ownership/runtime qualification and catalog membership are mandatory T019/T028 evidence before any descriptor becomes executable.
 
 ## Preflight capsule
@@ -68,8 +81,64 @@ Every check has `{id,effectId,resourceId,kind}` plus the exact kind fields. IDs 
 
 For ordinary check kinds resourceId matches effect resource. Baseline fingerprint references must be present for all source/derived service and config resources; install-only profiles may have no resource observation if all factual absence/package/CPU checks are in capsule. Check/renderer/probe execution comes only from bundled trusted compiler IDs and root receipt evidence. Fixed SQL is SELECT1, never a supplied query. Job's32-result summary is bounded UI history, not a replacement for the full required postcheck evidence. Succeeded admission outcome must compare the whole required checks/recipe postchecks against the durable executor evidence.
 
+A deferred DB settings check remains bound to its config effectId. It runs only
+after the matching derived restart with the same sourceStepId, and contributes
+one result for that checkId. An explicit service step before a config cannot
+check its future values; an explicit service step after the derived activation
+cannot append that config's completed check again. Both source orders remain
+valid for PostgreSQL and ClickHouse. Every explicit service effect still runs
+its own required state/restart/SQL checks.
+
 ## Implementation and acceptance
 
 Shared structural records live in protocol automation/plan_records.dart and observation_records.dart (T002), with exact descriptor/capsule types/digests and immutable input snapshots before any await. Plan/reference/freshness helpers do not admit effects. Complete live checks/compiler/preflight/reference resolution belong to locald plans/store and root compiler/recipes (T007/T019/T023–T028). Schema2 startup must validate all stored plan shapes/digests/revision references; it must not discard unknown nonempty collections.
 
 Tests cover runnable/blocked nulls, empty vs missing evidence, exact TTL, full tuple/default parameters, digest recomputation/input mutation during async hashing, foundation64-bit counter encoding, raw observed Unicode/template data, observation statuses/freshness/fingerprint change, descriptor unknown/duplicate/unsafe fields and hashes, correct recipe digest with wrong product version, program coverage/order/resource conflict/check tampering, cross-workspace/server/host/registry/revision bindings and historical parse vs live permission. These are structural tests; actual root fact/renderer/apt/SQL/systemd Docker/VM qualification and transactional startup/admission remain separately required.
+
+## Shared service and persistence
+
+The current concrete service is TrustedPlanService in locald automation/plans.dart,
+with PlanCreateCommand and the shared compiler. The MCP adapters own exactly
+serverdeck_plan_create and serverdeck_plans_get; owner service routes use the
+same domain when wired. Create captures original public request parameters
+verbatim before any await, rejects invalid parameter text/types, resolves all
+defaults against the selected immutable revision, and checks current plan scope,
+server access, non-archived catalog metadata and source tuple. Request replay is
+looked up before remote preflight and verifies actual retained native rows.
+
+Root preflight_get succeeds with exactly `{planFacts,digest,effects,checks,reasons,
+observations}`. observations are at most5 full ManagedResourceObservation records
+from the same fixed root probes, each stamped when that resource probe completes.
+No second hidden SSH query is needed to reconstruct those fingerprints. Locald
+verifies freshness/entire captured target/host/registry, recomputes every full
+fingerprint, validates the capsule/profile/input/runtime/build/boot bindings and
+compares the complete independently compiled local effects/checks with root.
+A source-qualified descriptor, its matching root enrollment and actual factual
+probes are required; a plausible self-reported digest is not sufficient.
+
+Known prerequisite failures create an immutable blocked plan with explicit safe
+reasons and no executable program/capsule. Invalid input, unauthorized scope,
+storage faults or cancelled/timed-out response interest never become a fabricated
+runnable plan. Derived effect count above32 is detected before remote IO and
+uses step_limit; remote capacity failure uses executor. A blocked plan is never
+upgraded in place; create a new explicit plan after prerequisites change.
+
+StateStore automation_plan_writes uses the existing common32 queue and native
+publication gate, exact current grant revision/scope/target counters, permanent
+canonical request receipt,1000-plan/10000-receipt/64MiB limits and a single native
+Isar transaction for plan plus receipt. It validates the complete candidate graph
+and all retained native rows/foundation after commit; known native capacity or
+policy aborts prove the unchanged snapshot before returning failure. Unknown
+commit/readback state blocks storage. Replay cannot extend expiry or rewrite the
+original plan. Historical plans remain visible to their current authorized origin;
+plans_get also reports an expired flag without changing the stored status.
+Create and receipt replay return exactly `{planId,planDigest}`. Full plan data
+belongs to plans_get; it is not an extra field in the closed durable acknowledgement.
+
+Each plan operation is bounded30s; each current-scope/native proof shares one5s
+budget including publication waits. Cancellation stops new remote work and
+result publication; already admitted metadata transactions drain physically and
+remain recoverable by their original request receipt. Native completion failures
+make service shutdown fail closed. Shared composition stops/drains plan work and
+actual root/native completions before releasing transport/storage ownership.
+Full native/integration/compiler/owner/MCP/UI qualification remains required.

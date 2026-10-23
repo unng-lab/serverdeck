@@ -197,6 +197,7 @@ foreach($variant in @('known','known-pointer','known-commit','known-gateway','un
 # the reporter stackTrace. Aliases below are controlled diagnostics, never
 # evidence that the native client scenarios themselves ran or passed.
 $clientModes=@('owner','cleanup2','cleanup3','mcp','grant','grant-bad-proof','grant-repeat','codes','quota','receipts',
+    'connection','bad-connection','bad-connect','bad-connect-status','bad-connect-cancel','bad-disconnect',
     'readiness2','bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize',
     'invalid-json','timeout','eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation',
     'hello-build','hello-version','hello-shape','bootstrap-timeout')
@@ -232,7 +233,7 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
         if($event.type -ceq 'testStart' -and $event.test.name -ceq ($privateMarker+' nested client')) {
             $event.test.name='actual format3 bootstrap and RPC client '+$mode
             $event.test.url=$clientUri
-            $event.test.line=59
+            $event.test.line=65
             switch($variant) {
                 'unknown-client' {$event.test.name='actual format3 bootstrap and RPC client '+$privateMarker}
                 'unknown-name' {$event.test.name+=$privateMarker}
@@ -300,7 +301,7 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
         $failure.sourceFrames[1].line -ne 40 -or $failure.sourceFrames[2].line -ne 41)){throw 'Joint frame total cap/order/dedup mismatch.'}
     if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled projection claimed qualification.'}
 }
-'QUALIFICATION_REAL_ASSERTION_TRUSTED_CLIENT_31_FIXED_CASES_NESTED_SOURCE_HASH_BOUNDS_PRIVACY_NEGATIVES_PASSED'
+'QUALIFICATION_REAL_ASSERTION_TRUSTED_CLIENT_37_FIXED_CASES_NESTED_SOURCE_HASH_BOUNDS_PRIVACY_NEGATIVES_PASSED'
 'QUALIFICATION_TRUSTED_CLIENT_FIXED_EXIT_SIGNED_UNSIGNED_RANGE_SHAPE_SOURCE_PRIVACY_NEGATIVES_PASSED'
 $fixture
 $invalidFixture

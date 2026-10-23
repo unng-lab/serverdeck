@@ -122,6 +122,17 @@ final class TrustedSessions extends _Sessions<TrustedPipePeer> {
   ) async => await _begin(channel, id, method) as TrustedSessionRequest;
   TrustedSessionRequest reserve(String channel, String id, String method) =>
       _reserve(channel, id, method) as TrustedSessionRequest;
+
+  Future<TrustedReconciledTargetChangeLease> beginReconciledTargetChange({
+    Duration deadline = rpcDeadline,
+  }) {
+    if (_stopping) return Future.error(StateError('SERVICE_UNAVAILABLE'));
+    final targets = _targets;
+    if (targets == null) return Future.error(StateError('NOT_READY'));
+    return targets
+        .begin(deadline, reconciled: true)
+        .then((lease) => TrustedReconciledTargetChangeLease._(lease._interest));
+  }
 }
 
 sealed class _Sessions<P> {
@@ -425,6 +436,7 @@ final class _Session<P> {
   int pending = 0;
   bool openAttempted = false;
   final detached = Completer<void>();
+  final connectionInterest = Object();
   _McpAuthority? authority;
   ClientGrantRecord? grant;
 }
@@ -587,6 +599,75 @@ final class TrustedSessionRequest
     _Session<TrustedPipePeer> session,
     String method,
   ) : super._(registry, channel, session, method);
+  Object get connectionInterest {
+    _live();
+    return _session.connectionInterest;
+  }
+
+  TrustedOwnerConnectionContext? _ownerConnection;
+  TrustedOwnerAutomationContext? _ownerAutomation;
+  Future<String> verifiedOwnerBundleRoot() async {
+    _live();
+    if (_session.role != OperationalRole.owner || !_initialAdmissionProved)
+      throw StateError('FORBIDDEN');
+    final root = await _session.peer.verifiedBundleRoot().timeout(rpcRemaining);
+    rpcRemaining;
+    return root;
+  }
+
+  TrustedOwnerAutomationContext ownerAutomationContext() {
+    _live();
+    if (_session.role != OperationalRole.owner ||
+        !TrustedOwnerAutomationContext.methods.contains(method) ||
+        !_initialAdmissionProved)
+      throw StateError('FORBIDDEN');
+    rpcRemaining;
+    return _ownerAutomation ??= TrustedOwnerAutomationContext._(
+      _registry as TrustedSessions,
+      channel,
+      _session,
+      _began,
+      method,
+    );
+  }
+
+  TrustedOwnerReadContext? _ownerRead;
+  TrustedOwnerReadContext ownerReadContext() {
+    _live();
+    if (_session.role != OperationalRole.owner ||
+        !const {
+          'servers.state',
+          'servers.logs',
+          'servers.configuration',
+          'servers.executorInspect',
+          'servers.recipes',
+        }.contains(method) ||
+        !_initialAdmissionProved)
+      throw StateError('FORBIDDEN');
+    rpcRemaining;
+    return _ownerRead ??= TrustedOwnerReadContext._(
+      _registry as TrustedSessions,
+      channel,
+      _session,
+      _began,
+    );
+  }
+
+  TrustedOwnerConnectionContext ownerConnectionContext() {
+    _live();
+    if (_session.role != OperationalRole.owner ||
+        method != 'servers.connect' ||
+        !_initialAdmissionProved)
+      throw StateError('FORBIDDEN');
+    rpcRemaining;
+    return _ownerConnection ??= TrustedOwnerConnectionContext._(
+      _registry as TrustedSessions,
+      channel,
+      _session,
+      _began,
+    );
+  }
+
   TrustedOwnerProbeContext? _ownerProbe;
   TrustedOwnerProbeContext ownerProbeContext() {
     _live();

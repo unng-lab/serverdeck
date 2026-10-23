@@ -1,6 +1,9 @@
 # Quickstart and acceptance — 021
 
-This guide describes the intended implemented entry points. They do not exist merely because this file is written. Record actual commands/results per task, never label planned fixture checks executed.
+This guide separates available source entry points from required acceptance.
+For current build and client configuration commands, use the
+[MCP setup guide](../../docs/development/mcp.md). Record actual commands/results
+per task; source presence never counts as an executed fixture check.
 
 ## Prerequisites
 
@@ -24,7 +27,7 @@ pwsh -File tools/test-mcp.ps1
 
 ## Owner setup and independent clients
 
-Build same compatible bundle with tools/build-mcp.ps1, start UI through existing entry, create synthetic target/credentials and owner-confirm exact SSH fingerprint. Owner UI creates grant for A with read/logs/author/plan/apply and expiry; exports standard JSON entry command+args with no credentials. Standard client launches MCP executable with absolute app-root/grant-id. Initialize, initialized, tools/list and tools/call follow [wire contract](contracts/mcp.md). Second independent SDK client uses same standard transport with separately issued grant. No direct SSH/Local API/sdk-specific shortcut. Executable identity mismatch, invalid proof, revoked/expired grant and cross-workspace cases fail before data access.
+Build the complete compatible format3 bundle with `pwsh -File tools/run-serverdeck.ps1 -Configuration Debug -BuildOnly` (not build-mcp.ps1 alone), start UI through the same entry without BuildOnly, create synthetic target/credentials and owner-confirm exact SSH fingerprint. Owner UI creates grant for A with read/logs/author/plan/apply and expiry; exports standard JSON entry command+args with no credentials. Standard client launches MCP executable with absolute app-root/grant-id. Initialize, initialized, tools/list and tools/call follow [wire contract](contracts/mcp.md). Second independent SDK client uses same standard transport with separately issued grant. No direct SSH/Local API/sdk-specific shortcut. Executable identity mismatch, invalid proof, revoked/expired grant and cross-workspace cases fail before data access. When a client Job Object refuses safe breakaway for a cold launch, start the normal UI/locald first; MCP must refuse the cold launch rather than inherit kill-on-close.
 
 ## US1 — common reads
 
@@ -37,10 +40,29 @@ Before creating any server, owner issues author-only grant with serverIds=[]; cl
 ## US3 — real execution and recovery
 
 ```powershell
-pwsh -File tools/test-mcp-vm.ps1 -FixtureManifest <owned-disposable-vm.private.json>
+pwsh -File tools/test-mcp-vm.ps1 -Mode Create -FixtureRoot <owned-fixture-root>
+pwsh -File tools/test-mcp-vm.ps1 -Mode Enroll -FixtureRoot <owned-fixture-root> -WorkspaceId <actual-owner-workspace-uuid>
+pwsh -File tools/test-mcp-vm.ps1 -Mode Remove -FixtureRoot <owned-fixture-root>
 ```
 
-Harness must reject non-owned/non-disposable fixture and any target loaded from user's profiles, provision only this explicitly selected disposable systemd Docker fixture (or owned VM), retain process/container/VM ownership and synthetic credentials, never publish private fixture. Fixture manifest requires format1, disposable true, unique fixture ID, host/port/user/key reference, expected host fingerprint, owned container ID plus Docker context (or owned VM identity), approved cleanup scope; no ambient target discovery. Test actual deployed executor/runtime lock hash.
+These are implemented setup subcommands, not a complete acceptance command.
+The owner/client core scenario has a source entry
+`pwsh -File tools/run-mcp-scenario.ps1`; it builds the actual native integration
+bundle, prepares two locked clients, creates a private fixture, takes the
+workspace UUID from the real UI and coordinates enrollment. It has not yet run.
+Its proof explicitly has fullAcceptance=false: the recipe/fault matrix and full
+test-mcp.ps1 aggregation remain T189 work. FixtureRoot must be a
+fresh protected direct child `.local/mcp-acceptance-<32-hex-ID>` with an
+owner-only format1 `fixture.json` containing the matching fixtureId, prepared
+using tools/mcp-fixture.ps1. Create requires a local otherwise idle disposable
+Docker Linux engine, records exact nonce-labelled container/image identity in
+docker.json and stores synthetic SSH credentials only in CurrentUser DPAPI
+seed.dpapi. Enroll requires the UUID from the actual authenticated owner
+workspace and records executor identity in enrolled.json. Remove revalidates
+the exact owned container/image before removal. No saved server target or
+remote Docker context is accepted. Never publish the private fixture or treat
+setup completion as tested execution. The acceptance scenario must compare
+actual deployed executor/runtime lock hashes and SSH fingerprint before use.
 
 Through actual MCP bridge/UI:
 
@@ -58,7 +80,7 @@ Capture separate evidence for Windows/native bridge, wire client1/client2, migra
 
 Windows native owner trust probe tests additionally use a disposable loopback SSH server with an ephemeral in-memory RSA key. Prepare Python3.12.10 x64 with [the fixture setup script](../../tools/prepare-trust-probe-fixture.ps1), which installs only the exact hash-locked Windows wheels from [the fixture requirements](../../tools/trust-probe-fixture-requirements.txt) into `.local/trust-probe-python`. Set `SERVERDECK_TRUST_FIXTURE_PYTHON` to the returned absolute executable before native tests. Both Windows workflows perform this setup. This test-only dependency is absent from the product bundle: the fixture accepts only loopback connections, rejects every authentication method and exposes only its generated public fingerprint and counters. Successful owner probes must match that actual SSH fingerprint, drain the physical transport before challenge publication and show zero authentication attempts. These cases do not establish trust confirmation, remote execution or full release acceptance.
 
-[MCP automatic checks](../../.github/workflows/mcp.yml) runs Windows source-built native/root/package checks and [Docker prerequisites](../../tools/test-executor-container.sh) on an isolated Ubuntu runner. The Docker job currently proves Python3.12/python3-apt, hash-locked Ansible, systemd PID1, SSH service and persistent state across container restart. It does not yet prove the unimplemented privileged executor or installation recipes. No repository secrets, user profiles or stored server credentials are supplied. Extend this same disposable fixture for T026/T035 acceptance as the executor is implemented.
+[MCP automatic checks](../../.github/workflows/mcp.yml) runs Windows source-built native/root/package checks and [Docker prerequisites](../../tools/test-executor-container.sh) on an isolated Ubuntu runner. The Docker job currently proves Python3.12/python3-apt, hash-locked Ansible, systemd PID1, SSH service and persistent state across container restart. It does not establish acceptance of the current privileged executor or installation recipes. No repository secrets, user profiles or stored server credentials are supplied. Full T026/T035 executor scenarios remain required beyond this prerequisite job.
 
 
 First hosted prerequisite result: [run39555867561](https://github.com/unng-lab/serverdeck/actions/runs/39555867561), source ecf8d534efd2dbea85a0b5546cb450d4a6484066, job119075366238 succeeded in34seconds. The real Docker job reports ansible-core2.21.5, pip check clean, systemd=true, containerRestart=true, kernelReboot=false, executorAcceptance=false. Windows job was still running when this result was recorded. This result closes no executor/recipe/bridge acceptance gate.

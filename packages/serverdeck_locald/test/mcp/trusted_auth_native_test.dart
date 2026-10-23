@@ -117,12 +117,21 @@ void main() {
     'owner-context-native',
     'owner-context-stop',
     'owner-context-physical',
+    'owner-connection',
+    'owner-connection-budget',
+    'owner-connection-detach',
+    'owner-connection-native',
+    'owner-connection-stop',
+    'owner-connection-physical',
   ]) {
     test(
       'actual format3 API1.1 bootstrap and session $scenario',
       () async {
         final fixture = b.Fixture(
-          scenario == 'owner-context-physical' ? observed : executable,
+          scenario == 'owner-context-physical' ||
+                  scenario == 'owner-connection-physical'
+              ? observed
+              : executable,
         );
         fixture.document['format'] = 3;
         fixture.document['workspaceSchema'] = 3;

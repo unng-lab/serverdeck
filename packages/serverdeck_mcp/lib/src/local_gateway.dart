@@ -14,19 +14,26 @@ import 'server.dart';
 ErrorCode _publicCode(ErrorCode code) =>
     code == ErrorCode.unauthorized ? ErrorCode.forbidden : code;
 
+ErrorCode _trustedCode(String code) => _publicCode(
+  ErrorCode.values.where((value) => value.wireName == code).firstOrNull ??
+      ErrorCode.internal,
+);
+
 final class _RpcFailure implements Exception {
   _RpcFailure(
     this.code, {
     this.terminal = false,
     this.origin,
+    this.domainCode,
     RetryAdvice? retry,
   }) : retry = retry ?? LocalError(code).retry;
   final ErrorCode code;
   final RetryAdvice retry;
   final bool terminal;
   final OperationalRpcFailureOrigin? origin;
+  final String? domainCode;
   Map<String, Object?> result() => McpToolResult.failure(
-    _publicCode(code).wireName,
+    domainCode ?? _publicCode(code).wireName,
     retry: switch (retry) {
       RetryAdvice.none => 'none',
       RetryAdvice.reload => 'reload',
@@ -39,6 +46,50 @@ final class _RpcFailure implements Exception {
 
 final class _RpcWork {
   final settled = Completer<void>();
+}
+
+sealed class _GatewayRpc {
+  bool get isClosed;
+  int get pendingRequests;
+  Future<void> get done;
+  Future<Map<String, Object?>> call(String method, Map<String, Object?> params);
+  Future<void> close();
+}
+
+final class _OperationalGatewayRpc extends _GatewayRpc {
+  _OperationalGatewayRpc(this.client);
+  final OperationalApiClient client;
+  @override
+  bool get isClosed => client.isClosed;
+  @override
+  int get pendingRequests => client.pendingRequests;
+  @override
+  Future<void> get done => client.done;
+  @override
+  Future<Map<String, Object?>> call(
+    String method,
+    Map<String, Object?> params,
+  ) => client.call(method, params);
+  @override
+  Future<void> close() => client.close();
+}
+
+final class _TrustedGatewayRpc extends _GatewayRpc {
+  _TrustedGatewayRpc(this.client);
+  final TrustedApiClient client;
+  @override
+  bool get isClosed => client.isClosed;
+  @override
+  int get pendingRequests => client.pendingRequests;
+  @override
+  Future<void> get done => client.done;
+  @override
+  Future<Map<String, Object?>> call(
+    String method,
+    Map<String, Object?> params,
+  ) => client.call(method, params);
+  @override
+  Future<void> close() => client.close();
 }
 
 /// Standard MCP adapter over one claimed, protected native MCP session.
@@ -98,7 +149,11 @@ final class LocalMcpGateway implements McpGateway {
         await gate.close();
         throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
       }
-      return LocalMcpGateway._(client, gate, DateTime.parse(grant.expiresAt));
+      return LocalMcpGateway._(
+        _OperationalGatewayRpc(client),
+        gate,
+        DateTime.parse(grant.expiresAt),
+      );
     } catch (error) {
       // A timed-out factory still owns any later-created gate and native work.
       creating.then<void>((gate) => gate.close()).ignore();
@@ -115,7 +170,49 @@ final class LocalMcpGateway implements McpGateway {
     }
   }
 
-  final OperationalApiClient? _client;
+  /// The production path accepts only a genuine format3 session which has
+  /// already completed protected grant proof. No role or credential DTO suffices.
+  static Future<LocalMcpGateway> connectTrusted(
+    TrustedClientSession session,
+  ) async {
+    final grant = session.grant;
+    if (session.role != OperationalRole.mcp || grant == null)
+      throw const McpGatewayFailure(ErrorCode.forbidden);
+    late final TrustedApiClient client;
+    try {
+      client = TrustedApiClient(session);
+    } on TrustedRpcException catch (error) {
+      throw McpGatewayFailure(_trustedCode(error.code));
+    }
+    final creating = session.peer.publicationGate(session.hello.generation);
+    creating.ignore();
+    try {
+      final gate = await creating.timeout(const Duration(seconds: 5));
+      if (client.isClosed) {
+        await gate.close();
+        throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
+      }
+      return LocalMcpGateway._(
+        _TrustedGatewayRpc(client),
+        gate,
+        DateTime.parse(grant.expiresAt),
+      );
+    } catch (error) {
+      creating.then<void>((gate) => gate.close()).ignore();
+      try {
+        await client.close();
+      } on Object {
+        /* Terminal cleanup failure. */
+      }
+      throw McpGatewayFailure(
+        error is TimeoutException
+            ? ErrorCode.timeout
+            : ErrorCode.serviceUnavailable,
+      );
+    }
+  }
+
+  final _GatewayRpc? _client;
   final OperationalPublicationGate? _gate;
   final DateTime? _expires;
   final _watch = Stopwatch()..start();
@@ -264,6 +361,18 @@ final class LocalMcpGateway implements McpGateway {
       if (error.terminal) close().ignore();
       throw _RpcFailure(
         error.code,
+        terminal: error.terminal,
+        origin: error.origin,
+        retry: error.retry,
+      );
+    } on TrustedRpcException catch (error) {
+      if (error.terminal) close().ignore();
+      throw _RpcFailure(
+        _trustedCode(error.code),
+        domainCode:
+            mcpDomainCodes.contains(error.code) && error.code != 'UNAUTHORIZED'
+            ? error.code
+            : null,
         terminal: error.terminal,
         origin: error.origin,
         retry: error.retry,

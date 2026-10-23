@@ -69,6 +69,7 @@ final class TrustedRpcException implements Exception {
 final class TrustedApiClient extends _RpcClient {
   factory TrustedApiClient(TrustedClientSession session) {
     if (session._closed ||
+        session._preGrantBusy ||
         session._ordinaryClaimed ||
         session._grantAttempted && session._grant == null)
       throw const TrustedRpcException._(
@@ -97,6 +98,12 @@ final class TrustedApiClient extends _RpcClient {
     Map<String, Object?> result,
   ) {
     if (ApiMethod.values.any((m) => m.wireName == method) ||
+        connectionOwnerMethods.contains(method) ||
+        remoteReadOwnerMethods.contains(method) ||
+        executorOwnerMethods.contains(method) ||
+        grantOwnerMethods.contains(method) ||
+        automationAuthorityOwnerMethods.contains(method) ||
+        ownerAutomationMethods.contains(method) ||
         hostTrustMethodFields.containsKey(method))
       return captureTrustedMethodResult(method, result);
     return super._captureResult(method, result);

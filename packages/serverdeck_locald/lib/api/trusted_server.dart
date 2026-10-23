@@ -36,25 +36,52 @@ final class TrustedReply {
 final class TrustedApiServer {
   TrustedApiServer({
     required this.sessions,
-    required this.authority,
-    required this.router,
+    required TrustedMcpAuthority authority,
+    required TrustedMcpRouter router,
     required this.readiness,
-    this.owner,
-  }) {
+    TrustedOwnerApi? owner,
+  }) : _authority = authority,
+       _router = router,
+       _owner = owner {
     if (!identical(sessions, router.sessions) ||
         !identical(authority, router.authority)) {
       throw ArgumentError('INVALID_CHANNEL_CONFIGURATION');
     }
   }
+
+  /// Authenticated readiness/ping during real storage startup. Domain routes
+  /// remain unavailable until the actual same-registry services are attached.
+  TrustedApiServer.starting({required this.sessions, required this.readiness});
   final TrustedSessions sessions;
-  final TrustedMcpAuthority authority;
-  final TrustedMcpRouter router;
+  TrustedMcpAuthority? _authority;
+  TrustedMcpRouter? _router;
+  TrustedOwnerApi? _owner;
+  TrustedMcpAuthority get authority =>
+      _authority ?? (throw StateError('NOT_READY'));
+  TrustedMcpRouter get router => _router ?? (throw StateError('NOT_READY'));
+  TrustedOwnerApi? get owner => _owner;
+  bool get isActivated => _authority != null;
+  void activate({
+    required TrustedMcpAuthority authority,
+    required TrustedMcpRouter router,
+    required TrustedOwnerApi owner,
+  }) {
+    if (isActivated ||
+        !identical(sessions, router.sessions) ||
+        !identical(authority, router.authority))
+      throw StateError('NOT_READY');
+    _authority = authority;
+    _router = router;
+    _owner = owner;
+  }
+
   final TrustedReadiness Function() readiness;
-  final TrustedOwnerApi? owner;
 
   TrustedReadiness _view() {
     final result = readiness();
     if (result.generation != sessions.generation) throw StateError('INTERNAL');
+    if (result.state == ReadinessState.ready && !isActivated)
+      throw StateError('INTERNAL');
     return result;
   }
 
@@ -111,11 +138,11 @@ final class TrustedApiServer {
       if (!builtins.contains(method)) {
         if (request.role != OperationalRole.owner)
           throw StateError('FORBIDDEN');
-        if (owner?.supports(method) != true) throw StateError('UNSUPPORTED');
         ownerRoute = true;
         final view = _view();
         if (view.state != ReadinessState.ready)
           throw StateError(view.toJson()['reason'] as String);
+        if (owner?.supports(method) != true) throw StateError('UNSUPPORTED');
         invocation = owner!.prepare(request, method, params, requestId: id);
       }
       try {

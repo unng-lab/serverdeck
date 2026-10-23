@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_protocol/wire.dart';
 
 import '../bootstrap/local_api_client.dart';
 import 'profile_controller.dart';
@@ -113,7 +112,7 @@ class StartupRecovery extends ChangeNotifier {
       if (!live()) return;
       if (reply.generation != generation)
         throw const FormatException('INCOMPATIBLE');
-      validateMethodResult('mutations.recent', reply.result);
+      model.bootstrap.client.captureResult('mutations.recent', reply.result);
       final raw = reply.result['receipts'] as List;
       if (raw.length > 20) throw const FormatException('INCOMPATIBLE');
       final values = <RecoveredCommit>[];

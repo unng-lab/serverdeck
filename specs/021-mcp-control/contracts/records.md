@@ -52,6 +52,17 @@ kind state requires state non-null, stepId/checkResult null and droppedCount0; k
 
 Exactly `{workspaceId,requestId,originGrantId,objectGrantId,canonicalDigest,operation,result,createdAt}`. originGrantId identifies the initiating verified session (null owner), while objectGrantId identifies the referenced plan/job/approval/delegation's original grant. These identities are intentionally distinct: an owner approvals.decide receipt has originGrantId null and objectGrantId G when approving an MCP grant G's plan. Owner actions never relabel that plan/approval/job to owner origin. An owner may act on a grant-origin object only under the same current object policy; owner approval does not resurrect revoked/expired G. For workspace-owned profile catalog and grant-management objects, objectGrantId is null. A delegation object always has its non-null grantId as objectGrantId. All fields are derived by trusted coordinator, never accepted as caller authority.
 
+The current-object-policy rule has one explicit no-effect exception: a verified
+owner may cancel or reconcile an already accepted job even when its original
+grant is revoked, expired or no longer includes the server/scope. This applies
+at initial check, durable replay and precommit revalidation. Origin remains
+null in the owner control receipt; objectGrantId and the historical job/plan
+grant remain G. MCP callers still require their current original grant and
+server/scope authorization. Owner apply, approval and every execution-step
+authorization retain the current object policy; no control receipt can revive
+G, submit a new attempt or authorize another effect. Terminal control is an
+idempotent observation/stop acknowledgement, not a new successful job.
+
 Result is a closed stable acknowledgement union below, at most4KiB; no arbitrary response/input/result blob. Receipt is at most8KiB. Every result has exactly listed fields, UUID/digest/revision/authority validation as elsewhere. These same result objects are returned as mutation success data to owner UI/MCP. The full immutable result is committed atomically with mutation/receipt and replayed verbatim after current authorization, including after a restart or subsequent object changes. It intentionally contains no mutable labels, profile bodies, current grant/job/approval state, expiry/freshness assertion or configuration path; clients read those through current read methods. Revision/digest identify the operation's committed version, not the latest head. Replay never reconstructs from current mutable metadata.
 
 | operation | Exact result |

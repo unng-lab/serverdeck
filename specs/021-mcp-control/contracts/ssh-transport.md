@@ -20,6 +20,21 @@ store trust. No change to wire versions or durable storage is needed for T144.
 
 ## Inputs and trust
 
+Connection/read implementation extension (pending final checks): an opaque
+`SshTransportReservation` charges this same two-slot pool before scoped custody
+work and atomically transfers its charge into the actual authenticated attempt.
+It accepts no wire credentials or authority. Failed/cancelled custody retains
+the reservation until actual completion. `SshLease.read` accepts only typed
+`SshReadRequest` operations (system, metrics, dpkg inventory, systemd inventory,
+journald); no arbitrary command/script/path input. At most four read channels
+per transport include late cleanup, each with a maximum 30-second logical
+budget and explicit cancel/physical settlement. Stdout caps are 256KiB for
+system/metrics, 4MiB packages, 2MiB units, 8MiB journal; stderr is drained without
+publication. Truncated stdout is marked rather than silently interpreted as a
+complete source. Transport teardown cancels and waits owned read channels.
+These extensions do not establish source/SSH/runtime qualification merely
+because their code compiles; full checks are deferred by the user's sequencing.
+
 One locald-owned pool admits at most two transports, including pending TCP,
 rejected handshakes and cleanup. There is no waiting queue: a third admission
 fails RESOURCE_LIMIT synchronously. Production composition shares one pool.

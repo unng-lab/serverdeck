@@ -75,6 +75,7 @@ function Write-NativeQualificationTestFailure {
         'rpc-timeout','rpc-remote','overall','cancel-timeout','missing-grant','owner-deny','pending','cancel-ack','native-loss',
         'expiry','revoke','stdout-revoke','stdout-target-change','stdout-target-failure','stdout-stop','writer-cancel','publish-order','publish-expiry','eof')
     $trustedClientCases=@('owner','cleanup2','cleanup3','mcp','grant','grant-bad-proof','grant-repeat','codes','quota','receipts',
+        'connection','bad-connection','bad-connect','bad-connect-status','bad-connect-cancel','bad-disconnect',
         'readiness2','bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize',
         'invalid-json','timeout','eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation',
         'hello-build','hello-version','hello-shape','bootstrap-timeout')

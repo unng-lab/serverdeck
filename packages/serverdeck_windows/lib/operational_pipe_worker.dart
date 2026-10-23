@@ -40,6 +40,17 @@ sealed class _EpochPipePeer {
   final BundlePeerRole localRole;
   final String buildId;
 
+  /// Endpoint root from the owning worker's current retained native proof.
+  Future<String> verifiedBundleRoot() async {
+    final identity =
+        await _worker._call('peerPublicationIdentity', _epoch) as List;
+    if (identity.length != 3 ||
+        identity[1] is! String ||
+        identity[2] != localRole.name)
+      throw StateError('UNAUTHORIZED');
+    return identity[1] as String;
+  }
+
   Future<OperationalNativeObservation> observeNextRevalidationForTest() async {
     if (!operationalNativeObservationEnabled) throw StateError('UNSUPPORTED');
     final token = await _worker._call('testPeerObservationArm', _epoch) as int;
@@ -146,7 +157,12 @@ final class _EndpointProof {
 }
 
 final class _EndpointBundle {
-  _EndpointBundle._(this.appRoot, this.buildId, this.verifyPeer);
+  _EndpointBundle._(
+    this.appRoot,
+    this.buildId,
+    this.verifyPeer, {
+    this.permitsLocaldProbe = false,
+  });
   factory _EndpointBundle.operational(McpBuildBundle bundle) =>
       _EndpointBundle._(bundle.manifest.appRoot, bundle.manifest.buildId, (
         identity,
@@ -162,8 +178,9 @@ final class _EndpointBundle {
       ) {
         final proof = bundle.verifyPeer(identity, sid);
         return _EndpointProof(() => proof.role, proof.revalidate);
-      });
+      }, permitsLocaldProbe: true);
   final String appRoot, buildId;
+  final bool permitsLocaldProbe;
   final _EndpointProof Function(RetainedProcessIdentity, String) verifyPeer;
 }
 
@@ -224,7 +241,7 @@ final class _OperationalEndpoint {
       }
       final role = peer!.role;
       if (server
-          ? role == BundlePeerRole.locald
+          ? role == BundlePeerRole.locald && !bundle.permitsLocaldProbe
           : role != BundlePeerRole.locald)
         throw StateError('UNAUTHORIZED');
       return role;
@@ -417,7 +434,9 @@ Future<void> _bundleWorker(
           );
     self = RetainedProcessIdentity.open(pid);
     final selfProof = bundle.verifyPeer(self, sid), role = selfProof.role;
-    if (server ? role != BundlePeerRole.locald : role == BundlePeerRole.locald)
+    if (server
+        ? role != BundlePeerRole.locald
+        : role == BundlePeerRole.locald && !bundle.permitsLocaldProbe)
       throw StateError('UNAUTHORIZED');
     pipe = server
         ? NativePipe.createServer(startup[1] as String, sid)

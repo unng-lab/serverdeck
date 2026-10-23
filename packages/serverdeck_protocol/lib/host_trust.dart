@@ -2,6 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'codec.dart';
+import 'connections.dart';
+import 'remote_reads.dart';
+import 'executor_owner.dart';
+import 'grant_owner.dart';
+import 'automation/authority_owner.dart';
+import 'automation/owner_operations.dart';
 import 'errors.dart';
 import 'models.dart';
 import 'validation.dart';
@@ -311,6 +317,18 @@ Map<String, Object?> captureTrustedMethodResult(
   String method,
   Map<String, Object?> value,
 ) {
+  if (grantOwnerMethods.contains(method))
+    return captureGrantOwnerResult(method, value);
+  if (ownerAutomationMethods.contains(method))
+    return captureOwnerAutomationResult(method, value);
+  if (automationAuthorityOwnerMethods.contains(method))
+    return captureAutomationAuthorityOwnerResult(method, value);
+  if (executorOwnerMethods.contains(method))
+    return captureExecutorOwnerResult(method, value);
+  if (remoteReadOwnerMethods.contains(method))
+    return captureRemoteReadResult(method, value);
+  if (connectionOwnerMethods.contains(method))
+    return captureConnectionResult(method, value);
   if (hostTrustMethodFields.containsKey(method))
     return captureHostTrustResult(method, value);
   if (method == 'readiness.get') {

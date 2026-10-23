@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:serverdeck_windows/pipe_worker.dart';
+import 'package:serverdeck_windows/operational_auth_client.dart';
 import 'package:serverdeck_windows/security.dart';
 
 Future<void> denied(Future<Object?> Function() run) async {
@@ -66,6 +67,14 @@ Future<void> main(List<String> args) async {
         in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
       try {
         switch (command) {
+          case 'bootstrap-denied':
+            final bootstrap = TrustedBootstrapClient(
+              pipe: worker,
+              generation: '10000000-0000-4000-8000-000000000001',
+              token: List<int>.filled(32, 0),
+            );
+            await denied(bootstrap.authenticate);
+            stdout.writeln('BOOTSTRAP_DENIED');
           case 'wrong-peer':
             await denied(() => worker.verifyOperationalPeer());
             stdout.writeln('WRONG_PEER_DENIED');

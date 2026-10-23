@@ -5,7 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:serverdeck_protocol/models.dart' show ThemePreference;
 
 import 'bootstrap/bootstrap_controller.dart';
-import 'bootstrap/native_bootstrap_host.dart';
+import 'bootstrap/trusted_native_bootstrap_host.dart';
 import 'profiles/profile_controller.dart';
 import 'profiles/profile_list.dart';
 import 'profiles/startup_recovery.dart';
@@ -25,7 +25,7 @@ class FoundationApp extends StatefulWidget {
 class _FoundationAppState extends State<FoundationApp>
     with WidgetsBindingObserver {
   late final BootstrapController controller;
-  NativeBootstrapHost? _host;
+  TrustedNativeBootstrapHost? _host;
   late final ProfileController profiles;
   late final StartupRecovery recovery;
   Future<void>? _closing;
@@ -37,7 +37,7 @@ class _FoundationAppState extends State<FoundationApp>
     if (supplied != null) {
       controller = supplied;
     } else {
-      final host = NativeBootstrapHost();
+      final host = TrustedNativeBootstrapHost();
       _host = host;
       controller = BootstrapController(
         client: host.client,
@@ -130,7 +130,10 @@ class _FoundationAppState extends State<FoundationApp>
               onRetry: () => controller.retry().ignore(),
               servers: RecoveryView(
                 recovery: recovery,
-                child: ProfileList(controller: profiles),
+                child: ProfileList(
+                  controller: profiles,
+                  controlClient: controller.client.trustedClient,
+                ),
               ),
               settings: RecoveryView(
                 recovery: recovery,

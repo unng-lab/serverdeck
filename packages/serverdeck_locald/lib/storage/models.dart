@@ -300,6 +300,27 @@ class WorkspaceState {
     ownerSid: ownerSid,
   );
 
+  factory WorkspaceState.emptyTrusted({
+    required String workspaceId,
+    required String receiptKeyId,
+    required String ownerSid,
+  }) => WorkspaceState.fromTrustedJson(
+    {
+      'schemaVersion': 3,
+      'workspaceId': workspaceId,
+      'receiptKeyId': receiptKeyId,
+      'ownerSid': ownerSid,
+      'storeRevision': '0',
+      'profiles': <String, Object?>{},
+      'credentials': <String, Object?>{},
+      'settings': const SettingsView().toJson(),
+      'receipts': <String, Object?>{},
+    },
+    workspaceId: workspaceId,
+    receiptKeyId: receiptKeyId,
+    ownerSid: ownerSid,
+  );
+
   factory WorkspaceState.fromJson(
     Map<String, Object?> value, {
     required String workspaceId,

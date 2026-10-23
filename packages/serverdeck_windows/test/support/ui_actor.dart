@@ -93,7 +93,7 @@ class UiActor {
         ((pending || serviceOwner || ownerRecovery) && role != 'observer')) {
       throw StateError('ACTOR_ROLE_INVALID');
     }
-    final environment = await ClientBootstrapEnvironment.verify();
+    final environment = await TrustedClientBootstrapEnvironment.verify();
     final executable = serviceOwner
         ? environment.localdPath
         : Platform.resolvedExecutable;

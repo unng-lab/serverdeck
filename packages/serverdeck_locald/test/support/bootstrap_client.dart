@@ -7,17 +7,19 @@ import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as p;
 import 'package:serverdeck_locald/bootstrap/discovery.dart';
 import 'package:serverdeck_locald/bootstrap/discovery_file.dart';
-import 'package:serverdeck_locald/bootstrap/native_runtime.dart';
+import 'package:serverdeck_windows/mcp_build_bundle.dart';
+import 'package:serverdeck_windows/operational_auth_client.dart';
+import 'package:serverdeck_protocol/mcp/handshake.dart';
 import 'package:serverdeck_protocol/codec.dart';
 import 'package:serverdeck_protocol/models.dart' show ApiMethod, ErrorCode;
-import 'package:serverdeck_protocol/wire.dart';
 import 'package:serverdeck_windows/dpapi.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 import 'package:serverdeck_windows/security.dart';
 
 import '../../../../lib/bootstrap/local_api_client.dart';
-import '../../../../lib/bootstrap/native_client_transport.dart';
-import 'loss_transport.dart';
+import 'owner_result_client.dart';
+
+const _crashProfileId = '82345678-1234-4234-8234-123456789012';
 
 void check(bool condition) {
   if (!condition) throw StateError('FIXTURE_FAILED');
@@ -28,7 +30,7 @@ Future<void> main(List<String> args) async {
   final mode = args.length > 2 ? args[2] : 'close';
   final blocked = mode == 'blocked-storage' || mode == 'blocked-incompatible';
   final rejectedAuth = mode.startsWith('reject-');
-  final manifest = await verifyBuildBundle(bundle);
+  final manifest = await verifyTrustedBuildBundle(bundle);
   final sid = currentUserSid();
   final discovery = DiscoveryFile(
     localAppData: root,
@@ -40,35 +42,39 @@ Future<void> main(List<String> args) async {
       mode == 'client-loss' ||
       mode == 'client-owner-loss' ||
       mode == 'client-sessions') {
-    LossTransport? loss;
+    OwnerResultFaults? loss;
     final endpointNames = <LocalApiClient, String>{};
     LocalApiClient makeClient() {
       late final LocalApiClient client;
-      client = LocalApiClient(
+      final inner = LocalApiClient.trusted(
         connect: () async {
-          final descriptor = await discovery.read(manifest.buildId);
+          final descriptor = await discovery.read(manifest.manifest.buildId);
           final token = descriptor.bootstrapToken;
           try {
             for (final name in descriptor.pipeNames) {
+              PipeWorker transport;
               try {
-                final transport = await NativeClientTransport.open(
-                  pipeName: name,
-                  ownerSid: sid,
-                  imagePath: p.join(bundle, 'locald.exe'),
-                  imageHash: manifest.sha256['locald.exe']!,
-                );
-                endpointNames[client] = name;
-                return ClientEndpoint(
-                  transport:
-                      mode == 'client-loss' || mode == 'client-owner-loss'
-                      ? (loss = LossTransport(transport))
-                      : transport,
-                  generation: descriptor.generation,
-                  buildId: descriptor.buildId,
-                  bootstrapToken: token,
+                transport = await PipeWorker.openTrustedClient(
+                  name,
+                  sid,
+                  bundle,
                 );
               } on StateError catch (error) {
                 if (error.message != 'SERVICE_UNAVAILABLE') rethrow;
+                continue;
+              }
+              final bootstrap = TrustedBootstrapClient(
+                pipe: transport,
+                generation: descriptor.generation,
+                token: token,
+              );
+              try {
+                final session = await bootstrap.authenticate();
+                endpointNames[client] = name;
+                return (TrustedApiClient(session), descriptor.generation);
+              } on Object {
+                await bootstrap.close();
+                rethrow;
               }
             }
             throw const LocalApiException(ErrorCode.serviceUnavailable);
@@ -78,6 +84,12 @@ Future<void> main(List<String> args) async {
           }
         },
       );
+      if (mode == 'client-loss' || mode == 'client-owner-loss') {
+        loss = OwnerResultFaults();
+        client = OwnerResultFaultClient(inner, loss!);
+      } else {
+        client = inner;
+      }
       return client;
     }
 
@@ -171,10 +183,10 @@ Future<void> main(List<String> args) async {
     while (pipe == null && watch.elapsed < const Duration(seconds: 25)) {
       try {
         descriptor?.close();
-        descriptor = await discovery.read(manifest.buildId);
+        descriptor = await discovery.read(manifest.manifest.buildId);
         for (final name in descriptor.pipeNames) {
           try {
-            pipe = await PipeWorker.openClient(name, sid);
+            pipe = await PipeWorker.openTrustedClient(name, sid, bundle);
             break;
           } on StateError catch (error) {
             check(error.message == 'SERVICE_UNAVAILABLE');
@@ -187,16 +199,13 @@ Future<void> main(List<String> args) async {
     check(pipe != null && descriptor != null);
     final connected = pipe!;
     final owned = descriptor!;
-    await connected.verifyPeer(
-      sid,
-      p.join(bundle, 'locald.exe'),
-      manifest.sha256['locald.exe']!,
-    );
+    final nativePeer = await connected.verifyTrustedPeer();
+    await nativePeer.revalidate();
     Future<Uint8List> exact(int count) async {
       final bytes = Uint8List(count);
       var offset = 0;
       while (offset < count) {
-        final part = await connected.read(
+        final part = await nativePeer.read(
           count: (count - offset).clamp(1, 65536),
         );
         check(part.isNotEmpty);
@@ -214,50 +223,47 @@ Future<void> main(List<String> args) async {
       return codec.decode(await exact(count), maxBytes: 8 * 1024 * 1024);
     }
 
-    final hello = await receive();
-    validateHello(hello);
-    check((hello['hello'] as Map)['generation'] == owned.generation);
+    final hello = OperationalHello.fromJson(await receive());
+    check(hello.generation == owned.generation);
+    check(
+      hello.clientRole ==
+          (mode == 'read-only' ? OperationalRole.mcp : OperationalRole.owner),
+    );
     final nonce = base64Url.encode(List.filled(32, 7)).replaceAll('=', '');
-    final caps = [
-      if (mode == 'reject-capability') 'executor.run',
-      if (mode == 'recover' || mode == 'verify-recovered' || blocked)
-        'mutations.read',
-      'profiles.read',
-      if (mode == 'crash' || blocked) 'profiles.write',
-      'readiness.read',
-      if (blocked) 'settings.read',
-      if (blocked) 'settings.write',
-    ];
-    final serverNonce = (hello['hello'] as Map)['serverNonce'];
+    final caps = [hello.clientRole.name];
+    final transcript = OperationalBootstrapTranscript(
+      hello: hello,
+      clientNonce: nonce,
+      requestedCapabilities: caps,
+    );
     final token = owned.bootstrapToken;
-    Future<String> proof(String role, [String? session]) async {
-      final transcript =
-          '$role\n1\ndefault\n${owned.generation}\n$serverNonce\n$nonce\n${manifest.buildId}\n${caps.join(',')}${session == null ? '' : '\n$session\n${caps.join(',')}'}';
+    Future<String> proof(List<int> bytes) async {
       final key = SecretKeyData(
         List<int>.of(token),
         overwriteWhenDestroyed: true,
       );
       try {
-        final mac = await Hmac.sha256().calculateMac(
-          utf8.encode(transcript),
-          secretKey: key,
-        );
+        final mac = await Hmac.sha256().calculateMac(bytes, secretKey: key);
         return base64Url.encode(mac.bytes).replaceAll('=', '');
       } finally {
         key.destroy();
       }
     }
 
-    await connected.write(
+    await nativePeer.write(
       frameBytes(
         codec.encode({
           'authenticate': {
             'clientNonce': nonce,
             'clientBuildId': mode == 'reject-build'
-                ? 'wrong'
-                : manifest.buildId,
-            'requestedCapabilities': caps,
-            'proof': mode == 'reject-proof' ? nonce : await proof('client'),
+                ? manifest.manifest.buildId.replaceFirst('Debug', 'Release')
+                : manifest.manifest.buildId,
+            'requestedCapabilities': mode == 'reject-capability'
+                ? ['executor.run']
+                : caps,
+            'proof': mode == 'reject-proof'
+                ? nonce
+                : await proof(transcript.clientBytes()),
           },
         }),
       ),
@@ -266,20 +272,16 @@ Future<void> main(List<String> args) async {
       token.fillRange(0, token.length, 0);
       // No error envelope or grant may disclose unauthenticated input.
       try {
-        check((await connected.read(count: 1)).isEmpty);
+        check((await nativePeer.read(count: 1)).isEmpty);
       } on StateError catch (error) {
         check(error.message == 'SERVICE_UNAVAILABLE');
       }
       stdout.writeln('COMPILED_BOOTSTRAP_AUTH_REJECTED_PROVED');
       return;
     }
-    final grant = await receive();
-    validateAuthenticated(grant);
-    final session = (grant['authenticated'] as Map)['sessionId'] as String;
-    check(
-      (grant['authenticated'] as Map)['proof'] ==
-          await proof('server', session),
-    );
+    final grant = OperationalAuthenticated.fromJson(await receive());
+    final session = grant.sessionId;
+    check(grant.proof == await proof(transcript.serverBytes(grant)));
     token.fillRange(0, token.length, 0);
     var counter = 0;
     Future<Map<String, Object?>> request(
@@ -290,7 +292,7 @@ Future<void> main(List<String> args) async {
       final id =
           requestId ??
           '92345678-1234-4234-8234-${(++counter).toString().padLeft(12, '0')}';
-      await connected.write(
+      await nativePeer.write(
         frameBytes(
           codec.encode({
             'v': 1,
@@ -342,7 +344,7 @@ Future<void> main(List<String> args) async {
             ready['reason'] == expectedCode &&
             ready['workspaceId'] == null,
       );
-      final refreshed = await discovery.read(manifest.buildId);
+      final refreshed = await discovery.read(manifest.manifest.buildId);
       try {
         check(
           refreshed.workspaceId == null &&
@@ -383,7 +385,7 @@ Future<void> main(List<String> args) async {
       return;
     }
     check(ready['workspaceId'] is String);
-    final refreshed = await discovery.read(manifest.buildId);
+    final refreshed = await discovery.read(manifest.manifest.buildId);
     try {
       check(
         refreshed.workspaceId == ready['workspaceId'] &&
@@ -393,10 +395,12 @@ Future<void> main(List<String> args) async {
       refreshed.close();
     }
     final idleWatch = Stopwatch()..start();
-    await rpc('profiles.list');
     if (mode == 'read-only') {
-      final before = await rpc('profiles.list');
+      // Native mcp.exe has no owner access, even before a grant is opened.
+      // Role comes from the verified executable path, never requested caps.
       for (final method in [
+        'profiles.list',
+        'profiles.get',
         'profiles.create',
         'profiles.update',
         'profiles.delete',
@@ -413,11 +417,10 @@ Future<void> main(List<String> args) async {
               error['retry'] == 'none',
         );
       }
-      check(jsonEncode(await rpc('profiles.list')) == jsonEncode(before));
       check((await rpc('readiness.get'))['state'] == 'ready');
       stdout.writeln('COMPILED_BOOTSTRAP_READ_ONLY_PROVED');
     }
-    const profileId = '72345678-1234-4234-8234-123456789012';
+    const profileId = _crashProfileId;
     const mutationId = 'a2345678-1234-4234-8234-123456789012';
     if (mode == 'crash') {
       final created = await rpc('profiles.create', {
@@ -477,7 +480,7 @@ Future<void> main(List<String> args) async {
     }
     if (mode == 'crash') {
       try {
-        final eof = await connected.read(count: 1);
+        final eof = await nativePeer.read(count: 1);
         check(eof.isEmpty);
       } on StateError catch (error) {
         check(error.message == 'SERVICE_UNAVAILABLE');
@@ -485,7 +488,7 @@ Future<void> main(List<String> args) async {
       stdout.writeln('COMPILED_BOOTSTRAP_OWNER_CRASH_PROVED');
     } else if (mode == 'expire') {
       try {
-        final eof = await connected.read(
+        final eof = await nativePeer.read(
           count: 1,
           deadline: const Duration(seconds: 70),
         );
@@ -512,11 +515,11 @@ Future<void> main(List<String> args) async {
 /// The driver kills only its own verified locald, after this real reply drops.
 Future<void> verifyOwnerLoss(
   LocalApiClient client,
-  LossTransport transport,
+  OwnerResultFaults transport,
 ) async {
   final ready = await client.read(ApiMethod.readinessGet);
   final intent = MutationIntent(ApiMethod.profilesCreate, {
-    'profileId': '72345678-1234-4234-8234-123456789012',
+    'profileId': _crashProfileId,
     'name': 'Crash fixture',
     'address': 'crash.example.test',
     'port': 22,
@@ -556,7 +559,10 @@ Future<void> verifyOwnerLoss(
         watch.elapsed < const Duration(seconds: 3)) {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
-    check(transport.replyDropped && !finished);
+    if (!transport.replyDropped || finished) {
+      final outcome = finished ? await pending : null;
+      throw StateError('OWNER_LOSS_NOT_PENDING:${outcome?.wireName}');
+    }
     stdout.writeln('COMPILED_BOOTSTRAP_HELD_READY');
     await stdout.flush();
     // No status, retry or graceful session.close while outcome is unknown.
@@ -664,7 +670,10 @@ Future<void> verifySessionSlots(
   }
 }
 
-Future<void> verifyLoss(LocalApiClient client, LossTransport transport) async {
+Future<void> verifyLoss(
+  LocalApiClient client,
+  OwnerResultFaults transport,
+) async {
   final before = await client.read(ApiMethod.profilesList);
   final baseline = BigInt.parse(before.result['storeRevision'] as String);
   final create = MutationIntent(ApiMethod.profilesCreate, {

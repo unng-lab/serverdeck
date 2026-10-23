@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_protocol/wire.dart';
 
 import '../bootstrap/bootstrap_controller.dart';
 import '../bootstrap/local_api_client.dart';
@@ -73,8 +72,8 @@ class ProfileController extends ChangeNotifier {
             snapshot.settings.result['storeRevision'])
       return;
     try {
-      validateMethodResult('profiles.list', snapshot.profiles.result);
-      validateMethodResult('settings.get', snapshot.settings.result);
+      bootstrap.client.captureResult('profiles.list', snapshot.profiles.result);
+      bootstrap.client.captureResult('settings.get', snapshot.settings.result);
       final revision = snapshot.storeRevision;
       if (_revision != null &&
           BigInt.parse(revision) < BigInt.parse(_revision!)) {

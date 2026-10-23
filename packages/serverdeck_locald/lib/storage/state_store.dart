@@ -7,6 +7,8 @@ import 'dart:typed_data';
 import 'package:isar_community/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/executor_enrollment.dart';
+import 'package:serverdeck_protocol/executor_owner.dart';
 import 'package:serverdeck_protocol/automation/models.dart';
 import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/mcp_credentials.dart';
@@ -18,6 +20,9 @@ import 'package:serverdeck_windows/security.dart';
 import '../bootstrap/native_runtime.dart';
 import '../automation/snapshot.dart';
 import '../automation/profile_commands.dart';
+import '../automation/plan_commands.dart';
+import '../automation/authority_commands.dart';
+import '../automation/job_commands.dart';
 import '../mcp/grants.dart';
 import 'credential_validation.dart';
 import 'automation_records.dart';
@@ -42,7 +47,13 @@ part 'mcp_grant_reads.dart';
 part 'operational_foundation_writes.dart';
 part 'trusted_foundation_writes.dart';
 part 'automation_profile_writes.dart';
+part 'automation_plan_writes.dart';
+part 'automation_delta.dart';
+part 'automation_authority_writes.dart';
+part 'automation_job_writes.dart';
+part 'automation_job_progress.dart';
 part 'automation_store_view.dart';
+part 'executor_enrollments.dart';
 
 /// Owned existing-workspace repository. Creation/promotion belongs to workspace.
 class StateStore {

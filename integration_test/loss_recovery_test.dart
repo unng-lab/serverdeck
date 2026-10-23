@@ -11,7 +11,7 @@ import 'package:integration_test/integration_test.dart';
 import '../lib/app.dart';
 import '../lib/main.dart' as app;
 import '../lib/bootstrap/bootstrap_controller.dart';
-import '../lib/bootstrap/native_bootstrap_host.dart';
+import '../lib/bootstrap/trusted_native_bootstrap_host.dart';
 
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/client_bootstrap.dart';
@@ -38,7 +38,7 @@ void main() {
   }
 
   Future<Map<String, Object?>> owner() => Isolate.run(() async {
-    final environment = await ClientBootstrapEnvironment.verify();
+    final environment = await TrustedClientBootstrapEnvironment.verify();
     final descriptor = await environment.discovery();
     if (descriptor == null) throw StateError('OWNER_MISSING');
     try {
@@ -55,7 +55,7 @@ void main() {
   testWidgetsWithRuntimeHooks('actual UI loss recovery role=$role', (
     tester,
   ) async {
-    NativeBootstrapHost? host;
+    TrustedNativeBootstrapHost? host;
     BootstrapController? supplied;
     LossClient? controlled;
     UiActor? child;
@@ -126,7 +126,7 @@ void main() {
     );
     try {
       if (role == 'primary') {
-        final normalHost = NativeBootstrapHost();
+        final normalHost = TrustedNativeBootstrapHost();
         host = normalHost;
         final fixture = LossClient();
         controlled = fixture;
@@ -243,7 +243,7 @@ void main() {
       await click('Сохранить');
       await wait(
         () => find.text('Сохранение не подтверждено').evaluate().isNotEmpty,
-        'real RPC deadline after lost reply',
+        'UI deadline after suppressed authenticated owner reply',
       );
       expect(transport.replyDropped, true);
       expect(find.text('Сохранено'), findsNothing);
@@ -273,7 +273,7 @@ void main() {
       await click('Сохранить');
       await wait(
         () => find.text('Сохранение не подтверждено').evaluate().isNotEmpty,
-        'held original RPC timeout',
+        'UI deadline while original intent remains unsent',
       );
       expect(transport.requestHeld, true);
       expect(find.text('Сохранено'), findsNothing);

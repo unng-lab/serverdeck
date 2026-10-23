@@ -1,0 +1,6 @@
+# Disposable qualification inputs only. Public trust anchors are supplied by the
+# administrator; no runtime tool installs a source, key or unpinned package.
+deb [signed-by=/etc/apt/keyrings/serverdeck-executor.gpg] https://archive.ubuntu.com/ubuntu noble main universe
+deb [signed-by=/etc/apt/keyrings/serverdeck-executor.gpg] https://archive.ubuntu.com/ubuntu noble-updates main universe
+deb [signed-by=/etc/apt/keyrings/serverdeck-executor.gpg] https://security.ubuntu.com/ubuntu noble-security main universe
+deb [signed-by=/etc/apt/keyrings/serverdeck-executor.gpg] https://packages.clickhouse.com/deb lts main

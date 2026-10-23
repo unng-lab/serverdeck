@@ -175,7 +175,35 @@ void main() {
         expect(await host.command('disconnect'), 'DISCONNECTED');
         expect(await client.command('close'), 'CLOSED');
         expect(await host.command('close'), 'CLOSED');
+        final contender = await start('locald.exe', 'operational-client', name);
+        expect(await contender.next(), 'STARTUP_ERR:UNAUTHORIZED');
+        expect(
+          await contender.child.exitCode.timeout(const Duration(seconds: 5)),
+          0,
+        );
       });
+
+      test(
+        'trusted locald ownership probe cannot authenticate as an API client',
+        () async {
+          final name = pipeName();
+          final host = await start('locald.exe', 'server', name);
+          expect(await host.next(), 'READY');
+          final contender = await connect(host, 'locald.exe', name, 'locald');
+          expect(await contender.command('raw'), 'RAW_DENIED');
+          expect(
+            await contender.command('bootstrap-denied'),
+            'BOOTSTRAP_DENIED',
+          );
+          expect(await host.command('disconnect'), 'DISCONNECTED');
+          expect(await contender.command('close'), 'CLOSED');
+          final owner = await connect(host, 'serverdeck.exe', name, 'owner');
+          await echo(host, owner);
+          expect(await host.command('disconnect'), 'DISCONNECTED');
+          expect(await owner.command('close'), 'CLOSED');
+          expect(await host.command('close'), 'CLOSED');
+        },
+      );
 
       test(
         'native factories reject reciprocal bundle formats before pipe IO',
@@ -382,11 +410,7 @@ void main() {
             .copySync(p.join(fixture.path, 'stranger.exe'));
         final outside = File(compiled)
             .copySync(p.join(compiledRoot.path, 'serverdeck.exe'));
-        for (final path in [
-          p.join(fixture.path, 'locald.exe'),
-          stranger.path,
-          outside.path,
-        ]) {
+        for (final path in [stranger.path, outside.path]) {
           final accepting = server.command('accept');
           final bad = await start('unused', 'legacy-client', name, path: path);
           expect(await bad.next(), 'READY');
@@ -410,7 +434,6 @@ void main() {
           for (final entry in [
             ('serverdeck.exe', 'server'),
             ('mcp.exe', 'server'),
-            ('locald.exe', 'client'),
           ]) {
             final actor = await start(entry.$1, entry.$2, name);
             expect(await actor.next(), 'STARTUP_ERR:UNAUTHORIZED');

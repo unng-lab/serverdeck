@@ -349,6 +349,141 @@ Future<void> scenario(String root, String name) async {
   }
 
   try {
+    if (name.startsWith('owner-connection')) {
+      final owner = await start('serverdeck.exe');
+      await owner.exchange();
+      check(await owner.next() == 'AUTH:owner');
+      final request = registry.reserve(
+        owner.channel,
+        owner.response!.sessionId,
+        'servers.connect',
+      );
+      await fails(Future.sync(request.ownerConnectionContext), 'FORBIDDEN');
+      time = const Duration(seconds: 4);
+      await registry.completeAdmission(request);
+      final context = request.ownerConnectionContext();
+      check(identical(context, request.ownerConnectionContext()));
+      check(
+        context.belongsTo(registry) &&
+            !context.belongsTo(TrustedSessions(generation: generation)) &&
+            context.sessionId == request.sessionId &&
+            context.generation == generation &&
+            context.remaining == const Duration(seconds: 11),
+      );
+      request.complete();
+      await fails(Future.sync(request.ownerConnectionContext), 'UNAUTHORIZED');
+      if (name == 'owner-connection-physical') {
+        final observation = await owner.peer!.observeNextRevalidationForTest();
+        time = const Duration(milliseconds: 14900);
+        final proof = context.revalidate();
+        proof.ignore();
+        try {
+          await observation.reached.timeout(const Duration(seconds: 2));
+          await fails(proof, 'TIMEOUT');
+          var drained = false;
+          final settling = context.settled.then<void>((_) {
+            drained = true;
+          });
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          check(!drained);
+          await observation.release();
+          await settling;
+          check(drained);
+          time = const Duration(seconds: 15);
+          await fails(context.revalidate(), 'TIMEOUT');
+        } finally {
+          await observation.release();
+          await context.settled;
+        }
+      } else if (name == 'owner-connection-detach' ||
+          name == 'owner-connection-stop') {
+        if (name == 'owner-connection-stop') {
+          registry.stop();
+        } else {
+          owner.handshake!.close();
+        }
+        await context.detached;
+        await fails(context.revalidate(), 'UNAUTHORIZED');
+      } else if (name == 'owner-connection-native') {
+        final manifest = File(p.join(root, 'foundation.manifest.json'));
+        final original = manifest.readAsBytesSync();
+        try {
+          manifest.writeAsBytesSync([...original, 10]);
+          await fails(context.revalidate(), 'UNAUTHORIZED');
+          await context.detached;
+          check(registry.count == 0);
+        } finally {
+          manifest.writeAsBytesSync(original);
+        }
+      } else {
+        time = const Duration(seconds: 6);
+        check(context.remaining == const Duration(seconds: 9));
+        await context.revalidate();
+        final wrong = await registry.begin(
+          owner.channel,
+          owner.response!.sessionId,
+          'servers.trust.probe',
+        );
+        try {
+          await fails(Future.sync(wrong.ownerConnectionContext), 'FORBIDDEN');
+          check(context.matches(wrong));
+        } finally {
+          wrong.complete();
+        }
+        if (name == 'owner-connection-budget') {
+          final late = await registry.begin(
+            owner.channel,
+            owner.response!.sessionId,
+            'servers.connect',
+          );
+          try {
+            time = const Duration(seconds: 11);
+            await fails(Future.sync(late.ownerConnectionContext), 'TIMEOUT');
+            time = const Duration(seconds: 15);
+            await fails(context.revalidate(), 'TIMEOUT');
+          } finally {
+            late.complete();
+          }
+        } else {
+          await fails(
+            owner.peer!.observeNextRevalidationForTest(),
+            'UNSUPPORTED',
+          );
+          final other = await start('serverdeck.exe');
+          await other.exchange();
+          check(await other.next() == 'AUTH:owner');
+          final foreign = await registry.begin(
+            other.channel,
+            other.response!.sessionId,
+            'servers.connect',
+          );
+          try {
+            check(!context.matches(foreign));
+          } finally {
+            foreign.complete();
+          }
+          final mcp = await start('mcp.exe');
+          await mcp.exchange();
+          check(await mcp.next() == 'AUTH:mcp');
+          final denied = await registry.begin(
+            mcp.channel,
+            mcp.response!.sessionId,
+            'session.ping',
+          );
+          try {
+            await fails(
+              Future.sync(denied.ownerConnectionContext),
+              'FORBIDDEN',
+            );
+            check(!context.matches(denied));
+          } finally {
+            denied.complete();
+          }
+        }
+      }
+      await context.settled;
+      return;
+    }
     if (name.startsWith('owner-context')) {
       final owner = await start('serverdeck.exe');
       await owner.exchange();

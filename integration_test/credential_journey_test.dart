@@ -129,7 +129,7 @@ void main() {
       final client = current.bootstrap.client;
       expect(current.loaded, true);
       final owner = await Isolate.run(() async {
-        final environment = await ClientBootstrapEnvironment.verify();
+        final environment = await TrustedClientBootstrapEnvironment.verify();
         final descriptor = await environment.discovery();
         if (descriptor == null) throw StateError('OWNER_MISSING');
         try {

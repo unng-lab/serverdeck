@@ -5,17 +5,35 @@ import 'package:serverdeck_protocol/validation.dart';
 
 import '../profiles/mutation_coordinator.dart';
 import '../remote/trust_probes.dart';
+import '../remote/connections.dart';
 import 'operational_auth.dart';
 import 'owner_api.dart';
 
 /// Two format3 native-owner writes using the existing common foundation queue.
 final class TrustMutationOwnerApi implements TrustedOwnerApi {
-  TrustMutationOwnerApi({required this.service, required this.coordinator}) {
+  TrustMutationOwnerApi({required this.service, required this.coordinator})
+    : connections = null {
+    _initialize();
+  }
+  TrustMutationOwnerApi.withConnections({
+    required this.service,
+    required this.coordinator,
+    required this.connections,
+  }) {
+    _initialize();
+  }
+  final TrustedConnectionService? connections;
+  void _initialize() {
     if (!identical(service.store, coordinator.store))
       throw ArgumentError('INVALID_CHANNEL_CONFIGURATION');
     if (!coordinator.isTrusted) throw StateError('NOT_READY');
+    if (connections != null &&
+        (!identical(connections!.store, service.store) ||
+            !identical(connections!.sessions, service.sessions)))
+      throw ArgumentError('INVALID_CHANNEL_CONFIGURATION');
     _unsubscribe = service.sessions.onSessionDetached(_detach);
   }
+
   final HostTrustProbeService service;
   final TrustedMutationCoordinator coordinator;
   final _interests = <String, Set<String>>{};
@@ -58,10 +76,7 @@ final class TrustMutationOwnerApi implements TrustedOwnerApi {
     (_interests[session] ??= {}).add(interest);
     return TrustedOwnerInvocation(request, () async {
       _ready();
-      final lease = await service.sessions.beginTargetChange(
-        deadline: request.rpcRemaining,
-      );
-      try {
+      Future<Map<String, Object?>> effect() async {
         _ready();
         try {
           final budget = request.rpcRemaining;
@@ -77,6 +92,15 @@ final class TrustMutationOwnerApi implements TrustedOwnerApi {
           request,
         );
         return captureHostTrustResult(method, result.toJson());
+      }
+
+      if (connections != null)
+        return connections!.runOwnerMutation(request, effect);
+      final lease = await service.sessions.beginTargetChange(
+        deadline: request.rpcRemaining,
+      );
+      try {
+        return await effect();
       } finally {
         await lease.close();
       }
