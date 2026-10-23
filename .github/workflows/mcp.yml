@@ -3,12 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: Run automatic checks or prepare exact recipe metadata only
+        description: Run automatic checks, Linux executor qualification, or prepare recipe metadata
         type: choice
         required: true
         default: checks
         options:
           - checks
+          - qualify-executor
           - prepare-recipes
   push:
     branches: ['feature/**']
@@ -17,7 +18,7 @@ permissions:
   contents: read
 jobs:
   ssh-transport:
-    if: github.event_name != 'workflow_dispatch' || inputs.scope != 'prepare-recipes'
+    if: github.event_name != 'workflow_dispatch' || inputs.scope == 'checks'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -44,7 +45,7 @@ jobs:
       - name: Docker systemd and locked Ansible prerequisites
         run: bash tools/test-executor-container.sh
   windows:
-    if: github.event_name != 'workflow_dispatch' || inputs.scope != 'prepare-recipes'
+    if: github.event_name != 'workflow_dispatch' || inputs.scope == 'checks'
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
