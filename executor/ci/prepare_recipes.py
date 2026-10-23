@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import traceback
 import urllib.request
 
 SOURCE = Path('/opt/serverdeck-source')
@@ -24,6 +25,19 @@ KEY_PRIMARY = '3A9EA1193A97B548BE1457D48919F6BD2B48D754'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
        'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8'}
 phase = 'fixture'
+
+
+def diagnostic_locations(error):
+    allowed = {Path(__file__).resolve(): 'ci/prepare_recipes.py'}
+    allowed.update({SOURCE / 'serverdeck_executor' / name:
+                    'serverdeck_executor/' + name for name in
+                    ('apt.py', 'apt_gate.py', 'codec.py', 'journal.py', 'probes.py')})
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        label = allowed.get(Path(frame.filename))
+        if label is not None and 1 <= frame.lineno <= 99999:
+            result.append('RECIPE_PREPARE_LOCATION ' + label + ':' + str(frame.lineno))
+    return result[-8:]
 
 
 def check(value):
@@ -171,6 +185,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (Exception, KeyboardInterrupt):
+    except (Exception, KeyboardInterrupt) as error:
+        for location in diagnostic_locations(error):
+            print(location, file=sys.stderr)
         print('Recipe preparation failed at ' + phase + '.', file=sys.stderr)
         sys.exit(1)

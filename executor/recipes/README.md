@@ -130,6 +130,8 @@ source identifiers and line numbers (`APT_PREPARE_LOCATION`), never exception
 text, local variables, input values or arbitrary stderr. Ordinary CLI diagnostics
 remain unchanged unless that explicit option is supplied. Source positions are
 diagnostic evidence only; they cannot satisfy signature/dependency acceptance.
+The Docker-only helper applies the same registered-source-position policy to
+its own failures with `RECIPE_PREPARE_LOCATION`, including artifact retention.
 
 For python3-apt2.7.7, a newly marked package can report both `marked_install`
 and `marked_upgrade`. The [libapt state predicates](https://raw.githubusercontent.com/Debian/apt/2.8.0/apt-pkg/depcache.h)

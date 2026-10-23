@@ -13,6 +13,15 @@ from ci import prepare_recipes
 
 
 class PreparationSourcesTest(unittest.TestCase):
+    def test_helper_retention_error_does_not_print_private_inputs(self):
+        executor = Path(__file__).resolve().parents[1]
+        filename = str(executor / 'ci/prepare_recipes.py')
+        try:
+            exec(compile("raise ValueError('private input marker')", filename, 'exec'), {})
+        except ValueError as error:
+            output = prepare_recipes.diagnostic_locations(error)
+        self.assertEqual(output, ['RECIPE_PREPARE_LOCATION ci/prepare_recipes.py:1'])
+
     def test_failed_cli_forwards_only_registered_source_locations(self):
         errors = (b'private marker or command data\n'
                   b'APT_PREPARE_LOCATION serverdeck_executor/apt.py:123\n'
