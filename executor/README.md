@@ -47,6 +47,18 @@ the signed indexes, exact immutable descriptors and both supported install order
 without changing packages; empty catalog advertises install unavailable.
 Full runtime checks are deferred until the functional implementation is complete.
 
+The [owned Docker check](../tools/test-executor-container.sh) also runs the
+source [core controller](ci/core.py) through the installed no-argument sudo
+bridge and real supervisor. It requires actual preflight, host occupancy,
+queued cancellation, consumed authorization challenge, one Ansible motd effect
+and factual postcheck, same-plan replay, and durable receipt after supervisor
+restart. It emits its core proof only after those assertions; the outer harness
+emits success only after its labelled container/image removal succeeds. Pure
+executor unit tests run separately in the same Linux image. This core path has
+no recipe catalog and cannot qualify database installation, the Windows MCP/UI
+path or the complete executor fault matrix. A source change alone is not a
+successful run; actual acceptance evidence is recorded in the feature tasks.
+
 Administrator provisioning is implemented by `packaging/install.py`; it requires
 the already prepared pinned venv, an inactive supervisor and no occupied host job,
 preserves the hostUUID, writes a fixed no-argument sudo enrollment and does not

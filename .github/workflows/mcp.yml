@@ -1,6 +1,15 @@
 name: MCP automatic checks
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Run automatic checks or prepare exact recipe metadata only
+        type: choice
+        required: true
+        default: checks
+        options:
+          - checks
+          - prepare-recipes
   push:
     branches: ['feature/**']
   pull_request:
@@ -8,6 +17,7 @@ permissions:
   contents: read
 jobs:
   ssh-transport:
+    if: github.event_name != 'workflow_dispatch' || inputs.scope != 'prepare-recipes'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -24,13 +34,17 @@ jobs:
       - name: Real disposable OpenSSH qualification
         run: bash tools/test-ssh-container.sh
   executor-prerequisites:
+    if: github.event_name != 'workflow_dispatch' || inputs.scope != 'prepare-recipes'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Fixture cleanup on failed container start
+        run: python3 -m unittest discover -s tools/tests -p test_executor_fixture_cleanup.py -v
       - name: Docker systemd and locked Ansible prerequisites
         run: bash tools/test-executor-container.sh
   windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.scope != 'prepare-recipes'
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
@@ -83,3 +97,19 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
+  recipe-preparation:
+    if: github.event_name == 'workflow_dispatch' && inputs.scope == 'prepare-recipes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare signed exact-version metadata without installing applications
+        run: bash tools/test-executor-container.sh prepare-recipes
+      - name: Retain public catalog and preparation provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: recipe-catalog-preparation
+          path: .local/recipe-catalog-*/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

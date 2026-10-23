@@ -13,7 +13,7 @@ COPY . /opt/serverdeck-source
 # Dedicated fixture account; no password/key is baked into the image. The
 # owned parent harness injects an ephemeral password over docker-exec stdin.
 RUN useradd --uid 42001 --create-home --shell /bin/bash --groups adm,systemd-journal sdeck && \
-    printf 'HostKey /etc/ssh/ssh_host_ed25519_key\nPasswordAuthentication yes\nPermitRootLogin no\n' \
+    printf 'HostKey /etc/ssh/ssh_host_ed25519_key\nPasswordAuthentication yes\nPermitRootLogin no\nSetEnv PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' \
       > /etc/ssh/sshd_config.d/serverdeck-fixture.conf && \
     printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d
 STOPSIGNAL SIGRTMIN+3

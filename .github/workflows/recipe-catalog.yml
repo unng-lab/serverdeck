@@ -1,0 +1,21 @@
+name: Prepare pinned recipe catalogs
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare signed metadata and resolve exact checked-in versions
+        run: bash tools/test-executor-container.sh prepare-recipes
+      - name: Retain public preparation inputs and unqualified catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: recipe-catalog-preparation
+          path: .local/recipe-catalog-*/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
