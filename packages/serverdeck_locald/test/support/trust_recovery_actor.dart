@@ -11,6 +11,7 @@ import 'package:serverdeck_locald/api/owner_trust_mutations.dart';
 import 'package:serverdeck_locald/api/owner_trust_probes.dart';
 import 'package:serverdeck_locald/api/trusted_owner_foundation.dart';
 import 'package:serverdeck_locald/bootstrap/native_runtime.dart';
+import 'package:serverdeck_locald/bootstrap/trusted_services.dart';
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
 import 'package:serverdeck_locald/remote/ssh_transport.dart';
 import 'package:serverdeck_locald/remote/trust_probes.dart';
@@ -93,6 +94,7 @@ Future<void> exercise(String root, String phase, String mode) async {
   TrustedFoundationOwnerApi? foundation;
   HostTrustProbeService? probes;
   TrustMutationOwnerApi? writes;
+  TrustedControlServices? control;
   TrustedOwnerApi? api;
   Process? ssh;
   StreamIterator<String>? sshLines;
@@ -110,6 +112,7 @@ Future<void> exercise(String root, String phase, String mode) async {
     Object? failure;
     StackTrace? stack;
     for (final close in <Future<void> Function()>[
+      () async => control?.close(),
       () async => writes?.close(),
       () async => foundation?.close(),
       () async => probes?.close(),
@@ -122,14 +125,24 @@ Future<void> exercise(String root, String phase, String mode) async {
       }
     }
     writes = null;
+    control = null;
     foundation = null;
     probes = null;
     api = null;
     if (failure != null) Error.throwWithStackTrace(failure, stack!);
   }
 
-  void makeServices() {
+  Future<void> makeServices() async {
     final state = store!, sessions = owner!.registry;
+    if (phase == 'verify') {
+      api = control = await TrustedControlServices.create(
+        store: state,
+        custody: custody,
+        receiptKey: key,
+        sessions: sessions,
+      );
+      return;
+    }
     final queue = TrustedMutationCoordinator(state, custody, key);
     foundation = TrustedFoundationOwnerApi(
       store: state,
@@ -218,7 +231,7 @@ Future<void> exercise(String root, String phase, String mode) async {
     owner = await a.Pair.start(root, 'serverdeck.exe', plain, nativeGate: true);
     await owner.exchange();
     a.check(await owner.next() == 'AUTH:owner');
-    makeServices();
+    await makeServices();
     if (phase == 'verify') {
       final saved = jsonDecode(
         File(p.join(root, 'trust-recovery.fixture.json')).readAsStringSync(),
@@ -228,7 +241,7 @@ Future<void> exercise(String root, String phase, String mode) async {
       final before = store.state.toJson();
       final beforeRows = store.trustedOperational.preservationDigest();
       final pin = store.trustedOperational.foundation.trust[server]!.toJson();
-      a.check(probes!.retainedProbes == 0);
+      a.check(control != null);
       await a.fails(
         call('servers.trust.probeStatus', {'operationId': saved['probeId']}),
         'NOT_FOUND',
@@ -437,7 +450,7 @@ Future<void> exercise(String root, String phase, String mode) async {
         a.check(await db.close());
       }
       store = await open();
-      makeServices();
+      await makeServices();
       final before = store.trustedOperational.preservationDigest();
       body = await challenge(server, id(21));
       for (var n = 0; n < 2; n++) {

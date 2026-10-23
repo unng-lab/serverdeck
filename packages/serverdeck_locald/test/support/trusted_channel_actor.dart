@@ -11,7 +11,7 @@ import 'package:serverdeck_locald/api/owner_profiles.dart';
 import 'package:serverdeck_locald/api/trusted_owner_foundation.dart';
 import 'package:serverdeck_locald/profiles/mutation_coordinator.dart';
 import 'package:serverdeck_locald/api/owner_trust_probes.dart';
-import 'package:serverdeck_locald/api/owner_trust_mutations.dart';
+import 'package:serverdeck_locald/bootstrap/trusted_services.dart';
 import 'package:serverdeck_locald/remote/trust_probes.dart';
 import 'package:serverdeck_locald/remote/ssh_transport.dart';
 import 'package:serverdeck_locald/automation/profiles.dart';
@@ -966,7 +966,7 @@ Future<void> main(List<String> args) async {
         HostTrustProbeService? probes;
         SshTransportPool? probeTransports;
         TrustProbeOwnerApi? probeOwner;
-        TrustMutationOwnerApi? trustWrites;
+        TrustedControlServices? control;
         Process? sshFixture;
         StreamIterator<String>? sshLines;
         Future<String>? sshErrors;
@@ -1057,18 +1057,25 @@ Future<void> main(List<String> args) async {
                   },
                   requester: 'fixture',
                 );
-                probeTransports = SshTransportPool();
-                probes = HostTrustProbeService(
-                  store: store,
-                  sessions: registry,
-                  transports: probeTransports,
-                );
-                probeOwner = TrustProbeOwnerApi(probes);
-                if (mode == 'trust-writes')
-                  trustWrites = TrustMutationOwnerApi(
-                    service: probes,
-                    coordinator: foundationOwner.coordinator,
+                if (mode == 'trust-writes') {
+                  await foundationOwner.close();
+                  foundationOwner = null;
+                  control = await TrustedControlServices.create(
+                    store: store,
+                    custody: custody,
+                    receiptKey: key,
+                    sessions: registry,
                   );
+                  authority = control.authority;
+                } else {
+                  probeTransports = SshTransportPool();
+                  probes = HostTrustProbeService(
+                    store: store,
+                    sessions: registry,
+                    transports: probeTransports,
+                  );
+                  probeOwner = TrustProbeOwnerApi(probes);
+                }
               }
             } else {
               catalog = TrustedAutomationProfileService(
@@ -1083,13 +1090,15 @@ Future<void> main(List<String> args) async {
           }
           final services = Services(mode);
           final owner = Owner(mode);
-          final router = TrustedMcpRouter(
-            sessions: registry,
-            authority: authority,
-            services: catalog == null
-                ? services
-                : TrustedProfileCatalogMcpServices(catalog),
-          );
+          final router =
+              control?.router ??
+              TrustedMcpRouter(
+                sessions: registry,
+                authority: authority,
+                services: catalog == null
+                    ? services
+                    : TrustedProfileCatalogMcpServices(catalog),
+              );
           if (mode == 'store-blocked' || mode == 'owner-blocked')
             await store.close();
           var readinessCalls = 0;
@@ -1098,13 +1107,10 @@ Future<void> main(List<String> args) async {
             authority: authority,
             router: router,
             owner:
+                control ??
                 (probeOwner == null
                     ? null
-                    : TrustedOwnerApiGroup([
-                        foundationOwner!,
-                        probeOwner,
-                        if (trustWrites != null) trustWrites,
-                      ])) ??
+                    : TrustedOwnerApiGroup([foundationOwner!, probeOwner])) ??
                 foundationOwner ??
                 profileOwner ??
                 (ownerMode(mode) && mode != 'owner' ? owner : null),
@@ -1352,7 +1358,7 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           await cleanupCatalogFixture([
-            () async => trustWrites?.close(),
+            () async => control?.close(),
             () async => probes?.close(),
             () async => probeTransports?.close(),
             () async => foundationOwner?.close(),
