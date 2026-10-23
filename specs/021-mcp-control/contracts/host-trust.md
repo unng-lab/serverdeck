@@ -114,6 +114,14 @@ delete through actual commit/rollback and old-reader physical drain; active/
 unknown target jobs retain HOST_BUSY guards. Metadata changes remain allowed.
 Late old-epoch values cannot publish, observations keep old identity/stale.
 
+When the connection-aware format3 composition is implemented, use the explicit
+[reconciled target lease](connections.md#confirmed-target-changes-and-shutdown)
+for foundation and trust adapters: same native gate/open fence, actual stable
+pre/post identity delta, affected-grant retirement and physical connection
+drain before ACK. This avoids eager retirement closing MCP-only transports
+on metadata/no-effect/replayed or disjoint-target mutations. Standalone legacy
+target leases retain their existing eager retirement behavior.
+
 Add exactly foundation receipt operations servers.trust.confirm/revoke,
 validated as profile updates (nondeleted entityId=profileId, entityRevision>=2,
 entityRevision<=receipt storeRevision). Existing foundation10000 receipts,

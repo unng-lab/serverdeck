@@ -6,6 +6,17 @@ Authority-only services use the same registry's runAuthorityMutation helper with
 
 ## Ownership and construction
 
+For the connection-aware format3 composition only, the later
+[shared connection contract](connections.md#confirmed-target-changes-and-shutdown)
+defines a separate `beginReconciledTargetChange` lease. It shares this native
+gate/open-fence admission and physical lifetime, defers MCP retirement until
+the actual stable pre/post target delta is known, and retires bound grants
+covering changed targets plus unbound sessions. Empty delta preserves existing
+MCP sessions. The eager `beginTargetChange` API and its standalone/format2
+semantics below remain unchanged. This explicit staged path is necessary to
+preserve MCP-only transports on metadata, failed CAS, replay and disjoint edits;
+the wire cannot select retirement policy.
+
 OperationalSessions.withNativePublicationGate in packages/serverdeck_locald/lib/api/operational_sessions.dart is an asynchronous trusted locald composition factory. It requires a real locald-side OperationalPipePeer, validates the generation UUID and derives a gate for that registry generation through the peer's native bundle proof. It returns only after the generation keeper exists; the caller retains its peer. Failed construction does not return a registry or mutate targets, observes any late gate creation and closes the late gate. The factory has the existing5second RPC budget and fixed TIMEOUT/SERVICE_UNAVAILABLE failures; a wrong native self role fails UNAUTHORIZED before creating a gate. No caller-supplied role, transport, lock or authority provider can replace native proof.
 
 The existing ordinary OperationalSessions constructor remains useful for bootstrap components that have no mutation gate. Its beginTargetChange fails NOT_READY before admitting a mutation; it never falls back to an unlocked mutation. Runtime activation must use the native factory before MCP intake. Wiring installed startup and every target/credential/trust mutator remains T109/T110 and original service tasks; this component alone enables no readiness feature.

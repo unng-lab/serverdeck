@@ -4,6 +4,8 @@ This guide describes the intended implemented entry points. They do not exist me
 
 ## Prerequisites
 
+For T170–T173 shared connection qualification, follow the [connection contract](contracts/connections.md). After those tasks exist, run `dart test test/mcp/connections_native_test.dart` from packages/serverdeck_locald with the existing actual DPAPI/native fixture and hash-locked loopback SSH fixture. Require two owner windows plus scoped MCP to share one authentication, cross-client disconnect isolation, all owner handle/TTL/quota boundaries and confirmed target/credential/trust/delete changes to drain old transport before ACK. Run existing trusted-services, strict-channel, recovery and portable/actual SSH suites serially. These are planned acceptance commands; missing tests or a passed low-level transport suite alone do not close this stage.
+
 Pinned Windows SDK/build tools and existing foundation native bundle requirements; current-user protected disposable workspace, no real stored profiles. Ubuntu24.04 amd64/systemd disposable Docker fixture on a GitHub Ubuntu runner (or an explicitly owned VM) with owned SSH identity, Python3.12/python3-apt/systemd/sudo/journald and prepared signed apt repositories/packages. Executor owner provisioning is explicit; MCP read/author tools never install it. See [runtime](contracts/executor.md), [profiles](contracts/profiles.md).
 
 ## Local checks after implementation

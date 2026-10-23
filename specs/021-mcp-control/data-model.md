@@ -10,6 +10,8 @@ New automation mutation receipts have their own permanent10000-record quota: no 
 
 ## Shared validation
 
+Ephemeral connection entries, exact public identity/snapshot fields, owner operation states and bounded retention are specified in [shared connections](contracts/connections.md). They are in-memory service state, never a new Isar collection or durable authority. Stored trust and credentials retain their existing schemas.
+
 Schema3 adds the exact StoredHostTrust row, independent trust revision transitions and full16-collection graph in the [host trust contract](contracts/host-trust.md). Schema1/2 equality rules and closed registries remain unchanged. The contract also defines2→3 migration preserving all15 old collections and explicit format3 remote composition; no owner/MCP service becomes ready from model parsing alone.
 
 Complete retained graph loading, historical reference rules and operational startup composition are specified in the [loading contract](contracts/loading.md). Historical grants/targets remain references rather than renewed live authority; current policy is checked at admission. Delegation metadata has a fixed1000-row workspace budget, including revoked/pinned rows, with RESOURCE_LIMIT before new admission and no automatic eviction.

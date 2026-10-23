@@ -4,6 +4,8 @@
 
 ## MCP transport
 
+Connection composition decision (T170): use one locald connection service over the already-owned transport pool, keyed by profile and connection/credential/trust revisions, with session-owned interests and explicit reconnect. Rationale: 001 AC-SVC-2C and FR-002-LOCAL-05 plus021 AC-MCP-1B require cross-window invalidation and a shared two-transport limit. Reconcile after the actual coordinator effect/readback outside the store queue while retaining the native target fence; this avoids a publication callback waiting on authorization that itself waits for store stability. Alternatives rejected: per-client pools multiply limits; automatic reconnect violates explicit connection recovery; awaiting physical reads inside store publication can deadlock. Exact interfaces, defaults, lifecycle and acceptance are in [connections](contracts/connections.md). This records design, not implemented behavior.
+
 Decision: standard stdio JSON-RPC MCP 2025-11-25, compatibility subset2025-06-18, tools discovery/calls only. Rationale: independent local clients without public ingress or vendor SDK. Alternative Streamable HTTP would require network authorization, origins and lifecycle beyond first scope. [Transports](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx), [tools](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx), [lifecycle](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/lifecycle.mdx).
 
 ## Ansible placement

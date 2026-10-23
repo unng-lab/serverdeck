@@ -12,6 +12,16 @@ The trusted OperationalOwnerApi.prepare interface receives required named `reque
 
 ## Admission and execution
 
+The later connection-aware format3 composition uses the separate reconciled
+native lease and exact pre/post identity comparison in
+[shared connections](connections.md#confirmed-target-changes-and-shutdown).
+Its explicit foundation/trust adapters preserve MCP-only transports for an
+empty delta and retire grants covering actual changed targets before ACK.
+Existing standalone adapters and format2 retain the eager target fence below;
+that constructor is not installed in the connected composition. No optional
+wire flag or fallback changes these paths. Retain eager-fence tests and add
+MCP-only preservation/queued-output tests for the new path.
+
 OperationalSessions separates initial admission concretely: synchronous reserve(channel,sessionId,method) performs existing live-session identity/role/method and per-session16 quota checks, reserves its ordinary request interest, and returns the opaque request without native IO. completeAdmission(request) owns and shares one initial-proof future: revalidate the actual peer within the request remaining5second budget, renew the session lease only on successful proof, and set a private initial-proof-success marker on that exact live request. Foreign/completed/stopped requests fail; no caller can set the marker. Existing begin remains a compatibility wrapper over reserve followed by completeAdmission, preserving all existing callers' initial-proof guarantee. Late proof after timeout/disconnect cannot set the marker or activate an invocation.
 
 OperationalApiServer uses reserve synchronously after envelope validation. For an owner route it then checks owner role/exact method and readiness and calls the supporting adapter's synchronous prepare before invoking completeAdmission or any other asynchronous/native wait. prepare may validate/copy/canonicalize/register a reservation, but cannot prepare credentials, write, acquire a native gate or read a method result. The subsequent completeAdmission must succeed before invocation execution. Builtin/MCP routes still complete native admission before accessing their payload/object data; denied role/method never calls owner preparation. An unsupported or validation-failed call retains the existing authenticated safe-error response path without effects.
