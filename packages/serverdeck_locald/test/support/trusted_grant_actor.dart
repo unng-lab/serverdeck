@@ -148,6 +148,15 @@ Future<void> controlled(
   }
 
   try {
+    if (mode == 'drain-empty') {
+      final closing = authority.closeAndDrain();
+      a.check(identical(closing, authority.closeAndDrain()));
+      await closing;
+      a.check(authority.pendingOpens == 0 && !authority.belongsTo(store));
+      authority.close();
+      a.check(identical(closing, authority.closeAndDrain()));
+      return;
+    }
     if (mode == 'replay') {
       final first = await a.Pair.start(root, 'mcp.exe', registry);
       pairs.add(first);
@@ -172,7 +181,7 @@ Future<void> controlled(
       );
       return;
     }
-    final count = mode == 'pool' ? 4 : 1;
+    final count = mode == 'pool' || mode == 'late-drain-pool' ? 4 : 1;
     protection.pauseNext = count;
     for (var n = 0; n < count; n++) {
       await start();
@@ -184,7 +193,42 @@ Future<void> controlled(
       }
     }
     a.check(authority.pendingOpens == count);
-    if (mode == 'pool') {
+    if (mode.startsWith('late-drain')) {
+      if (mode == 'late-drain-timeout') {
+        a.check(await outcomes.single == 'TIMEOUT');
+      } else if (mode == 'late-drain-pool') {
+        authority.close(); // Drain also works after the synchronous stop.
+      }
+      final closing = authority.closeAndDrain();
+      a.check(identical(closing, authority.closeAndDrain()));
+      a.check(!authority.belongsTo(store) && authority.pendingOpens == count);
+      for (final outcome in outcomes) {
+        a.check(
+          await outcome ==
+              (mode == 'late-drain-timeout' ? 'TIMEOUT' : 'UNAUTHORIZED'),
+        );
+      }
+      var drained = false;
+      closing.then<void>((_) => drained = true).ignore();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      a.check(!drained);
+      if (count > 1) {
+        for (final gate in protection.waiting.take(count - 1)) gate.complete();
+        final watch = Stopwatch()..start();
+        while (authority.pendingOpens != 1) {
+          a.check(watch.elapsed < const Duration(seconds: 3));
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        a.check(!drained);
+      }
+      protection.release();
+      await closing.timeout(const Duration(seconds: 3));
+      a.check(
+        authority.pendingOpens == 0 &&
+            drained &&
+            identical(closing, authority.closeAndDrain()),
+      );
+    } else if (mode == 'pool') {
       await start();
       a.check(await outcomes.last == 'RESOURCE_LIMIT');
       a.check(authority.pendingOpens == 4 && protection.waiting.length == 4);
@@ -218,6 +262,7 @@ Future<void> controlled(
   } finally {
     protection.release();
     for (final request in requests) request.complete();
+    await authority.closeAndDrain();
     for (final pair in pairs) await pair.close();
   }
 }
@@ -438,7 +483,10 @@ Future<void> scenario(
       );
       return;
     }
-    if (mode == 'pool' || mode == 'replay' || mode.startsWith('late-')) {
+    if (mode == 'pool' ||
+        mode == 'replay' ||
+        mode == 'drain-empty' ||
+        mode.startsWith('late-')) {
       await controlled(root, mode, state, auth, registry, protection, write);
       return;
     }

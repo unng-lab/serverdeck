@@ -14,6 +14,11 @@ final class OperationalMcpAuthority extends _McpAuthority {
 /// Format3 authority. Only trusted native requests can bind this authority.
 final class TrustedMcpAuthority extends _McpAuthority {
   TrustedMcpAuthority(super.store, {super.clock});
+
+  /// Stop authority synchronously and await all already charged open work,
+  /// including late key disposal after a caller timeout or disconnect.
+  /// The runtime still owns the registry, native peers and store teardown.
+  Future<void> closeAndDrain() => _closeAndDrain();
   @override
   ClientGrantRecord _read(String id) =>
       _store.currentTrustedMcpGrant(id, at: _clock());
@@ -33,6 +38,7 @@ sealed class _McpAuthority {
   final _interests = <Completer<void>>{};
   bool _closed = false;
   int _working = 0;
+  Completer<void>? _draining;
   int get pendingOpens => _working;
   bool belongsTo(StateStore store) => identical(_store, store) && !_closed;
 
@@ -89,6 +95,15 @@ sealed class _McpAuthority {
     _closed = true;
     for (final interest in _interests) interest.complete();
     _interests.clear();
+  }
+
+  Future<void> _closeAndDrain() {
+    final previous = _draining;
+    if (previous != null) return previous.future;
+    final done = _draining = Completer<void>();
+    close();
+    if (_working == 0) done.complete();
+    return done.future;
   }
 }
 
@@ -190,6 +205,7 @@ extension _GrantOpen<P> on _GrantSessionRequest<P> {
     } finally {
       owned?.close();
       authority._working--;
+      if (authority._working == 0) authority._draining?.complete();
     }
   }
 }

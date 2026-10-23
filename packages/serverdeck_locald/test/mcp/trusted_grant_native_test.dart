@@ -56,6 +56,10 @@ void main() {
     'late-close',
     'late-repeat',
     'late-timeout',
+    'drain-empty',
+    'late-drain',
+    'late-drain-timeout',
+    'late-drain-pool',
   ]) {
     test(
       'actual protected trusted native grant open $mode',
