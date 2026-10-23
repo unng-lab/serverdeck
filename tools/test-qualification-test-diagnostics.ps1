@@ -223,7 +223,7 @@ try {
     if($LASTEXITCODE -eq 0){throw 'Controlled assertion unexpectedly passed.'}
 } finally {Pop-Location}
 $rawAssert=[IO.File]::ReadAllLines($assertReport)
-foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type','invalid-line','changed-source','unknown-source','actor-changed','frames-bound','joint-frames','plain-assertion'))) {
+foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type','invalid-line','changed-source','unknown-source','actor-changed','frames-bound','joint-frames','plain-assertion','exit-signed','exit-unsigned','exit-zero','exit-too-low','exit-too-high','exit-prefixed','exit-nonnumeric','exit-no-line-end'))) {
     $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
     [void][IO.Directory]::CreateDirectory($caseFixture)
     $mode=if($variant -in $clientModes){$variant}else{'owner'}
@@ -246,6 +246,16 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
                 throw 'Expected real Dart assertion with nested reason.'
             }
             if($variant -ceq 'plain-assertion') {$event.error='Expected: <0>\nActual: <1>\n'+$privateMarker}
+            switch($variant) {
+                'exit-signed' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-1073741819>')}
+                'exit-unsigned' {$event.error=$event.error.Replace('Actual: <1>','Actual: <3221225477>')}
+                'exit-zero' {$event.error=$event.error.Replace('Actual: <1>','Actual: <0>')}
+                'exit-too-low' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483649>')}
+                'exit-too-high' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967296>')}
+                'exit-prefixed' {$event.error=$privateMarker+"`n"+$event.error}
+                'exit-nonnumeric' {$event.error=$event.error.Replace('Actual: <1>',('Actual: <'+$privateMarker+'>'))}
+                'exit-no-line-end' {$event.error="Expected: <0>`n  Actual: <1>"}
+            }
             if($variant -ceq 'frames-bound') {
                 $event.error+="`n"+((@(40,40,41,42,43,999999)|ForEach-Object{"#0 check (${actorUri}:$($_):1)"}) -join "`n")
             }
@@ -276,8 +286,12 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
     $expectCase=$variant -notin @('unknown-client','unknown-name','name-type','invalid-line','changed-source','unknown-source')
     if(($expectCase -and $failure.fixtureCase -cne ('trusted-client-'+$mode)) -or
         (-not $expectCase -and $null -ne $failure.fixtureCase)){throw ('Client fixed case mismatch: '+$variant)}
-    $frameCount=if($variant -in @('actor-changed','plain-assertion')){0}elseif($variant -in @('frames-bound','joint-frames')){3}else{1}
-    if($failure.sourceFrames.Count -ne $frameCount -or $null -ne $failure.safeCode -or $null -ne $failure.failureKind){throw ('Client nested frame bounds mismatch: '+$variant)}
+    $frameCount=if($variant -in @('actor-changed','plain-assertion','exit-no-line-end')){0}elseif($variant -in @('frames-bound','joint-frames')){3}else{1}
+    $expectExit=$expectCase -and $variant -notin @('plain-assertion','exit-zero','exit-too-low','exit-too-high','exit-prefixed','exit-nonnumeric','exit-no-line-end')
+    $exitCode=if($variant -ceq 'exit-signed'){-1073741819L}elseif($variant -ceq 'exit-unsigned'){3221225477L}else{1L}
+    if(($expectExit -and ($failure.failureKind -cne 'fixture-exit' -or $failure.fixtureExitCode -ne $exitCode)) -or
+        (-not $expectExit -and ($null -ne $failure.failureKind -or $null -ne $failure.fixtureExitCode))) {throw ('Client fixed exit projection mismatch: '+$variant)}
+    if($failure.sourceFrames.Count -ne $frameCount -or $null -ne $failure.safeCode){throw ('Client nested frame bounds mismatch: '+$variant)}
     foreach($frame in $failure.sourceFrames){
         if($variant -ceq 'joint-frames' -and $frame.file -ceq $clientSource -and $frame.line -eq 84){continue}
         if($frame.file -cne $actorSource -or $frame.line -notin @(40,41,42)){throw 'Client nested source mismatch.'}
@@ -287,6 +301,7 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
     if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled projection claimed qualification.'}
 }
 'QUALIFICATION_REAL_ASSERTION_TRUSTED_CLIENT_31_FIXED_CASES_NESTED_SOURCE_HASH_BOUNDS_PRIVACY_NEGATIVES_PASSED'
+'QUALIFICATION_TRUSTED_CLIENT_FIXED_EXIT_SIGNED_UNSIGNED_RANGE_SHAPE_SOURCE_PRIVACY_NEGATIVES_PASSED'
 $fixture
 $invalidFixture
 exit 0

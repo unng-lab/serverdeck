@@ -124,7 +124,7 @@ function Write-NativeQualificationTestFailure {
                             }
                             $safeCode=$null
                             if([string]$event.error -cmatch '^Bad state: (IDENTITY_UNAVAILABLE|PROTECTION_UNAVAILABLE|SECURITY_UNAVAILABLE|UNSAFE_PATH|RESOURCE_LIMIT|SERVICE_UNAVAILABLE|INTERNAL|WORKSPACE_CHILD_FAILED|WORKSPACE_CHILD_TIMEOUT)$'){$safeCode=$Matches[1]}
-                            $fixtureCase=$null;$failureKind=$null
+                            $fixtureCase=$null;$failureKind=$null;$fixtureExitCode=$null
                             if($declarationLine) {
                                 if([string]$event.error -cmatch '^TimeoutException(?: after [0-9]{1,3}:[0-5][0-9]:[0-5][0-9]\.[0-9]{6})?:') {
                                     $failureKind='timeout'
@@ -163,8 +163,18 @@ function Write-NativeQualificationTestFailure {
                                     }
                                 }
                             }
+                            # Only the known client's first numeric exit assertion is
+                            # projected. A nonzero exit is evidence, not a crash cause.
+                            if($fixtureCase -clike 'trusted-client-*' -and
+                                [string]$event.error -cmatch '\AExpected: <0>\r?\n[ \t]*Actual: <(?<exit>-?[0-9]{1,10})>\r?\n') {
+                                $candidateExit=[long]$Matches['exit']
+                                if($candidateExit -ne 0 -and $candidateExit -ge -2147483648 -and $candidateExit -le 4294967295) {
+                                    $fixtureExitCode=$candidateExit
+                                    $failureKind='fixture-exit'
+                                }
+                            }
                             # Names, messages, raw stack, stdout and private paths never enter proof.
-                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode;fixtureCase=$fixtureCase;failureKind=$failureKind})
+                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode;fixtureCase=$fixtureCase;failureKind=$failureKind;fixtureExitCode=$fixtureExitCode})
                         }
                         'done' {$complete=$event.success -eq $false}
                     }
