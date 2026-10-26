@@ -60,7 +60,13 @@ try {
                 Push-Location (Join-Path $NativeIsarRepository ('packages/' + $package))
                 try {
                     Invoke-NativeQualificationPhase ($package + '-analyze') { Invoke-FoundationCommand $FoundationDart @('analyze') }
-                    Invoke-NativeQualificationPhase ($package + '-tests') { Invoke-FoundationCommand $FoundationDart @('test','--file-reporter',('json:'+(Join-Path $script:qualificationDirectory ($package+'-tests.machine.jsonl')))) }
+                    Invoke-NativeQualificationPhase ($package + '-tests') {
+                        $qualificationTestArguments=@('test','--file-reporter',('json:'+(Join-Path $script:qualificationDirectory ($package+'-tests.machine.jsonl'))))
+                        if($package -ceq 'serverdeck_locald') {
+                            $qualificationTestArguments+=@('--concurrency=1','--fail-fast')
+                        }
+                        Invoke-FoundationCommand $FoundationDart $qualificationTestArguments
+                    }
                 } finally { Pop-Location }
             }
             $bundles=[Collections.Generic.List[object]]::new()
