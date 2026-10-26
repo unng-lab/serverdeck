@@ -4,15 +4,29 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
-import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/operational_auth_client.dart';
 
 import 'automation_controller.dart';
+import 'automation_sections.dart';
+import 'automation_presentation.dart';
+import '../servers/server_controller.dart';
+import '../theme/motion.dart';
+import '../theme/brand_tokens.dart';
+import '../ui/deck_components.dart';
 
 class AutomationPanel extends StatefulWidget {
-  const AutomationPanel({super.key, required this.client, this.serverId});
+  const AutomationPanel({
+    super.key,
+    required this.client,
+    this.serverId,
+    this.installationCatalog = false,
+    this.serverProfiles = const [],
+  });
   final TrustedApiClient client;
   final String? serverId;
+  final bool installationCatalog;
+  final List<ProfileView> serverProfiles;
   @override
   State<AutomationPanel> createState() => _AutomationPanelState();
 }
@@ -20,44 +34,139 @@ class AutomationPanel extends StatefulWidget {
 class _AutomationPanelState extends State<AutomationPanel> {
   late AutomationController model;
   Timer? _expiry;
+  ServerController? _recipeConnection;
+  bool _openingRecipes = false;
+  String? _recipeConnectionError;
+  String? _invalidPlanId, _invalidPlanReason;
+  final _planAnchor = GlobalKey();
+  final _modalChanges = ValueNotifier<int>(0);
+  final _modalObservers = <VoidCallback>{};
+  final _presentation = AutomationUiOperation();
   String pretty(Object? value) =>
       const JsonEncoder.withIndent('  ').convert(value);
   @override
   void initState() {
     super.initState();
+    _presentation.addListener(_presentationChanged);
     _create();
   }
+
+  void _presentationChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _present(
+    AutomationUiPhase phase,
+    Future<void> Function() action, {
+    VoidCallback? onAdmitted,
+    ValueChanged<AutomationUiResult>? onCompleted,
+  }) {
+    final captured = model;
+    if (captured.busy ||
+        captured.client.isClosed ||
+        phase.durable &&
+            !(phase == AutomationUiPhase.retry
+                ? captured.canRetry
+                : captured.canMutate)) {
+      return action();
+    }
+    return _presentation.run(
+      phase,
+      () {
+        final work = action();
+        if (captured.busy) onAdmitted?.call();
+        return work;
+      },
+      result: () {
+        final result = _result(captured);
+        onCompleted?.call(result);
+        return result;
+      },
+      admitted: () => captured.busy,
+    );
+  }
+
+  AutomationUiResult _result(AutomationController controller) =>
+      AutomationUiResult(
+        errorCode: controller.error,
+        pendingLabel: controller.pendingLabel,
+      );
 
   void _create() {
     model = AutomationController(
       client: widget.client,
       serverId: widget.serverId,
     )..addListener(_changed);
-    model.initialize().ignore();
+    _presentation.reset();
+    _present(AutomationUiPhase.initialize, model.initialize).ignore();
+    _openingRecipes = false;
+    _recipeConnectionError = null;
+    _invalidPlanId = _invalidPlanReason = null;
+    _recipeConnection = widget.installationCatalog && widget.serverId != null
+        ? ServerController(client: widget.client, profileId: widget.serverId!)
+        : null;
   }
 
   @override
   void didUpdateWidget(covariant AutomationPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.client, widget.client) ||
-        oldWidget.serverId != widget.serverId) {
+        oldWidget.serverId != widget.serverId ||
+        oldWidget.installationCatalog != widget.installationCatalog) {
       _expiry?.cancel();
       model.removeListener(_changed);
       model.dispose();
+      _recipeConnection?.dispose();
       _create();
     }
+    _notifyModalContext();
   }
+
+  void _notifyModalContext() {
+    // Retire consent synchronously, even if metadata changes back before paint.
+    for (final observe in List<VoidCallback>.of(_modalObservers)) {
+      observe();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _modalChanges.value++;
+    });
+  }
+
+  AutomationProfileRecord? _profileForPlan(Map<String, Object?> plan) =>
+      [if (model.profile != null) model.profile!, ...model.profiles]
+          .where(
+            (row) =>
+                row.id == plan['profileId'] &&
+                row.workspaceId == plan['workspaceId'],
+          )
+          .firstOrNull;
 
   void _changed() {
     _expiry?.cancel();
     if (!mounted) return;
+    _presentation.observeOwner(_result(model));
+    final planId = model.plan?['id'] as String?;
+    if (_invalidPlanId != planId) _invalidPlanId = _invalidPlanReason = null;
+    if (planId != null &&
+        const {
+          'PLAN_STALE',
+          'PLAN_EXPIRED',
+          'TRUST_CHANGED',
+        }.contains(model.error)) {
+      _invalidPlanId = planId;
+      _invalidPlanReason = message(model.error!);
+    }
     setState(() {});
+    _notifyModalContext();
     final expiry = DateTime.tryParse('${model.plan?['expiresAt']}');
     if (expiry != null && expiry.isAfter(DateTime.now())) {
       _expiry = Timer(
         expiry.difference(DateTime.now()) + const Duration(milliseconds: 1),
         () {
-          if (mounted) setState(() {});
+          if (mounted) {
+            setState(() {});
+            _notifyModalContext();
+          }
         },
       );
     }
@@ -66,102 +175,244 @@ class _AutomationPanelState extends State<AutomationPanel> {
   @override
   void dispose() {
     _expiry?.cancel();
+    _presentation.removeListener(_presentationChanged);
+    _presentation.dispose();
     model.removeListener(_changed);
     model.dispose();
+    _recipeConnection?.dispose();
+    _modalChanges.dispose();
     super.dispose();
   }
 
-  Map<String, Object?> parse(String source) =>
-      StrictCodec().decode(utf8.encode(source), maxBytes: 256 * 1024);
-  Widget jsonView(String title, Object? value) => ExpansionTile(
-    title: Text(title),
-    children: [
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: SelectableText(
-            pretty(value),
-            style: const TextStyle(fontFamily: 'monospace'),
-          ),
-        ),
-      ),
-    ],
-  );
-  Widget button(String label, VoidCallback action, {bool mutation = false}) =>
-      OutlinedButton(
-        onPressed:
-            (mutation
-                ? model.canMutate
-                : !model.busy && !widget.client.isClosed)
-            ? action
-            : null,
-        child: Text(label),
-      );
+  Future<void> _loadRecipes() async {
+    final captured = model, connection = _recipeConnection;
+    if (connection == null) {
+      await _present(AutomationUiPhase.catalog, captured.loadRecipes);
+      return;
+    }
+    if (_openingRecipes) return;
+    setState(() {
+      _openingRecipes = true;
+      _recipeConnectionError = null;
+    });
+    try {
+      // Only this explicit user action connects; page construction never does.
+      await connection.connect();
+      if (!mounted || !identical(captured, model)) return;
+      if (connection.error != null) {
+        setState(() => _recipeConnectionError = connection.error);
+        return;
+      }
+      await _present(AutomationUiPhase.catalog, captured.loadRecipes);
+    } finally {
+      if (mounted && identical(captured, model)) {
+        setState(() => _openingRecipes = false);
+      }
+    }
+  }
+
+  Future<void> _createRecipePlan(String digest) async {
+    final captured = model;
+    await _present(
+      AutomationUiPhase.recipePlan,
+      () => captured.createRecipePlan(digest),
+    );
+    if (!mounted || !identical(captured, model) || captured.error != null)
+      return;
+    final id = captured.plan?['id'];
+    if (id == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(captured, model) || model.plan?['id'] != id)
+        return;
+      final anchor = _planAnchor.currentContext;
+      if (anchor != null) Scrollable.ensureVisible(anchor).ignore();
+    });
+  }
+
+  Map<String, Object?> parse(String source) => parseAutomationDraft(source);
 
   Future<void> _jsonEditor(
     String title,
     Map<String, Object?> initial,
-    Future<void> Function(Map<String, Object?>) submit,
-  ) async {
+    Future<void> Function(Map<String, Object?>) submit, {
+    required AutomationUiPhase phase,
+    String? purpose,
+    String? target,
+    Map<String, Object?>? contextDetails,
+    List<String> targetServerIds = const [],
+    bool Function()? contextCurrent,
+  }) async {
+    final captured = model;
+    final serverProfiles = List<ProfileView>.unmodifiable(
+      widget.serverProfiles,
+    );
     final input = TextEditingController(text: pretty(initial));
-    String? error;
+    Map<String, Object?>? preview = initial;
+    final submission = AutomationJsonDraftSubmission(phase);
+    AutomationUiResult? ownResult;
+    var invalidated = false;
+    bool current(Map<String, Object?>? value) =>
+        mounted &&
+        identical(captured, model) &&
+        !captured.client.isClosed &&
+        (contextCurrent?.call() ?? true) &&
+        automationTargetsUnchanged(
+          [
+            ...targetServerIds,
+            if (value?['serverIds'] is List)
+              ...(value!['serverIds'] as List).whereType<String>(),
+          ],
+          serverProfiles,
+          widget.serverProfiles,
+        );
+    final reviewCurrent = automationReviewGuard(() => current(preview));
+    void observe() {
+      invalidated = invalidated || !reviewCurrent();
+      submission.observe(
+        current: !invalidated,
+        pendingLabel: captured.pendingLabel,
+      );
+    }
+
+    _modalObservers.add(observe);
     try {
       if (!mounted) return;
-      await showDialog<void>(
+      await showMotionDialog<void>(
         context: context,
-        builder: (dialog) => StatefulBuilder(
-          builder: (context, update) => AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: 720,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: input,
-                      minLines: 8,
-                      maxLines: 18,
-                      decoration: const InputDecoration(labelText: 'JSON'),
-                      style: const TextStyle(fontFamily: 'monospace'),
-                    ),
-                    if (error != null) Text(error!),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialog),
-                child: const Text('Закрыть'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final Future<void> work;
+        barrierDismissible: true,
+        builder: (dialog) => ListenableBuilder(
+          listenable: Listenable.merge([submission, _modalChanges]),
+          builder: (context, _) => StatefulBuilder(
+            builder: (context, update) {
+              observe();
+              bool live() =>
+                  mounted &&
+                  identical(captured, model) &&
+                  !captured.client.isClosed &&
+                  dialog.mounted;
+              bool dispatchCurrent() =>
+                  live() && !invalidated && current(preview);
+              void close() {
+                if (live()) Navigator.pop(dialog);
+              }
+
+              return AutomationJsonEditorDialog(
+                title: title,
+                input: input,
+                error: submission.error,
+                preview: preview,
+                purpose: purpose,
+                target: target,
+                contextDetails: contextDetails,
+                serverProfiles: serverProfiles,
+                targetServerIds: targetServerIds,
+                contextCurrent: !invalidated,
+                saving: submission.saving,
+                requestRetained: submission.requestRetained,
+                canContinue: phase.durable
+                    ? captured.canMutate
+                    : !captured.busy,
+                ownerStatus:
+                    !live() ||
+                        !(submission.saving || submission.requestRetained)
+                    ? null
+                    : AutomationStatusSection(
+                        busy: submission.saving,
+                        openingRecipes: false,
+                        canRetry:
+                            !invalidated &&
+                            submission.requestRetained &&
+                            captured.canRetry,
+                        errorCode: phase.durable ? null : submission.errorCode,
+                        writeOutcome: submission.writeOutcome,
+                        pendingLabel: submission.requestRetained
+                            ? phase.label
+                            : null,
+                        operationLabel: submission.saving ? phase.label : null,
+                        onRetry: () => submission
+                            .retrySaved(
+                              current: dispatchCurrent,
+                              completionCurrent: live,
+                              canRetry: () => captured.canRetry,
+                              retry: (admitted) {
+                                ownResult = null;
+                                return _present(
+                                  AutomationUiPhase.retry,
+                                  captured.retryPending,
+                                  onAdmitted: admitted,
+                                  onCompleted: (value) => ownResult = value,
+                                );
+                              },
+                              result: () => ownResult,
+                              close: close,
+                            )
+                            .ignore(),
+                        onDismiss: () => submission.dismissSaved(
+                          completionCurrent: live,
+                          dismiss: () => _presentation.dismiss(
+                            captured.dismissPending,
+                            () => _result(captured),
+                          ),
+                          pendingLabel: () => captured.pendingLabel,
+                        ),
+                        onStopWaiting: () {
+                          if (live() && submission.saving)
+                            captured.cancelInterest().ignore();
+                        },
+                      ),
+                onChanged: (_) => update(() {
                   try {
-                    final value = parse(input.text);
-                    work = submit(value);
-                  } catch (_) {
-                    update(() => error = 'Проверьте JSON и типы значений');
-                    return;
+                    preview = parse(input.text);
+                  } on FormatException {
+                    preview = null;
                   }
-                  if (dialog.mounted) Navigator.pop(dialog);
-                  await work;
+                }),
+                onClose: () => Navigator.pop(dialog),
+                onContinue: () async {
+                  observe();
+                  if (invalidated) return;
+                  await submission.submit(
+                    source: input.text,
+                    current: dispatchCurrent,
+                    draftCurrent: current,
+                    completionCurrent: live,
+                    canSubmit: () =>
+                        phase.durable ? captured.canMutate : !captured.busy,
+                    targetsAvailable: (value) => automationTargetsAvailable([
+                      ...targetServerIds,
+                      if (value['serverIds'] is List)
+                        ...(value['serverIds'] as List).whereType<String>(),
+                    ], serverProfiles),
+                    submit: (value, admitted) {
+                      ownResult = null;
+                      return _present(
+                        phase,
+                        () => submit(value),
+                        onAdmitted: admitted,
+                        onCompleted: (value) => ownResult = value,
+                      );
+                    },
+                    result: () => ownResult,
+                    close: close,
+                  );
                 },
-                child: const Text('Продолжить'),
-              ),
-            ],
+              );
+            },
           ),
         ),
       );
     } finally {
+      _modalObservers.remove(observe);
+      submission.dispose();
       input.dispose();
     }
   }
 
   Future<void> _editProfile({AutomationProfileRecord? existing}) async {
     final controller = model;
+    final baseRevision = existing == null
+        ? null
+        : controller.revision!['revision'] as int;
     final name = TextEditingController(text: existing?.name ?? 'Новый профиль');
     final description = TextEditingController(
       text: existing?.description ?? '',
@@ -182,136 +433,218 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   },
                 ],
               }
-            : model.revision!['body'],
+            : controller.revision!['body'],
       ),
+    );
+    final submission = AutomationProfileDraftSubmission(
+      initialBasis: existing == null
+          ? null
+          : AutomationProfileBasis(
+              profile: existing,
+              revision: baseRevision!,
+              digest: controller.revision!['digest'] as String,
+            ),
+    );
+    bool current() =>
+        mounted &&
+        identical(controller, model) &&
+        !controller.client.isClosed &&
+        !submission.contextRetired;
+    bool basisCurrent(AutomationProfileBasis basis) =>
+        basis.matches(controller.profile, controller.revision);
+    void observe() =>
+        submission.observeBasis(current: current(), unchanged: basisCurrent);
+    _modalObservers.add(observe);
+    Future<void> readBasis(BuildContext dialog) => submission.readBasis(
+      current: () => current() && dialog.mounted,
+      canRead: () => controller.canMutate,
+      pendingLabel: () => controller.pendingLabel,
+      read: () async {
+        await _present(
+          AutomationUiPhase.version,
+          () => controller.selectProfile(existing!.id),
+        );
+        if (!current() || !dialog.mounted || controller.error != null)
+          return null;
+        final profile = controller.profile, revision = controller.revision;
+        if (profile == null || revision == null) return null;
+        return AutomationProfileBasis.fromOwner(
+          profile,
+          revision,
+          currentHead: true,
+        );
+      },
     );
     String? error;
     var validating = false;
     Map<String, Object?>? draftValidation;
     try {
       if (!mounted) return;
-      await showDialog<void>(
+      await showMotionDialog<void>(
         context: context,
-        builder: (dialog) => StatefulBuilder(
-          builder: (context, update) => AlertDialog(
-            title: Text(
-              existing == null
-                  ? 'Новый Ansible-профиль'
-                  : 'Новая версия профиля',
-            ),
-            content: SizedBox(
-              width: 720,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: name,
-                      maxLength: 100,
-                      decoration: const InputDecoration(labelText: 'Название'),
-                    ),
-                    TextField(
-                      controller: description,
-                      maxLength: 2000,
-                      decoration: const InputDecoration(labelText: 'Описание'),
-                    ),
-                    TextField(
-                      controller: body,
-                      onChanged: (_) => update(() => draftValidation = null),
-                      minLines: 8,
-                      maxLines: 16,
-                      decoration: const InputDecoration(
-                        labelText: 'Шаги и параметры профиля (JSON)',
-                      ),
-                      style: const TextStyle(fontFamily: 'monospace'),
-                    ),
-                    if (existing != null)
-                      Text(
-                        'Основа: версия ${model.revision!['revision']}. Текущая версия: ${existing.headRevision}.',
-                      ),
-                    if (existing != null)
-                      const Text(
-                        'Для новой версии потребуется отдельное разрешение на запуск.',
-                      ),
-                    if (draftValidation != null)
-                      SelectableText(pretty(draftValidation)),
-                    if (error != null) Text(error!),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialog),
-                child: const Text('Закрыть'),
-              ),
-              FilledButton(
-                onPressed: validating
+        barrierDismissible: true,
+        builder: (dialog) => ListenableBuilder(
+          listenable: Listenable.merge([submission, _modalChanges]),
+          builder: (context, _) => StatefulBuilder(
+            builder: (context, update) {
+              observe();
+              return AutomationProfileEditorDialog(
+                existing: submission.currentBasis?.profile ?? existing,
+                baseRevision: baseRevision,
+                name: name,
+                description: description,
+                body: body,
+                validation: draftValidation,
+                error: submission.error ?? error,
+                nameError: submission.nameError,
+                descriptionError: submission.descriptionError,
+                saveError: submission.saveError,
+                saveUnconfirmed: submission.saveUnconfirmed,
+                saving: submission.saving,
+                contextCurrent: current(),
+                requestRetained: controller.pendingLabel != null,
+                canSave:
+                    !submission.saving &&
+                    current() &&
+                    controller.canMutate &&
+                    !submission.requiresNewBasis &&
+                    (submission.currentBasis == null ||
+                        basisCurrent(submission.currentBasis!)),
+                ownerStatus: !current()
                     ? null
-                    : () async {
-                        try {
-                          final parsed = parse(body.text);
-                          final work = model.saveProfile(
-                            name: name.text,
-                            description: description.text,
-                            body: parsed,
-                            existing: existing,
+                    : AutomationStatusSection(
+                        busy: controller.busy,
+                        openingRecipes: false,
+                        canRetry: controller.canRetry,
+                        errorCode: _presentation.readErrorCode,
+                        writeOutcome: _presentation.writeOutcome,
+                        pendingLabel: controller.pendingLabel,
+                        operationLabel: _presentation.label,
+                        onRetry: () => submission
+                            .retrySaved(
+                              retry: () => _present(
+                                AutomationUiPhase.retry,
+                                controller.retryPending,
+                              ),
+                              canRetry: () => controller.canRetry,
+                              current: () => current() && dialog.mounted,
+                              resultError: () => controller.error,
+                              pendingLabel: () => controller.pendingLabel,
+                              close: () {
+                                if (current() && dialog.mounted)
+                                  Navigator.pop(dialog);
+                              },
+                            )
+                            .ignore(),
+                        onDismiss: () {
+                          if (!current()) return;
+                          submission.dismissSaved(
+                            dismiss: () => _presentation.dismiss(
+                              controller.dismissPending,
+                              () => _result(controller),
+                            ),
+                            pendingLabel: () => controller.pendingLabel,
                           );
-                          Navigator.pop(dialog);
-                          await work;
-                        } on FormatException {
-                          update(
-                            () => error = 'Проверьте формат профиля и допустимые значения',
-                          );
-                        }
-                      },
-                child: const Text('Сохранить версию'),
-              ),
-              OutlinedButton(
-                onPressed: validating || model.busy
-                    ? null
-                    : () async {
-                        final source = body.text;
-                        try {
-                          final input = parse(source);
-                          update(() {
-                            validating = true;
-                            error = null;
-                            draftValidation = null;
-                          });
-                          await controller.validateBody(input);
-                          if (!mounted ||
-                              !context.mounted ||
-                              !identical(controller, model) ||
-                              controller.client.isClosed)
-                            return;
-                          update(() {
-                            if (body.text == source) {
-                              draftValidation = model.validation;
-                              error = model.error == null
-                                  ? null
-                                  : message(model.error!);
-                            } else {
-                              error =
-                                  'Черновик изменён — проверьте его ещё раз';
-                            }
-                          });
-                        } on FormatException {
-                          if (context.mounted)
-                            update(() => error = 'Проверьте формат JSON');
-                        } finally {
-                          if (context.mounted) update(() => validating = false);
-                        }
-                      },
-                child: Text(
-                  validating ? 'Проверка…' : 'Проверить без сохранения',
+                        },
+                        onStopWaiting: () {
+                          if (current()) controller.cancelInterest().ignore();
+                        },
+                      ),
+                basisReview: AutomationProfileBasisReview(
+                  submission: submission,
+                  requestRetained: controller.pendingLabel != null,
+                  canRead:
+                      current() && controller.canMutate && !submission.saving,
+                  canAccept: current() && controller.canMutate,
+                  onRead: () => readBasis(dialog).ignore(),
+                  onAccept: () => submission.acceptBasis(
+                    current: () => current() && dialog.mounted,
+                    canAccept: () => controller.canMutate,
+                    unchanged: basisCurrent,
+                  ),
                 ),
-              ),
-            ],
+                validating: validating,
+                canValidate: !validating && !model.busy,
+                onBodyChanged: (_) {
+                  if (current() && context.mounted)
+                    update(() => draftValidation = null);
+                },
+                onClose: () {
+                  if (dialog.mounted) Navigator.pop(dialog);
+                },
+                onSave: () => submission
+                    .save(
+                      name: name.text,
+                      description: description.text,
+                      source: body.text,
+                      current: () => current() && dialog.mounted,
+                      canSubmit: () => controller.canMutate,
+                      basisCurrent: basisCurrent,
+                      submit: (capturedName, capturedDescription, parsed) =>
+                          _present(
+                            AutomationUiPhase.saveProfile,
+                            () => controller.saveProfile(
+                              name: capturedName,
+                              description: capturedDescription,
+                              body: parsed,
+                              existing:
+                                  submission.currentBasis?.profile ?? existing,
+                            ),
+                          ),
+                      resultError: () => controller.error,
+                      pendingLabel: () => controller.pendingLabel,
+                      close: () {
+                        if (dialog.mounted) Navigator.pop(dialog);
+                      },
+                    )
+                    .ignore(),
+                onValidate: () async {
+                  if (!current() ||
+                      !dialog.mounted ||
+                      !context.mounted ||
+                      validating ||
+                      controller.busy)
+                    return;
+                  final source = body.text;
+                  try {
+                    final input = parse(source);
+                    update(() {
+                      validating = true;
+                      error = null;
+                      draftValidation = null;
+                    });
+                    await _present(
+                      AutomationUiPhase.validate,
+                      () => controller.validateBody(input),
+                    );
+                    if (!current() || !dialog.mounted || !context.mounted)
+                      return;
+                    update(() {
+                      if (body.text == source) {
+                        draftValidation = controller.validation;
+                        error = controller.error == null
+                            ? null
+                            : message(controller.error!);
+                      } else {
+                        error = 'Черновик изменён — проверьте его ещё раз';
+                      }
+                    });
+                  } on FormatException {
+                    if (current() && context.mounted)
+                      update(() => error = 'Проверьте формат JSON');
+                  } finally {
+                    if (current() && context.mounted)
+                      update(() => validating = false);
+                  }
+                },
+              );
+            },
           ),
         ),
       );
     } finally {
+      _modalObservers.remove(observe);
+      submission.dispose();
       name.dispose();
       description.dispose();
       body.dispose();
@@ -319,61 +652,83 @@ class _AutomationPanelState extends State<AutomationPanel> {
   }
 
   Future<void> _decision(Map<String, Object?> plan, bool approve) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: Text(
-          approve ? 'Подтвердить этот план?' : 'Отклонить этот план?',
-        ),
-        content: SizedBox(
-          width: 720,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(dialog).height * .55,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SelectableText(
-                    'Сервер: ${plan['serverId']}\nПрофиль: ${plan['profileId']} · версия ${plan['profileRevision']}\nПлан: ${plan['digest']}\nДействует до: ${plan['expiresAt']}',
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Параметры и все действия'),
-                  SelectableText(
-                    pretty({
-                      'parameters': plan['exactParams'],
-                      'effects': plan['effects'],
-                      'checks': plan['checks'],
-                    }),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialog, false),
-            child: const Text('Назад'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialog, true),
-            child: Text(approve ? 'Подтвердить план' : 'Отклонить план'),
-          ),
-        ],
-      ),
+    final captured = model;
+    final serverProfiles = List<ProfileView>.unmodifiable(
+      widget.serverProfiles,
     );
-    if (result == true && mounted)
-      await model.approvePlan(plan, approve: approve);
+    final profileStamp = pretty(_profileForPlan(plan)?.toJson());
+    final planStamp = pretty(plan);
+    final current = automationReviewGuard(
+      () =>
+          mounted &&
+          identical(captured, model) &&
+          !captured.client.isClosed &&
+          pretty(captured.plan) == planStamp &&
+          pretty(_profileForPlan(plan)?.toJson()) == profileStamp &&
+          automationTargetsUnchanged(
+            [if (plan['serverId'] is String) plan['serverId'] as String],
+            serverProfiles,
+            widget.serverProfiles,
+          ),
+    );
+    void observe() {
+      current();
+    }
+
+    _modalObservers.add(observe);
+    bool? result;
+    try {
+      result = await showMotionDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialog) => ListenableBuilder(
+          listenable: _modalChanges,
+          builder: (context, _) => AutomationPlanDecisionDialog(
+            plan: plan,
+            serverProfiles: widget.serverProfiles,
+            automationProfile: _profileForPlan(plan),
+            contextCurrent: current(),
+            approve: approve,
+            onBack: () => Navigator.pop(dialog, false),
+            onConfirm: () => Navigator.pop(dialog, true),
+          ),
+        ),
+      );
+    } finally {
+      _modalObservers.remove(observe);
+    }
+    final deadline = DateTime.tryParse('${plan['expiresAt']}');
+    if (result == true &&
+        current() &&
+        (!approve ||
+            automationPlanTargetAvailable(plan, widget.serverProfiles) &&
+                _profileForPlan(plan) != null) &&
+        captured.plan?['id'] == plan['id'] &&
+        _invalidPlanId != plan['id'] &&
+        deadline != null &&
+        deadline.isAfter(DateTime.now())) {
+      await _present(
+        approve ? AutomationUiPhase.approve : AutomationUiPhase.deny,
+        () => captured.approvePlan(plan, approve: approve),
+      );
+    }
   }
 
   Future<void> _delegate() async {
     final controller = model, selected = model.revision;
     final body = selected?['body'] as Map<String, Object?>?;
     if (body == null || selected == null) return;
-    await controller.refreshGrants();
-    if (!mounted || !identical(controller, model)) return;
+    final revisionStamp = pretty(selected);
+    final profileStamp = pretty(controller.profile?.toJson());
+    final targetId = widget.serverId;
+    bool current() =>
+        mounted &&
+        identical(controller, model) &&
+        widget.serverId == targetId &&
+        pretty(controller.revision) == revisionStamp &&
+        pretty(controller.profile?.toJson()) == profileStamp;
+    await _present(AutomationUiPhase.grants, controller.refreshGrants);
+    if (!current()) return;
     final eligible = controller.grants
         .where(
           (row) =>
@@ -393,20 +748,15 @@ class _AutomationPanelState extends State<AutomationPanel> {
       );
       return;
     }
-    final grant = await showDialog<Map<String, Object?>>(
+    final grant = await showMotionDialog<Map<String, Object?>>(
       context: context,
-      builder: (dialog) => SimpleDialog(
-        title: const Text('Кому делегировать профиль?'),
-        children: [
-          for (final row in eligible)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dialog, row),
-              child: Text('${row['label']} · до ${row['expiresAt']}'),
-            ),
-        ],
+      barrierDismissible: true,
+      builder: (dialog) => AutomationDelegationGrantDialog(
+        grants: eligible,
+        onSelect: (row) => Navigator.pop(dialog, row),
       ),
     );
-    if (grant == null || !mounted || !identical(controller, model)) return;
+    if (grant == null || !current()) return;
     final definitions = body['parameters'] as Map<String, Object?>;
     final predicates = <String, Object?>{};
     for (final row in definitions.entries) {
@@ -419,7 +769,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
             };
     }
     await _jsonEditor(
-      'Делегирование «${grant['label']}» · версия ${selected['revision']}\n${selected['profileId']}\n${selected['digest']}',
+      'Делегирование «${grant['label']}» · версия ${selected['revision']}',
       {'lifetimeSeconds': 3600, 'predicates': predicates},
       (value) => controller.createDelegation(
         displayedRevision: selected,
@@ -427,139 +777,105 @@ class _AutomationPanelState extends State<AutomationPanel> {
         lifetimeSeconds: value['lifetimeSeconds'] as int,
         predicates: value['predicates'] as Map<String, Object?>,
       ),
+      phase: AutomationUiPhase.delegate,
+      purpose: 'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
+      target:
+          'Ansible-профиль: ${controller.profile?.name ?? 'Название профиля недоступно'} · версия ${selected['revision']}. Доступ клиента до: ${grant['expiresAt']} (UTC).',
+      targetServerIds: [if (targetId != null) targetId],
+      contextCurrent: current,
+      contextDetails: {
+        'profileId': selected['profileId'],
+        'revision': selected['revision'],
+        'bodyDigest': selected['digest'],
+        'serverId': widget.serverId,
+        'grantId': grant['id'],
+      },
     );
   }
 
   bool grantCurrent(Map<String, Object?> row) {
-    final now = DateTime.now().toUtc();
-    return row['revokedAt'] == null &&
-        !DateTime.parse(row['issuedAt'] as String).isAfter(now) &&
-        DateTime.parse(row['expiresAt'] as String).isAfter(now);
+    return automationGrantCurrent(row);
   }
 
-  Future<void> _grantEditor({Map<String, Object?>? existing}) => _jsonEditor(
-    existing == null
-        ? 'Выдать ИИ доступ через MCP'
-        : 'Изменить права и перевыпустить доступ',
-    {
-      'label': existing?['label'] ?? 'ИИ-клиент',
-      'scopes':
-          existing?['scopes'] ??
-          (widget.serverId == null
-              ? ['author']
-              : ['read', 'logs', 'author', 'plan']),
-      'serverIds':
-          existing?['serverIds'] ??
-          (widget.serverId == null ? <String>[] : [widget.serverId]),
-      'lifetimeSeconds': existing == null
-          ? 28800
-          : DateTime.parse(existing['expiresAt'] as String)
-                .difference(DateTime.parse(existing['issuedAt'] as String))
-                .inSeconds,
-    },
-    (value) => model.saveGrant(value, existing: existing),
-  );
-
-  Widget grantManagement() => ExpansionTile(
-    title: const Text('Доступ ИИ рабочего пространства'),
-    children: [
-      Wrap(
-        spacing: 8,
-        children: [
-          button('Обновить клиентов', () => model.refreshGrants().ignore()),
-          button(
-            'Подключить ИИ',
-            () => _grantEditor().ignore(),
-            mutation: true,
+  Future<void> _grantEditor({Map<String, Object?>? existing}) {
+    final captured = model;
+    final stamp = pretty(existing);
+    return _jsonEditor(
+      existing == null
+          ? 'Выдать ИИ доступ через MCP'
+          : 'Изменить права и перевыпустить доступ',
+      {
+        'label': existing?['label'] ?? 'ИИ-клиент',
+        'scopes':
+            existing?['scopes'] ??
+            (widget.serverId == null
+                ? ['author']
+                : ['read', 'logs', 'author', 'plan']),
+        'serverIds':
+            existing?['serverIds'] ??
+            (widget.serverId == null ? <String>[] : [widget.serverId]),
+        'lifetimeSeconds': existing == null
+            ? 28800
+            : DateTime.parse(existing['expiresAt'] as String)
+                  .difference(DateTime.parse(existing['issuedAt'] as String))
+                  .inSeconds,
+      },
+      (value) => captured.saveGrant(value, existing: existing),
+      phase: existing == null
+          ? AutomationUiPhase.saveGrant
+          : AutomationUiPhase.replaceGrant,
+      contextCurrent: () =>
+          existing == null ||
+          captured.grants.any(
+            (row) => row['id'] == existing['id'] && pretty(row) == stamp,
           ),
-        ],
-      ),
-      if (model.grantsLoaded && model.grants.isEmpty)
-        const Text('Клиентов ИИ пока нет'),
-      for (final row in model.grants)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListTile(
-              title: Text(
-                '${row['label']}${row['revokedAt'] != null
-                    ? ' · отозвано'
-                    : !grantCurrent(row)
-                    ? ' · срок истёк'
-                    : ''}',
-              ),
-              subtitle: Text(
-                'Права: ${(row['scopes'] as List).join(', ')}\nДействует до: ${row['expiresAt']}',
-              ),
-            ),
-            jsonView('Серверы и выданные права', row),
-            Wrap(
-              spacing: 8,
-              children: [
-                if (grantCurrent(row))
-                  button(
-                    'Конфигурация MCP',
-                    () => model
-                        .configurationForGrant(row['id'] as String)
-                        .ignore(),
-                  ),
-                if (row['revokedAt'] == null) ...[
-                  button(
-                    'Изменить права',
-                    () => _grantEditor(existing: row).ignore(),
-                    mutation: true,
-                  ),
-                  button('Отозвать доступ', () async {
-                    final yes = await showDialog<bool>(
-                      context: context,
-                      builder: (dialog) => AlertDialog(
-                        title: Text('Отозвать доступ «${row['label']}»?'),
-                        content: const Text(
-                          'Текущий шаг задания может завершиться. Следующие шаги потребуют действующих прав.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dialog, false),
-                            child: const Text('Назад'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialog, true),
-                            child: const Text('Отозвать доступ'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (yes == true && mounted) await model.revokeGrant(row);
-                  }, mutation: true),
-                ],
-              ],
-            ),
-          ],
-        ),
-      if (model.launchConfiguration != null) ...[
-        jsonView('Команда и аргументы MCP', model.launchConfiguration),
-        button(
-          'Скопировать конфигурацию',
-          () => Clipboard.setData(
-            ClipboardData(text: pretty(model.launchConfiguration)),
-          ).ignore(),
-        ),
-      ],
-    ],
-  );
+      purpose: existing == null
+          ? 'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.'
+          : 'Сохранение заменит права и перевыпустит доступ клиента ИИ на указанный срок.',
+    );
+  }
 
-  String message(String code) => switch (code) {
-    'TRUST_REQUIRED' => 'Сначала подтвердите SSH-ключ сервера.',
-    'EXECUTOR_UNAVAILABLE' => 'Executor сервера недоступен.',
-    'APPROVAL_REQUIRED' => 'Для запуска подтвердите этот план.',
-    'PLAN_STALE' => 'Состояние сервера изменилось. Создайте новый план.',
-    'PLAN_EXPIRED' => 'Срок плана истёк. Создайте новый план.',
-    'REVISION_CONFLICT' => 'Профиль изменился. Загрузите его заново.',
-    'FORBIDDEN' => 'Недостаточно прав для операции.',
-    'CANCELLED' => 'Ожидание результата остановлено.',
-    'TIMEOUT' => 'Ответ не получен вовремя.',
-    _ => 'Не удалось выполнить запрос: $code',
-  };
+  Future<void> _revokeGrant(Map<String, Object?> row) async {
+    final captured = model;
+    final yes = await showMotionDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialog) => AutomationConfirmationDialog(
+        title: 'Отозвать доступ «${row['label']}»?',
+        message: 'Текущий шаг задания может завершиться. Следующие шаги потребуют действующих прав.',
+        confirmLabel: 'Отозвать доступ',
+        onBack: () => Navigator.pop(dialog, false),
+        onConfirm: () => Navigator.pop(dialog, true),
+      ),
+    );
+    if (yes == true && mounted && identical(captured, model))
+      await _present(
+        AutomationUiPhase.revokeGrant,
+        () => captured.revokeGrant(row),
+      );
+  }
+
+  Future<void> _archiveProfile(AutomationProfileRecord selected) async {
+    final captured = model;
+    final yes = await showMotionDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialog) => AutomationConfirmationDialog(
+        title: 'Архивировать «${selected.name}»?',
+        message: 'История версий и заданий сохранится.',
+        confirmLabel: 'Архивировать',
+        onBack: () => Navigator.pop(dialog, false),
+        onConfirm: () => Navigator.pop(dialog, true),
+      ),
+    );
+    if (yes == true && mounted && identical(captured, model))
+      await _present(
+        AutomationUiPhase.archive,
+        () => captured.archiveProfile(selected),
+      );
+  }
+
+  String message(String code) => automationMessage(code);
 
   @override
   Widget build(BuildContext context) {
@@ -568,340 +884,289 @@ class _AutomationPanelState extends State<AutomationPanel> {
         plan = model.plan,
         job = model.job;
     final deadline = DateTime.tryParse('${plan?['expiresAt']}');
+    final invalidPlan = _invalidPlanId != null && _invalidPlanId == plan?['id'];
     final runnable =
+        !invalidPlan &&
         plan?['status'] == 'runnable' &&
         deadline != null &&
         deadline.isAfter(DateTime.now());
-    return Card(
-      child: ExpansionTile(
-        title: Text(
-          widget.serverId == null
-              ? 'ИИ-доступ и Ansible-профили'
-              : 'Автоматизация',
-        ),
-        childrenPadding: const EdgeInsets.all(12),
-        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (model.busy) const LinearProgressIndicator(),
-          if (model.error != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(message(model.error!)),
-              ),
+    final expired = deadline != null && !deadline.isAfter(DateTime.now());
+    final actions = AutomationActionAvailability(
+      read: !_openingRecipes && !model.busy && !widget.client.isClosed,
+      mutate: !_openingRecipes && model.canMutate,
+      select: !model.busy && !_openingRecipes,
+    );
+    return AbsorbPointer(
+      absorbing: _openingRecipes,
+      child: DeckSurface(
+        padding: EdgeInsets.zero,
+        child: ExpansionTile(
+          initiallyExpanded: widget.installationCatalog,
+          title: DeckFocusLabel(
+            child: Text(
+              widget.installationCatalog
+                  ? 'ПО и планы установки'
+                  : widget.serverId == null
+                  ? 'ИИ-доступ и Ansible-профили'
+                  : 'Автоматизация',
             ),
-          if (model.pendingLabel != null && !model.busy)
-            Wrap(
-              spacing: 8,
-              children: [
-                Text('Запрос: ${model.pendingLabel}'),
-                OutlinedButton(
-                  onPressed: model.canRetry
-                      ? () => model.retryPending().ignore()
-                      : null,
-                  child: const Text('Повторить тот же запрос'),
-                ),
-                TextButton(
-                  onPressed: model.dismissPending,
-                  child: const Text('Закрыть запрос'),
-                ),
-              ],
-            ),
-          if (model.busy)
-            TextButton(
-              onPressed: () => model.cancelInterest().ignore(),
-              child: const Text('Перестать ждать ответ'),
-            ),
-          Wrap(
-            spacing: 8,
-            children: [
-              button(
-                'Обновить профили',
-                () => model.refreshProfiles().ignore(),
-              ),
-              button(
-                'Новый профиль',
-                () => _editProfile().ignore(),
-                mutation: true,
-              ),
-              if (widget.serverId != null)
-                button('Рецепты установки', () => model.loadRecipes().ignore()),
-            ],
           ),
-          if (model.profilesLoaded && model.profiles.isEmpty)
-            const Text('Ansible-профилей пока нет'),
-          grantManagement(),
-          for (final row in model.profiles)
-            ListTile(
-              title: Text(row.name),
-              subtitle: Text(
-                'Версия ${row.headRevision}${row.archived ? ' · архив' : ''}',
+          childrenPadding: const EdgeInsets.all(BrandSpacing.space16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AutomationStatusSection(
+              busy: model.busy,
+              openingRecipes: _openingRecipes,
+              canRetry: model.canRetry,
+              recipeConnectionError: _recipeConnectionError == null
+                  ? null
+                  : message(_recipeConnectionError!),
+              errorCode: _presentation.readErrorCode,
+              writeOutcome: _presentation.writeOutcome,
+              operationLabel: _presentation.label,
+              pendingLabel: model.pendingLabel,
+              onRetry: () => _present(
+                AutomationUiPhase.retry,
+                model.retryPending,
+              ).ignore(),
+              onDismiss: () => _presentation.dismiss(
+                model.dismissPending,
+                () => _result(model),
               ),
-              selected: selected?.id == row.id,
-              enabled: !model.busy,
-              onTap: () => model.selectProfile(row.id).ignore(),
+              onStopWaiting: () => model.cancelInterest().ignore(),
             ),
-          if (model.profilesCursor != null)
-            button(
-              'Ещё профили',
-              () => model.refreshProfiles(more: true).ignore(),
+            AutomationProfileActions(
+              actions: actions,
+              hasServer: widget.serverId != null,
+              installationCatalog: widget.installationCatalog,
+              onRefresh: () => _present(
+                AutomationUiPhase.profiles,
+                model.refreshProfiles,
+              ).ignore(),
+              onCreate: () => _editProfile().ignore(),
+              onLoadRecipes: () => _loadRecipes().ignore(),
             ),
-          if (selected != null && revision != null) ...[
-            Text(
-              '${selected.name} · версия ${revision['revision']}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            SelectableText(
-              'Профиль: ${selected.id}\nХеш: ${revision['digest']}',
-            ),
-            jsonView('Шаги и параметры', revision['body']),
-            if (model.validation != null)
-              jsonView('Результат проверки содержимого', model.validation),
-            if (model.comparison != null)
-              jsonView('Сравнение выбранных версий', model.comparison),
-            Wrap(
-              spacing: 8,
-              children: [
-                button(
-                  'Выбрать версию',
-                  () => _jsonEditor(
-                    'Версия профиля',
-                    {'revision': revision['revision']},
-                    (value) => model.selectProfile(
-                      selected.id,
-                      version: value['revision'] as int,
+            if (model.catalog != null)
+              AutomationRecipesSection(
+                catalog: model.catalog!,
+                canMutate: actions.mutate,
+                onCreatePlan: (digest) => _createRecipePlan(digest).ignore(),
+              ),
+            AutomationProfilesSection(
+              profiles: model.profiles,
+              loaded: model.profilesLoaded,
+              hasMore: model.profilesCursor != null,
+              selectedId: selected?.id,
+              actions: actions,
+              onSelect: (id) => _present(
+                AutomationUiPhase.version,
+                () => model.selectProfile(id),
+              ).ignore(),
+              onMore: () => _present(
+                AutomationUiPhase.profiles,
+                () => model.refreshProfiles(more: true),
+              ).ignore(),
+              beforeProfiles: AutomationGrantsSection(
+                serverProfiles: widget.serverProfiles,
+                grants: [
+                  for (final row in model.grants)
+                    AutomationGrantPresentation(
+                      value: row,
+                      current: grantCurrent(row),
                     ),
-                  ).ignore(),
-                ),
-                button(
-                  'Проверить версию',
-                  () => model
-                      .validateBody(revision['body'] as Map<String, Object?>)
-                      .ignore(),
-                ),
-                button(
-                  'Сравнить версии',
-                  () => _jsonEditor('Сравнение шагов двух версий', {
+                ],
+                loaded: model.grantsLoaded,
+                actions: actions,
+                launchConfiguration: model.launchConfiguration,
+                onRefresh: () => _present(
+                  AutomationUiPhase.grants,
+                  model.refreshGrants,
+                ).ignore(),
+                onCreate: () => _grantEditor().ignore(),
+                onConfigure: (id) => _present(
+                  AutomationUiPhase.configuration,
+                  () => model.configurationForGrant(id),
+                ).ignore(),
+                onEdit: (row) => _grantEditor(existing: row).ignore(),
+                onRevoke: (row) => _revokeGrant(row).ignore(),
+                onCopyConfiguration: () => Clipboard.setData(
+                  ClipboardData(text: pretty(model.launchConfiguration)),
+                ).ignore(),
+              ),
+            ),
+            if (selected != null && revision != null)
+              AutomationProfileDetailSection(
+                profile: selected,
+                revision: revision,
+                validation: model.validation,
+                comparison: model.comparison,
+                hasServer: widget.serverId != null,
+                actions: actions,
+                onSelectVersion: () => _jsonEditor(
+                  'Версия профиля',
+                  {'revision': revision['revision']},
+                  (value) => model.selectProfile(
+                    selected.id,
+                    version: value['revision'] as int,
+                  ),
+                  phase: AutomationUiPhase.version,
+                ).ignore(),
+                onValidate: () => _present(
+                  AutomationUiPhase.validate,
+                  () => model.validateBody(
+                    revision['body'] as Map<String, Object?>,
+                  ),
+                ).ignore(),
+                onCompare: () => _jsonEditor(
+                  'Сравнение шагов двух версий',
+                  {
                     'fromRevision': (revision['revision'] as int) > 1
                         ? (revision['revision'] as int) - 1
                         : 1,
                     'toRevision': revision['revision'],
-                  }, model.compareVersions).ignore(),
-                ),
-                if (!selected.archived) ...[
-                  button(
-                    'Изменить профиль',
-                    () => _editProfile(existing: selected).ignore(),
-                    mutation: true,
-                  ),
-                  if (widget.serverId != null)
-                    button('Создать план', () {
-                      final parameters =
-                          (revision['body']
-                                  as Map<String, Object?>)['parameters']
-                              as Map<String, Object?>;
-                      _jsonEditor('Параметры плана', {
-                        for (final row in parameters.entries)
-                          row.key:
-                              (row.value as Map<String, Object?>)['default'],
-                      }, model.createPlan).ignore();
-                    }, mutation: true),
-                  if (widget.serverId != null)
-                    button(
-                      'Делегировать версию',
-                      () => _delegate().ignore(),
-                      mutation: true,
-                    ),
-                  button('Архивировать', () async {
-                    final yes = await showDialog<bool>(
-                      context: context,
-                      builder: (dialog) => AlertDialog(
-                        title: Text('Архивировать «${selected.name}»?'),
-                        content: const Text(
-                          'История версий и заданий сохранится.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dialog, false),
-                            child: const Text('Назад'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialog, true),
-                            child: const Text('Архивировать'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (yes == true && mounted)
-                      await model.archiveProfile(selected);
-                  }, mutation: true),
-                ],
-              ],
-            ),
-          ],
-          if (model.catalog != null)
-            jsonView('Каталог рецептов и доступность установки', model.catalog),
-          if (plan != null) ...[
-            const Divider(),
-            Text(
-              'План · ${plan['status']}${deadline != null && !deadline.isAfter(DateTime.now()) ? ' · срок истёк' : ''}',
-            ),
-            SelectableText(
-              'Версия профиля: ${plan['profileRevision']}\nХеш плана: ${plan['digest']}\nДействует до: ${plan['expiresAt']}',
-            ),
-            jsonView('Параметры, действия и проверки', {
-              'parameters': plan['exactParams'],
-              'effects': plan['effects'],
-              'checks': plan['checks'],
-              'reasons': plan['reasons'],
-            }),
-            Wrap(
-              spacing: 8,
-              children: [
-                if (runnable) ...[
-                  button(
-                    'Подтвердить план',
-                    () => _decision(plan, true).ignore(),
-                    mutation: true,
-                  ),
-                  button(
-                    'Отклонить план',
-                    () => _decision(plan, false).ignore(),
-                    mutation: true,
-                  ),
-                  button(
-                    'Запустить',
-                    () => model.applyPlan(plan).ignore(),
-                    mutation: true,
-                  ),
-                ],
-                button(
-                  'Обновить план',
-                  () => model.loadPlan(plan['id'] as String).ignore(),
-                ),
-              ],
-            ),
-          ],
-          if (widget.serverId != null) ...[
-            const Divider(),
-            Wrap(
-              spacing: 8,
-              children: [
-                button('Обновить задания', () => model.refreshJobs().ignore()),
-                button(
-                  'Обновить разрешения',
-                  () => model.refreshAuthorities().ignore(),
-                ),
-              ],
-            ),
-            if (model.jobsLoaded && model.jobs.isEmpty)
-              const Text('Заданий на этом сервере пока нет'),
-            for (final row in model.jobs)
-              Builder(
-                builder: (context) {
-                  final entry = row['job'] as Map<String, Object?>;
-                  return ListTile(
-                    title: Text('Задание · ${entry['state']}'),
-                    subtitle: Text('${entry['id']}'),
-                    enabled: !model.busy,
-                    selected: job?['id'] == entry['id'],
-                    onTap: () =>
-                        model.selectJob(entry['id'] as String).ignore(),
-                  );
+                  },
+                  (value) => model.compareVersions(value),
+                  phase: AutomationUiPhase.compare,
+                ).ignore(),
+                onEdit: () => _editProfile(existing: selected).ignore(),
+                onCreatePlan: () {
+                  final captured = model;
+                  final revisionStamp = pretty(revision);
+                  final profileStamp = pretty(selected.toJson());
+                  final targetId = widget.serverId;
+                  final parameters =
+                      (revision['body'] as Map<String, Object?>)['parameters']
+                          as Map<String, Object?>;
+                  _jsonEditor(
+                    'Параметры плана',
+                    {
+                      for (final row in parameters.entries)
+                        row.key: (row.value as Map<String, Object?>)['default'],
+                    },
+                    (value) => captured.createPlan(value),
+                    phase: AutomationUiPhase.createPlan,
+                    purpose: 'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
+                    target:
+                        'Ansible-профиль: ${selected.name} · версия ${revision['revision']}.',
+                    targetServerIds: [if (targetId != null) targetId],
+                    contextCurrent: () =>
+                        widget.serverId == targetId &&
+                        pretty(captured.revision) == revisionStamp &&
+                        pretty(captured.profile?.toJson()) == profileStamp,
+                    contextDetails: {
+                      'profileId': selected.id,
+                      'revision': revision['revision'],
+                      'bodyDigest': revision['digest'],
+                      'serverId': widget.serverId,
+                    },
+                  ).ignore();
                 },
+                onDelegate: () => _delegate().ignore(),
+                onArchive: () => _archiveProfile(selected).ignore(),
               ),
-            if (model.jobsCursor != null)
-              button(
-                'Ещё задания',
-                () => model.refreshJobs(more: true).ignore(),
+            if (plan != null)
+              AutomationPlanSection(
+                plan: plan,
+                serverProfiles: widget.serverProfiles,
+                automationProfile: _profileForPlan(plan),
+                runnable: runnable,
+                expired: expired,
+                invalidReason: invalidPlan ? _invalidPlanReason : null,
+                planAnchor: _planAnchor,
+                actions: actions,
+                onApprove: () => _decision(plan, true).ignore(),
+                onDeny: () => _decision(plan, false).ignore(),
+                onApply: () {
+                  if (!automationPlanExpired(plan) &&
+                      _invalidPlanId != plan['id'] &&
+                      pretty(model.plan) == pretty(plan) &&
+                      automationPlanTargetAvailable(
+                        plan,
+                        widget.serverProfiles,
+                      ) &&
+                      _profileForPlan(plan) != null) {
+                    _present(
+                      AutomationUiPhase.apply,
+                      () => model.applyPlan(plan),
+                    ).ignore();
+                  }
+                },
+                onRefresh: () => _present(
+                  AutomationUiPhase.plan,
+                  () => model.loadPlan(plan['id'] as String),
+                ).ignore(),
               ),
-            if (job != null) ...[
-              Text('Состояние: ${job['state']}'),
-              Wrap(
-                spacing: 8,
-                children: [
-                  button(
-                    'План задания',
-                    () => model
-                        .loadPlan(job['immutablePlanId'] as String)
-                        .ignore(),
-                  ),
-                  if (!AutomationController.terminal.contains(job['state']) &&
-                      job['cancelRequested'] != true)
-                    button(
-                      'Остановить после текущего шага',
-                      () => model
-                          .jobAction(job['id'] as String, reconcile: false)
-                          .ignore(),
-                      mutation: true,
-                    ),
-                  if (job['state'] == 'unknown')
-                    button(
-                      'Уточнить результат',
-                      () => model
-                          .jobAction(job['id'] as String, reconcile: true)
-                          .ignore(),
-                      mutation: true,
-                    ),
-                ],
+            if (widget.serverId != null) ...[
+              AutomationJobsSection(
+                serverId: widget.serverId,
+                jobs: model.jobs,
+                job: job,
+                events: model.events,
+                loaded: model.jobsLoaded,
+                hasMore: model.jobsCursor != null,
+                droppedEvents: model.droppedEvents,
+                canCancel:
+                    job != null &&
+                    !AutomationController.terminal.contains(job['state']) &&
+                    job['cancelRequested'] != true,
+                canReconcile: job?['state'] == 'unknown',
+                actions: actions,
+                onRefresh: () => _present(
+                  AutomationUiPhase.jobs,
+                  model.refreshJobs,
+                ).ignore(),
+                onRefreshAuthorities: () => _present(
+                  AutomationUiPhase.authorities,
+                  model.refreshAuthorities,
+                ).ignore(),
+                onSelect: (id) => _present(
+                  AutomationUiPhase.job,
+                  () => model.selectJob(id),
+                ).ignore(),
+                onMore: () => _present(
+                  AutomationUiPhase.jobs,
+                  () => model.refreshJobs(more: true),
+                ).ignore(),
+                onShowPlan: () => _present(
+                  AutomationUiPhase.plan,
+                  () => model.loadPlan(job!['immutablePlanId'] as String),
+                ).ignore(),
+                onCancel: () => _present(
+                  AutomationUiPhase.cancelJob,
+                  () => model.jobAction(job!['id'] as String, reconcile: false),
+                ).ignore(),
+                onReconcile: () => _present(
+                  AutomationUiPhase.reconcile,
+                  () => model.jobAction(job!['id'] as String, reconcile: true),
+                ).ignore(),
               ),
-              jsonView('Результат и проверки задания', job),
-              jsonView(
-                'Последние 200 полученных событий · пропущено в источнике: ${model.droppedEvents}',
-                model.events,
+              AutomationAuthoritiesSection(
+                approvals: model.approvals,
+                delegations: model.delegations,
+                loaded: model.authoritiesLoaded,
+                hasMoreApprovals: model.approvalsNext != null,
+                hasMoreDelegations: model.delegationsNext != null,
+                actions: actions,
+                onOpenPlan: (id) => _present(
+                  AutomationUiPhase.plan,
+                  () => model.loadPlan(id),
+                ).ignore(),
+                onRevokeDelegation: (row) => _present(
+                  AutomationUiPhase.revokeDelegation,
+                  () => model.revokeDelegation(row),
+                ).ignore(),
+                onMoreApprovals: () => _present(
+                  AutomationUiPhase.authorities,
+                  () => model.moreAuthorities(approvals: true),
+                ).ignore(),
+                onMoreDelegations: () => _present(
+                  AutomationUiPhase.authorities,
+                  () => model.moreAuthorities(approvals: false),
+                ).ignore(),
               ),
             ],
-            ExpansionTile(
-              title: const Text('Запросы подтверждения этого сервера'),
-              children: [
-                if (model.authoritiesLoaded && model.approvals.isEmpty)
-                  const Text('Запросов пока нет'),
-                for (final row in model.approvals)
-                  ListTile(
-                    title: Text('${row['state']} · до ${row['expiresAt']}'),
-                    subtitle: Text('План ${row['planId']}'),
-                    enabled: !model.busy,
-                    onTap: () =>
-                        model.loadPlan(row['planId'] as String).ignore(),
-                  ),
-                if (model.approvalsNext != null)
-                  button(
-                    'Ещё запросы',
-                    () => model.moreAuthorities(approvals: true).ignore(),
-                  ),
-              ],
-            ),
-            ExpansionTile(
-              title: const Text('Делегированные версии'),
-              children: [
-                if (model.authoritiesLoaded && model.delegations.isEmpty)
-                  const Text('Делегирований пока нет'),
-                for (final row in model.delegations)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      jsonView(
-                        'ИИ ${row['grantId']} · до ${row['expiresAt']}${row['revokedAt'] != null ? ' · отозвано' : ''}',
-                        row,
-                      ),
-                      if (row['revokedAt'] == null)
-                        button(
-                          'Отозвать делегирование',
-                          () => model.revokeDelegation(row).ignore(),
-                          mutation: true,
-                        ),
-                    ],
-                  ),
-                if (model.delegationsNext != null)
-                  button(
-                    'Ещё делегирования',
-                    () => model.moreAuthorities(approvals: false).ignore(),
-                  ),
-              ],
-            ),
           ],
-        ],
+        ),
       ),
     );
   }

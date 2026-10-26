@@ -115,6 +115,30 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+  testWidgets('Space activates save once and Escape keeps form cleanup', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.enterText(field('name'), 'Space draft');
+    final save = find.widgetWithText(FilledButton, 'Сохранить');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    Focus.of(tester.element(find.text('Сохранить'))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(client.sent, hasLength(1));
+    expect(find.text('Сохранение не подтверждено'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(client.sent, hasLength(1));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileForm), findsNothing);
+    expect(launcher.hasFocus, isTrue);
+    expect(client.sent, hasLength(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets(
     'Esc cancels transient secret and clears owned buffer before disposal',
     (tester) async {
@@ -129,7 +153,7 @@ void main() {
       );
       final owned = credentials.password;
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Пароль'),
+        find.byKey(const ValueKey('credential-password')),
         ' synthetic secret ',
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -177,7 +201,7 @@ void main() {
       );
       final owned = credentials.password;
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Пароль'),
+        find.byKey(const ValueKey('credential-password')),
         ' synthetic password ',
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);

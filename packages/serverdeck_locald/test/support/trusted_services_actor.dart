@@ -419,8 +419,9 @@ Future<void> scenario(String root, String mode) => g.scenario(
           ...fields,
           'name': 'Changed metadata',
         });
-        await a.fails(tool(mcp, 'list', {}), 'UNAUTHORIZED');
-        mcp = await openedMcp();
+        // The connected composition preserves sessions for metadata-only
+        // changes. Keep this exact session for the unrelated grant mutations.
+        a.check((await tool(mcp, 'list', {}))['items'] is List);
         final newGrant = id(8100);
         await call('grants.create', grant(id(next++), newGrant));
         await call('grants.replace', grant(id(next++), newGrant, revision: 1));

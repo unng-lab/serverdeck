@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:serverdeck/main.dart' as app;
+import 'package:serverdeck/profiles/recovery_view.dart';
 import 'package:serverdeck_windows/client_bootstrap.dart';
 
 import '../packages/serverdeck_windows/test/support/ui_actor.dart';
@@ -187,7 +188,9 @@ void main() {
           expect(
             find.descendant(
               of: find.byType(Dialog),
-              matching: find.byType(Card),
+              matching: find.byWidgetPredicate(
+                (widget) => widget.key is RecentOperationReceiptKey,
+              ),
             ),
             findsNWidgets(3),
           );
@@ -230,7 +233,9 @@ void main() {
             expect(
               find.descendant(
                 of: find.byType(Dialog),
-                matching: find.byType(Card),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget.key is RecentOperationReceiptKey,
+                ),
               ),
               findsNWidgets(2),
             );

@@ -1,17 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:serverdeck_protocol/host_trust.dart' show HostTrustStatus;
+import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/operational_auth_client.dart';
 
+import '../theme/motion.dart';
+import '../theme/brand_tokens.dart';
 import 'server_controller.dart';
-import 'metrics_history.dart';
+import 'server_sections.dart';
 
 /// Remote operations use the same service as MCP through a verified owner RPC.
 class ServerPanel extends StatefulWidget {
-  const ServerPanel({super.key, required this.client, required this.profileId});
+  const ServerPanel({super.key, required this.client, required this.profile});
   final TrustedApiClient client;
-  final String profileId;
+  final ProfileView profile;
   @override
   State<ServerPanel> createState() => _ServerPanelState();
 }
@@ -19,6 +21,11 @@ class ServerPanel extends StatefulWidget {
 class _ServerPanelState extends State<ServerPanel> {
   late ServerController model;
   final _text = TextEditingController();
+  final _profileChanges = ValueNotifier(0);
+  bool _retired = false;
+  ServerPresentationOperation _operation = ServerPresentationOperation.read;
+  Object? _trustConfirmChallenge;
+  bool _dispatching = false, _wasBusy = false;
   String _resource = 'system.motd';
   @override
   void initState() {
@@ -27,338 +34,308 @@ class _ServerPanelState extends State<ServerPanel> {
   }
 
   void _create() {
+    _operation = ServerPresentationOperation.read;
+    _trustConfirmChallenge = null;
+    _wasBusy = false;
     model = ServerController(
       client: widget.client,
-      profileId: widget.profileId,
+      profileId: widget.profile.id,
     );
+    model.addListener(_observeOperation);
     model.refresh().ignore();
+  }
+
+  void _observeOperation() {
+    // A sampler/read that starts outside an explicit panel dispatch must not
+    // inherit an old write label. This observes existing owner notifications.
+    if (model.busy && !_wasBusy && !_dispatching) {
+      _operation = ServerPresentationOperation.read;
+      _trustConfirmChallenge = null;
+    }
+    _wasBusy = model.busy;
+  }
+
+  Future<void> _dispatch(
+    ServerPresentationOperation operation,
+    Future<void> Function() action,
+  ) async {
+    if (!mounted || _retired || model.busy || widget.client.isClosed) return;
+    _operation = operation;
+    _trustConfirmChallenge =
+        operation == ServerPresentationOperation.trustConfirm
+        ? model.trustChallenge
+        : null;
+    _dispatching = true;
+    late Future<void> result;
+    try {
+      result = action();
+    } finally {
+      _dispatching = false;
+    }
+    await result;
   }
 
   @override
   void didUpdateWidget(covariant ServerPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.client, widget.client) ||
-        oldWidget.profileId != widget.profileId) {
+        oldWidget.profile.id != widget.profile.id) {
+      model.removeListener(_observeOperation);
       model.dispose();
       _create();
     }
+    _profileChanges.value++;
   }
 
   @override
   void dispose() {
+    _retired = true;
+    _profileChanges.value++;
+    model.removeListener(_observeOperation);
     model.dispose();
     _text.dispose();
+    _profileChanges.dispose();
     super.dispose();
   }
 
-  Future<bool> _confirm(String title, Widget content, String action) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(title),
-          content: SingleChildScrollView(child: content),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Отмена'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(action),
-            ),
-          ],
-        ),
-      ) ??
-      false;
+  Future<bool> _confirm(String title, Widget content, String action) {
+    final profile = widget.profile;
+    return showServerConfirmationDialog(
+      context: context,
+      profile: profile,
+      title: title,
+      child: content,
+      confirmLabel: action,
+    );
+  }
 
   Future<void> _trust() async {
+    final owner = model;
     final challenge = model.trustChallenge;
     if (challenge == null) return;
-    if (await _confirm(
-          'Подтвердить SSH-ключ',
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Сверьте отпечаток с ключом вашего сервера.'),
-              const SizedBox(height: 12),
-              SelectableText(challenge.key.fingerprint),
-              const SizedBox(height: 8),
-              Text('Действует до ${challenge.expiresAt}'),
-            ],
-          ),
-          'Подтвердить',
-        ) &&
+    final profile = widget.profile;
+    if (await showMotionDialog<bool>(
+              context: context,
+              barrierDismissible: true,
+              builder: (context) => ServerTrustConfirmation(
+                challenge: challenge,
+                profile: profile,
+                changes: Listenable.merge([owner, _profileChanges]),
+                currentProfile: () =>
+                    mounted && !_retired ? widget.profile : null,
+                currentChallenge: () =>
+                    mounted && !_retired && identical(owner, model)
+                    ? model.trustChallenge
+                    : null,
+                onCancel: () => Navigator.pop(context, false),
+                onConfirm: () => Navigator.pop(context, true),
+              ),
+            ) ==
+            true &&
         mounted &&
-        identical(challenge, model.trustChallenge))
-      await model.confirmTrust();
+        identical(owner, model) &&
+        identical(challenge, model.trustChallenge) &&
+        serverTrustReviewIsCurrent(
+          challenge: challenge,
+          profile: profile,
+          currentProfile: widget.profile,
+          currentChallenge: model.trustChallenge,
+        ))
+      await _dispatch(
+        ServerPresentationOperation.trustConfirm,
+        model.confirmTrust,
+      );
   }
 
   Future<void> _executor() async {
+    final owner = model;
     final inspection = model.executorInspection;
     if (inspection == null) return;
-    final enrollment = inspection['enrollment'] as Map<String, Object?>;
-    final connection = enrollment['connection'] as Map<String, Object?>;
-    final key = connection['key'] as Map<String, Object?>;
-    if (await _confirm(
-          'Подтвердить исполнитель',
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Привязать исполнитель к этому серверу и его проверенному SSH-ключу?',
-              ),
-              const SizedBox(height: 12),
-              const Text('Идентификатор сервера'),
-              SelectableText(enrollment['hostId'] as String),
-              const SizedBox(height: 8),
-              const Text('SSH-ключ'),
-              SelectableText(key['fingerprint'] as String),
-              const SizedBox(height: 8),
-              Text('Версия: ${enrollment['runtimeVersion']}'),
-            ],
-          ),
-          'Привязать',
-        ) &&
+    final profile = widget.profile;
+    final changes = Listenable.merge([owner, _profileChanges]);
+    bool current() =>
         mounted &&
-        identical(inspection, model.executorInspection))
-      await model.confirmExecutor();
+        !_retired &&
+        identical(owner, model) &&
+        serverExecutorReviewIsCurrent(
+          inspection: inspection,
+          profile: profile,
+          currentProfile: widget.profile,
+          currentInspection: model.executorInspection,
+        );
+    var retired = !current();
+    void observe() => retired = retired || !current();
+    changes.addListener(observe);
+    try {
+      final confirmed = await showMotionDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => ServerExecutorConfirmation(
+          inspection: inspection,
+          profile: profile,
+          changes: changes,
+          currentProfile: () => mounted && !_retired ? widget.profile : null,
+          currentInspection: () =>
+              mounted && !_retired && identical(owner, model)
+              ? model.executorInspection
+              : null,
+          onCancel: () => Navigator.pop(context, false),
+          onConfirm: () => Navigator.pop(context, true),
+        ),
+      );
+      if (confirmed == true && !retired && current())
+        await _dispatch(
+          ServerPresentationOperation.executorWrite,
+          owner.confirmExecutor,
+        );
+    } finally {
+      changes.removeListener(observe);
+    }
   }
 
-  Map<String, Object?>? _value(String key) =>
-      (model.state?[key] as Map<String, Object?>?)?['value']
-          as Map<String, Object?>?;
-  String _quality(String key) {
-    final part = model.state?[key] as Map<String, Object?>?;
-    if (part?['stale'] == true)
-      return 'Устаревшие данные: ${part?['receivedAt']}';
-    return switch (part?['quality']) {
-      'known' => 'Получено ${part?['receivedAt']}',
-      'stale' => 'Устаревшие данные: ${part?['receivedAt']}',
-      'denied' => 'Недостаточно прав',
-      'unsupported' => 'Источник не поддерживается',
-      'incomplete' => 'Получены неполные данные',
-      _ => 'Данных пока нет',
-    };
+  Future<void> _revokeTrust() async {
+    if (await _confirm(
+          'Отозвать доверие',
+          const Text(
+            'Доступ к серверу будет остановлен до нового подтверждения ключа.',
+          ),
+          'Отозвать',
+        ) &&
+        mounted)
+      // This handler reads before its write. Without an owner phase marker a
+      // timeout cannot establish whether the revoke was dispatched or ACKed.
+      await _dispatch(
+        ServerPresentationOperation.trustRevoke,
+        model.revokeTrust,
+      );
   }
 
-  Widget _button(String text, Future<void> Function() action) => OutlinedButton(
-    onPressed: model.busy ? null : () => action().ignore(),
-    child: Text(text),
-  );
+  Future<void> _revokeExecutor() async {
+    if (await _confirm(
+          'Отозвать привязку',
+          const Text(
+            'Новые изменения через этот исполнитель будут недоступны.',
+          ),
+          'Отозвать',
+        ) &&
+        mounted)
+      await _dispatch(
+        ServerPresentationOperation.executorWrite,
+        model.revokeExecutor,
+      );
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
     builder: (context, _) {
-      final metrics = _value('metrics'), system = _value('system');
-      final memory = metrics?['memory'] as Map<String, Object?>?;
-      final disk = metrics?['rootDisk'] as Map<String, Object?>?;
-      final connected =
-          model.connection?.state == 'connected' &&
-          model.connection?.interested == true;
-      final logs = model.logs?['records'] as List? ?? const [];
+      // Keep the target and result that supplied these rows together. A later
+      // owner update must not relabel an already displayed record on tap.
+      final profile = widget.profile;
+      final logs = model.logs;
+      final recordContext = ServerLogRecordContext.capture(profile, logs);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(switch (model.connection?.state) {
-            'connected' =>
-              connected ? 'Подключён' : 'Подключён другим клиентом',
-            'connecting' => 'Подключение',
-            'closing' => 'Отключение',
-            _ => 'Не подключён',
-          }, style: Theme.of(context).textTheme.titleMedium),
-          if (model.busy) const LinearProgressIndicator(),
-          if (model.error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                _error(model.error!),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+          ServerOverviewSection(
+            state: model.state,
+            connection: ServerConnectionSection(
+              connection: model.connection,
+              trust: model.trust,
+              busy: model.busy,
+              error: model.error,
+              operation: _operation,
+              // confirmTrust clears the exact challenge only after its write
+              // reply, before its existing readback. Client closure also clears
+              // it, so that retirement must never be interpreted as an ACK.
+              trustWriteAcknowledged:
+                  _operation == ServerPresentationOperation.trustConfirm &&
+                  _trustConfirmChallenge != null &&
+                  model.trustChallenge == null &&
+                  !widget.client.isClosed,
+              hasTrustChallenge: model.trustChallenge != null,
+              onRefresh: () => _dispatch(
+                ServerPresentationOperation.read,
+                model.refresh,
+              ).ignore(),
+              onProbeTrust: () => _dispatch(
+                ServerPresentationOperation.read,
+                model.probeTrust,
+              ).ignore(),
+              onConfirmTrust: () => _trust().ignore(),
+              onConnect: () => _dispatch(
+                ServerPresentationOperation.connectionWrite,
+                model.connect,
+              ).ignore(),
+              onDisconnect: () => _dispatch(
+                ServerPresentationOperation.connectionWrite,
+                model.disconnect,
+              ).ignore(),
+              onRevokeTrust: () => _revokeTrust().ignore(),
+              onCancel: () {
+                _operation = ServerPresentationOperation.read;
+                _trustConfirmChallenge = null;
+                model.cancel().ignore();
+              },
             ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _button('Обновить подключение', model.refresh),
-              _button('Получить SSH-ключ', model.probeTrust),
-              if (model.trustChallenge != null)
-                _button('Подтвердить SSH-ключ', _trust),
-              _button(
-                connected ? 'Отключить' : 'Подключить',
-                connected ? model.disconnect : model.connect,
-              ),
-              if (model.trust?.trust?.status == HostTrustStatus.trusted)
-                _button('Отозвать доверие к SSH-ключу', () async {
-                  if (await _confirm(
-                        'Отозвать доверие',
-                        const Text(
-                          'Доступ к серверу будет остановлен до нового подтверждения ключа.',
-                        ),
-                        'Отозвать',
-                      ) &&
-                      mounted)
-                    await model.revokeTrust();
-                }),
-              if (model.busy)
-                TextButton(
-                  onPressed: () => model.cancel().ignore(),
-                  child: const Text('Отменить'),
-                ),
-            ],
           ),
-          const Divider(),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _button('Получить состояние', model.refreshState),
-              _button('Получить данные исполнителя', model.inspectExecutor),
-              if (model.executorInspection != null)
-                _button('Привязать исполнитель', _executor),
-              if (model.executor != null)
-                _button('Отозвать привязку исполнителя', () async {
-                  if (await _confirm(
-                        'Отозвать привязку',
-                        const Text(
-                          'Новые изменения через этот исполнитель будут недоступны.',
-                        ),
-                        'Отозвать',
-                      ) &&
-                      mounted)
-                    await model.revokeExecutor();
-                }),
-            ],
+          const SizedBox(height: BrandSpacing.space16),
+          ServerExecutorSection(
+            executor: model.executor,
+            hasInspection: model.executorInspection != null,
+            busy: model.busy,
+            onRefreshState: () => _dispatch(
+              ServerPresentationOperation.read,
+              model.refreshState,
+            ).ignore(),
+            onInspect: () => _dispatch(
+              ServerPresentationOperation.read,
+              model.inspectExecutor,
+            ).ignore(),
+            onConfirm: () => _executor().ignore(),
+            onRevoke: () => _revokeExecutor().ignore(),
           ),
-          if (model.executor != null)
-            Text('Исполнитель: ${model.executor!.hostId}'),
-          Text(
-            'Система: ${system?['hostname'] ?? '—'} · ${system?['architecture'] ?? '—'} · ${system?['kernel'] ?? '—'}',
-          ),
-          Text(_quality('system')),
-          Text(
-            'CPU: ${metrics?['cpuPercent'] ?? '—'}% · RAM: ${memory?['usedPercent'] ?? '—'}% · Диск /: ${disk?['usedPercent'] ?? '—'}%',
-          ),
-          Text(_quality('metrics')),
-          if (model.state?['history'] is List)
-            MetricsHistory(
-              points: (model.state!['history'] as List).cast<Object?>(),
-            ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _resource,
-            decoration: const InputDecoration(labelText: 'Управляемый ресурс'),
-            items: const [
-              DropdownMenuItem(
-                value: 'system.motd',
-                child: Text('Приветствие сервера'),
-              ),
-              DropdownMenuItem(
-                value: 'postgresql.service',
-                child: Text('Служба PostgreSQL'),
-              ),
-              DropdownMenuItem(
-                value: 'postgresql.settings',
-                child: Text('Настройки PostgreSQL'),
-              ),
-              DropdownMenuItem(
-                value: 'clickhouse.service',
-                child: Text('Служба ClickHouse'),
-              ),
-              DropdownMenuItem(
-                value: 'clickhouse.settings',
-                child: Text('Настройки ClickHouse'),
-              ),
-            ],
-            onChanged: model.busy
-                ? null
-                : (value) {
-                    if (value != null) setState(() => _resource = value);
-                  },
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _button(
-              'Прочитать ресурс',
+          const SizedBox(height: BrandSpacing.space16),
+          ServerConfigurationSection(
+            resource: _resource,
+            busy: model.busy,
+            onResourceChanged: (value) {
+              if (value != null) setState(() => _resource = value);
+            },
+            onRead: () => _dispatch(
+              ServerPresentationOperation.read,
               () => model.readConfiguration(_resource),
-            ),
+            ).ignore(),
+            result: model.configuration == null
+                ? null
+                : _Configuration(value: model.configuration!),
           ),
-          if (model.configuration != null)
-            _Configuration(value: model.configuration!),
-          const Divider(),
-          TextField(
-            controller: _text,
-            maxLength: 256,
-            decoration: const InputDecoration(labelText: 'Фильтр журнала'),
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              _button(
-                'Получить журнал',
-                () => model.loadLogs(text: _text.text),
+          const SizedBox(height: BrandSpacing.space16),
+          ServerLogsSection(
+            logs: logs,
+            filterController: _text,
+            busy: model.busy,
+            onLoad: () => _dispatch(
+              ServerPresentationOperation.read,
+              () => model.loadLogs(text: _text.text),
+            ).ignore(),
+            onPrevious: () => _dispatch(
+              ServerPresentationOperation.read,
+              () => model.loadLogs(
+                text: _text.text,
+                cursor: logs!['nextCursor'] as String,
               ),
-              if (model.logs?['nextCursor'] is String)
-                _button(
-                  'Предыдущие записи',
-                  () => model.loadLogs(
-                    text: _text.text,
-                    cursor: model.logs!['nextCursor'] as String,
-                  ),
-                ),
-            ],
-          ),
-          if (model.logs != null)
-            Text(
-              'UTC · ${_status(model.logs!['quality'])} · записей: ${logs.length}',
-            ),
-          if (model.logs?['gaps'] == true || model.logs?['truncated'] == true)
-            const Text(
-              'Журнал неполный: часть записей пропущена или ограничена.',
-            ),
-          if (model.logs?['quality'] == 'known' && logs.isEmpty)
-            const Text('Записей по выбранному фильтру нет.'),
-          if (model.logs != null &&
-              model.logs?['quality'] != 'known' &&
-              logs.isEmpty)
-            const Text('Подтверждённые записи журнала не получены.'),
-          if (logs.isNotEmpty)
-            SizedBox(
-              height: 320,
-              child: ListView.builder(
-                itemCount: logs.length,
-                itemBuilder: (context, index) {
-                  final row = logs[index] as Map<String, Object?>;
-                  return ListTile(
-                    title: Text('${row['timestamp']}'),
-                    subtitle: Text(
-                      '${row['message']}',
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: const Icon(Icons.open_in_full),
-                    onTap: () => showDialog<void>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text('${row['timestamp']} UTC'),
-                        content: SizedBox(
-                          width: 640,
-                          child: SingleChildScrollView(
-                            child: SelectableText('${row['message']}'),
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Закрыть'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+            ).ignore(),
+            onOpenRecord: (row) => showMotionDialog<void>(
+              context: context,
+              barrierDismissible: true,
+              builder: (context) => ServerLogRecordDialog(
+                recordContext: recordContext,
+                record: row,
+                onClose: () => Navigator.pop(context),
               ),
             ),
+          ),
         ],
       );
     },
@@ -410,7 +387,6 @@ class _ConfigurationState extends State<_Configuration> {
 
   @override
   Widget build(BuildContext context) {
-    final observation = value['observation'] as Map<String, Object?>;
     final comparison = value['comparison'] as Map<String, Object?>;
     var comparisonStatus = comparison['status'];
     if (const {'matched', 'drift'}.contains(comparisonStatus)) {
@@ -421,103 +397,9 @@ class _ConfigurationState extends State<_Configuration> {
       if (age == null || age.isNegative || age > const Duration(seconds: 15))
         comparisonStatus = 'stale';
     }
-    final desired = value['desired'] as Map<String, Object?>?;
-    final expected = value['expected'] as Map<String, Object?>?;
-    final differences = (comparison['differences'] as List)
-        .cast<Map<String, Object?>>();
-    final facts = observation['value'] as Map<String, Object?>?;
-    final fields = facts?['values'] as Map<String, Object?>?;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${observation['resourceId']} · ${_status(observation['status'])}',
-        ),
-        if (comparison['observedAt'] != null)
-          Text('Наблюдение: ${comparison['observedAt']} · UTC'),
-        Text(switch (comparisonStatus) {
-          'matched' => 'Желаемые и фактические значения совпадают.',
-          'drift' => 'Найдены расхождения с желаемыми значениями.',
-          'stale' => 'Для сравнения нужны свежие данные.',
-          'unmanaged' => 'Успешных применений настроек этого ресурса ещё нет.',
-          _ => switch (comparison['reason']) {
-            'target-changed' => 'После успешного применения изменились данные цели. Сравнение не подтверждено.',
-            'recipe-evidence' =>
-              'Данных рецепта для сравнения пока недостаточно.',
-            _ => 'Сравнение пока не подтверждено.',
-          },
-        }),
-        if (desired != null) ...[
-          Text('Желаемая версия: ${desired['desiredRevision']}'),
-          Text('Успешное применение: ${comparison['confirmedAt']} · UTC'),
-          if (comparison['basis'] == 'file')
-            const Text('Сравнивается управляемый файл конфигурации.'),
-          if (comparison['basis'] == 'service')
-            const Text('Сравниваются состояние службы и автозапуск.'),
-          if (expected?['values'] case final Map<String, Object?> values)
-            for (final field in values.entries)
-              SelectableText('Желаемое ${field.key}: ${field.value}'),
-          if (expected?['kind'] == 'service') ...[
-            if (expected?['activeState'] != null)
-              Text('Желаемое состояние: ${expected!['activeState']}'),
-            if (expected?['unitFileState'] != null)
-              Text('Желаемый автозапуск: ${expected!['unitFileState']}'),
-          ],
-          if (expected?['kind'] == 'recipe')
-            Text('Рецепт: ${expected!['id']} ${expected['version']}'),
-        ],
-        if (differences.isNotEmpty) ...[
-          const Text('Расхождения:'),
-          for (final difference in differences)
-            difference['field'] == 'fileDigest'
-                ? const Text('Изменилось содержимое управляемого файла.')
-                : SelectableText(
-                    '${difference['field']}: ожидалось ${difference['desired']}, получено ${difference['observed']}',
-                  ),
-        ],
-        if (facts == null)
-          const Text('Подтверждённых данных пока нет.')
-        else if (fields != null) ...[
-          for (final field in fields.entries)
-            SelectableText('${field.key}: ${field.value}'),
-        ] else ...[
-          if (facts['exists'] == false) const Text('Файл отсутствует.'),
-          if (facts['activeState'] != null)
-            Text('Состояние службы: ${facts['activeState']}'),
-          if (facts['unitFileState'] != null)
-            Text('Автозапуск: ${facts['unitFileState']}'),
-        ],
-      ],
+    return ServerConfigurationResult(
+      value: value,
+      comparisonStatus: comparisonStatus,
     );
   }
 }
-
-String _status(Object? value) => switch (value) {
-  'known' => 'Данные получены',
-  'stale' => 'Данные устарели',
-  'incomplete' => 'Неполные данные',
-  'denied' => 'Недостаточно прав',
-  'unsupported' => 'Не поддерживается',
-  'error' => 'Ошибка чтения',
-  _ => 'Данных пока нет',
-};
-
-String _error(String code) => switch (code) {
-  'TRUST_REQUIRED' => 'Подтвердите SSH-ключ сервера.',
-  'TRUST_CHANGED' ||
-  'REVISION_CONFLICT' => 'Данные сервера изменились. Получите их повторно.',
-  'EXECUTOR_UNAVAILABLE' =>
-    'Исполнитель не настроен или недоступен на сервере.',
-  'RUNTIME_INCOMPATIBLE' ||
-  'INCOMPATIBLE' => 'Версия исполнителя не соответствует приложению.',
-  'FORBIDDEN' => 'Недостаточно прав для этой операции.',
-  'CANCELLED' => 'Операция отменена.',
-  'TIMEOUT' =>
-    'Время ожидания истекло. Проверьте состояние перед повторной попыткой.',
-  'CURSOR_EXPIRED' => 'Страница журнала устарела. Получите журнал заново.',
-  'NOT_READY' => 'Сначала подключитесь к серверу.',
-  'NOT_FOUND' => 'Запрос устарел или сервер удалён. Получите данные повторно.',
-  'RESOURCE_LIMIT' ||
-  'HOST_BUSY' => 'Ресурс занят. Дождитесь завершения текущей операции.',
-  _ => 'Операция не выполнена. Проверьте доступность сервиса.',
-};

@@ -62,8 +62,15 @@ void main() {
     'deleted': form == _Form.delete,
   };
   Future<void> click(WidgetTester tester, String label) async {
+    // Let a preceding field edit finish its automatic focus scrolling first.
+    await tester.pumpAndSettle();
     final target = find.text(label);
-    await tester.ensureVisible(target);
+    final button = find.ancestor(
+      of: target,
+      matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+    );
+    // Scroll the complete control, including its touch area, into the dialog.
+    await tester.ensureVisible(button.evaluate().length == 1 ? button : target);
     await tester.pumpAndSettle();
     await tester.tap(target);
     await tester.pumpAndSettle();

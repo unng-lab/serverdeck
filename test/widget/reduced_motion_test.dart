@@ -63,43 +63,50 @@ void main() {
     },
   );
 
-  testWidgets('production reduced drawer and profile dialog have zero routes', (
-    tester,
-  ) async {
-    final client = fixture.ModelClient();
-    final bootstrap = fixture.ModelBootstrap(client)
-      ..show(ReadinessState.ready);
-    await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
-    client.events.add(fixture.snapshot());
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Создать профиль'));
-    await tester.pump();
-    expect(
-      (ModalRoute.of(
+  testWidgets(
+    'reduced profile dialog has zero transition and adaptive navigation retains its route',
+    (tester) async {
+      final client = fixture.ModelClient();
+      final bootstrap = fixture.ModelBootstrap(client)
+        ..show(ReadinessState.ready);
+      await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
+      client.events.add(fixture.snapshot());
+      await tester.pumpAndSettle();
+      final settings = find.byKey(
+        const ValueKey('foundation-navigation-settings'),
+      );
+      final baseRoute =
+          ModalRoute.of(tester.element(settings)) as TransitionRoute;
+      await tester.tap(find.text('Создать профиль'));
+      await tester.pump();
+      final profileRoute = ModalRoute.of(
         tester.element(find.text('Сохранить')),
-      ) as TransitionRoute).transitionDuration,
-      Duration.zero,
-    );
-    await tester.ensureVisible(find.text('Отмена'));
-    await tester.tap(find.text('Отмена'));
-    await tester.pump();
-    await tester.tap(find.byTooltip('Открыть меню навигации'));
-    await tester.pump();
-    expect(find.byType(Drawer), findsOneWidget);
-    expect(
-      (ModalRoute.of(
-        tester.element(find.text('Настройки').last),
-      ) as TransitionRoute).transitionDuration,
-      Duration.zero,
-    );
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Настройки'));
-    await tester.pump();
-    expect(find.byType(Drawer), findsNothing);
-    expect(find.text('Тема: тёмная'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await client.events.close();
-    await client.readErrors.close();
-  });
+      ) as TransitionRoute;
+      expect(profileRoute, isNot(same(baseRoute)));
+      expect(profileRoute.transitionDuration, Duration.zero);
+      await tester.ensureVisible(find.text('Отмена'));
+      await tester.tap(find.text('Отмена'));
+      await tester.pump();
+      expect(ModalRoute.of(tester.element(settings)), same(baseRoute));
+      expect(baseRoute.isCurrent, isTrue);
+      expect(baseRoute.animation!.status, AnimationStatus.completed);
+      expect(baseRoute.animation!.value, 1);
+      await tester.ensureVisible(settings);
+      await tester.pump();
+      expect(settings.hitTestable(), findsOneWidget);
+      await tester.tap(settings);
+      await tester.pump();
+      expect(ModalRoute.of(tester.element(settings)), same(baseRoute));
+      expect(baseRoute.isCurrent, isTrue);
+      expect(baseRoute.animation!.status, AnimationStatus.completed);
+      expect(baseRoute.animation!.value, 1);
+      expect(Navigator.of(tester.element(settings)).canPop(), isFalse);
+      expect(find.text('Тема: тёмная'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await client.events.close();
+      await client.readErrors.close();
+    },
+  );
 
   for (final os in [false, true]) {
     for (final saved in [false, true]) {

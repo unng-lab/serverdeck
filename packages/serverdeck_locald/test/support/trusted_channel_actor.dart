@@ -841,7 +841,10 @@ Future<void> client(List<String> args) async {
       }
     } else {
       final unknown = await rpc.call('grants.list', {});
-      n.check((unknown['error'] as Map)['code'] == 'UNSUPPORTED');
+      n.check(
+        (unknown['error'] as Map)['code'] ==
+            (mode == 'owner-blocked' ? 'STORAGE_BLOCKED' : 'UNSUPPORTED'),
+      );
       if (mode == 'owner-blocked') {
         final blocked = await rpc.call('fixture.wait', {
           'invalid': 'must not execute',

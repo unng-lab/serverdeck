@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/main.dart';
+import 'package:serverdeck/profiles/profile_list.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck_protocol/models.dart';
 
@@ -8,7 +9,7 @@ import '../contract/profile_controller_test.dart' as fixtures;
 
 void main() {
   testWidgets(
-    'real app projects service profiles, target and settings without secret input',
+    'real app retains profile data and privacy across adaptive settings navigation',
     (tester) async {
       final client = fixtures.ModelClient();
       final bootstrap = fixtures.ModelBootstrap(client)
@@ -19,10 +20,8 @@ void main() {
       client.events.add(fixtures.snapshot());
       await tester.pumpAndSettle();
       expect(find.text('Saved profile'), findsOneWidget);
-      expect(
-        find.text('Saved profile · 192.0.2.1:22\nНе подключён'),
-        findsOneWidget,
-      );
+      expect(find.text('Saved profile · 192.0.2.1:22'), findsOneWidget);
+      expect(find.textContaining('Не подключён'), findsNothing);
       await tester.tap(find.text('Saved profile'));
       await tester.pumpAndSettle();
       expect(find.text('Пользователь SSH: admin'), findsOneWidget);
@@ -44,10 +43,16 @@ void main() {
       expect(client.refreshes, before + 1);
       client.events.add(fixtures.snapshot());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Открыть меню навигации'));
+      final settings = find.byKey(
+        const ValueKey('foundation-navigation-settings'),
+      );
+      final route = ModalRoute.of(tester.element(settings));
+      await tester.ensureVisible(settings);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Настройки'));
+      expect(settings.hitTestable(), findsOneWidget);
+      await tester.tap(settings);
       await tester.pumpAndSettle();
+      expect(ModalRoute.of(tester.element(settings)), same(route));
       expect(find.text('Тема: тёмная'), findsOneWidget);
       expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
       client.readErrors.add(ErrorCode.internal);
@@ -121,8 +126,20 @@ void main() {
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
           await tester.pumpAndSettle();
           expect(media.size.width, size.width);
-          await tester.ensureVisible(find.text(raw['name'] as String));
-          await tester.tap(find.text(raw['name'] as String));
+          final scrollable = find
+              .descendant(
+                of: find.byType(ProfileList),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          final tile = find.byKey(const ValueKey(fixtures.profileId));
+          await tester.scrollUntilVisible(tile, 200, scrollable: scrollable);
+          final disclosure = find
+              .descendant(of: tile, matching: find.byType(Icon))
+              .first;
+          await tester.ensureVisible(disclosure);
+          await tester.pumpAndSettle();
+          await tester.tap(disclosure);
           await tester.pumpAndSettle();
           await tester.ensureVisible(
             find.text('Подключение к серверу пока недоступно'),

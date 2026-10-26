@@ -134,27 +134,9 @@ void main() {
           );
           final stdoutResult = owner.stdout.transform(utf8.decoder).join();
           final stderrResult = owner.stderr.transform(utf8.decoder).join();
-          if (run == 0) {
-            // A contender must not bind the service before its first actual
-            // owner/MCP session, nor acquire a keeper session of its own.
-            final coldLocal = Directory(p.join(root, 'cold-contender-local'))
-              ..createSync();
-            final contender = await Process.run(
-              p.join(bundle.path, 'locald.exe'),
-              ['--workspace', 'default', '--app-root', bundle.path],
-              environment: {'LOCALAPPDATA': coldLocal.path},
-            ).timeout(const Duration(seconds: 35));
-            expect(
-              contender.exitCode,
-              0,
-              reason: '${contender.stdout}\n${contender.stderr}',
-            );
-            expect(contender.stderr, isEmpty);
-            expect(coldLocal.listSync(), isEmpty);
-          }
-          if (run == 4 || run == 5) {
+          if (run == 0 || run == 4 || run == 5) {
             // Protected publication follows owner mutex acquisition. Confirm
-            // this launched owner before observer setup and the pending timer.
+            // this launched owner before starting a losing contender or observer.
             final publicationWatch = Stopwatch()..start();
             final publishedDiscovery = DiscoveryFile(
               localAppData: local.path,
@@ -191,6 +173,24 @@ void main() {
               }
               await Future<void>.delayed(const Duration(milliseconds: 100));
             }
+          }
+          if (run == 0) {
+            // A contender must not bind the service before its first actual
+            // owner/MCP session, nor acquire a keeper session of its own.
+            final coldLocal = Directory(p.join(root, 'cold-contender-local'))
+              ..createSync();
+            final contender = await Process.run(
+              p.join(bundle.path, 'locald.exe'),
+              ['--workspace', 'default', '--app-root', bundle.path],
+              environment: {'LOCALAPPDATA': coldLocal.path},
+            ).timeout(const Duration(seconds: 35));
+            expect(
+              contender.exitCode,
+              0,
+              reason: '${contender.stdout}\n${contender.stderr}',
+            );
+            expect(contender.stderr, isEmpty);
+            expect(coldLocal.listSync(), isEmpty);
           }
           late final ProcessResult client;
           if (run == 0 || run >= 4) {

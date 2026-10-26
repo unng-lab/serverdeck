@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/shell/error_view.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
+import 'package:serverdeck/ui/deck_components.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode;
 
 void main() {
@@ -25,6 +26,8 @@ void main() {
       );
       expect(categories.add(ReadErrorView.category(code)), isTrue);
       expect(find.text(ReadErrorView.category(code)), findsOneWidget);
+      expect(find.byType(DeckNotice), findsOneWidget);
+      expect(find.byType(DeckStatus), findsOneWidget);
       if (find.text('Повторить чтение').evaluate().isNotEmpty) {
         await tester.tap(find.text('Повторить чтение'));
       } else if (find.text('Повторить проверку службы').evaluate().isNotEmpty) {

@@ -9,3 +9,10 @@ native/isar-3.3.2/Cargo.lock -text
 native/isar-3.3.2/licenses/** -text
 # Preserve exact upstream license bytes, including their original whitespace.
 executor/licenses/** -text -whitespace
+# Canonical design snapshots are pinned by SHA-256, including line endings.
+docs/brandbook/tokens/serverdeck.tokens.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/design/DESIGN.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/design/ServerDeck-design.html -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/design/screens.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve the upstream OFL notice byte-for-byte, including its trailing space.
+assets/brand/fonts/OFL-NotoSansSC.txt -text -whitespace

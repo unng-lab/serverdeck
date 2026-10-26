@@ -51,6 +51,7 @@ void main() {
                   builder: (context, child) => MediaQuery(
                     data: MediaQuery.of(context).copyWith(
                       textScaler: const TextScaler.linear(2),
+                      viewInsets: const EdgeInsets.only(bottom: 300),
                       disableAnimations: true,
                     ),
                     child: child!,

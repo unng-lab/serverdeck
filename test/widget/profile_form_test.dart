@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/profiles/profile_controller.dart';
 import 'package:serverdeck/profiles/profile_form.dart';
+import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck_protocol/models.dart';
@@ -129,6 +130,55 @@ void main() {
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
     expect(find.byType(ProfileForm), findsNothing);
+    expect(client.sent, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+    await bootstrap.close();
+    await client.events.close();
+    await client.readErrors.close();
+  });
+
+  testWidgets('readiness loss removes private form and clears secret editors', (
+    tester,
+  ) async {
+    final client = MutationClient();
+    final bootstrap = fixture.ModelBootstrap(client)
+      ..show(ReadinessState.ready);
+    final model = ProfileController(bootstrap: bootstrap);
+    client.events.add(fixture.snapshot());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.light,
+        home: ProfileForm(model: model, initial: model.profiles.single),
+      ),
+    );
+    await tester.ensureVisible(find.text('Сохранить существующий'));
+    await tester.tap(find.text('Сохранить существующий'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Новый пароль').last);
+    await tester.pumpAndSettle();
+    final credential = tester.state<CredentialInputState>(
+      find.byType(CredentialInput),
+    );
+    credential.password.text = 'synthetic private marker';
+    final password = credential.password;
+    bootstrap.show(ReadinessState.unavailable);
+    await tester.pumpAndSettle();
+    expect(find.byType(CredentialInput), findsNothing);
+    expect(find.byType(Form), findsNothing);
+    expect(find.textContaining('Saved profile'), findsNothing);
+    expect(find.textContaining('synthetic private marker'), findsNothing);
+    expect(password.text, isEmpty);
+    bootstrap.show(ReadinessState.ready);
+    client.events.add(fixture.snapshot());
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .state<CredentialInputState>(find.byType(CredentialInput))
+          .password
+          .text,
+      isEmpty,
+    );
     expect(client.sent, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();

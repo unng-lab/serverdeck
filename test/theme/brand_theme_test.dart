@@ -10,6 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/main.dart';
 import 'package:serverdeck/theme/brand_assets.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
+import 'package:serverdeck/theme/brand_tokens.dart';
+import 'package:serverdeck/theme/motion.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -77,6 +79,188 @@ void main() {
       );
     }
   });
+
+  test('all brand text roles and both themes share the bundled fallback', () {
+    expect(BrandAssets.fontFamilyFallback, [BrandAssets.unicodeFont]);
+    for (final style in [
+      BrandTypography.button,
+      BrandTypography.tableHeader,
+      BrandTypography.body,
+      BrandTypography.table,
+      BrandTypography.log,
+      BrandTypography.title,
+      BrandTypography.label,
+      BrandTypography.caption,
+    ]) {
+      expect(style.fontFamilyFallback, BrandAssets.fontFamilyFallback);
+    }
+    for (final theme in [BrandTheme.light, BrandTheme.dark]) {
+      for (final text in [theme.textTheme, theme.primaryTextTheme]) {
+        for (final style in [
+          text.displayLarge,
+          text.displayMedium,
+          text.displaySmall,
+          text.headlineLarge,
+          text.headlineMedium,
+          text.headlineSmall,
+          text.titleLarge,
+          text.titleMedium,
+          text.titleSmall,
+          text.bodyLarge,
+          text.bodyMedium,
+          text.bodySmall,
+          text.labelLarge,
+          text.labelMedium,
+          text.labelSmall,
+        ]) {
+          expect(style!.fontFamily, BrandAssets.uiFont);
+          expect(style.fontFamilyFallback, BrandAssets.fontFamilyFallback);
+        }
+      }
+    }
+  });
+
+  testWidgets('production buttons use the button role instead of caption', (
+    tester,
+  ) async {
+    for (final theme in [BrandTheme.light, BrandTheme.dark]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Column(
+              children: [
+                FilledButton(onPressed: () {}, child: const Text('Filled')),
+                OutlinedButton(onPressed: () {}, child: const Text('Outlined')),
+                TextButton(onPressed: () {}, child: const Text('Text')),
+              ],
+            ),
+          ),
+        ),
+      );
+      for (final label in ['Filled', 'Outlined', 'Text']) {
+        final style = DefaultTextStyle.of(tester.element(find.text(label)))
+            .style;
+        expect(style.fontFamily, BrandAssets.uiFont);
+        expect(style.fontSize, 13, reason: '$label font size');
+        expect(style.height! * style.fontSize!, closeTo(20, 0.000001));
+        expect(style.fontWeight, FontWeight.w600);
+      }
+    }
+  });
+
+  test('geometry and explicit text roles retain the presentation contract', () {
+    expect(
+      [
+        BrandSpacing.space4,
+        BrandSpacing.space8,
+        BrandSpacing.space12,
+        BrandSpacing.space16,
+        BrandSpacing.space24,
+        BrandSpacing.space32,
+        BrandSpacing.space48,
+      ],
+      [4, 8, 12, 16, 24, 32, 48],
+    );
+    expect(
+      [
+        BrandGeometry.radiusControl,
+        BrandGeometry.radiusCard,
+        BrandGeometry.radiusDialog,
+      ],
+      [8, 12, 16],
+    );
+    expect(
+      [
+        BrandGeometry.iconSize,
+        BrandGeometry.focusWidth,
+        BrandGeometry.focusGap,
+        BrandGeometry.minTarget,
+      ],
+      [20, 2, 2, 44],
+    );
+    expect([BrandAssets.logoMinWidth, BrandAssets.markMinSize], [140, 24]);
+    for (final style in [BrandTypography.button, BrandTypography.tableHeader]) {
+      expect(style.fontSize, 13);
+      expect(style.height! * style.fontSize!, closeTo(20, 0.000001));
+      expect(style.fontWeight, FontWeight.w600);
+    }
+    expect(BrandTypography.caption.fontSize, 12);
+    expect(
+      BrandTypography.caption.height! * BrandTypography.caption.fontSize!,
+      16,
+    );
+    expect(BrandTypography.caption.fontWeight, FontWeight.w400);
+  });
+
+  test(
+    'used text, status, control and focus pairs meet contrast in both themes',
+    () {
+      double contrast(Color a, Color b) {
+        final x = a.computeLuminance(), y = b.computeLuminance();
+        return ((x > y ? x : y) + .05) / ((x > y ? y : x) + .05);
+      }
+
+      for (final theme in [BrandTheme.light, BrandTheme.dark]) {
+        final c = theme.extension<BrandColors>()!;
+        for (final surface in [
+          'bg',
+          'surface',
+          'raised',
+          'hover',
+          'selected',
+        ]) {
+          for (final role in ['text', 'muted', 'disabled']) {
+            expect(
+              contrast(c[role], c[surface]),
+              greaterThanOrEqualTo(4.5),
+              reason: '$role on $surface / ${theme.brightness}',
+            );
+          }
+          for (final role in ['control', 'focus']) {
+            expect(
+              contrast(c[role], c[surface]),
+              greaterThanOrEqualTo(3),
+              reason: '$role on $surface / ${theme.brightness}',
+            );
+          }
+        }
+        for (final role in [
+          'available',
+          'unavailable',
+          'unknown',
+          'warning',
+          'error',
+          'running',
+          'success',
+        ]) {
+          expect(
+            contrast(c[role], c['surface']),
+            greaterThanOrEqualTo(4.5),
+            reason: '$role status text / ${theme.brightness}',
+          );
+        }
+        for (final surface in ['accent', 'accentHover']) {
+          expect(
+            contrast(c['onAccent'], c[surface]),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+        final reduced = Motion.theme(theme, true);
+        for (final style in [
+          reduced.filledButtonTheme.style!,
+          reduced.elevatedButtonTheme.style!,
+          reduced.outlinedButtonTheme.style!,
+          reduced.textButtonTheme.style!,
+          reduced.iconButtonTheme.style!,
+        ]) {
+          expect(style.animationDuration, Duration.zero);
+          expect(style.backgroundBuilder, isNotNull);
+          expect(style.minimumSize!.resolve({}), const Size(44, 44));
+        }
+      }
+    },
+  );
 
   test(
     'bundle contains original fonts, license and decodable current logos',

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/automation/profile_body.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/mcp/operations.dart';
+import 'package:serverdeck_protocol/executor_recipes.dart';
 import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/operational_auth_client.dart';
 
@@ -646,6 +647,60 @@ class AutomationController extends ChangeNotifier {
       catalog = value['catalog'] as Map<String, Object?>;
     }),
   );
+
+  Future<void> createRecipePlan(String recipeDigest) {
+    if (!canMutate) return Future.value();
+    final available = captureExecutorRecipes(
+      catalog ?? (throw StateError('VALIDATION')),
+    );
+    if (available['installEnabled'] != true) throw StateError('UNSUPPORTED');
+    final recipe = (available['recipes'] as List)
+        .cast<Map<String, Object?>>()
+        .singleWhere((row) => row['digest'] == recipeDigest);
+    final target = _target;
+    final body = AutomationBody.fromJson({
+      'format': 1,
+      'environment': available['environment'],
+      'parameters': <String, Object?>{},
+      'steps': [
+        {
+          'id': 'install',
+          'kind': 'install_recipe',
+          'recipeDigest': recipe['digest'],
+          'version': recipe['version'],
+        },
+      ],
+    }).toJson();
+    // Both identities survive a lost response and retry of this same action.
+    final profileRequest = newRequestId(), planRequest = newRequestId();
+    final name = recipe['id'] == 'postgresql16'
+        ? 'Установка PostgreSQL 16'
+        : 'Установка ClickHouse';
+    plan = null;
+    return _run(
+      _Action('План установки', true, (epoch) async {
+        final saved = await _direct('automation.profiles.create', {
+          'requestId': profileRequest,
+          'name': name,
+          'description':
+              'Чистая установка ${recipe['id']} ${recipe['version']}. Рецепт ${recipe['digest']}.',
+          'body': body,
+        }, epoch);
+        final id = saved['profileId'] as String,
+            version = saved['revision'] as int;
+        await _select(id, epoch, version: version);
+        final created = await _async('plans.create', {
+          'requestId': planRequest,
+          'serverId': target,
+          'profileId': id,
+          'revision': version,
+          'parameters': <String, Object?>{},
+        }, epoch);
+        await _loadPlan(created['planId'] as String, epoch);
+        await _profiles(epoch);
+      }),
+    );
+  }
 
   @override
   void dispose() {

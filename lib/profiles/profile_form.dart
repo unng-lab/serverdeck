@@ -7,7 +7,10 @@ import 'package:serverdeck_windows/profile_input.dart';
 
 import '../bootstrap/local_api_client.dart';
 import '../shell/readiness_view.dart';
+import '../shell/error_view.dart';
 import '../shell/form_keyboard.dart';
+import '../theme/brand_tokens.dart';
+import '../ui/deck_components.dart';
 import 'credential_input.dart';
 import 'mutation_controller.dart';
 import 'mutation_status.dart';
@@ -53,6 +56,7 @@ class _ProfileFormState extends State<ProfileForm> {
   late final String id;
   String? revision, inputError;
   bool _reloading = false;
+  bool _readingError = false;
 
   @override
   void initState() {
@@ -78,6 +82,7 @@ class _ProfileFormState extends State<ProfileForm> {
 
   Future<void> _save() async {
     if (_reloading ||
+        _readingError ||
         widget.model.bootstrap.state != ReadinessState.ready ||
         mutation.state != MutationPresentation.idle ||
         !widget.model.loaded ||
@@ -109,7 +114,7 @@ class _ProfileFormState extends State<ProfileForm> {
   }
 
   Future<void> _reload() async {
-    if (_reloading || mutation.busy) return;
+    if (_reloading || _readingError || mutation.busy) return;
     setState(() => _reloading = true);
     await widget.model.refresh();
     if (!mounted) return;
@@ -131,6 +136,27 @@ class _ProfileFormState extends State<ProfileForm> {
         mutation.reset();
       }
     });
+  }
+
+  Future<void> _readAgain() async {
+    if (_readingError ||
+        _reloading ||
+        (mutation.busy && mutation.state == MutationPresentation.committed))
+      return;
+    final model = widget.model;
+    setState(() => _readingError = true);
+    try {
+      await model.refresh();
+    } finally {
+      if (mounted && identical(widget.model, model)) {
+        setState(() => _readingError = false);
+      }
+    }
+  }
+
+  void _readCommitted() {
+    if (_readingError || _reloading) return;
+    mutation.refreshCommitted().ignore();
   }
 
   void _close() {
@@ -166,25 +192,38 @@ class _ProfileFormState extends State<ProfileForm> {
     String field,
     String label,
     bool enabled,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: SubmitOnEnter(
-      enabled: enabled && field != 'tags',
-      child: TextFormField(
-        key: ValueKey('profile-$field'),
-        controller: controller,
-        enabled: enabled,
-        autofocus: field == 'name',
-        onFieldSubmitted: field == 'tags' ? null : (_) => _save().ignore(),
-        decoration: InputDecoration(labelText: label),
-        validator: (value) => _validate(field, value),
-        minLines: field == 'tags' ? 2 : 1,
-        maxLines: field == 'tags' ? 4 : 1,
-        textInputAction: field == 'tags'
-            ? TextInputAction.newline
-            : TextInputAction.done,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      // Floating InputDecorator labels elide long instructions at200%. Keep
+      // the whole label visible and associate it with the same keyed input.
+      ExcludeSemantics(
+        child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
       ),
-    ),
+      const SizedBox(height: BrandSpacing.space8),
+      Semantics(
+        label: label,
+        child: SubmitOnEnter(
+          enabled: enabled && field != 'tags',
+          child: TextFormField(
+            key: ValueKey('profile-$field'),
+            controller: controller,
+            enabled: enabled,
+            // Keep the canonical opaque body style while the draft is locked.
+            style: Theme.of(context).textTheme.bodyLarge,
+            autofocus: field == 'name',
+            onFieldSubmitted: field == 'tags' ? null : (_) => _save().ignore(),
+            decoration: const InputDecoration(),
+            validator: (value) => _validate(field, value),
+            minLines: field == 'tags' ? 2 : 1,
+            maxLines: field == 'tags' ? 4 : 1,
+            textInputAction: field == 'tags'
+                ? TextInputAction.newline
+                : TextInputAction.done,
+          ),
+        ),
+      ),
+    ],
   );
 
   @override
@@ -197,128 +236,135 @@ class _ProfileFormState extends State<ProfileForm> {
     builder: (context, _) {
       final ready = widget.model.bootstrap.state == ReadinessState.ready;
       final editable =
-          ready && !_reloading && mutation.state == MutationPresentation.idle;
+          ready &&
+          !_reloading &&
+          !_readingError &&
+          mutation.state == MutationPresentation.idle;
+      final close = OutlinedButton(
+        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: _close,
+        child: Text(
+          !ready || mutation.state != MutationPresentation.idle
+              ? 'Закрыть'
+              : 'Отмена',
+        ),
+      );
       return FormKeyboard(
         onSubmit: () => _save().ignore(),
         onClose: _close,
-        child: Dialog(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Offstage(
-                    offstage: !ready,
-                    child: ExcludeFocus(
-                      excluding: !ready,
-                      child: Form(
-                        key: _form,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              widget.initial == null
-                                  ? 'Новый профиль'
-                                  : 'Редактирование профиля',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            _field(_name, 'name', 'Название', editable),
-                            _field(
-                              _address,
-                              'address',
-                              'Адрес (IP или имя домена)',
-                              editable,
-                            ),
-                            _field(_port, 'port', 'Порт SSH', editable),
-                            _field(_user, 'user', 'Пользователь SSH', editable),
-                            _field(
-                              _tags,
-                              'tags',
-                              'Метки (одна на строку)',
-                              editable,
-                            ),
-                            CredentialInput(
-                              key: _credential,
-                              readReadyEpoch: () =>
-                                  widget.model.bootstrap.state ==
-                                      ReadinessState.ready
-                                  ? widget.model.bootstrap.readinessEpoch
-                                  : null,
-                              onSubmit: () => _save().ignore(),
-                              creating: revision == null,
-                              enabled: editable,
-                            ),
-                            if (inputError != null) Text(inputError!),
-                            const SizedBox(height: 16),
-                            MutationStatus(
-                              controller: mutation,
-                              onReload: () => _reload().ignore(),
-                            ),
-                            if (mutation.state != MutationPresentation.idle)
-                              const Text(
-                                'Закрытие формы не отменяет уже отправленное сохранение',
-                              ),
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 8,
-                              children: [
-                                FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                  ),
-                                  onPressed: editable && widget.model.loaded
-                                      ? () => _save().ignore()
-                                      : null,
-                                  child: const Text('Сохранить'),
-                                ),
-                                OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                  ),
-                                  onPressed: _close,
-                                  child: Text(
-                                    mutation.state == MutationPresentation.idle
-                                        ? 'Отмена'
-                                        : 'Закрыть',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+        child: DeckDialogLayout(
+          title: !ready
+              ? 'Локальное пространство недоступно'
+              : widget.initial == null
+              ? 'Новый профиль'
+              : 'Редактирование профиля',
+          target: ready && widget.initial != null
+              ? DeckKeyValue(
+                  label: 'Цель изменения',
+                  value: '${_name.text} · ${_address.text}:${_port.text}',
+                )
+              : null,
+          actions: [
+            if (ready)
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: editable && widget.model.loaded
+                    ? () => _save().ignore()
+                    : null,
+                child: const Text('Сохранить'),
+              ),
+            close,
+          ],
+          // Removing the form disposes its credential editors and retires any
+          // native picker. Ordinary theme/size changes keep this same subtree.
+          child: !ready
+              ? ReadinessView(
+                  state: widget.model.bootstrap.state,
+                  reason: widget.model.bootstrap.reason,
+                  retryInProgress: widget.model.bootstrap.retryInProgress,
+                  onRetry: () => widget.model.bootstrap.retry().ignore(),
+                )
+              : Form(
+                  key: _form,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DeckFormSection(
+                        title: 'Параметры профиля',
+                        description: 'Сохранение меняет локальный профиль. Подключение к серверу выполняется отдельно.',
+                        children: [_field(_name, 'name', 'Название', editable)],
                       ),
-                    ),
-                  ),
-                  if (!ready)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ReadinessView(
-                          state: widget.model.bootstrap.state,
-                          reason: widget.model.bootstrap.reason,
-                          retryInProgress:
-                              widget.model.bootstrap.retryInProgress,
-                          onRetry: () =>
+                      const SizedBox(height: BrandSpacing.space24),
+                      DeckFormSection(
+                        title: 'Подключение по SSH',
+                        children: [
+                          _field(
+                            _address,
+                            'address',
+                            'Адрес (IP или имя домена)',
+                            editable,
+                          ),
+                          _field(_port, 'port', 'Порт SSH', editable),
+                          _field(_user, 'user', 'Пользователь SSH', editable),
+                          _field(
+                            _tags,
+                            'tags',
+                            'Метки (одна на строку)',
+                            editable,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: BrandSpacing.space24),
+                      CredentialInput(
+                        key: _credential,
+                        readReadyEpoch: () =>
+                            widget.model.bootstrap.state == ReadinessState.ready
+                            ? widget.model.bootstrap.readinessEpoch
+                            : null,
+                        onSubmit: () => _save().ignore(),
+                        creating: revision == null,
+                        enabled: editable,
+                      ),
+                      if (widget.model.error case final code?) ...[
+                        const SizedBox(height: BrandSpacing.space16),
+                        ReadErrorView(
+                          code: code,
+                          reading: _readingError || _reloading,
+                          pendingLabel: 'Чтение актуального профиля',
+                          onReadAgain: () => _readAgain().ignore(),
+                          onCheckService: () =>
                               widget.model.bootstrap.retry().ignore(),
                         ),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(48, 48),
-                          ),
-                          onPressed: _close,
-                          child: const Text('Закрыть'),
+                      ],
+                      if (_readingError && widget.model.error == null) ...[
+                        const SizedBox(height: BrandSpacing.space16),
+                        const DeckStatus(
+                          label: 'Чтение актуального профиля',
+                          pending: true,
                         ),
                       ],
-                    ),
-                ],
-              ),
-            ),
-          ),
+                      if (inputError != null) ...[
+                        const SizedBox(height: BrandSpacing.space16),
+                        DeckNotice(message: inputError!, tone: DeckTone.error),
+                      ],
+                      if (mutation.state != MutationPresentation.idle) ...[
+                        const SizedBox(height: BrandSpacing.space16),
+                        MutationStatus(
+                          controller: mutation,
+                          reloading: _reloading,
+                          readPending: _readingError,
+                          onReadCommitted: _readCommitted,
+                          onReload: () => _reload().ignore(),
+                        ),
+                        const SizedBox(height: BrandSpacing.space12),
+                        const Text(
+                          'Закрытие формы не отменяет уже отправленное сохранение',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
         ),
       );
     },

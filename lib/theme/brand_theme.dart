@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 
 import 'brand_assets.dart';
+import 'brand_tokens.dart';
 
 /// Exact semantic roles from tokens/serverdeck.tokens.json (palette 1.0).
 /// A ThemeExtension preserves roles that have no Material ColorScheme slot.
@@ -82,36 +84,50 @@ class BrandColors extends ThemeExtension<BrandColors> {
 
 /// UI/table/log/title/label styles retain the source's sizes and line heights.
 abstract final class BrandTypography {
+  static const button = TextStyle(
+    fontFamily: BrandAssets.uiFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
+    fontSize: 13,
+    height: 20 / 13,
+    fontWeight: FontWeight.w600,
+  );
+  static const tableHeader = button;
   static const body = TextStyle(
     fontFamily: BrandAssets.uiFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.w400,
   );
   static const table = TextStyle(
     fontFamily: BrandAssets.uiFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 13,
     height: 20 / 13,
     fontWeight: FontWeight.w400,
   );
   static const log = TextStyle(
     fontFamily: BrandAssets.monoFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 13,
     height: 20 / 13,
     fontWeight: FontWeight.w400,
   );
   static const title = TextStyle(
     fontFamily: BrandAssets.uiFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 24,
     height: 32 / 24,
     fontWeight: FontWeight.w600,
   );
   static const label = TextStyle(
     fontFamily: BrandAssets.uiFont,
+    fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 12,
     height: 16 / 12,
     fontWeight: FontWeight.w400,
   );
+  static const caption = label;
 }
 
 abstract final class BrandTheme {
@@ -141,6 +157,7 @@ abstract final class BrandTheme {
       brightness: brightness,
       extensions: [colors],
       fontFamily: BrandAssets.uiFont,
+      fontFamilyFallback: BrandAssets.fontFamilyFallback,
       textTheme: text,
       primaryTextTheme: text,
       scaffoldBackgroundColor: colors['bg'],
@@ -148,9 +165,104 @@ abstract final class BrandTheme {
       cardColor: colors['surface'],
       dividerColor: colors['border'],
       disabledColor: colors['disabled'],
-      focusColor: colors['focus'],
+      // Stock InkWell paints this across its whole row. Keep that fill
+      // readable; DeckFocusLabel supplies the separate focus-token outline.
+      focusColor: colors['selected'],
       hoverColor: colors['hover'],
       highlightColor: colors['selected'],
+      iconTheme: IconThemeData(
+        size: BrandGeometry.iconSize,
+        color: colors['text'],
+      ),
+      checkboxTheme: CheckboxThemeData(
+        side: WidgetStateBorderSide.resolveWith((states) {
+          if (states.contains(WidgetState.selected) &&
+              !states.contains(WidgetState.disabled)) {
+            return BorderSide.none;
+          }
+          return BorderSide(
+            color:
+                colors[states.contains(WidgetState.error)
+                    ? 'error'
+                    : 'control'],
+            width: 2,
+          );
+        }),
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (!states.contains(WidgetState.selected)) {
+            return Colors.transparent;
+          }
+          if (states.contains(WidgetState.disabled)) return colors['control'];
+          return colors[states.contains(WidgetState.error)
+              ? 'error'
+              : 'accent'];
+        }),
+        checkColor: WidgetStateProperty.resolveWith((states) {
+          return colors[states.contains(WidgetState.disabled) ||
+                  states.contains(WidgetState.error)
+              ? 'bg'
+              : 'onAccent'];
+        }),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: _button(colors, _ButtonKind.filled),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: _button(colors, _ButtonKind.filled),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _button(colors, _ButtonKind.outlined),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: _button(colors, _ButtonKind.text),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: _button(
+          colors,
+          _ButtonKind.text,
+        ).copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.all(12))),
+      ),
+      cardTheme: CardThemeData(
+        color: colors['surface'],
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(BrandGeometry.radiusCard),
+          side: BorderSide(color: colors['border']),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: colors['surface'],
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(BrandGeometry.radiusDialog),
+          side: BorderSide(color: colors['border']),
+        ),
+        titleTextStyle: BrandTypography.title.copyWith(color: colors['text']),
+        contentTextStyle: BrandTypography.body.copyWith(color: colors['text']),
+      ),
+      inputDecorationTheme: InputDecorationThemeData(
+        filled: true,
+        fillColor: colors['surface'],
+        labelStyle: BrandTypography.body.copyWith(color: colors['muted']),
+        hintStyle: BrandTypography.body.copyWith(color: colors['muted']),
+        errorStyle: BrandTypography.caption.copyWith(color: colors['error']),
+        contentPadding: const EdgeInsets.all(BrandSpacing.space12),
+        constraints: const BoxConstraints(minHeight: BrandGeometry.minTarget),
+        border: _inputBorder(colors['control']),
+        enabledBorder: _inputBorder(colors['control']),
+        disabledBorder: _inputBorder(colors['control']),
+        focusedBorder: _FocusInputBorder(
+          control: colors['control'],
+          focus: colors['focus'],
+        ),
+        errorBorder: _inputBorder(colors['error']),
+        focusedErrorBorder: _FocusInputBorder(
+          control: colors['error'],
+          focus: colors['focus'],
+        ),
+      ),
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: colors['accent'],
@@ -181,4 +293,181 @@ abstract final class BrandTheme {
       ),
     );
   }
+
+  static OutlineInputBorder _inputBorder(Color color) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(BrandGeometry.radiusControl),
+    borderSide: BorderSide(color: color),
+  );
+
+  static ButtonStyle _button(BrandColors colors, _ButtonKind kind) =>
+      ButtonStyle(
+        textStyle: const WidgetStatePropertyAll(BrandTypography.button),
+        minimumSize: const WidgetStatePropertyAll(
+          Size(BrandGeometry.minTarget, BrandGeometry.minTarget),
+        ),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(
+            horizontal: BrandSpacing.space16,
+            vertical: BrandSpacing.space12,
+          ),
+        ),
+        iconSize: const WidgetStatePropertyAll(BrandGeometry.iconSize),
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        elevation: const WidgetStatePropertyAll(0),
+        animationDuration: const Duration(milliseconds: 120),
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: const WidgetStatePropertyAll(BorderSide.none),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              BrandGeometry.radiusControl +
+                  BrandGeometry.focusGap +
+                  BrandGeometry.focusWidth,
+            ),
+          ),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return colors['disabled'];
+          if (states.contains(WidgetState.error)) return colors['text'];
+          if (states.contains(WidgetState.selected)) return colors['text'];
+          return kind == _ButtonKind.filled
+              ? colors['onAccent']
+              : colors['text'];
+        }),
+        backgroundBuilder: (context, states, child) => CustomPaint(
+          painter: _ButtonPainter(colors, kind, states),
+          child: child,
+        ),
+      );
+}
+
+enum _ButtonKind { filled, outlined, text }
+
+/// Reserves four pixels inside the hit area. The transparent gap exposes the
+/// actual adjacent surface, including when a button is placed on a card.
+class _ButtonPainter extends CustomPainter {
+  _ButtonPainter(this.colors, this.kind, Set<WidgetState> states)
+    : states = Set.of(states);
+  final BrandColors colors;
+  final _ButtonKind kind;
+  final Set<WidgetState> states;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = BrandGeometry.focusWidth + BrandGeometry.focusGap;
+    final rect = (Offset.zero & size).deflate(inset);
+    final radius = Radius.circular(BrandGeometry.radiusControl);
+    final control = RRect.fromRectAndRadius(rect, radius);
+    final disabled = states.contains(WidgetState.disabled);
+    final selected = states.contains(WidgetState.selected);
+    final error = states.contains(WidgetState.error);
+    final hovered =
+        states.contains(WidgetState.hovered) ||
+        states.contains(WidgetState.pressed);
+    final Color fill;
+    if (selected) {
+      fill = colors['selected'];
+    } else if (disabled || error) {
+      fill = colors['raised'];
+    } else if (kind == _ButtonKind.filled) {
+      fill = colors[hovered ? 'accentHover' : 'accent'];
+    } else {
+      fill = hovered ? colors['hover'] : Colors.transparent;
+    }
+    canvas.drawRRect(control, Paint()..color = fill);
+    if (kind == _ButtonKind.outlined || disabled || error || selected) {
+      final paint = Paint()
+        ..color = colors[error ? 'error' : 'control']
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      if (disabled) {
+        final path = Path()..addRRect(control.deflate(0.5));
+        for (final metric in path.computeMetrics()) {
+          for (double offset = 0; offset < metric.length; offset += 7) {
+            canvas.drawPath(metric.extractPath(offset, offset + 4), paint);
+          }
+        }
+      } else {
+        canvas.drawRRect(control.deflate(0.5), paint);
+      }
+    }
+    if (states.contains(WidgetState.focused)) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(BrandGeometry.focusWidth / 2),
+          const Radius.circular(
+            BrandGeometry.radiusControl + inset - BrandGeometry.focusWidth / 2,
+          ),
+        ),
+        Paint()
+          ..color = colors['focus']
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = BrandGeometry.focusWidth,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ButtonPainter oldDelegate) =>
+      colors != oldDelegate.colors ||
+      kind != oldDelegate.kind ||
+      !setEquals(states, oldDelegate.states);
+}
+
+/// A second, inset outline keeps focus visible alongside an error outline.
+/// Both strokes fit inside the InputDecorator's reserved border dimensions.
+class _FocusInputBorder extends OutlineInputBorder {
+  _FocusInputBorder({required this.control, required this.focus})
+    : super(
+        borderRadius: BorderRadius.circular(BrandGeometry.radiusControl),
+        borderSide: BorderSide(color: control, width: 1),
+        gapPadding: 4,
+      );
+  final Color control;
+  final Color focus;
+
+  @override
+  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(5);
+
+  @override
+  void paint(
+    Canvas canvas,
+    Rect rect, {
+    double? gapStart,
+    double gapExtent = 0,
+    double gapPercentage = 0,
+    TextDirection? textDirection,
+  }) {
+    super.paint(
+      canvas,
+      rect,
+      gapStart: gapStart,
+      gapExtent: gapExtent,
+      gapPercentage: gapPercentage,
+      textDirection: textDirection,
+    );
+    OutlineInputBorder(
+      borderRadius: BorderRadius.circular(BrandGeometry.radiusControl - 3),
+      borderSide: BorderSide(color: focus, width: BrandGeometry.focusWidth),
+      gapPadding: 4,
+    ).paint(
+      canvas,
+      rect.deflate(3),
+      gapStart: gapStart == null ? null : gapStart - 3,
+      gapExtent: gapExtent,
+      gapPercentage: gapPercentage,
+      textDirection: textDirection,
+    );
+  }
+
+  @override
+  _FocusInputBorder copyWith({
+    BorderSide? borderSide,
+    BorderRadius? borderRadius,
+    double? gapPadding,
+  }) => _FocusInputBorder(control: borderSide?.color ?? control, focus: focus);
 }

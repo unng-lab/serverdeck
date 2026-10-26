@@ -12,6 +12,7 @@ import '../lib/app.dart';
 import '../lib/main.dart' as app;
 import '../lib/bootstrap/bootstrap_controller.dart';
 import '../lib/bootstrap/trusted_native_bootstrap_host.dart';
+import '../lib/profiles/recovery_view.dart';
 
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/client_bootstrap.dart';
@@ -160,7 +161,12 @@ void main() {
         await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
         await tester.pumpAndSettle();
         expect(
-          find.descendant(of: find.byType(Dialog), matching: find.byType(Card)),
+          find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byWidgetPredicate(
+              (widget) => widget.key is RecentOperationReceiptKey,
+            ),
+          ),
           findsNWidgets(3),
         );
         expect(find.text('Создание профиля подтверждено'), findsOneWidget);

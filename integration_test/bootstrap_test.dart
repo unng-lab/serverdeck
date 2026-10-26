@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:serverdeck/main.dart' as app;
+import 'package:serverdeck/profiles/recovery_view.dart';
+import 'package:serverdeck/settings/settings_view.dart';
 import 'package:serverdeck_protocol/models.dart' show ThemePreference;
 
 void main() {
@@ -85,7 +87,10 @@ void main() {
       expect(find.text('Тема: светлая'), findsOneWidget);
       expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
       expect(
-        find.text('Compiled profile · xn--e1afmkfd.xn--p1ai:22\nНе подключён'),
+        find.descendant(
+          of: find.byType(SettingsView),
+          matching: find.text('Compiled profile · xn--e1afmkfd.xn--p1ai:22'),
+        ),
         findsOneWidget,
       );
       stdout.writeln('COMPILED_FLUTTER_SETTINGS_SAVE_PROVED');
@@ -113,7 +118,10 @@ void main() {
       expect(find.text('Тема: светлая'), findsOneWidget);
       expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
       expect(
-        find.text('Compiled profile · xn--e1afmkfd.xn--p1ai:22\nНе подключён'),
+        find.descendant(
+          of: find.byType(SettingsView),
+          matching: find.text('Compiled profile · xn--e1afmkfd.xn--p1ai:22'),
+        ),
         findsOneWidget,
       );
       stdout.writeln('COMPILED_FLUTTER_SETTINGS_REOPEN_PROVED');
@@ -139,6 +147,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Удалить профиль'));
+      await tester.pumpAndSettle();
+      expect(find.text('Удалить профиль').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Удалить профиль'));
       await tester.pumpAndSettle();
       final deleteContext = tester.element(find.text('Подтвердить удаление'));
@@ -189,7 +199,15 @@ void main() {
       await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
       await tester.pumpAndSettle();
       expect(find.text('Удаление профиля подтверждено'), findsOneWidget);
-      expect(find.byType(Card), findsNWidgets(3));
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byWidgetPredicate(
+            (widget) => widget.key is RecentOperationReceiptKey,
+          ),
+        ),
+        findsNWidgets(3),
+      );
       await tester.ensureVisible(find.text('Закрыть'));
       await tester.tap(find.text('Закрыть'));
       await tester.pumpAndSettle();

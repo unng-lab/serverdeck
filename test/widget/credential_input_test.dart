@@ -162,7 +162,7 @@ void main() {
       await tester.tap(find.text('Показать введённый секрет'));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Приватный ключ'),
+        find.byKey(const ValueKey('credential-private-key')),
         'synthetic key',
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);

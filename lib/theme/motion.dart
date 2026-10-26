@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../shell/private_session.dart';
+import '../ui/deck_components.dart';
+
 /// Reduce large transitions; keep feedback, focus, text input and timers live.
 abstract final class Motion {
   static bool reduced(BuildContext context) =>
@@ -17,13 +20,19 @@ abstract final class Motion {
         expansionAnimationStyle: AnimationStyle.noAnimation,
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: base.filledButtonTheme.style?.merge(style) ?? style,
+        style: style.merge(base.filledButtonTheme.style),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: style.merge(base.elevatedButtonTheme.style),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: style.merge(base.iconButtonTheme.style),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: base.outlinedButtonTheme.style?.merge(style) ?? style,
+        style: style.merge(base.outlinedButtonTheme.style),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: base.textButtonTheme.style?.merge(style) ?? style,
+        style: style.merge(base.textButtonTheme.style),
       ),
     );
   }
@@ -33,12 +42,40 @@ Future<T?> showMotionDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool barrierDismissible = false,
-}) => showDialog<T>(
-  context: context,
-  builder: builder,
-  barrierDismissible: barrierDismissible,
-  animationStyle: Motion.reduced(context) ? AnimationStyle.noAnimation : null,
-);
+  bool privateContent = true,
+}) async {
+  final launcher = FocusManager.instance.primaryFocus;
+  final launchScope = FocusScope.of(context, createDependency: false);
+  final launchRoute = ModalRoute.of(launchScope.context ?? context);
+  final launchEpoch = privateContent
+      ? PrivateSessionScope.maybeOf(context)?.epoch
+      : null;
+  final result = await showDialog<T>(
+    context: context,
+    builder: privateContent
+        ? (context) =>
+              PrivateDialogGate(launchEpoch: launchEpoch, builder: builder)
+        : builder,
+    barrierDismissible: barrierDismissible,
+    animationStyle: Motion.reduced(context) ? AnimationStyle.noAnimation : null,
+  );
+  // Flutter restores a surviving launcher. If it was removed while the modal
+  // was open, move to an existing control only in the still-current route and
+  // session. Focus movement never invokes an action or revives a private owner.
+  final scopeContext = launchScope.context;
+  if (launcher != null &&
+      launcher.context?.mounted != true &&
+      launchRoute?.isCurrent == true &&
+      scopeContext != null &&
+      scopeContext.mounted) {
+    final session = PrivateSessionScope.maybeOf(scopeContext);
+    if (launchEpoch == null ||
+        (session?.authorized == true && session?.epoch == launchEpoch)) {
+      launchScope.nextFocus();
+    }
+  }
+  return result;
+}
 
 /// Flutter's dropdown route has a fixed duration. Reduced mode uses a static
 /// modal list with the same values and explicit selection/cancellation.
@@ -66,7 +103,19 @@ class MotionDropdown<T> extends StatelessWidget {
     if (!Motion.reduced(context))
       return DropdownButtonFormField<T>(
         initialValue: initialValue,
-        items: items,
+        isDense: false,
+        itemHeight: null,
+        items: [
+          for (final item in items)
+            DropdownMenuItem<T>(
+              key: item.key,
+              value: item.value,
+              onTap: item.onTap,
+              enabled: item.enabled,
+              alignment: item.alignment,
+              child: DeckFocusLabel(child: item.child),
+            ),
+        ],
         decoration: decoration,
         onChanged: onChanged,
         isExpanded: isExpanded,

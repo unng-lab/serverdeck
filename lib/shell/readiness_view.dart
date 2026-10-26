@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode, ReadinessState;
 
-import '../theme/brand_theme.dart';
+import '../theme/brand_tokens.dart';
+import '../ui/deck_components.dart';
 
 class ReadinessView extends StatelessWidget {
   const ReadinessView({
@@ -41,8 +42,46 @@ class ReadinessView extends StatelessWidget {
           ReadinessState.unavailable => true,
           _ => false,
         };
-    final theme = Theme.of(context);
-    final colors = theme.extension<BrandColors>()!;
+    final pending =
+        retryInProgress ||
+        {
+          ReadinessState.starting,
+          ReadinessState.recovering,
+          ReadinessState.stopping,
+        }.contains(state);
+    final tone = switch (state) {
+      ReadinessState.storageBlocked => DeckTone.error,
+      ReadinessState.incompatible => DeckTone.warning,
+      ReadinessState.unavailable => DeckTone.unavailable,
+      _ => DeckTone.running,
+    };
+    final stage = retryInProgress
+        ? 'Ожидаем результат текущей попытки.'
+        : switch (state) {
+            ReadinessState.starting ||
+            ReadinessState.recovering => 'Ожидаем результат запуска.',
+            ReadinessState.stopping => 'Ожидаем завершения работы службы.',
+            ReadinessState.unavailable => 'Локальное пространство недоступно.',
+            ReadinessState.incompatible => 'Требуется совместимая версия.',
+            ReadinessState.storageBlocked => 'Доступ к хранилищу заблокирован.',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
+    final nextStep = switch (state) {
+      ReadinessState.starting => 'Дождитесь готовности локального пространства. Данные появятся после проверки доступа.',
+      ReadinessState.recovering =>
+        'Дождитесь завершения восстановления локального пространства.',
+      ReadinessState.stopping =>
+        'Дождитесь завершения текущей службы перед новым запуском.',
+      ReadinessState.unavailable =>
+        'Проверьте доступность локальной службы и повторите запуск.',
+      ReadinessState.incompatible => 'Используйте совместимые версии клиента и локальной службы, затем повторите запуск.',
+      ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
+      ReadinessState.ready => throw StateError(
+        'Ready requires the workspace shell',
+      ),
+    };
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -54,73 +93,58 @@ class ReadinessView extends StatelessWidget {
             ),
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(BrandSpacing.space24),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: Semantics(
                     liveRegion: true,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            style: theme.textTheme.titleLarge,
-                            textAlign: TextAlign.center,
+                    child: DeckSurface(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
-                        ),
-                        if (reason != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: BrandSpacing.space16),
+                          DeckStatus(
+                            label: stage,
+                            tone: tone,
+                            pending: pending,
+                          ),
+                          if (reason != null) ...[
+                            const SizedBox(height: BrandSpacing.space16),
+                            Text(_reasonMessage(reason!)),
+                          ],
+                          const SizedBox(height: BrandSpacing.space16),
                           Text(
-                            _reasonMessage(reason!),
-                            textAlign: TextAlign.center,
+                            retryInProgress
+                                ? 'Текущая попытка уже выполняется. Дождитесь результата.'
+                                : nextStep,
                           ),
-                        ],
-                        if (state == ReadinessState.starting ||
-                            state == ReadinessState.recovering) ...[
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Ожидаем результат запуска.',
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                        if (retryAvailable) ...[
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed: retryInProgress ? null : onRetry,
-                            style: ButtonStyle(
-                              minimumSize: const WidgetStatePropertyAll(
-                                Size(48, 48),
-                              ),
-                              shape: WidgetStatePropertyAll(
-                                RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                          if (retryAvailable) ...[
+                            const SizedBox(height: BrandSpacing.space24),
+                            DeckActions(
+                              children: [
+                                FilledButton(
+                                  onPressed: retryInProgress ? null : onRetry,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  child: const Text(
+                                    'Повторить запуск',
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
-                              ),
-                              side: WidgetStateProperty.resolveWith(
-                                (states) => BorderSide(
-                                  color: states.contains(WidgetState.focused)
-                                      ? colors['focus']
-                                      : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            child: const Text(
-                              'Повторить запуск',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          if (retryInProgress) ...[
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Ожидаем результат текущей попытки.',
-                              textAlign: TextAlign.center,
+                              ],
                             ),
                           ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

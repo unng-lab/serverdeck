@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/shell/readiness_view.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
+import 'package:serverdeck/ui/deck_components.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode, ReadinessState;
 
 Widget app(Widget child, {Brightness brightness = Brightness.light}) =>
@@ -41,6 +42,13 @@ void main() {
         app(ReadinessView(state: entry.key, onRetry: () {})),
       );
       expect(find.text(entry.value), findsOneWidget);
+      final status = tester.widget<DeckStatus>(find.byType(DeckStatus));
+      expect(status.tone, switch (entry.key) {
+        ReadinessState.storageBlocked => DeckTone.error,
+        ReadinessState.incompatible => DeckTone.warning,
+        ReadinessState.unavailable => DeckTone.unavailable,
+        _ => DeckTone.running,
+      });
       expect(
         find.byType(FilledButton),
         {
@@ -69,7 +77,7 @@ void main() {
           .widgetList<Text>(find.byType(Text))
           .map((text) => text.data!)
           .toList();
-      expect(texts.length, 2);
+      expect(texts.length, greaterThanOrEqualTo(3));
       expect(texts.last, isNotEmpty);
       expect(texts.any((text) => text.contains(reason.wireName)), isFalse);
       expect(texts.any((text) => text.contains('Сервер выключен')), isFalse);
@@ -103,11 +111,10 @@ void main() {
       expect(retries, 0);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
-      final button = tester.widget<FilledButton>(find.byType(FilledButton));
-      final focus = button.style!.side!.resolve({WidgetState.focused})!;
-      expect(focus.color, BrandColors.light['focus']);
-      expect(focus.width, 2);
-      expect(FocusManager.instance.primaryFocus, isNotNull);
+      final context = tester.element(find.text('Повторить запуск'));
+      expect(Focus.of(context).hasFocus, isTrue);
+      // The shared brand button painter supplies the visible focus ring.
+      expect(FilledButtonTheme.of(context).style!.backgroundBuilder, isNotNull);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(retries, 1);

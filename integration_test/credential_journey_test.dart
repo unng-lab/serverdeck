@@ -202,7 +202,7 @@ void main() {
           await edit();
           await choose('Сохранить существующий', 'Новый пароль');
           await tester.enterText(
-            find.widgetWithText(TextFormField, 'Пароль'),
+            find.byKey(const ValueKey('credential-password')),
             _password,
           );
           await saved();
@@ -215,11 +215,11 @@ void main() {
           await choose('Сохранить существующий', 'Новый приватный ключ');
           await click('Показать введённый секрет');
           await tester.enterText(
-            find.widgetWithText(TextFormField, 'Приватный ключ'),
+            find.byKey(const ValueKey('credential-private-key')),
             _pem,
           );
           await tester.enterText(
-            find.widgetWithText(TextFormField, 'Passphrase (необязательно)'),
+            find.byKey(const ValueKey('credential-passphrase')),
             _passphrase,
           );
           await click('Показать введённый секрет');
@@ -234,7 +234,7 @@ void main() {
           await edit();
           expect(find.text('Сохранить существующий'), findsOneWidget);
           expect(
-            find.widgetWithText(TextFormField, 'Приватный ключ'),
+            find.byKey(const ValueKey('credential-private-key')),
             findsNothing,
           );
           await tester.enterText(
@@ -246,7 +246,7 @@ void main() {
           await edit();
           await choose('Сохранить существующий', 'Новый пароль');
           await tester.enterText(
-            find.widgetWithText(TextFormField, 'Пароль'),
+            find.byKey(const ValueKey('credential-password')),
             'synthetic-cancelled-password-173',
           );
           await click('Отмена');

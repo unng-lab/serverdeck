@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode;
 
+import '../theme/brand_tokens.dart';
+import '../ui/deck_components.dart';
+
 /// Only a safe code enters presentation; private exception text is excluded.
 class ReadErrorView extends StatelessWidget {
   const ReadErrorView({
@@ -8,9 +11,13 @@ class ReadErrorView extends StatelessWidget {
     required this.code,
     required this.onReadAgain,
     required this.onCheckService,
+    this.reading = false,
+    this.pendingLabel = 'Чтение актуальных локальных данных',
   });
   final ErrorCode code;
   final VoidCallback onReadAgain, onCheckService;
+  final bool reading;
+  final String pendingLabel;
 
   static String category(ErrorCode code) => switch (code) {
     ErrorCode.unsupported => 'Функция недоступна в этой версии',
@@ -62,29 +69,51 @@ class ReadErrorView extends StatelessWidget {
             ? 'Повторите чтение актуальных локальных данных.'
             : 'Повторите проверку подключения к локальной службе.',
     };
+    final tone = switch (code) {
+      ErrorCode.serviceUnavailable || ErrorCode.timeout => DeckTone.unavailable,
+      ErrorCode.storageBlocked ||
+      ErrorCode.internal ||
+      ErrorCode.unauthorized => DeckTone.error,
+      _ => DeckTone.warning,
+    };
+    final notice = DeckNotice(
+      title: category(code),
+      message: hint,
+      tone: tone,
+      actions: [
+        if (read || check)
+          FilledButton(
+            onPressed: reading
+                ? null
+                : read
+                ? onReadAgain
+                : onCheckService,
+            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+            child: Text(
+              read ? 'Повторить чтение' : 'Повторить проверку службы',
+            ),
+          ),
+      ],
+    );
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Semantics(
-              liveRegion: true,
-              child: Text(category(code), textAlign: TextAlign.center),
-            ),
-            const SizedBox(height: 16),
-            Text(hint, textAlign: TextAlign.center),
-            if (read || check) ...[
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: read ? onReadAgain : onCheckService,
-                style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-                child: Text(
-                  read ? 'Повторить чтение' : 'Повторить проверку службы',
-                ),
-              ),
-            ],
-          ],
+        padding: const EdgeInsets.all(BrandSpacing.space24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Semantics(
+            liveRegion: true,
+            child: reading
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DeckStatus(label: pendingLabel, pending: true),
+                      const SizedBox(height: BrandSpacing.space12),
+                      notice,
+                    ],
+                  )
+                : notice,
+          ),
         ),
       ),
     );
