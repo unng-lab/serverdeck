@@ -4,6 +4,313 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/qualification-test-diagnostics.ps1"
+
+function Test-TrustProbeDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawTimeout,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $trustSource='packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart'
+    $trustUri=([Uri](Join-Path $NativeIsarRepository $trustSource)).AbsoluteUri
+    $trustLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $trustSource))
+    $modeLoop=[regex]::Matches(($trustLines -join "`n"),'(?s)for \(final mode in \[(?<cases>.*?)\]\) \{')
+    if($modeLoop.Count -ne 1){throw 'Expected one checked native trust probe mode loop.'}
+    $trustModes=@([regex]::Matches($modeLoop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})
+    $declaration=@(for($index=1;$index -lt $trustLines.Length;$index++) {
+        if($trustLines[$index].Trim() -ceq "'actual native host trust probes `$mode'," -and
+            $trustLines[$index-1].Trim() -ceq 'test('){$index}
+    })
+    $exitLine=@(for($index=0;$index -lt $trustLines.Length;$index++) {
+        if($trustLines[$index].Trim() -ceq 'await child.exitCode.timeout(const Duration(seconds: 55)),'){$index+1}
+    })
+    if($trustModes.Count -ne 36 -or $declaration.Count -ne 1 -or $exitLine.Count -ne 1) {
+        throw 'Expected 36 fixed trust probe modes, one checked declaration and unchanged child deadline.'
+    }
+    $declaration=$declaration[0];$exitLine=$exitLine[0]
+    $rawError=@($RawTimeout|Where-Object {$_.type -ceq 'error'})[0]
+    $target=$rawError.testID
+    if($rawError.error -cne 'TimeoutException after 0:00:00.001000: Future not completed') {
+        throw 'Expected actual Dart controlled timeout reporter shape.'
+    }
+    foreach($variant in ($trustModes+@('unknown-mode','suffixed-name','prefixed-name','name-type','wrong-source','unknown-source',
+        'missing-url','url-type','invalid-declaration','unrelated-declaration','non-test-line','null-declaration','declaration-type',
+        'fractional-declaration','changed-source','wrong-phase','plain-assertion','safe-code','without-frame','unknown-frame','invalid-frame'))) {
+        $mode=if($variant -in $trustModes){$variant}else{'basic'}
+        $events=foreach($rawEvent in $RawTimeout) {
+            if($rawEvent.type -ceq 'testStart' -and $rawEvent.test.id -ne $target){continue}
+            if($rawEvent.type -cin @('print','error','testDone') -and $rawEvent.testID -ne $target){continue}
+            $event=$rawEvent|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$trustUri}
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual native host trust probes '+$mode
+                $event.test.url=$trustUri
+                $event.test.line=$declaration
+                switch($variant) {
+                    'unknown-mode' {$event.test.name='actual native host trust probes '+$PrivateMarker}
+                    'suffixed-name' {$event.test.name+=$PrivateMarker}
+                    'prefixed-name' {$event.test.name=$PrivateMarker+$event.test.name}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-source' {$event.test.url=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/storage/operational_open_native_test.dart')).AbsoluteUri}
+                    'unknown-source' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'url-type' {$event.test.url=@{private=$PrivateMarker}}
+                    'invalid-declaration' {$event.test.line=999999}
+                    'unrelated-declaration' {$event.test.line=1}
+                    'non-test-line' {$event.test.line=$exitLine}
+                    'null-declaration' {$event.test.line=$null}
+                    'declaration-type' {$event.test.line=[string]$declaration}
+                    'fractional-declaration' {$event.test.line=[double]$declaration}
+                }
+            }
+            if($event.type -ceq 'error') {
+                $event.stackTrace="#0 controlled (${trustUri}:${exitLine}:1)`n#1 private (file:///C:/${PrivateMarker}/private.dart:9:2)"
+                switch($variant) {
+                    'plain-assertion' {$event.error="Expected: <0>`n  Actual: <1>`n"+$PrivateMarker}
+                    'safe-code' {$event.error='Bad state: WORKSPACE_CHILD_TIMEOUT'}
+                    'without-frame' {$event.stackTrace=$PrivateMarker}
+                    'unknown-frame' {$event.stackTrace="#0 private (file:///C:/${PrivateMarker}/private.dart:${exitLine}:1)"}
+                    'invalid-frame' {$event.stackTrace="#0 controlled (${trustUri}:999999:1)"}
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($caseFixture)
+        $phase=if($variant -ceq 'wrong-phase'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),[string[]]$events,[Text.UTF8Encoding]::new($false))
+        $selected=$Snapshot
+        if($variant -ceq 'changed-source') {
+            $selected=@{sha256=$Snapshot.sha256;files=@($Snapshot.files|ForEach-Object {
+                if($_.file -ceq $trustSource){@{file=$trustSource;sha256=('0'*64)}}else{$_}
+            })}
+        }
+        Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+        $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json')
+        $caseProof=Read-NativeIsarArtifactJson $casePath
+        $safe=[IO.File]::ReadAllText($casePath)
+        if($caseProof.schemaVersion -ne 1 -or $caseProof.status -cne 'failed-test-details' -or -not $caseProof.controlledFixture -or
+            -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1 -or
+            $safe.Contains($PrivateMarker) -or $safe.Contains('actual native host trust probes ') -or
+            $safe.Contains('file:///') -or $safe.Contains('C:/') -or $safe.Contains('stackTrace') -or
+            $safe.Contains('Future not completed') -or $safe.Contains('Expected:') -or $safe.Contains('999999') -or
+            $caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated) {
+            throw ('Trust probe controlled projection privacy/schema mismatch: '+$variant)
+        }
+        $failure=$caseProof.failures[0]
+        $expectCase=$variant -in $trustModes -or $variant -in @('plain-assertion','safe-code','without-frame','unknown-frame','invalid-frame')
+        if(($expectCase -and $failure.fixtureCase -cne ('trust-probe-'+$mode)) -or
+            (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            $null -ne $failure.fixtureExitCode -or $null -ne $failure.fixturePhase -or $failure.nativeErrors.Count -ne 0) {
+            throw ('Trust probe fixed case/source projection mismatch: '+$variant)
+        }
+        if(($variant -in $trustModes -and $failure.failureKind -cne 'timeout') -or
+            ($variant -in @('plain-assertion','safe-code') -and $null -ne $failure.failureKind) -or
+            ($variant -ceq 'safe-code' -and $failure.safeCode -cne 'WORKSPACE_CHILD_TIMEOUT') -or
+            ($variant -cne 'safe-code' -and $null -ne $failure.safeCode)) {
+            throw ('Trust probe prior error classification changed: '+$variant)
+        }
+        $expectedFrames=if($variant -in @('changed-source','without-frame','unknown-frame','invalid-frame')){0}else{1}
+        if($failure.sourceFrames.Count -ne $expectedFrames -or
+            ($expectedFrames -eq 1 -and ($failure.sourceFrames[0].file -cne $trustSource -or $failure.sourceFrames[0].line -ne $exitLine))) {
+            throw ('Trust probe checked frame projection changed: '+$variant)
+        }
+    }
+    'QUALIFICATION_REAL_TIMEOUT_TRUST_PROBE_36_FIXED_MODES_SOURCE_HASH_DECLARATION_SHAPE_AND_PRIVACY_NEGATIVES_PASSED'
+}
+
+function Test-BootstrapDiagnosticProjection {
+    param([Parameter(Mandatory)][string]$Fixture,
+        [Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawBootstrap,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $bootstrapSource='packages/serverdeck_locald/test/bootstrap_native_test.dart'
+    $preparationSource='packages/serverdeck_locald/test/support/bootstrap_preparation.dart'
+    $bootstrapUri=([Uri](Join-Path $NativeIsarRepository $bootstrapSource)).AbsoluteUri
+    $bootstrapLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $bootstrapSource))
+    $bodyLine=@(for($index=1;$index -lt $bootstrapLines.Length;$index++) {
+        if($bootstrapLines[$index].Trim() -ceq "'compiled owner authenticates, becomes ready, closes and reopens workspace'," -and
+            $bootstrapLines[$index-1].Trim() -ceq 'test('){$index}
+    })
+    $hookLine=@(for($index=0;$index -lt $bootstrapLines.Length;$index++) {
+        if($bootstrapLines[$index].Trim() -ceq 'setUpAll(() async {'){$index+1}
+    })
+    if($bodyLine.Count -ne 1 -or $hookLine.Count -ne 1){throw 'Expected one checked bootstrap body and preparation hook declaration.'}
+    $bodyLine=$bodyLine[0];$hookLine=$hookLine[0]
+    $preparationLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $preparationSource))
+    $preparationText=$preparationLines -join "`n"
+    if(-not (Get-NativeBootstrapDiagnosticShape -BootstrapLines $bootstrapLines -PreparationLines $preparationLines)) {
+        throw 'Expected checked bootstrap producer source shape.'
+    }
+    foreach($mutation in @(
+        $preparationText.Replace('print(''BOOTSTRAP_FIXTURE_PHASE:${phase.identifier}'');','print(phase.identifier);'),
+        $preparationText.Replace("compileOwner('compile-owner')","compileOwner('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER')"),
+        $preparationText.Replace('final String identifier;','String identifier;'),
+        ($preparationText+"`n// BOOTSTRAP_FIXTURE_PHASE:SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER"))) {
+        if(Get-NativeBootstrapDiagnosticShape -BootstrapLines $bootstrapLines -PreparationLines ($mutation -split '\r?\n')) {
+            throw 'Bootstrap invalid producer or unknown enum source was accepted.'
+        }
+    }
+    $bodyName='compiled bootstrap compiled owner authenticates, becomes ready, closes and reopens workspace'
+    $hookName='compiled bootstrap (setUpAll)'
+    $rawHook=@($RawBootstrap|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' preparation (setUpAll)')})
+    $rawBody=@($RawBootstrap|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' behavior body')})
+    if($rawHook.Count -ne 1 -or $rawBody.Count -ne 1 -or $rawHook[0].test.line -ne 5 -or
+        $rawBody[0].test.line -ne 12 -or $rawHook[0].test.url -isnot [string]) {
+        throw 'Expected actual Dart preparation hook/body reporter metadata.'
+    }
+    $bootstrapPhases=@('prepare-start','compile-owner','compile-client','select-native','manifest','prepared',
+        'behavior-start','namespace-check','run-0','run-1','run-2','run-3','run-4','run-5','refusal-checks','cleanup','complete')
+    $variants=@($bootstrapPhases|ForEach-Object {'body-'+$_; 'hook-'+$_})+@(
+        'hook-null-line','body-without-marker','hook-without-marker','last-fixed-phase','different-test-id','string-test-id','string-start-id','string-suite-id',
+        'unknown-name','name-type','unknown-source','missing-source','wrong-suite','missing-suite','unrelated-source',
+        'invalid-body-line','unrelated-body-line','null-body-line','invalid-hook-line','unrelated-hook-line',
+        'changed-bootstrap','changed-preparation','missing-preparation','wrong-package',
+        'unknown-phase','prefixed-marker','suffixed-marker','multiline-marker','arbitrary-print','wrong-message-type','wrong-event-type','wrong-event-case',
+        'marker-before-start','marker-after-error','cross-test-marker','reused-test-id','id-bound-32','id-bound-33')
+    foreach($variant in $variants) {
+        $hook=$variant.StartsWith('hook-') -or $variant -in @('invalid-hook-line','unrelated-hook-line')
+        $target=if($hook){$rawHook[0].test.id}else{$rawBody[0].test.id}
+        $events=[Collections.Generic.List[object]]::new()
+        foreach($rawEvent in $RawBootstrap) {
+            if($rawEvent.type -cnotin @('suite','testStart','print','error','done')){continue}
+            if($rawEvent.type -ceq 'testStart' -and $rawEvent.test.id -ne $target){continue}
+            if($rawEvent.type -cin @('print','error') -and $rawEvent.testID -ne $target){continue}
+            $event=$rawEvent|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$bootstrapUri}
+            if($event.type -ceq 'testStart') {
+                $event.test.name=if($hook){$hookName}else{$bodyName}
+                $event.test.url=$bootstrapUri
+                $event.test.line=if($hook){$hookLine}else{$bodyLine}
+                switch($variant) {
+                    'hook-null-line' {$event.test.line=$null}
+                    'unknown-name' {$event.test.name+=$PrivateMarker}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'unknown-source' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-source' {$event.test.url=$null}
+                    'unrelated-source' {$event.test.url=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/storage/operational_open_native_test.dart')).AbsoluteUri}
+                    'wrong-suite' {$event.test.suiteID=999999}
+                    'string-start-id' {$event.test.id=[string]$event.test.id}
+                    'string-suite-id' {$event.test.suiteID=[string]$event.test.suiteID}
+                    'invalid-body-line' {$event.test.line=999999}
+                    'unrelated-body-line' {$event.test.line=1}
+                    'null-body-line' {$event.test.line=$null}
+                    'invalid-hook-line' {$event.test.line=999999}
+                    'unrelated-hook-line' {$event.test.line=1}
+                }
+                if($variant -ceq 'marker-before-start') {
+                    $events.Add(@{type='print';messageType='print';message='BOOTSTRAP_FIXTURE_PHASE:run-2';testID=$target})
+                }
+                if($variant -in @('id-bound-32','id-bound-33')) {
+                    $extra=if($variant -ceq 'id-bound-32'){31}else{32}
+                    for($index=0;$index -lt $extra;$index++) {
+                        $copy=$event|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+                        $copy.test.id=100+$index
+                        $events.Add($copy)
+                    }
+                }
+                $events.Add($event)
+                if($variant -ceq 'reused-test-id'){$events.Add($event)}
+                continue
+            }
+            if($event.type -ceq 'suite' -and $variant -ceq 'missing-suite'){continue}
+            if($event.type -ceq 'print') {
+                if($variant -in @('body-without-marker','hook-without-marker','marker-before-start','marker-after-error')){continue}
+                if($variant -cmatch '^(body|hook)-(.+)$' -and $Matches[2] -in $bootstrapPhases) {
+                    $event.message='BOOTSTRAP_FIXTURE_PHASE:'+$Matches[2]
+                }
+                switch($variant) {
+                    'different-test-id' {$event.testID=999999}
+                    'string-test-id' {$event.testID=[string]$target}
+                    'unknown-phase' {$event.message='BOOTSTRAP_FIXTURE_PHASE:'+ $PrivateMarker}
+                    'prefixed-marker' {$event.message=$PrivateMarker+$event.message}
+                    'suffixed-marker' {$event.message+=$PrivateMarker}
+                    'multiline-marker' {$event.message+="`n"+$PrivateMarker}
+                    'arbitrary-print' {$event.message=$PrivateMarker}
+                    'wrong-message-type' {$event.messageType='error'}
+                    'wrong-event-type' {$event.type='stdout'}
+                    'wrong-event-case' {$event.type='PRINT'}
+                    'cross-test-marker' {
+                        $copy=$rawBody[0]|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+                        $copy.test.id=100;$copy.test.name=$bodyName;$copy.test.url=$bootstrapUri;$copy.test.line=$bodyLine
+                        $events.Add($copy)
+                        $event.testID=100
+                    }
+                }
+                $events.Add($event)
+                if($variant -ceq 'last-fixed-phase') {
+                    $events.Add(@{type='print';messageType='print';message='BOOTSTRAP_FIXTURE_PHASE:cleanup';testID=$target})
+                    $events.Add(@{type='print';messageType='print';message=$PrivateMarker;testID=$target})
+                }
+                continue
+            }
+            if($event.type -ceq 'error') {
+                if($event.error -cne 'TimeoutException after 0:00:00.001000: Future not completed') {
+                    throw 'Expected actual Dart bootstrap probe timeout shape.'
+                }
+                $event.stackTrace=$PrivateMarker
+                $events.Add($event)
+                if($variant -ceq 'marker-after-error') {
+                    $events.Add(@{type='print';messageType='print';message='BOOTSTRAP_FIXTURE_PHASE:run-2';testID=$target})
+                }
+                continue
+            }
+            $events.Add($event)
+        }
+        $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($caseFixture)
+        $phase=if($variant -ceq 'wrong-package'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),
+            [string[]]@($events|ForEach-Object {$_|ConvertTo-Json -Depth 30 -Compress}),[Text.UTF8Encoding]::new($false))
+        $selected=$Snapshot
+        if($variant -in @('changed-bootstrap','changed-preparation','missing-preparation')) {
+            $changed=if($variant -ceq 'changed-bootstrap'){$bootstrapSource}else{$preparationSource}
+            $selected=@{sha256=$Snapshot.sha256;files=@($Snapshot.files|ForEach-Object {
+                if($_.file -ceq $changed) {
+                    if($variant -cne 'missing-preparation'){@{file=$changed;sha256=('0'*64)}}
+                } else {$_}
+            })}
+        }
+        Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+        $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json')
+        $caseProof=Read-NativeIsarArtifactJson $casePath
+        $safe=[IO.File]::ReadAllText($casePath)
+        if($safe.Contains($PrivateMarker) -or $safe.Contains('BOOTSTRAP_FIXTURE_PHASE:') -or $safe.Contains('file:///') -or
+            $safe.Contains('C:/') -or $safe.Contains('stackTrace') -or $safe.Contains('Future not completed') -or
+            $safe.Contains($bodyName) -or $safe.Contains($hookName) -or $safe.Contains('999999') -or
+            $caseProof.schemaVersion -ne 1 -or -not $caseProof.controlledFixture -or
+            $caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated) {
+            throw ('Bootstrap controlled projection privacy/schema mismatch: '+$variant)
+        }
+        if($variant -ceq 'id-bound-33') {
+            if($caseProof.status -cne 'unavailable-reporter' -or $caseProof.reporterComplete -or $caseProof.failures.Count -ne 0) {
+                throw 'Bootstrap test ID replay bound did not fail closed.'
+            }
+            continue
+        }
+        if($caseProof.status -cne 'failed-test-details' -or -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1) {
+            throw ('Bootstrap controlled projection status mismatch: '+$variant)
+        }
+        $failure=$caseProof.failures[0]
+        $expectCase=$variant -notin @('unknown-name','name-type','unknown-source','missing-source','unrelated-source','wrong-suite','missing-suite','string-start-id','string-suite-id',
+            'invalid-body-line','unrelated-body-line','null-body-line','invalid-hook-line','unrelated-hook-line',
+            'changed-bootstrap','changed-preparation','missing-preparation','wrong-package','reused-test-id')
+        $expectPhase=$expectCase -and ($variant -cmatch '^(body|hook)-(.+)$' -and $Matches[2] -in $bootstrapPhases -or
+            $variant -in @('hook-null-line','last-fixed-phase','id-bound-32'))
+        $expectedPhase=if($variant -ceq 'last-fixed-phase'){'cleanup'}elseif($variant -ceq 'hook-null-line'){'compile-owner'}elseif($variant -ceq 'id-bound-32'){'run-2'}elseif($expectPhase){$variant.Substring(5)}else{$null}
+        $expectedCase=if($hook){'bootstrap-prepare'}else{'bootstrap-body'}
+        if(($expectCase -and $failure.fixtureCase -cne $expectedCase) -or
+            (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            ($expectPhase -and $failure.fixturePhase -cne $expectedPhase) -or
+            (-not $expectPhase -and $null -ne $failure.fixturePhase) -or
+            $null -ne $failure.fixtureExitCode -or $null -ne $failure.safeCode -or
+            $failure.nativeErrors.Count -ne 0 -or $failure.sourceFrames.Count -ne 0) {
+            throw ('Bootstrap fixed case/phase/source projection mismatch: '+$variant)
+        }
+        if($variant -ceq 'hook-null-line' -and ($null -ne $failure.declarationLine -or $null -ne $failure.failureKind)) {
+            throw 'Bootstrap synthetic preparation declaration was invented.'
+        }
+    }
+    'QUALIFICATION_REAL_BOOTSTRAP_REPORTER_BODY_PREPARATION_17_FIXED_PHASES_SOURCE_HASH_DECLARATION_ID_BOUND_AND_PRIVACY_NEGATIVES_PASSED'
+}
 $fixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
 Assert-NativeIsarPlainPath $fixture
 [void][IO.Directory]::CreateDirectory($fixture)
@@ -123,6 +430,7 @@ try {
     if($LASTEXITCODE -eq 0){throw 'Controlled timeout unexpectedly passed.'}
 } finally {Pop-Location}
 $rawTimeout=[IO.File]::ReadAllLines($timeoutReport)
+Test-TrustProbeDiagnosticProjection -Snapshot $snapshot -RawTimeout @($rawTimeout|ForEach-Object {$_|ConvertFrom-Json -AsHashtable}) -PrivateMarker $privateMarker
 $source='packages/serverdeck_locald/test/storage/operational_open_native_test.dart'
 $sourceUri=([Uri](Join-Path $NativeIsarRepository $source)).AbsoluteUri
 $casePrefix='compiled operational snapshot actual owned operational native open '
@@ -529,6 +837,38 @@ foreach($variant in ($pipePhases+@('unknown-phase','prefixed-error','suffixed-er
     if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled pipe projection claimed qualification.'}
 }
 'QUALIFICATION_REAL_PIPE_TIMEOUT_FIVE_FIXED_PHASES_SOURCE_HASH_LINE_CASE_SHAPE_AND_PRIVACY_NEGATIVES_PASSED'
+
+# The generated groups are non-native failures. They confirm the actual
+# reporter's hook name, declaration/URL and per-test print event association.
+# Only their metadata is aliased to the checked bootstrap source contract.
+$bootstrapProbe=Join-Path $fixture 'controlled-bootstrap.dart'
+$bootstrapReport=Join-Path $fixture 'controlled-bootstrap.machine.jsonl'
+[IO.File]::WriteAllText($bootstrapProbe,@'
+import 'dart:async';
+import 'package:test/test.dart';
+void main() {
+  group('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER preparation', () {
+    setUpAll(() async {
+      print('BOOTSTRAP_FIXTURE_PHASE:compile-owner');
+      await Completer<void>().future.timeout(const Duration(milliseconds: 1));
+    });
+    test('body', () {});
+  });
+  group('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER behavior', () {
+    test('body', () async {
+      print('BOOTSTRAP_FIXTURE_PHASE:run-2');
+      await Completer<void>().future.timeout(const Duration(milliseconds: 1));
+    });
+  });
+}
+'@,[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_locald')
+try {
+    & $FoundationDart test $bootstrapProbe --file-reporter "json:$bootstrapReport" *> (Join-Path $fixture 'controlled-bootstrap.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled bootstrap failures unexpectedly passed.'}
+} finally {Pop-Location}
+$rawBootstrap=@([IO.File]::ReadAllLines($bootstrapReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+Test-BootstrapDiagnosticProjection -Fixture $fixture -Snapshot $snapshot -RawBootstrap $rawBootstrap -PrivateMarker $privateMarker
 $fixture
 $invalidFixture
 exit 0

@@ -899,3 +899,24 @@ Read-only ci_outer_budget_diagnosis подтвердил shared SID/default mute
 ### T109: fresh review завершён
 
 t109_independent_review завершился без замечаний в scope локальной T109 implementation; отдельный installer-helper subaudit0. Все7size/SHA review-T109.json совпали в начале и конце, HEADF4 сохранён; источник/пакет не изменялись во время review. Независимо подтверждена корректировка: A933/F4 YAML уже concurrency1, новыйCLI1 лишь явное закрепление. Проверки627/0/analyze0/7505pass1skip и mock/links приняты только в их реальном scope. T109 закрыт локально; достаточность240min, новый commit/CI/build/install/source/tag/publication не объявлены выполненными. До commit ещё выполняются проверка ссылок и fresh recording audit трёх документов; все прошлые completed tasks/RED/cancelled history остаются.
+
+## T110 — новый actual bootstrap failure и замер
+
+Push40395514770 на2af Windows121827367880 failed21:00:16Z во время locald-tests. Safeartifact12689026159: reporterComplete=true, testFile bootstrap_native_test.dart, declaration17, failureKind timeout, sourceFrames/nativeErrors/fixturePhase пусты. Qualification целиком не пройдена. Другой PR40395530655 на момент начала T110 ещё выполнялся. Отсутствие фазы не доказывает конкретную причину/отсутствие иных ошибок.
+
+Read-only bootstrap_ci_timeout_diagnosis подтвердил aggregate4min budget с AOT/resolver/manifest внутри,223970msT106 и framework hooks12min; outer timeout не отменяет async body. Root выполнил timing-instrumented ignored copy исходного test с прежними assertions/4min и cached provider: exit0/3m31, compile8.064+3.736s, native selection0.496s, first run→cleanup198.513s; raw .local/release/T110-profile/profile.log/jsonl/-exit.json и original hash сохранены. Это локальная контрольная копия, не sourcebuilt CI и не новый completed T110. Новые изменения подготовки/диагностики и их обязательные checks/review ещё выполняются; установленный+4 остаётся фактически проверенной приватной сборкой.
+
+## T111 — второй actual CI4 failure
+
+PR40395530655 Windows121827422196 failed21:33:25Z; safeartifact12691076818 сохранён .local/release/ci-failure-40395530655. locald-tests reporterComplete=true, trust_probes_native_test declaration85/frame117 timeout, fixtureCase/phase null. Этот child55s failure отличается от push40395514770 bootstrap aggregate4m failure; оба остаются RED. Старый public projection не различал36trust-probe modes. Read-only trust_probe_ci_timeout_audit подтверждает gap и предел выводов; возможные unbounded fixture waits/transaction-heavy cases не приписываются actual CI без mode. T111 добавляет только case vocabulary/controlled refusal и не меняет actor/runtime/deadlines. Actual probe cause пока unknown; merge/tag/source publication не выполнялись.
+
+### T110/T111: локальные проверки перед independent review
+
+Root format628files/0changes, Flutter analyze0issues/exit0, полный Flutter test7505passed/1expected opt-in skip/5m10/exit0. Locald analyzer после scoped test-only print suppression0issues. Actual modified bootstrap targeted exit0: preparation hook12633ms, behavior198307ms с прежним4min limit,17machine phase prints/done.success=true. Полный последовательный locald suite завершён54m30:930passed/1expected Linux SSH fixture skip/0failed/exit0, machine done.success=true; все36trust-probe modes passed (локальный cached provider, не sourcebuilt coldCI). Это не устанавливает mode/причину старого CI55s timeout.
+
+Full controlled diagnosticsT108/T110/T111 завершён числовым exit0:12PASSmarkers, в том числе17bootstrap phases/72cases+4producer mutations и36trust modes/57positive-negative cases; RED сохранены. Strict links до записи1461total/1460OK/0errors, после записи повторяются. Подготовленный helper+5 — один literal guard+2→+5 в прежнем reviewed installer, file verifier8pass; тело ещё не исполнено, новыйbundle не собран. Native source/production/services/provider/deadlines не менялись. Fresh independent code/spec/helper review и запись результата ещё обязательны до commit; source5CI/build/install/tag/публикация pending.
+
+
+### T110/T111: fresh independent review завершён
+
+t110_t111_independent_review завершён без замечаний; отдельный read-only diagnostics subaudit также0. Все9size/SHA review-T110-T111.json совпали в начале и конце, HEAD2af сохранён. Проверены bootstrap preparation/ownership/cleanup, сохранность прежних behavior/oracles/deadlines, fixed17phase/36case projection и installer+5 literal guard; cached local evidence не расширено до coldCI. T110/T111 закрыты только в локальном implementation/checks/review scope, T001–T109 и все RED сохранены. После этой записи обязательны fresh links и отдельный recording audit до commit. Новый exact commit, terminal successful CI, build/install/source/tag/merge/publication ещё не выполнены для+5.

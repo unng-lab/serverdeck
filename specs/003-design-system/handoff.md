@@ -76,3 +76,16 @@ T108 локальные проверки завершены: root627/0format, an
 T109 локальные проверки конфигурации и metadata+4 завершены: actual PS argument-block mock/parse/workflow diff, pinned CLI flags, root627/0/analyze0/7505passed1skip. Package YAML прежде уже сериализовал locald; CLI1 закрепляет это явно. Новый240min budget и fail-fast не утверждают отсутствие других ошибок или завершённость CI. Fresh code/spec review и recording audit ещё обязательны до commit; новая+4поставка пока не выполнена.
 
 Fresh t109_independent_review и installer narrow subaudit завершились0findings. Локальные задачиT001–T109 закрыты; это не successful CI или выпуск+4. Перед commit остаётся recording audit трёх документов после link check; затем обязательны новый точный commit/terminalCI/проверенные+4build-install-source/tag/publication receipts. Ни общий240min ceiling, ни явныйCLI1 не превращают прежнюю отмену/unknown errors в успешную qualification.
+
+## T110 follow-up
+
+Новый2af push CI остановлен fail-fast на bootstrap aggregate4min timeout без фазы; T110 разделяет bounded fixture preparation и прежнее4min behavior, добавляя fixed print phase projection. Все runtime assertions/deadlines/authority остаются; это не установленная production причина и не успешная cold qualification. Локальные T001–T109 сохраняются, T110 ещё выполняется. Следующий metadata+5 потребует своих actual checks/reviews/commit/build/install/source/tag и успешного exact-revision CI; private+4 и данные сохраняются, source publication/merge не выполнены.
+
+T111 диагностический follow-up учитывает второй CI4PR failure: trust-probe child55s timeout с неизвестным mode. Добавляется fixed36-case projection, без изменения actor/runtime/55s/80s и без объявления реальной причины устранённой. T110/T111 metadata+5 ещё локально проверяются; новый actual successful exact-revision CI обязателен, current installed+4/data сохраняются.
+
+T110/T111 локальные проверки завершены: root628/0/analyze0/7505pass1skip, modifiedbootstrap preparation12.6s+behavior198.3s/17phases, fullseriallocald930pass1skip54m30exit0, controlleddiagnostics12PASS/exit0. Это cached native scope, не cold qualification и не доказанная причина старого probe timeout. Следующий gate — fresh independent code/spec/helper+5 review и отдельный recording audit до нового commit.
+
+
+### T110/T111: fresh independent review завершён
+
+t110_t111_independent_review завершён без замечаний; отдельный read-only diagnostics subaudit также0. Все9size/SHA review-T110-T111.json совпали в начале и конце, HEAD2af сохранён. Проверены bootstrap preparation/ownership/cleanup, сохранность прежних behavior/oracles/deadlines, fixed17phase/36case projection и installer+5 literal guard; cached local evidence не расширено до coldCI. T110/T111 закрыты только в локальном implementation/checks/review scope, T001–T109 и все RED сохранены. После этой записи обязательны fresh links и отдельный recording audit до commit. Новый exact commit, terminal successful CI, build/install/source/tag/merge/publication ещё не выполнены для+5.
