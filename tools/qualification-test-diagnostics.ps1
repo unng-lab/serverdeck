@@ -125,7 +125,7 @@ function Write-NativeQualificationTestFailure {
                             }
                             $safeCode=$null
                             if([string]$event.error -cmatch '^Bad state: (IDENTITY_UNAVAILABLE|PROTECTION_UNAVAILABLE|SECURITY_UNAVAILABLE|UNSAFE_PATH|RESOURCE_LIMIT|SERVICE_UNAVAILABLE|INTERNAL|WORKSPACE_CHILD_FAILED|WORKSPACE_CHILD_TIMEOUT)$'){$safeCode=$Matches[1]}
-                            $fixtureCase=$null;$failureKind=$null;$fixtureExitCode=$null
+                            $fixtureCase=$null;$failureKind=$null;$fixtureExitCode=$null;$fixturePhase=$null
                             if($declarationLine) {
                                 if([string]$event.error -cmatch '^TimeoutException(?: after [0-9]{1,3}:[0-5][0-9]:[0-5][0-9]\.[0-9]{6})?:') {
                                     $failureKind='timeout'
@@ -163,6 +163,22 @@ function Write-NativeQualificationTestFailure {
                                         }
                                     }
                                 }
+                                if($Phase -ceq 'serverdeck_windows-tests' -and
+                                    $file -ceq 'packages/serverdeck_windows/test/pipe_disconnected_test.dart' -and
+                                    $test['name'] -is [string] -and
+                                    $test['name'] -ceq 'compiled disconnected pipe read after native disconnect fails promptly without waiting on an unissued event') {
+                                    foreach($frame in $frames) {
+                                        if($frame.file -cne $file){continue}
+                                        $pipeLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $file))
+                                        if($pipeLines[[int]$frame.line-1].Trim() -ceq 'onTimeout: () => throw TimeoutException(') {
+                                            $fixtureCase='pipe-disconnected'
+                                            if([string]$event.error -cmatch '\ATimeoutException after 0:00:15\.000000: DISCONNECT_FIXTURE_TIMEOUT:(started|connected|disconnected|read-terminated|reuse-cancel-proved)\z') {
+                                                $fixturePhase=$Matches[1]
+                                            }
+                                            break
+                                        }
+                                    }
+                                }
                             }
                             # Only the known client's first numeric exit assertion is
                             # projected. A nonzero exit is evidence, not a crash cause.
@@ -174,8 +190,39 @@ function Write-NativeQualificationTestFailure {
                                     $failureKind='fixture-exit'
                                 }
                             }
+                            # A cleanup exception can mask the actor outcome. Export
+                            # only fixed Windows delete codes from the known owned
+                            # fixture's checked delete statement, never its path or
+                            # OS message. Other FileSystemExceptions stay private.
+                            if($Phase -ceq 'serverdeck_windows-tests' -and $fixtureCase -clike 'trusted-client-*' -and
+                                [string]$event.error -cmatch "\AFileSystemException: Deletion failed, path = '[\s\S]*' \(OS Error: [\s\S]*, errno = (?<errno>[0-9]{1,3})\)\z") {
+                                $deleteCode=[long]$Matches['errno']
+                                if($deleteCode -in @(5L,32L,33L,145L)) {
+                                    foreach($frame in $frames) {
+                                        $oldCleanup=$frame.file -ceq 'packages/serverdeck_windows/test/mcp_build_bundle_test.dart'
+                                        $ownedCleanup=$frame.file -ceq 'packages/serverdeck_windows/test/support/owned_fixture_cleanup.dart'
+                                        if(-not $oldCleanup -and -not $ownedCleanup){continue}
+                                        $cleanupLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $frame.file))
+                                        $index=[int]$frame.line-1
+                                        $checkedOldDelete=$oldCleanup -and $index -gt 0 -and
+                                            $cleanupLines[$index].Trim() -ceq 'root.deleteSync(recursive: true);' -and
+                                            $cleanupLines[$index-1].Trim() -ceq 'ownRoot(path);'
+                                        $checkedOwnedDelete=$ownedCleanup -and $index -gt 1 -and
+                                            $cleanupLines[$index].Trim() -ceq 'checkedDirectory.deleteSync(recursive: true);' -and
+                                            $cleanupLines[$index-1].Trim() -ceq 'try {' -and
+                                            $cleanupLines[$index-2].Trim() -ceq 'final checkedDirectory = _checkedOwnedFixtureDirectory(directory);'
+                                        if($checkedOldDelete -or $checkedOwnedDelete) {
+                                            if($native.Count -lt 3) {
+                                                $native.Add(@{kind='WIN32_FIXTURE_DELETE';code=$deleteCode})
+                                                $failureKind='fixture-cleanup'
+                                            }
+                                            break
+                                        }
+                                    }
+                                }
+                            }
                             # Names, messages, raw stack, stdout and private paths never enter proof.
-                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode;fixtureCase=$fixtureCase;failureKind=$failureKind;fixtureExitCode=$fixtureExitCode})
+                            $failures.Add(@{testFile=$file;declarationLine=$declarationLine;sourceFrames=@($frames.ToArray());nativeErrors=@($native.ToArray());safeCode=$safeCode;fixtureCase=$fixtureCase;failureKind=$failureKind;fixtureExitCode=$fixtureExitCode;fixturePhase=$fixturePhase})
                         }
                         'done' {$complete=$event.success -eq $false}
                     }

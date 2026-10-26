@@ -292,7 +292,7 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
     $exitCode=if($variant -ceq 'exit-signed'){-1073741819L}elseif($variant -ceq 'exit-unsigned'){3221225477L}else{1L}
     if(($expectExit -and ($failure.failureKind -cne 'fixture-exit' -or $failure.fixtureExitCode -ne $exitCode)) -or
         (-not $expectExit -and ($null -ne $failure.failureKind -or $null -ne $failure.fixtureExitCode))) {throw ('Client fixed exit projection mismatch: '+$variant)}
-    if($failure.sourceFrames.Count -ne $frameCount -or $null -ne $failure.safeCode){throw ('Client nested frame bounds mismatch: '+$variant)}
+    if($failure.sourceFrames.Count -ne $frameCount -or $null -ne $failure.safeCode -or $null -ne $failure.fixturePhase){throw ('Client nested frame bounds mismatch: '+$variant)}
     foreach($frame in $failure.sourceFrames){
         if($variant -ceq 'joint-frames' -and $frame.file -ceq $clientSource -and $frame.line -eq 84){continue}
         if($frame.file -cne $actorSource -or $frame.line -notin @(40,41,42)){throw 'Client nested source mismatch.'}
@@ -303,6 +303,232 @@ foreach($variant in ($clientModes+@('unknown-client','unknown-name','name-type',
 }
 'QUALIFICATION_REAL_ASSERTION_TRUSTED_CLIENT_37_FIXED_CASES_NESTED_SOURCE_HASH_BOUNDS_PRIVACY_NEGATIVES_PASSED'
 'QUALIFICATION_TRUSTED_CLIENT_FIXED_EXIT_SIGNED_UNSIGNED_RANGE_SHAPE_SOURCE_PRIVACY_NEGATIVES_PASSED'
+
+# Use a real Dart FileSystemException reporter, then alias only its metadata
+# and checked source frames. These controlled errors do not identify the OS
+# error from a native qualification run or claim that a fixture ran.
+$cleanupSource='packages/serverdeck_windows/test/support/owned_fixture_cleanup.dart'
+$cleanupUri=([Uri](Join-Path $NativeIsarRepository $cleanupSource)).AbsoluteUri
+$cleanupLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $cleanupSource))
+$cleanupLine=@(for($index=0;$index -lt $cleanupLines.Length;$index++) {
+    if($cleanupLines[$index].Trim() -ceq 'checkedDirectory.deleteSync(recursive: true);'){$index+1}
+})
+if($cleanupLine.Count -ne 1){throw 'Expected exactly one checked owned fixture delete statement.'}
+$cleanupLine=$cleanupLine[0]
+$cleanupProbe=Join-Path $fixture 'controlled-cleanup.dart'
+$cleanupReport=Join-Path $fixture 'controlled-cleanup.machine.jsonl'
+$cleanupDart=@'
+import 'dart:io';
+import 'package:test/test.dart';
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER cleanup', () {
+    Error.throwWithStackTrace(
+      const FileSystemException('Deletion failed', 'C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private', OSError('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER', 32)),
+      StackTrace.fromString('#0 cleanup (FIXTURE_CLEANUP_URI:FIXTURE_CLEANUP_LINE:1)\n#1 private (file:///C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart:9:2)'));
+  });
+}
+'@
+[IO.File]::WriteAllText($cleanupProbe,$cleanupDart.Replace('FIXTURE_CLEANUP_URI',$cleanupUri).Replace('FIXTURE_CLEANUP_LINE',[string]$cleanupLine),[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_windows')
+try {
+    & $FoundationDart test $cleanupProbe --file-reporter "json:$cleanupReport" *> (Join-Path $fixture 'controlled-cleanup.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled cleanup failure unexpectedly passed.'}
+} finally {Pop-Location}
+$rawCleanup=[IO.File]::ReadAllLines($cleanupReport)
+foreach($variant in @('delete-5','delete-32','delete-33','delete-145','duplicate-frame',
+    'unknown-code','zero-code','negative-code','oversize-code','wrong-operation','wrong-exception','prefixed-error','suffixed-error','nested-error',
+    'unknown-name','name-type','invalid-declaration','changed-client','unknown-client-source','changed-cleanup',
+    'unknown-cleanup-source','invalid-cleanup-line','unrelated-cleanup-line','unrelated-frame','wrong-phase')) {
+    $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($caseFixture)
+    $events=foreach($line in $rawCleanup) {
+        $event=$line|ConvertFrom-Json -AsHashtable
+        if($event.type -ceq 'testStart' -and $event.test.name -ceq ($privateMarker+' cleanup')) {
+            $event.test.name='actual format3 bootstrap and RPC client receipts'
+            $event.test.url=$clientUri
+            $event.test.line=65
+            switch($variant) {
+                'unknown-name' {$event.test.name+=$privateMarker}
+                'name-type' {$event.test.name=@{private=$privateMarker}}
+                'invalid-declaration' {$event.test.line=999999}
+                'unknown-client-source' {$event.test.url='file:///C:/'+$privateMarker+'/private.dart'}
+            }
+        }
+        if($event.type -ceq 'error') {
+            if($event.error -cnotmatch "\AFileSystemException: Deletion failed, path = '[\s\S]*' \(OS Error: [\s\S]*, errno = 32\)\z") {
+                throw 'Expected actual Dart deletion exception reporter shape.'
+            }
+            switch($variant) {
+                'delete-5' {$event.error=$event.error.Replace('errno = 32)','errno = 5)')}
+                'delete-33' {$event.error=$event.error.Replace('errno = 32)','errno = 33)')}
+                'delete-145' {$event.error=$event.error.Replace('errno = 32)','errno = 145)')}
+                'unknown-code' {$event.error=$event.error.Replace('errno = 32)','errno = 2)')}
+                'zero-code' {$event.error=$event.error.Replace('errno = 32)','errno = 0)')}
+                'negative-code' {$event.error=$event.error.Replace('errno = 32)','errno = -1)')}
+                'oversize-code' {$event.error=$event.error.Replace('errno = 32)','errno = 4294967296)')}
+                'wrong-operation' {$event.error=$event.error.Replace('Deletion failed','Cannot open file')}
+                'wrong-exception' {$event.error=$event.error.Replace('FileSystemException','StateError')}
+                'prefixed-error' {$event.error=$privateMarker+"`n"+$event.error}
+                'suffixed-error' {$event.error+="`n"+$privateMarker}
+                'nested-error' {$event.error="Expected: <0>`n  Actual: <1>`n"+$event.error}
+                'duplicate-frame' {$event.stackTrace+="`n#2 cleanup (${cleanupUri}:${cleanupLine}:1)"}
+                'unknown-cleanup-source' {$event.stackTrace="#0 private (file:///C:/${privateMarker}/private.dart:${cleanupLine}:1)"}
+                'invalid-cleanup-line' {$event.stackTrace="#0 cleanup (${cleanupUri}:999999:1)"}
+                'unrelated-cleanup-line' {$event.stackTrace="#0 cleanup (${cleanupUri}:1:1)"}
+                'unrelated-frame' {$event.stackTrace="#0 unrelated (package:serverdeck_windows/native_attributes.dart:65:1)"}
+            }
+        }
+        $event|ConvertTo-Json -Depth 30 -Compress
+    }
+    $phase=if($variant -ceq 'wrong-phase'){'serverdeck_locald-tests'}else{'serverdeck_windows-tests'}
+    [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),[string[]]$events,[Text.UTF8Encoding]::new($false))
+    $selected=$snapshot
+    if($variant -in @('changed-client','changed-cleanup')) {
+        $changed=if($variant -ceq 'changed-client'){$clientSource}else{$cleanupSource}
+        $selected=@{sha256=$snapshot.sha256;files=@($snapshot.files|ForEach-Object{
+            if($_.file -ceq $changed){@{file=$changed;sha256=('0'*64)}}else{$_}
+        })}
+    }
+    Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+    $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json')
+    $caseProof=Read-NativeIsarArtifactJson $casePath
+    $safe=[IO.File]::ReadAllText($casePath)
+    if($caseProof.schemaVersion -ne 1 -or $caseProof.status -cne 'failed-test-details' -or -not $caseProof.controlledFixture -or
+        -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1 -or
+        $safe.Contains($privateMarker) -or $safe.Contains('file:///') -or $safe.Contains('C:/') -or
+        $safe.Contains('stackTrace') -or $safe.Contains('Deletion failed') -or $safe.Contains('OS Error:') -or
+        $safe.Contains('999999') -or $safe.Contains('Expected:')) {throw 'Cleanup projection privacy/report mismatch.'}
+    $failure=$caseProof.failures[0]
+    $expectCleanup=$variant -in @('delete-5','delete-32','delete-33','delete-145','duplicate-frame')
+    $expectExit=$variant -ceq 'nested-error'
+    $expectCase=$variant -notin @('unknown-name','name-type','invalid-declaration','changed-client','unknown-client-source')
+    if(($expectCase -and $failure.fixtureCase -cne 'trusted-client-receipts') -or
+        (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+        ($expectExit -and $failure.fixtureExitCode -ne 1) -or
+        (-not $expectExit -and $null -ne $failure.fixtureExitCode) -or
+        $null -ne $failure.safeCode -or $null -ne $failure.fixturePhase) {throw ('Cleanup fixed metadata mismatch: '+$variant)}
+    if($expectCleanup) {
+        $expectedCode=switch($variant){'delete-5'{5L};'delete-33'{33L};'delete-145'{145L};default{32L}}
+        if($failure.failureKind -cne 'fixture-cleanup' -or $failure.nativeErrors.Count -ne 1 -or
+            $failure.nativeErrors[0].kind -cne 'WIN32_FIXTURE_DELETE' -or $failure.nativeErrors[0].code -ne $expectedCode) {
+            throw ('Known fixture cleanup projection mismatch: '+$variant)
+        }
+    } elseif(($expectExit -and $failure.failureKind -cne 'fixture-exit') -or
+        (-not $expectExit -and $null -ne $failure.failureKind) -or $failure.nativeErrors.Count -ne 0) {
+        throw ('Unrelated cleanup exception was exported: '+$variant)
+    }
+    if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled cleanup projection claimed qualification.'}
+}
+'QUALIFICATION_REAL_DELETE_EXCEPTION_KNOWN_WINDOWS_CODES_SOURCE_HASH_LINE_PHASE_CASE_AND_PRIVACY_NEGATIVES_PASSED'
+
+# The native pipe watchdog emits one fixed phase. It is safe only at the
+# checked test declaration and timeout callback, with an exact error shape.
+$pipeSource='packages/serverdeck_windows/test/pipe_disconnected_test.dart'
+$pipeUri=([Uri](Join-Path $NativeIsarRepository $pipeSource)).AbsoluteUri
+$pipeLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $pipeSource))
+$pipeTimeoutLine=@(for($index=0;$index -lt $pipeLines.Length;$index++) {
+    if($pipeLines[$index].Trim() -ceq 'onTimeout: () => throw TimeoutException('){$index+1}
+})
+$pipeDeclaration=@(for($index=0;$index -lt $pipeLines.Length;$index++) {
+    if($pipeLines[$index].TrimStart().StartsWith('test(')){$index+1}
+})
+if($pipeTimeoutLine.Count -ne 1 -or $pipeDeclaration.Count -ne 1){throw 'Expected one checked disconnected pipe timeout and test declaration.'}
+$pipeTimeoutLine=$pipeTimeoutLine[0];$pipeDeclaration=$pipeDeclaration[0]
+$pipeName='compiled disconnected pipe read after native disconnect fails promptly without waiting on an unissued event'
+$pipeProbe=Join-Path $fixture 'controlled-pipe-timeout.dart'
+$pipeReport=Join-Path $fixture 'controlled-pipe-timeout.machine.jsonl'
+$pipeDart=@'
+import 'dart:async';
+import 'package:test/test.dart';
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER pipe timeout', () {
+    Error.throwWithStackTrace(
+      TimeoutException('DISCONNECT_FIXTURE_TIMEOUT:connected', const Duration(seconds: 15)),
+      StackTrace.fromString('#0 timeout (FIXTURE_PIPE_URI:FIXTURE_PIPE_LINE:1)\n#1 private (file:///C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart:9:2)'));
+  });
+}
+'@
+[IO.File]::WriteAllText($pipeProbe,$pipeDart.Replace('FIXTURE_PIPE_URI',$pipeUri).Replace('FIXTURE_PIPE_LINE',[string]$pipeTimeoutLine),[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_windows')
+try {
+    & $FoundationDart test $pipeProbe --file-reporter "json:$pipeReport" *> (Join-Path $fixture 'controlled-pipe-timeout.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled pipe timeout unexpectedly passed.'}
+} finally {Pop-Location}
+$rawPipe=[IO.File]::ReadAllLines($pipeReport)
+$pipePhases=@('started','connected','disconnected','read-terminated','reuse-cancel-proved')
+foreach($variant in ($pipePhases+@('unknown-phase','prefixed-error','suffixed-error','wrong-duration','wrong-error',
+    'unknown-name','name-type','invalid-declaration','changed-source','unknown-source','unrelated-source',
+    'invalid-frame','unrelated-frame','unknown-frame','missing-frame','wrong-phase'))) {
+    $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($caseFixture)
+    $events=foreach($line in $rawPipe) {
+        $event=$line|ConvertFrom-Json -AsHashtable
+        if($event.type -ceq 'testStart' -and $event.test.name -ceq ($privateMarker+' pipe timeout')) {
+            $event.test.name=$pipeName
+            $event.test.url=$pipeUri
+            $event.test.line=$pipeDeclaration
+            switch($variant) {
+                'unknown-name' {$event.test.name+=$privateMarker}
+                'name-type' {$event.test.name=@{private=$privateMarker}}
+                'invalid-declaration' {$event.test.line=999999}
+                'unknown-source' {$event.test.url='file:///C:/'+$privateMarker+'/private.dart'}
+                'unrelated-source' {$event.test.url=$clientUri}
+            }
+        }
+        if($event.type -ceq 'error') {
+            if($event.error -cne 'TimeoutException after 0:00:15.000000: DISCONNECT_FIXTURE_TIMEOUT:connected') {
+                throw 'Expected actual Dart pipe timeout reporter shape.'
+            }
+            if($variant -in $pipePhases){$event.error=$event.error.Replace(':connected',(':'+$variant))}
+            switch($variant) {
+                'unknown-phase' {$event.error=$event.error.Replace(':connected',(':'+$privateMarker))}
+                'prefixed-error' {$event.error=$privateMarker+"`n"+$event.error}
+                'suffixed-error' {$event.error+="`n"+$privateMarker}
+                'wrong-duration' {$event.error=$event.error.Replace('0:00:15.000000','0:00:30.000000')}
+                'wrong-error' {$event.error='Bad state: '+$event.error}
+                'invalid-frame' {$event.stackTrace="#0 timeout (${pipeUri}:999999:1)"}
+                'unrelated-frame' {$event.stackTrace="#0 timeout (${pipeUri}:1:1)"}
+                'unknown-frame' {$event.stackTrace="#0 private (file:///C:/${privateMarker}/private.dart:${pipeTimeoutLine}:1)"}
+                'missing-frame' {$event.stackTrace=$privateMarker}
+            }
+        }
+        $event|ConvertTo-Json -Depth 30 -Compress
+    }
+    $phase=if($variant -ceq 'wrong-phase'){'serverdeck_locald-tests'}else{'serverdeck_windows-tests'}
+    [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),[string[]]$events,[Text.UTF8Encoding]::new($false))
+    $selected=$snapshot
+    if($variant -ceq 'changed-source') {
+        $selected=@{sha256=$snapshot.sha256;files=@($snapshot.files|ForEach-Object{
+            if($_.file -ceq $pipeSource){@{file=$pipeSource;sha256=('0'*64)}}else{$_}
+        })}
+    }
+    Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+    $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json')
+    $caseProof=Read-NativeIsarArtifactJson $casePath
+    $safe=[IO.File]::ReadAllText($casePath)
+    if($caseProof.schemaVersion -ne 1 -or $caseProof.status -cne 'failed-test-details' -or -not $caseProof.controlledFixture -or
+        -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1 -or
+        $safe.Contains($privateMarker) -or $safe.Contains('file:///') -or $safe.Contains('C:/') -or
+        $safe.Contains('stackTrace') -or $safe.Contains('DISCONNECT_FIXTURE_TIMEOUT:') -or $safe.Contains('999999')) {
+        throw 'Pipe timeout projection privacy/report mismatch.'
+    }
+    $failure=$caseProof.failures[0]
+    $expectPhase=$variant -in $pipePhases
+    $expectCase=$variant -notin @('unknown-name','name-type','invalid-declaration','changed-source','unknown-source','unrelated-source',
+        'invalid-frame','unrelated-frame','unknown-frame','missing-frame','wrong-phase')
+    $expectTimeout=$variant -notin @('prefixed-error','wrong-error','invalid-declaration','changed-source','unknown-source')
+    if(($expectPhase -and $failure.fixturePhase -cne $variant) -or
+        (-not $expectPhase -and $null -ne $failure.fixturePhase) -or
+        ($expectCase -and $failure.fixtureCase -cne 'pipe-disconnected') -or
+        (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+        ($expectTimeout -and $failure.failureKind -cne 'timeout') -or
+        (-not $expectTimeout -and $null -ne $failure.failureKind) -or
+        $null -ne $failure.fixtureExitCode -or $null -ne $failure.safeCode -or $failure.nativeErrors.Count -ne 0) {
+        throw ('Pipe fixed phase/source projection mismatch: '+$variant)
+    }
+    if($caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated){throw 'Controlled pipe projection claimed qualification.'}
+}
+'QUALIFICATION_REAL_PIPE_TIMEOUT_FIVE_FIXED_PHASES_SOURCE_HASH_LINE_CASE_SHAPE_AND_PRIVACY_NEGATIVES_PASSED'
 $fixture
 $invalidFixture
 exit 0

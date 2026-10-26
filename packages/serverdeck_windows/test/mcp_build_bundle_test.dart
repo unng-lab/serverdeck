@@ -8,6 +8,8 @@ import 'package:serverdeck_windows/process.dart';
 import 'package:serverdeck_windows/security.dart';
 import 'package:test/test.dart';
 
+import 'support/owned_fixture_cleanup.dart';
+
 Matcher code(String value) =>
     throwsA(isA<StateError>().having((e) => e.message, 'safe code', value));
 
@@ -116,7 +118,7 @@ class Fixture {
     for (final error in errors)
       expect(await error.timeout(const Duration(seconds: 5)), isEmpty);
     ownRoot(path);
-    root.deleteSync(recursive: true);
+    await deleteOwnedFixtureDirectory(root);
   }
 }
 
