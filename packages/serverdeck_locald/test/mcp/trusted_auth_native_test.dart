@@ -108,6 +108,8 @@ void main() {
     'stale-close',
     'proofs',
     'quota',
+    'control-pressure',
+    'control-metadata',
     'expiry',
     'close',
     'snapshot',
@@ -134,7 +136,9 @@ void main() {
       () async {
         final fixture = b.Fixture(
           scenario == 'owner-context-physical' ||
-                  scenario == 'owner-connection-physical'
+                  scenario == 'owner-connection-physical' ||
+                  scenario == 'control-pressure' ||
+                  scenario == 'control-metadata'
               ? observed
               : executable,
         );

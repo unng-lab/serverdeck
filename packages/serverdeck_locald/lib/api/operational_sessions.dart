@@ -282,6 +282,9 @@ sealed class _Sessions<P> {
       _clock() + sessionLease,
     );
     _sessions[channel] = session;
+    binding.bindFailureHandler(() {
+      if (identical(_sessions[channel], session)) disconnect(channel);
+    });
     _emptyAt = null;
     _onChanged?.call();
     if (!_current(channel, session)) throw StateError('UNAUTHORIZED');
@@ -371,6 +374,7 @@ sealed class _Sessions<P> {
   void _remove(String channel, Duration at) {
     final session = _sessions.remove(channel);
     if (session == null) return;
+    session.nativeScope.retire();
     session.detached.complete();
     if (_sessions.isEmpty) _emptyAt = at;
     var listenerFailed = false;
@@ -431,6 +435,7 @@ final class _Session<P> {
   final OperationalHello hello;
   final P peer;
   final _ServerPeer binding;
+  final nativeScope = NativeControlScope();
   OperationalRole get role => hello.clientRole;
   Duration expires;
   int pending = 0;
@@ -448,6 +453,7 @@ sealed class _SessionRequest<P> {
   final _Session<P> _session;
   final String channel, method;
   final Duration _began;
+  final nativeScope = NativeControlScope();
   bool belongsTo(_Sessions<P> registry) => identical(_registry, registry);
   bool _completed = false;
   bool _initialAdmissionProved = false;
@@ -530,10 +536,24 @@ sealed class _SessionRequest<P> {
       try {
         final budget = rpcBudgetRemaining;
         final actual = _session.binding.revalidate(
+          remaining: () {
+            final value = rpcBudgetRemaining;
+            final grant = _session.grant;
+            if (grant != null &&
+                (_session.authority!._closed ||
+                    !grant.isCurrentAt(_session.authority!._clock()))) {
+              _detach();
+              throw StateError('UNAUTHORIZED');
+            }
+            return value;
+          },
+          scopes: [_session.nativeScope, nativeScope],
           observeNativeCompletion: observeNativeCompletion,
         );
         actual.ignore();
         await actual.timeout(budget);
+      } on NativeControlLocalFailure catch (error) {
+        error.rethrowCause();
       } on TimeoutException {
         throw StateError('TIMEOUT');
       } catch (error) {
@@ -556,6 +576,7 @@ sealed class _SessionRequest<P> {
   void complete() {
     if (_completed) return;
     _completed = true;
+    nativeScope.retire();
     _session.pending--;
   }
 }
@@ -610,7 +631,20 @@ final class TrustedSessionRequest
     _live();
     if (_session.role != OperationalRole.owner || !_initialAdmissionProved)
       throw StateError('FORBIDDEN');
-    final root = await _session.peer.verifiedBundleRoot().timeout(rpcRemaining);
+    final budget = rpcRemaining;
+    late final String root;
+    try {
+      root = await _session.binding
+          .verifiedBundleRoot(
+            remaining: () => rpcRemaining,
+            scopes: [_session.nativeScope, nativeScope],
+          )
+          .timeout(budget);
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
+    } on TimeoutException {
+      throw StateError('TIMEOUT');
+    }
     rpcRemaining;
     return root;
   }

@@ -1,9 +1,60 @@
 # Implementation Plan: MCP и Ansible
 
+## Current unit-widget stage (2026-10-27)
+
+The explicit user decision and Constitution4.0.0/VII select **unit/widget and
+static checks both locally and in automatic push/PR CI** for PR3/source-only
+MIT preview `0.2.0-preview.1+9`. The authoritative scope, exact-source merge
+gate and excluded workloads are recorded in
+[003 current-stage plan](../003-design-system/plan.md#unit-widget-stage-2026-10-27);
+[current commands](quickstart.md#current-unit-widget-commands) take precedence
+over earlier unconditional native/full-cold instructions below for this stage.
+
+T204–T212 source is implemented. Root unit/widget/static, pure protocol and pure
+accepted-peer scheduler results are recorded separately in
+[003 evidence](../003-design-system/evidence.md#current-unit-widget-evidence-2026-10-27).
+The completed R3 summary covers only its40frozen source files/incremental
+implementation; it does not review this new policy/workflow/documentation.
+New [T213](tasks.md#current-unit-widget-stage-2026-10-27) records current-stage
+local acceptance after its own checks and fresh independent review. Original
+T204–T212 task lines and markers remain historical/full-acceptance scope;
+**T207 full-native acceptance remains uncompleted**.
+
+Product FR/AC, native3/16-RPC bounds,1024tickets, original deadlines, guards,
+failure/recovery oracles and component responsibilities do not change.
+Full affected channel72, Windows176, grant66 and other native acceptance
+requirements in [native-control](contracts/native-control.md) remain future
+qualification. Earlier focused Terminal2/Observer8 passes are scoped evidence;
+ChannelFull stopped after8passes/0failures is incomplete, not a full native pass.
+No native/FFI/Isar/DPAPI/service/process/pipe/integration/real-SSH/container/cold
+test run is permitted now without another user instruction. Existing full
+native CI jobs remain a future explicit manual profile; not-selected/skipped
+does not mean passed. Full001/021/005, native distribution/signing and
+production readiness remain open. The earlier no-amendment statement describes
+the original plan; the current verification governance is adopted4.0.0/VII.
+
 **Feature**: 021-mcp-control | **Date**: 2026-10-21 | **Spec**: [spec.md](spec.md)
 **Status**: Design review3 completed with no findings; ready for staged implementation. Implement started; runtime/acceptance not complete.
 
 ## Summary
+
+The scoped T204–T207 correction implements
+[accepted-peer native control coordination](contracts/native-control.md) in the
+existing locald API layer. One bounded pure scheduler per private accepted-peer
+binding shares only preissue fresh-proof cohorts and serializes distinct native
+metadata; physical completion remains separate from logical timeout. Existing
+session/request scopes detach queued tickets, the sealed first-open exception
+remains distinct, and channel close retains its original drain/disconnect
+barrier. No backend, protocol, native quota, storage or package dependency changes
+are needed. Existing decisions/history below remain; this correction requires
+its own completed readiness and implementation review before acceptance.
+T212 adds only write-admission accounting in the shared epoch native peer and
+sealed failed-open permit: both channels record the original ordinary/terminal
+deadline only after command admission, so first-RPC terminal close drains while
+pre-admission refusal preserves the preceding write budget. Additive observation
+does not change callback-null writes, native3,16-RPC bounds, protocol, schemas,
+release prerequisites or physical ownership. Its contract/task amendment needs
+fresh readiness review before implementation and fresh checks/review afterward.
 
 Persisted remote trust requires explicit schema3 and owner-only challenge/confirmation under the [host trust contract](contracts/host-trust.md). Schema2 components remain exact historical/prototype readers; remote startup uses a separate format3/API1.1/schema3 bundle after protected migration and all service gates, with no implicit trust-table fallback.
 

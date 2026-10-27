@@ -30,14 +30,26 @@ void main() {
     }
   });
 
-  test(
-    'real pinned map-full aborts every earlier write and allows recovery',
-    () async {
-      final nativeLibrary = nativeArtifactForTest();
-      await Isar.initializeIsarCore(
-        libraries: {Abi.windowsX64: nativeLibrary},
-        download: false,
-      );
+  group('native capacity', () {
+    setUpAll(() async {
+      final setupWatch = Stopwatch()..start();
+      try {
+        final nativeLibrary = nativeArtifactForTest();
+        await Isar.initializeIsarCore(
+          libraries: {Abi.windowsX64: nativeLibrary},
+          download: false,
+        );
+      } finally {
+        setupWatch.stop();
+        // ignore: avoid_print
+        print(
+          'NATIVE_CAPACITY_SETUP_ELAPSED_MS:${setupWatch.elapsedMilliseconds}',
+        );
+      }
+    });
+
+    test('real pinned map-full aborts every earlier write and allows recovery', () async {
+      final workloadWatch = Stopwatch()..start();
       final parent = Directory.systemTemp.createTempSync(
         'serverdeck-map-full-fixture-',
       );
@@ -122,10 +134,17 @@ void main() {
         expect(await database.storedProfiles.count(), committed - 3);
         expect(await database.storedReceipts.count(), committed);
       } finally {
-        await database?.close();
-        parent.deleteSync(recursive: true);
+        try {
+          await database?.close();
+          parent.deleteSync(recursive: true);
+        } finally {
+          workloadWatch.stop();
+          // ignore: avoid_print
+          print(
+            'NATIVE_CAPACITY_WORKLOAD_ELAPSED_MS:${workloadWatch.elapsedMilliseconds}',
+          );
+        }
       }
-    },
-    testOn: 'windows',
-  );
+    }, testOn: 'windows');
+  }, testOn: 'windows');
 }

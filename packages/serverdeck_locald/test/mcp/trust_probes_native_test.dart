@@ -81,6 +81,7 @@ void main() {
     'admission-clock',
     'reserved-cancel',
     'physical-cancel',
+    'physical-cancel-rpc',
     'physical-detach',
     'physical-stale',
   ]) {

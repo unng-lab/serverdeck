@@ -118,8 +118,16 @@ extension _GrantOpen<P> on _GrantSessionRequest<P> {
 
   Future<void> _openVerify() async {
     try {
-      await _session.binding.revalidate().timeout(_openRemaining());
+      final budget = _openRemaining();
+      await _session.binding
+          .revalidate(
+            remaining: _openRemaining,
+            scopes: [_session.nativeScope, nativeScope],
+          )
+          .timeout(budget);
       _openRemaining();
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
     } on TimeoutException {
       throw StateError('TIMEOUT');
     }

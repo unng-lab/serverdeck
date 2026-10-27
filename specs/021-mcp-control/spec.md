@@ -111,6 +111,21 @@
 
 ## Assumptions
 
+The existing native freshness/bounds requirements are further specified by
+[accepted-peer control coordination](contracts/native-control.md), implemented
+as the scoped T204–T207 correction to US1/FR-MCP-004/005. It preserves the native3
+and logical16 limits and introduces no new wire or storage format. Its design,
+implementation and acceptance are separately reviewed; the historical readiness
+statement above does not claim this correction has passed those gates.
+
+The current explicit unit/widget/static stage, locally and in automatic CI,
+is defined by Constitution4.0.0/VII and the
+[003 stage record](../003-design-system/plan.md#unit-widget-stage-2026-10-27),
+with separate [T213 acceptance](tasks.md#current-unit-widget-stage-2026-10-27).
+It changes no product FR/AC or native-control oracle; implemented source and
+scoped unit evidence do not close original T207/full-native correction
+acceptance or establish full021/platform/distribution readiness.
+
 - Windows первая, Ubuntu 24.04 amd64/systemd первая target; обязательное облако/смена Flutter/Dart/Isar не требуются.
 - Локальный stdio MCP достаточен для первой поставки; remote MCP требует отдельного auth/network design.
 - Авторство означает поддержанное декларативное содержимое, исполняемое Ansible. Неограниченное выполнение скачанного playbook не подразумевается; выразительность определяется Plan/контрактом до реализации.

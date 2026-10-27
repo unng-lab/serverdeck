@@ -23,8 +23,15 @@ final class OperationalOpenFailure extends _OpenFailure<OperationalPipePeer> {
   @override
   Map<String, Object?> get _error => LocalError(_code).toJson();
   @override
-  Future<void> _write(List<int> bytes, Duration deadline) =>
-      _request._session.peer.write(bytes, deadline: deadline);
+  Future<void> _write(
+    List<int> bytes,
+    Duration deadline, {
+    void Function(Future<void>)? observeNativeCompletion,
+  }) => _request._session.peer.write(
+    bytes,
+    deadline: deadline,
+    observeNativeCompletion: observeNativeCompletion,
+  );
 }
 
 final class TrustedOpenFailure extends _OpenFailure<TrustedPipePeer> {
@@ -33,15 +40,26 @@ final class TrustedOpenFailure extends _OpenFailure<TrustedPipePeer> {
   @override
   Map<String, Object?> get _error => TrustedLocalError(_code.wireName).toJson();
   @override
-  Future<void> _write(List<int> bytes, Duration deadline) =>
-      _request._session.peer.write(bytes, deadline: deadline);
+  Future<void> _write(
+    List<int> bytes,
+    Duration deadline, {
+    void Function(Future<void>)? observeNativeCompletion,
+  }) => _request._session.peer.write(
+    bytes,
+    deadline: deadline,
+    observeNativeCompletion: observeNativeCompletion,
+  );
 }
 
 sealed class _OpenFailure<P> {
   _OpenFailure._(this._request, this._code);
   final _GrantSessionRequest<P> _request;
   Map<String, Object?> get _error;
-  Future<void> _write(List<int> bytes, Duration deadline);
+  Future<void> _write(
+    List<int> bytes,
+    Duration deadline, {
+    void Function(Future<void>)? observeNativeCompletion,
+  });
   final ErrorCode _code;
   bool _used = false;
 
@@ -67,6 +85,7 @@ sealed class _OpenFailure<P> {
   Future<void> write(
     String requestId, {
     Duration deadline = rpcDeadline,
+    void Function(Future<void>)? observeNativeCompletion,
   }) async {
     if (_used) throw StateError('UNAUTHORIZED');
     _used = true;
@@ -89,10 +108,18 @@ sealed class _OpenFailure<P> {
         }),
       );
       final verificationBudget = remaining();
-      await peer.revalidate().timeout(verificationBudget);
+      await peer
+          .revalidate(remaining: remaining, scopes: [_request.nativeScope])
+          .timeout(verificationBudget);
       // Synchronous guard after the await, immediately before issuing I/O.
-      await _write(bytes, remaining());
+      await _write(
+        bytes,
+        remaining(),
+        observeNativeCompletion: observeNativeCompletion,
+      );
       remaining();
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
     } on TimeoutException {
       throw StateError('TIMEOUT');
     } finally {

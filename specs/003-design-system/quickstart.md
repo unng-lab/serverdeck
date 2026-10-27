@@ -1,5 +1,52 @@
 # Quickstart: проверка003
 
+## Current unit-widget commands
+
+Текущий scope и merge/source-preview gate определены
+[решением этапа](plan.md#unit-widget-stage-2026-10-27), Constitution4.0.0/VII
+и AGENTS.md. Этот блок имеет приоритет над native/integration/capture/cold
+командами ниже: они сохраняются для будущей квалификации и сейчас не разрешены.
+Новый native/full run требует отдельного указания пользователя.
+
+Использовать закреплённые Flutter3.47.7 / Dart3.13.5/framework
+`abaf9c523780a608bd46686fd5e53740a07077f8` и locked dependencies.
+После разрешённого dependency restore, из root:
+
+```powershell
+$env:SERVERDECK_NATIVE_CONTROL_RED = '0'
+dart format --output=none --set-exit-if-changed .
+flutter analyze
+flutter test --reporter expanded
+Push-Location packages/serverdeck_protocol
+try { dart analyze; dart test --reporter expanded } finally { Pop-Location }
+Push-Location packages/serverdeck_windows
+try { dart analyze } finally { Pop-Location }
+Push-Location packages/serverdeck_locald
+try {
+  dart analyze
+  dart test test/server_peer_coordination_test.dart --reporter expanded
+} finally { Pop-Location }
+lychee "specs/**/*.md"
+```
+
+Фиксировать exit каждой команды отдельно: PowerShell `try/finally` сам по себе
+не проверяет exit предыдущего Dart process. Root `flutter test` означает
+обычный unit/contract/widget suite в `test/`, без `integration_test` и без
+capture dart-defines; ожидаемый opt-in capture skip не является выполненным
+capture. Полный protocol suite и выбранный locald queue test используют pure
+fixtures. Полный `dart test` locald/Windows/MCP, portable SSH suite с loopback/
+ssh-keygen и любые FFI/DPAPI/service/process/pipe fixtures в текущий gate не
+входят. SDK/Flutter test runner — prerequisites unit tooling, а не разрешение
+product-native execution.
+
+Push/PR и default manual profile выбирают `unit-widget-checks`; native jobs
+сохраняются только за explicit manual `profile=native-full`, который сейчас
+не dispatch-ится. `foundation.yml` остаётся отдельным ручным full-product
+профилем с незакрытым acceptance marker и также не запускается. После реальных
+проверок — fresh independent policy/spec/workflow review с frozen inputs.
+CI, packaging/install и release evidence записываются только по своим actual
+receipts; старые partial/failed native результаты не становятся успешными.
+
 Это воспроизводимый validation guide [плана](plan.md), а не отчёт о выполненных проверках. Fixture helpers/tests, отмеченные ниже как новые, создаются задачами реализации. Запускать из корня репозитория; пользовательские профили/серверы не нужны.
 
 ## Prerequisites

@@ -82,7 +82,7 @@ final class OperationalServerChannel {
       maxBytes: maxHandshakeBytes,
     );
     final budget = _remaining(until);
-    await handshake.peer.revalidate().timeout(budget);
+    await handshake.revalidateForWrite(() => _remaining(until)).timeout(budget);
     await handshake.peer.write(bytes, deadline: _remaining(until));
     _remaining(until);
   }
@@ -111,7 +111,13 @@ final class OperationalServerChannel {
       if (_closing) return;
       if (reply.closeChannel) _accepting = false;
       if (reply.terminal != null) _terminal = reply;
-      final writing = _writeTail.then((_) => _publish(reply, until));
+      final writing = _writeTail.then((_) async {
+        await _publish(reply, until);
+        if (_terminal != null && !identical(_terminal, reply)) return;
+        // Retire before draining, while this publication still owns the
+        // writer. No later reply may validate or write after this ACK.
+        if (reply.closeChannel) await close();
+      });
       writing.ignore();
       _writeTail = writing;
       _publishing++;
@@ -119,11 +125,6 @@ final class OperationalServerChannel {
         await writing;
       } finally {
         _publishing--;
-      }
-      if (_terminal != null && !identical(_terminal, reply)) return;
-      if (reply.closeChannel) {
-        await handshake.peer.drainOutput(deadline: _remaining(until));
-        await close();
       }
     } catch (error) {
       abandoned = true;
@@ -142,7 +143,13 @@ final class OperationalServerChannel {
   Future<void> _publish(OperationalReply reply, Duration until) async {
     if (_terminal != null && !identical(_terminal, reply)) return;
     if (reply.terminal != null) {
-      await reply.terminal!.write(reply.id, deadline: _remaining(until));
+      await reply.terminal!.write(
+        reply.id,
+        deadline: _remaining(until),
+        observeNativeCompletion: (_) {
+          _issuedUntil = until;
+        },
+      );
       return;
     }
     final bytes = frameBytes(reply.bytes!, maxBytes: maxResponseBytes);
@@ -164,10 +171,12 @@ final class OperationalServerChannel {
         rethrow;
       }
       final outer = _remaining(until);
-      _issuedUntil = until;
       await handshake.peer.write(
         bytes,
         deadline: original < outer ? original : outer,
+        observeNativeCompletion: (_) {
+          _issuedUntil = until;
+        },
       );
       break;
     }
@@ -228,7 +237,12 @@ final class OperationalServerChannel {
     final until = _issuedUntil;
     if (until != null && until > _clock()) {
       try {
-        await handshake.peer.drainOutput(deadline: until - _clock());
+        // Retiring logical waiters does not free an issued native control slot.
+        // Its wait and the optional drain share the committed write's budget.
+        await handshake.nativeControlSettled.timeout(until - _clock());
+        final remaining = until - _clock();
+        if (remaining > Duration.zero)
+          await handshake.peer.drainOutput(deadline: remaining);
       } catch (_) {
         // Abandoned/failed native output has no delivery guarantee. Physical
         // cancellation/disconnect below must still confirm the reuse barrier.
@@ -236,6 +250,7 @@ final class OperationalServerChannel {
     }
     try {
       await handshake.peer.disconnect();
+      await handshake.nativeControlSettled;
     } catch (error) {
       failure ??= error;
     } finally {

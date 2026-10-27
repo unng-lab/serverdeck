@@ -1,13 +1,87 @@
 name: MCP automatic checks
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Explicit validation profile; native-full retains the existing real fixtures'
+        required: true
+        default: unit-widget
+        type: choice
+        options:
+          - unit-widget
+          - native-full
   push:
     branches: ['feature/**']
   pull_request:
 permissions:
   contents: read
 jobs:
+  unit-widget-checks:
+    name: unit-widget-checks
+    if: github.event_name != 'workflow_dispatch' || inputs.profile == 'unit-widget'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      SERVERDECK_NATIVE_CONTROL_RED: '0'
+      DESIGN_CAPTURE_DIR: ''
+      DESIGN_STATE_CAPTURE_DIR: ''
+      DESIGN_STOCK_CAPTURE_DIR: ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verified pinned SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'unit-sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'unit-sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Prepare pinned SDK dependencies and verify identity
+        timeout-minutes: 15
+        shell: pwsh
+        run: ./tools/prepare-foundation-sdk.ps1
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
+          foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
+            Push-Location (Join-Path 'packages' $package)
+            try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
+            finally { Pop-Location }
+          }
+      - name: Format and static analysis
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationDart @('format','--output=none','--set-exit-if-changed','.')
+          Invoke-FoundationCommand $FoundationFlutter @('analyze')
+          foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
+            Push-Location (Join-Path 'packages' $package)
+            try { Invoke-FoundationCommand $FoundationDart @('analyze') }
+            finally { Pop-Location }
+          }
+      - name: Root unit and widget tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationFlutter @('test','--reporter','expanded')
+      - name: Protocol unit tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_protocol
+          try { Invoke-FoundationCommand $FoundationDart @('test','--reporter','expanded') }
+          finally { Pop-Location }
+      - name: Pure accepted-peer scheduler unit tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_locald
+          try { Invoke-FoundationCommand $FoundationDart @('test','test/server_peer_coordination_test.dart','--reporter','expanded') }
+          finally { Pop-Location }
   ssh-transport:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -24,6 +98,7 @@ jobs:
       - name: Real disposable OpenSSH qualification
         run: bash tools/test-ssh-container.sh
   executor-prerequisites:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -31,6 +106,7 @@ jobs:
       - name: Docker systemd and locked Ansible prerequisites
         run: bash tools/test-executor-container.sh
   windows:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
     runs-on: windows-2022
     timeout-minutes: 240
     steps:

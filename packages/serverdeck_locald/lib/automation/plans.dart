@@ -175,7 +175,7 @@ final class PlanOperation {
       if (service.store.hasPendingMcpAuthorityPublication)
         await service.store.waitForMcpAuthority(deadline: left());
       try {
-        await owner!.revalidate().timeout(left());
+        await owner!.revalidate(deadline: left());
       } on TimeoutException {
         throw StateError('TIMEOUT');
       }

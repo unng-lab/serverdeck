@@ -114,6 +114,19 @@ Future<void> client(List<String> args) async {
             stdout.writeln('ERROR:${error.message}');
           }
         }
+        if (command == 'pressure-write') {
+          await session.peer.write([83]);
+          stdout.writeln('PRESSURE_WROTE');
+        }
+        if (command == 'pressure-read') {
+          var remaining = 1024 * 1024;
+          while (remaining > 0) {
+            final bytes = await session.peer.read(count: min(remaining, 65536));
+            check(bytes.isNotEmpty && bytes.every((byte) => byte == 81));
+            remaining -= bytes.length;
+          }
+          stdout.writeln('PRESSURE_READ');
+        }
         if (command == 'repeat') {
           await fails(bootstrap.authenticate(), 'UNAUTHORIZED');
           stdout.writeln('REPEAT_REFUSED');
@@ -328,6 +341,150 @@ final class Pair {
   }
 }
 
+Future<void> controlPressure(Pair owner, {String? metadataRoot}) async {
+  final completions = <void Function()>[];
+  final pending = <Future<void>>[];
+  Future<T> track<T>(Future<T> work) {
+    pending.add(work.then<void>((_) {}, onError: (Object _) {}));
+    return work;
+  }
+
+  await runOwnedFixtureLifecycle(
+    body: () async {
+      final firstRequest = await owner.registry.begin(
+        owner.channel,
+        owner.response!.sessionId,
+        'session.ping',
+      );
+      completions.add(firstRequest.complete);
+      final secondRequest = await owner.registry.begin(
+        owner.channel,
+        owner.response!.sessionId,
+        'session.ping',
+      );
+      completions.add(secondRequest.complete);
+      TrustedSessionRequest? metadataRequest;
+      if (metadataRoot != null) {
+        metadataRequest = await owner.registry.begin(
+          owner.channel,
+          owner.response!.sessionId,
+          'session.ping',
+        );
+        completions.add(metadataRequest.complete);
+      }
+      final peer = owner.peer!;
+      final observation = await peer.observeNextRevalidationForTest();
+      var firstObservers = 0, secondObservers = 0;
+      Future<void>? firstActual, secondActual;
+      final firstProof = track(
+        firstRequest.revalidate(
+          observeNativeCompletion: (actual) {
+            firstObservers++;
+            firstActual = track(actual);
+          },
+        ),
+      );
+      var firstSettled = false;
+      firstProof
+          .then<void>(
+            (_) => firstSettled = true,
+            onError: (Object _) => firstSettled = true,
+          )
+          .ignore();
+      // The reached command must retire before W and R consume native slots.
+      await observation.reached.timeout(const Duration(seconds: 2));
+      check(firstObservers == 1 && !firstSettled);
+      var writeSettled = false, readSettled = false;
+      final writing = track(peer.write(List<int>.filled(1024 * 1024, 81)));
+      writing
+          .then<void>(
+            (_) => writeSettled = true,
+            onError: (Object _) => writeSettled = true,
+          )
+          .ignore();
+      final reading = track(peer.read(count: 1));
+      reading
+          .then<void>(
+            (_) => readSettled = true,
+            onError: (Object _) => readSettled = true,
+          )
+          .ignore();
+      // Direct fourth-command refusal remains correct at physical W+V+R.
+      await fails(owner.server.verifyTrustedPeer(), 'RESOURCE_LIMIT');
+      Future<String>? metadata;
+      var metadataSettled = false;
+      if (metadataRequest != null) {
+        metadata = track(metadataRequest.verifiedOwnerBundleRoot());
+        metadata
+            .then<void>(
+              (_) => metadataSettled = true,
+              onError: (Object _) => metadataSettled = true,
+            )
+            .ignore();
+      }
+      final secondProof = track(
+        secondRequest.revalidate(
+          observeNativeCompletion: (actual) {
+            secondObservers++;
+            secondActual = track(actual);
+          },
+        ),
+      );
+      var secondSettled = false;
+      secondProof
+          .then<void>(
+            (_) => secondSettled = true,
+            onError: (Object _) => secondSettled = true,
+          )
+          .ignore();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      check(
+        !firstSettled &&
+            !secondSettled &&
+            !writeSettled &&
+            !readSettled &&
+            secondObservers == 0 &&
+            (metadata == null || !metadataSettled),
+      );
+      owner.child.stdin.writeln('pressure-write');
+      await owner.child.stdin.flush();
+      check((await reading).single == 83);
+      check(await owner.next() == 'PRESSURE_WROTE');
+      // R has actually settled, so this ordinary release is not a fourth call.
+      await observation.release();
+      await firstProof;
+      if (metadata != null) {
+        check(await metadata == p.normalize(metadataRoot!).toLowerCase());
+      }
+      await secondProof;
+      check(
+        firstObservers == 1 &&
+            secondObservers == 1 &&
+            !identical(firstActual, secondActual),
+      );
+      await firstActual!;
+      await secondActual!;
+      owner.child.stdin.writeln('pressure-read');
+      await owner.child.stdin.flush();
+      await writing;
+      check(await owner.next() == 'PRESSURE_READ');
+      final healthy = await owner.registry.begin(
+        owner.channel,
+        owner.response!.sessionId,
+        'session.ping',
+      );
+      healthy.complete();
+    },
+    cleanup: () async {
+      for (final complete in completions) complete();
+      // Exempt disconnect also releases the held proof if an assertion failed
+      // before R settled; an ordinary observation release could hit quota3.
+      await owner.peer!.disconnect();
+      await Future.wait(pending);
+    },
+  );
+}
+
 Future<void> scenario(String root, String name) async {
   ownRoot(root);
   var time = Duration.zero, detached = 0, expired = 0;
@@ -356,6 +513,16 @@ Future<void> scenario(String root, String name) async {
 
   await runOwnedFixtureLifecycle(
     body: () async {
+      if (name == 'control-pressure' || name == 'control-metadata') {
+        final owner = await start('serverdeck.exe');
+        await owner.exchange();
+        check(await owner.next() == 'AUTH:owner');
+        await controlPressure(
+          owner,
+          metadataRoot: name == 'control-metadata' ? root : null,
+        );
+        return;
+      }
       if (name.startsWith('owner-connection')) {
         final owner = await start('serverdeck.exe');
         await owner.exchange();

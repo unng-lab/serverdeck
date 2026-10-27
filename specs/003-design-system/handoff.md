@@ -1,5 +1,40 @@
 # Локальная передача дизайна ServerDeck
 
+## Current stage handoff (2026-10-27)
+
+Для PR3/source-only MIT preview `0.2.0-preview.1+9` действует
+[unit/widget и static stage](plan.md#unit-widget-stage-2026-10-27) локально
+и в автоматическом CI. Constitution4.0.0/VII и явное решение пользователя
+имеют приоритет над прежними full-cold gates ниже. Completed117 tasks003
+сохраняются; новая T118 и [021 T213](../021-mcp-control/tasks.md#current-unit-widget-stage-2026-10-27)
+ведут отдельный текущий stage, original T207 full-native acceptance не закрыта.
+
+Текущий исходный код T204–T212 реализован; factual local scope:
+format643/0changed, root/locald/Windows analyze0, root Flutter7505passed+
+1expected opt-in skip/exit0, protocol analyze0/165passed и pure queue21passed.
+Completed R3 summary фиксирует0findings/40frozen files/0mismatches только
+incremental source implementation. Это не review новых policy/spec/workflow
+изменений. Полные receipt paths, provenance и ограничения — в
+[evidence](evidence.md#current-unit-widget-evidence-2026-10-27).
+
+Ранее выполненные focused native Terminal2 и Observer8 прошли на своём source.
+ChannelFull72 остановлен по решению пользователя после8passes/0failures:
+reporter без done, runner1, acceptancePassed=false. Это incomplete/cancelled,
+не полный native pass. Windows176, grant66 и иные полные native suites
+остаются будущими, без запуска сейчас. Прежние RED/failed attempts сохранены.
+
+На этом checkpoint working metadata+9 не является выпущенным+9:
+actual HEAD/private install остаются+8/`0f1210a8bc44014f3fdf14b68227078023bd9e3a`.
+Новые current-policy review, exact-source push/PR unit CI и отдельные +9
+commit/build/private-package/install/archive/merge/tag/publication receipts
+ещё не заявлены. Перед merge нужен новый unit CI gate из плана; public assets
+ограничены source ZIP и SHA256SUMS.txt с MIT. Разрешённые private build/install
+сохраняют workspace и прежние installs и имеют отдельные receipts.
+Full001/021/005, native distribution/signing, c45 activation и production
+readiness этим этапом не принимаются.
+
+## Предыдущая запись handoff — исторический checkpoint
+
 Актуально на 27 октября 2026 года. Этапы003.1–003.3 приняты в согласованных UI границах; их code/visual/doc reviews и история сохранены ниже. Все117 уникальных задач закрыты только в своих фактических local scopes; T116/T117 finalDart6/PS2 implementation, применимые checks и fresh scoped reviews завершены. Current HEAD/private install/source archive —0.2.0-preview.1+7 из02ac9c88ba3e697f284af5598d37cb4b844a7ff1; workingmetadata+8 ещё не release. Оба Windows CI7 terminal failed gateway-quota/exit1; четыре Linux jobs successful; phase/code/cause неизвестны. Следующий gate — fresh after-recording strictlinks/diff и completed independent recording review frozen13 до commit. Затем exact future successful fullcoldCI и отдельные фактические release receipts обязательны до merge/tag/source-onlyMITrelease. Актуальные scoped results и ограничения приведены в [evidence](evidence.md#t116t117-локальная-реализация-проверки-и-повторные-reviews); старые pending paragraphs ниже сохраняют исторический scope.
 
 ## Что передаётся

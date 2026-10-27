@@ -11,7 +11,7 @@ import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
 
 void main() {
   late Directory compiledRoot;
-  late String executable;
+  late String executable, observed;
   setUpAll(() async {
     compiledRoot = Directory.systemTemp.createTempSync(
       'serverdeck-mcp-bundle-auth-',
@@ -22,6 +22,27 @@ void main() {
       executable,
       source: 'test/support/operational_auth_actor.dart',
     );
+    observed = p.join(compiledRoot.path, 'observed.exe');
+    final compiler = await Process.start(Platform.resolvedExecutable, [
+      'compile',
+      'exe',
+      '-DSERVERDECK_TEST_NATIVE_OBSERVATION=true',
+      'test/support/operational_auth_actor.dart',
+      '-o',
+      observed,
+    ]);
+    final output = b.boundedOutput(compiler.stdout),
+        errors = b.boundedOutput(compiler.stderr);
+    try {
+      expect(
+        await compiler.exitCode.timeout(const Duration(seconds: 90)),
+        0,
+        reason: '${await output}\n${await errors}',
+      );
+    } finally {
+      compiler.kill();
+      await compiler.exitCode.timeout(const Duration(seconds: 10));
+    }
   });
   tearDownAll(() {
     b.ownRoot(compiledRoot.path);
@@ -78,6 +99,7 @@ void main() {
     'stale-close',
     'proofs',
     'quota',
+    'control-pressure',
     'expiry',
     'close',
     'snapshot',
@@ -89,7 +111,9 @@ void main() {
     test(
       'actual API1.1 bootstrap and session $scenario',
       () async {
-        final fixture = b.Fixture(executable);
+        final fixture = b.Fixture(
+          scenario == 'control-pressure' ? observed : executable,
+        );
         try {
           final child = await Process.start(
             p.join(fixture.path, 'locald.exe'),

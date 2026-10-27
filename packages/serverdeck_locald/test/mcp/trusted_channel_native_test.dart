@@ -37,6 +37,7 @@ void main() {
     'mcp-builtin-errors',
     'owner-builtin-errors',
     'badproof',
+    'badproof-first-drain',
     'store-blocked',
     'second-open',
     'malformed',
@@ -51,6 +52,8 @@ void main() {
     'eof',
     'reentrant-close',
     'backpressure',
+    'close-queued-owner',
+    'close-queued-mcp',
     'rpc-timeout',
     'output-error',
     'writer-revoke',
@@ -87,6 +90,29 @@ void main() {
             reason: '${await output}\n${await errors}',
           );
           expect((await output).trim().endsWith('PASS:$mode'), true);
+          if (mode == 'badproof-first-drain') {
+            expect(
+              (await output)
+                  .split('\n')
+                  .where(
+                    (line) => line.trim() == 'FIRST_OPEN_TERMINAL_DRAIN_PROVED',
+                  )
+                  .length,
+              1,
+            );
+          }
+          if (mode.startsWith('close-queued-')) {
+            expect(
+              (await output)
+                  .split('\n')
+                  .where(
+                    (line) =>
+                        line.trim() == 'CLOSE_ACK_DRAIN_QUEUE_AND_EPOCH_PROVED',
+                  )
+                  .length,
+              1,
+            );
+          }
           if (mode == 'codes') {
             final reports = (await output)
                 .split('\n')

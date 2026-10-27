@@ -1034,7 +1034,7 @@ final class _JobActor {
       );
     } else {
       try {
-        await owner!.revalidate().timeout(deadline);
+        await owner!.revalidate(deadline: deadline);
       } on TimeoutException {
         throw StateError('TIMEOUT');
       }

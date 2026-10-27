@@ -1,5 +1,58 @@
 # Implementation Plan: Дизайн и доступность
 
+## Unit-widget stage (2026-10-27)
+
+Явное решение пользователя и [Constitution4.0.0, VII](../../.specify/memory/constitution.md)
+задают текущий этап для PR3 и source-only MIT preview `0.2.0-preview.1+9`:
+**локально и в автоматическом push/PR CI выполняются только unit/widget tests
+и статические проверки**. Этот раздел имеет приоритет над прежними требованиями
+full cold CI/native acceptance в этом пакете и связанном021 для текущего
+source-preview gate. Прежние записи, completed tasks и результаты сохраняют
+свой исторический scope; продуктовые FR/AC и будущие native oracles не меняются.
+
+Обязательный текущий набор: root literal format, Flutter analyze и обычный
+`flutter test` из `test/`; analyze затронутых protocol/Windows/locald packages;
+полный pure protocol suite и только pure
+`packages/serverdeck_locald/test/server_peer_coordination_test.dart`.
+`SERVERDECK_NATIVE_CONTROL_RED=0`; capture flags не передаются, ожидаемый
+opt-in capture skip фиксируется отдельно. Для specs обязательны strict
+`lychee "specs/**/*.md"` и completed independent AGENTS review/fix loop.
+Команды и точные границы — [quickstart](quickstart.md#current-unit-widget-commands).
+
+Product-native/FFI/Isar/DPAPI, реальные службы/process/pipe fixtures,
+integration, SSH/container/Docker/systemd/Ansible suites и cold qualification
+не запускаются без нового указания пользователя. Полные native профили и их
+неизменённые acceptance oracles сохраняются как будущая ручная квалификация;
+skipped/not-selected/not-run/interrupted не означают pass. Это ограничение не
+отменяет отдельно разрешённые сборку, проверку состава/хешей и private install,
+но эти действия поставки не разрешают integration execution.
+
+Перед merge/source-only publication нужны reviewed exact source commit и
+terminal success workflow `MCP automatic checks` / `.github/workflows/mcp.yml`
+для **push и pull_request**, с `unit-widget-checks=completed/success` на той же
+source revision. PR test-merge SHA допустим только с проверенными source/base
+parents. В каждом event run прежние `ssh-transport`,
+`executor-prerequisites`, `windows` должны быть
+`completed/skipped` как not-selected; это отдельное состояние native,
+а не successful native execution. Проверяются workflow identity/hash, event,
+repo/branch/source/base/parents, run attempt, свежесть и полнота API inventory;
+missing/duplicate/renamed/skipped/failed/cancelled/timed-out unit result либо
+изменившийся source/base/workflow не закрывают gate. Exact-source CI inspector
+обязан подтвердить оба unit event runs перед merge; без этого результата merge
+не выполняется. Существующие required contexts/rulesets учитываются по
+фактическому read-only результату; новый stage не требует создавать protection
+или менять repository settings. Skipped native jobs не подменяют unit success.
+Это критерии будущего фактического CI evidence, не заявление о выполненном run.
+
+Локальная source implementation acceptance T204–T212 и этот новый stage
+учитываются [T213 в021](../021-mcp-control/tasks.md#current-unit-widget-stage-2026-10-27);
+original full-native acceptance T207 остаётся незавершённой. Новая003 T118
+не переписывает завершённые T001–T117. Unit gate, source ZIP/SHA256SUMS/MIT,
+private installation и native/production readiness учитываются раздельно.
+Полные001/021/005, native distribution/signing и full-platform acceptance
+остаются открыты до своей будущей квалификации. Фактические результаты и
+ограничения — [evidence](evidence.md#current-unit-widget-evidence-2026-10-27).
+
 **Feature**: `003-design-system` | **Date**: 2026-10-26 | **Spec**: [spec.md](spec.md)
 
 **Checkout**: существующая ветка `feature/mcp-control`; новая ветка не создаётся. Первоначальный Setup выполнен с временным override для003 без записи общего указателя. Для продолжения полного цикла текущей цели существующий003 затем выбран в локальном `.specify/feature.json`; история001/021 и рабочая ветка сохранены. План охватывает003.1–003.3; реализация и приёмка им не подтверждены.

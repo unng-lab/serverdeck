@@ -54,11 +54,13 @@ int wireDepth(Object? value) {
 bool ownerMode(String mode) => const {
   'owner',
   'backpressure',
+  'close-queued-owner',
   'rpc-timeout',
   'output-error',
 }.contains(mode);
 bool pendingMode(String mode) => const {
   'pending',
+  'close-queued-mcp',
   'eof',
   'reentrant-close',
   'depth-pending',
@@ -97,6 +99,8 @@ final class Services implements McpToolServices {
   Services(this.mode);
   final String mode;
   final pending = Completer<McpToolResult>();
+  final closeReached = Completer<void>(), closeRelease = Completer<void>();
+  bool closeCancelled = false;
   int calls = 0;
   Future<void> Function()? onCancel;
   McpToolResult output() => McpToolResult.success(
@@ -112,14 +116,23 @@ final class Services implements McpToolServices {
     McpToolDefinition definition,
     Map<String, Object?> arguments,
   ) {
-    calls++;
+    final number = ++calls;
     return McpServiceOperation(
-      pendingMode(mode)
+      mode == 'close-queued-mcp' && number == 2
+          ? Future.sync(
+              () => McpToolResult.success({'large': 'x' * (1024 * 1024)}),
+            )
+          : pendingMode(mode)
           ? pending.future.then(
               (value) => mode.startsWith('depth-') ? output() : value,
             )
           : Future.sync(output),
       () async {
+        if (mode == 'close-queued-mcp') {
+          if (!closeReached.isCompleted) closeReached.complete();
+          await closeRelease.future;
+          closeCancelled = true;
+        }
         await onCancel?.call();
       },
     );
@@ -129,7 +142,7 @@ final class Services implements McpToolServices {
 final class Owner implements OperationalOwnerApi {
   Owner(this.mode);
   final String mode;
-  final gate = Completer<void>();
+  final gate = Completer<void>(), lateGate = Completer<void>();
   int calls = 0, settled = 0;
   @override
   bool supports(String method) => method == 'fixture.wait';
@@ -144,8 +157,11 @@ final class Owner implements OperationalOwnerApi {
       final number = ++calls;
       if (mode == 'output-error') return {'invalid': Object()};
       await gate.future;
+      if (mode == 'close-queued-owner' && number == 2) await lateGate.future;
       settled++;
-      return {'number': number};
+      return mode == 'close-queued-owner' && number == 1
+          ? {'large': 'x' * (1024 * 1024)}
+          : {'number': number};
     });
   }
 }
@@ -234,6 +250,98 @@ final class Client {
   }
 }
 
+bool closeQueuedMode(String mode) =>
+    mode == 'close-queued-owner' || mode == 'close-queued-mcp';
+
+Future<void> waitForCloseCondition(bool Function() condition) async {
+  final watch = Stopwatch()..start();
+  while (!condition()) {
+    n.check(watch.elapsed < const Duration(seconds: 3));
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
+// Reading only the ACK header holds the actual native outbound-buffer
+// drain. Full ACK delivery is asserted after the independent release.
+Future<void> queuedClose(Client rpc, String method, String precedingId) async {
+  final commands = StreamIterator(
+    stdin.transform(utf8.decoder).transform(const LineSplitter()),
+  );
+  try {
+    stdout.writeln('CLOSE_WAIT');
+    n.check(await commands.moveNext());
+    n.check(commands.current == 'close');
+    final id = await rpc.send(method, {});
+    stdout.writeln('CLOSE_SENT');
+    n.check(await commands.moveNext());
+    n.check(commands.current == 'read-first');
+    final first = await rpc.read();
+    n.check(
+      first['id'] == precedingId && jsonEncode(first).length > 1024 * 1024,
+    );
+    await rpc.header();
+    n.check(rpc.bufferedSize != null && rpc.bufferedSize! > 0);
+    stdout.writeln('CLOSE_HEADER');
+    n.check(await commands.moveNext());
+    n.check(commands.current == 'consume-close');
+    final ack = await rpc.read();
+    n.check(ack['id'] == id && (ack['result'] as Map)['closed'] == true);
+    stdout.writeln('CLOSE_ACK_RECEIVED');
+    await closed(rpc.read());
+  } finally {
+    await commands.cancel();
+  }
+}
+
+Future<void> assertCloseWorkerReuse({
+  required String root,
+  required String name,
+  required PipeWorker worker,
+  required OperationalApiServer server,
+  required OperationalSessions registry,
+  required OperationalPipePeer oldPeer,
+  required bool owner,
+}) async {
+  Process? child;
+  StreamIterator<String>? lines;
+  OperationalServerChannel? channel;
+  try {
+    final accepting = worker.accept();
+    child = await Process.start(
+      p.join(root, owner ? 'serverdeck.exe' : 'mcp.exe'),
+      ['wire-client', name, root, 'close-reuse'],
+    );
+    final errors = child.stderr.transform(utf8.decoder).join();
+    lines = StreamIterator(
+      child.stdout.transform(utf8.decoder).transform(const LineSplitter()),
+    );
+    await accepting;
+    // A stale close cannot touch this replacement connection.
+    await n.fails(oldPeer.revalidate(), 'UNAUTHORIZED');
+    await n.fails(oldPeer.disconnect(), 'UNAUTHORIZED');
+    final handshake = OperationalServerHandshake(
+      peer: await worker.verifyOperationalPeer(),
+      token: n.token,
+      channel: name,
+      sessions: registry,
+    );
+    channel = OperationalServerChannel(handshake: handshake, server: server);
+    final running = channel.run();
+    running.ignore();
+    n.check(await lines.moveNext().timeout(const Duration(seconds: 12)));
+    n.check(lines.current == 'CLIENT_PASS');
+    await n.finishClient(child);
+    n.check(await child.exitCode == 0 && (await errors).isEmpty);
+    await running.timeout(const Duration(seconds: 10));
+    n.check(registry.count == 0);
+  } finally {
+    await channel?.close();
+    child?.kill();
+    if (child != null) await child.exitCode;
+    await lines?.cancel();
+  }
+}
+
 Future<void> client(List<String> args) async {
   final root = args[2], mode = args[3];
   runtime.ownRoot(root);
@@ -265,6 +373,55 @@ Future<void> client(List<String> args) async {
       stdout.writeln('CLIENT_PASS');
     }
 
+    if (mode == 'badproof-first-drain') {
+      // No readiness, role-denial or ping RPC may precede this failed open.
+      final id = await rpc.send('mcp.open', {
+        'grantId': g.grantId,
+        'clientNonce': base64Url.encode(List.filled(32, 8)).replaceAll('=', ''),
+        'proof': base64Url.encode(List.filled(32, 0)).replaceAll('=', ''),
+      });
+      n.check(rpc.counter == 1);
+      final commands = StreamIterator(
+        stdin.transform(utf8.decoder).transform(const LineSplitter()),
+      );
+      try {
+        await rpc.header();
+        n.check(rpc.bufferedSize != null && rpc.bufferedSize! > 0);
+        stdout.writeln('TERMINAL_HEADER');
+        n.check(await commands.moveNext());
+        n.check(commands.current == 'consume-terminal');
+        final failed = await rpc.read();
+        n.check(
+          failed.length == 4 &&
+              failed['v'] == 1 &&
+              failed['id'] == id &&
+              failed['generation'] == session.hello.generation &&
+              failed['error'] is Map,
+        );
+        final error = failed['error'] as Map;
+        n.check(
+          error.length == 3 &&
+              error['code'] == 'UNAUTHORIZED' &&
+              error['boundary'] == 'local' &&
+              error['retry'] == 'reconnect',
+        );
+        stdout.writeln('TERMINAL_ERROR_RECEIVED');
+        await closed(rpc.read());
+      } finally {
+        await commands.cancel();
+      }
+      await done();
+      return;
+    }
+    if (mode == 'close-reuse') {
+      final ping = await rpc.call('session.ping', {});
+      n.check((ping['result'] as Map)['leaseSeconds'] == 60);
+      final ack = await rpc.call('session.close', {});
+      n.check((ack['result'] as Map)['closed'] == true);
+      await closed(rpc.read());
+      await done();
+      return;
+    }
     final readiness = await rpc.call('readiness.get', {});
     final view = OperationalReadiness.fromJson(readiness['result']);
     n.check(view.generation == session.hello.generation && !view.features.any);
@@ -384,6 +541,21 @@ Future<void> client(List<String> args) async {
         'extra': true,
       });
       n.check((union['error'] as Map)['code'] == 'VALIDATION');
+      if (mode == 'close-queued-mcp') {
+        final pending = await rpc.call('mcp.invoke', validationCall());
+        n.check((pending['result'] as Map)['done'] == false);
+        final handle = (pending['result'] as Map)['operationId'];
+        n.check(handle is String);
+        // Hold a large first reply so close and the later cancel result
+        // can both join the real serialized publication tail.
+        final first = await rpc.send('mcp.invoke', validationCall());
+        await rpc.send('mcp.invoke', {
+          'cancel': {'operationId': handle},
+        });
+        await queuedClose(rpc, 'mcp.close', first);
+        await done();
+        return;
+      }
       if (mode == 'writer-revoke') {
         final first = await rpc.send('mcp.invoke', validationCall());
         await rpc.send('mcp.invoke', validationCall());
@@ -451,6 +623,13 @@ Future<void> client(List<String> args) async {
     } else {
       final unknown = await rpc.call('grants.list', {});
       n.check((unknown['error'] as Map)['code'] == 'UNSUPPORTED');
+      if (mode == 'close-queued-owner') {
+        final first = await rpc.send('fixture.wait', {});
+        await rpc.send('fixture.wait', {});
+        await queuedClose(rpc, 'session.close', first);
+        await done();
+        return;
+      }
       if (mode == 'backpressure') {
         final ids = <String>{};
         final watch = Stopwatch()..start();
@@ -567,9 +746,130 @@ Future<void> main(List<String> args) async {
               await first;
             };
           }
+          var firstTerminalPhysicallySettled = false;
           final running = channel.run();
           running.ignore();
+          if (mode == 'badproof-first-drain') {
+            running
+                .then<void>(
+                  (_) => firstTerminalPhysicallySettled = true,
+                  onError: (Object _) => firstTerminalPhysicallySettled = true,
+                )
+                .ignore();
+          }
           n.check(await lines.moveNext().timeout(const Duration(seconds: 12)));
+          if (mode == 'badproof-first-drain') {
+            final closingChannel = channel;
+            n.check(lines.current == 'TERMINAL_HEADER');
+            await waitForCloseCondition(
+              () =>
+                  registry.count == 0 &&
+                  closingChannel.pendingPublications == 1,
+            );
+            final closing = closingChannel.close();
+            n.check(identical(closing, closingChannel.close()));
+            var closeSettled = false;
+            closing
+                .then<void>(
+                  (_) => closeSettled = true,
+                  onError: (Object _) => closeSettled = true,
+                )
+                .ignore();
+            // No paused proof can explain this hold. With the terminal body still
+            // unread, close's real native drain retains physical ownership.
+            await handshake.nativeControlSettled.timeout(
+              const Duration(seconds: 3),
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+            n.check(
+              registry.count == 0 &&
+                  closingChannel.pendingPublications == 1 &&
+                  !firstTerminalPhysicallySettled &&
+                  !closeSettled,
+            );
+            // Release independently of the shared physical-close future.
+            child.stdin.writeln('consume-terminal');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+            n.check(lines.current == 'TERMINAL_ERROR_RECEIVED');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+          }
+          if (closeQueuedMode(mode)) {
+            final closingChannel = channel;
+            n.check(lines.current == 'CLOSE_WAIT');
+            if (ownerMode(mode)) {
+              await waitForCloseCondition(() => owner.calls == 2);
+              owner.gate.complete();
+            } else {
+              await services.closeReached.future.timeout(
+                const Duration(seconds: 3),
+              );
+            }
+            await waitForCloseCondition(
+              () => closingChannel.pendingPublications == 1,
+            );
+            var physicallySettled = false;
+            running
+                .then<void>(
+                  (_) => physicallySettled = true,
+                  onError: (Object _) => physicallySettled = true,
+                )
+                .ignore();
+            child.stdin.writeln('close');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+            n.check(lines.current == 'CLOSE_SENT');
+            await waitForCloseCondition(
+              () => closingChannel.pendingPublications == 2,
+            );
+            if (ownerMode(mode)) {
+              owner.lateGate.complete();
+            } else {
+              services.closeRelease.complete();
+            }
+            // All three replies are queued before the client consumes the first
+            // large frame. The last reply must remain behind close's drain.
+            await waitForCloseCondition(
+              () => closingChannel.pendingPublications == 3,
+            );
+            child.stdin.writeln('read-first');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+            n.check(lines.current == 'CLOSE_HEADER');
+            // The client holds the ACK body, so drain cannot yet report success.
+            // Logical retirement must already be visible despite that held drain.
+            await waitForCloseCondition(
+              () =>
+                  registry.count == 0 &&
+                  closingChannel.pendingPublications == 2,
+            );
+            n.check(!physicallySettled);
+            await n.fails(worker.accept(), 'SERVICE_UNAVAILABLE');
+            if (ownerMode(mode)) {
+              n.check(owner.calls == 2 && owner.settled == 2);
+            } else {
+              n.check(services.closeCancelled && router.chargedOperations == 1);
+              services.pending.complete(McpToolResult.success(data()));
+              await waitForCloseCondition(() => router.chargedOperations == 0);
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            n.check(registry.count == 0 && !physicallySettled);
+            n.check(channel.pendingPublications == 2);
+            // Release consumption independently of the close future it unblocks.
+            child.stdin.writeln('consume-close');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+            n.check(lines.current == 'CLOSE_ACK_RECEIVED');
+            n.check(
+              await lines.moveNext().timeout(const Duration(seconds: 12)),
+            );
+          }
           if (mode == 'pending' || mode.endsWith('-pending')) {
             n.check(lines.current == 'PENDING');
             services.pending.complete(McpToolResult.success(data()));
@@ -649,6 +949,38 @@ Future<void> main(List<String> args) async {
             await running.timeout(const Duration(seconds: 10));
           }
           n.check(registry.count == 0 && router.retainedOperations == 0);
+          if (closeQueuedMode(mode)) {
+            n.check(
+              channel.activeRequests == 0 && channel.pendingPublications == 0,
+            );
+            await assertCloseWorkerReuse(
+              root: root,
+              name: name,
+              worker: worker,
+              server: server,
+              registry: registry,
+              oldPeer: handshake.peer,
+              owner: ownerMode(mode),
+            );
+            stdout.writeln('CLOSE_ACK_DRAIN_QUEUE_AND_EPOCH_PROVED');
+          }
+          if (mode == 'badproof-first-drain') {
+            n.check(
+              firstTerminalPhysicallySettled &&
+                  channel.activeRequests == 0 &&
+                  channel.pendingPublications == 0,
+            );
+            await assertCloseWorkerReuse(
+              root: root,
+              name: name,
+              worker: worker,
+              server: server,
+              registry: registry,
+              oldPeer: handshake.peer,
+              owner: false,
+            );
+            stdout.writeln('FIRST_OPEN_TERMINAL_DRAIN_PROVED');
+          }
           if (mode == 'eof' || mode == 'reentrant-close') {
             n.check(router.chargedOperations == 1);
             services.pending.complete(McpToolResult.success(data()));
@@ -665,6 +997,9 @@ Future<void> main(List<String> args) async {
           }
         } finally {
           if (!owner.gate.isCompleted) owner.gate.complete();
+          if (!owner.lateGate.isCompleted) owner.lateGate.complete();
+          if (!services.closeRelease.isCompleted)
+            services.closeRelease.complete();
           if (!services.pending.isCompleted)
             services.pending.complete(McpToolResult.success(data()));
           if (mode == 'worker-loss' && channel != null) {

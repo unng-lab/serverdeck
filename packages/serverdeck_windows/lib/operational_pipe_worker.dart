@@ -116,14 +116,35 @@ sealed class _EpochPipePeer {
   Future<void> write(
     List<int> bytes, {
     Duration deadline = const Duration(seconds: 5),
+    void Function(Future<void>)? observeNativeCompletion,
   }) async {
     if (bytes.isEmpty || bytes.length > 8 * 1024 * 1024 + 4)
       throw StateError('RESOURCE_LIMIT');
-    await _worker._call('peerWrite', [
+    // Synchronous refusal admits no command and supplies no actual future.
+    final response = _worker._call('peerWrite', [
       _epoch,
       Uint8List.fromList(bytes),
       deadline.inMilliseconds,
     ]);
+    if (observeNativeCompletion == null) {
+      await response;
+      return;
+    }
+    // The observer records admission before the first await. It does not
+    // authorize output, retry I/O or replace physical completion with itself.
+    final actual = response.then<void>((_) {});
+    actual.ignore();
+    try {
+      observeNativeCompletion(actual);
+    } catch (_) {
+      try {
+        await actual;
+      } catch (_) {
+        /* Actual failure remains observed. */
+      }
+      throw StateError('SERVICE_UNAVAILABLE');
+    }
+    await actual;
   }
 
   Future<void> drainOutput({

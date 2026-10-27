@@ -109,10 +109,17 @@ sealed class _McpContext<P> {
       try {
         final budget = remaining();
         final actual = _session.binding.revalidate(
+          remaining: () {
+            untilExpiry;
+            return remaining();
+          },
+          scopes: [_session.nativeScope],
           observeNativeCompletion: observeNativeCompletion,
         );
         actual.ignore();
         await actual.timeout(budget);
+      } on NativeControlLocalFailure catch (error) {
+        error.rethrowCause();
       } on TimeoutException {
         throw StateError('TIMEOUT');
       } catch (error) {

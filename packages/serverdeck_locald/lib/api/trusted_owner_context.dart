@@ -124,25 +124,40 @@ sealed class _TrustedOwnerAsyncContext {
   /// Stop issuing proofs before awaiting physical cleanup, also after timeout.
   Future<void> get settled => Future.wait<void>(_proofs.toList());
 
-  Future<void> revalidate() async {
+  Future<void> revalidate({Duration deadline = rpcDeadline}) async {
     final left = remaining;
-    final budget = left < rpcDeadline ? left : rpcDeadline;
+    var budget = left < deadline ? left : deadline;
+    if (budget > rpcDeadline) budget = rpcDeadline;
+    final watch = Stopwatch()..start();
+    Duration proofRemaining() {
+      final operation = remaining, attempt = budget - watch.elapsed;
+      if (attempt <= Duration.zero) throw StateError('TIMEOUT');
+      return operation < attempt ? operation : attempt;
+    }
+
     try {
-      final actual = _session.binding.revalidate();
-      final tracked = actual.then<void>(
+      final ticket = _session.binding.beginRevalidation(
+        remaining: proofRemaining,
+        scopes: [_session.nativeScope],
+      );
+      final tracked = ticket.settled.then<void>(
         (_) {},
         onError: (Object _, StackTrace __) {},
       );
       _proofs.add(tracked);
       tracked.then<void>((_) => _proofs.remove(tracked)).ignore();
-      await actual.timeout(budget);
+      await ticket.result;
     } on TimeoutException {
       throw StateError('TIMEOUT');
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
     } catch (error) {
       if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
       if (identical(_registry._sessions[_channel], _session))
         _registry.disconnect(_channel);
       throw StateError('UNAUTHORIZED');
+    } finally {
+      watch.stop();
     }
     remaining;
   }
@@ -196,25 +211,40 @@ final class TrustedOwnerProbeContext {
   /// before retiring its admission slot, including after timeout or detach.
   Future<void> get settled => Future.wait<void>(_proofs.toList());
 
-  Future<void> revalidate() async {
+  Future<void> revalidate({Duration deadline = rpcDeadline}) async {
     final left = remaining;
-    final budget = left < rpcDeadline ? left : rpcDeadline;
+    var budget = left < deadline ? left : deadline;
+    if (budget > rpcDeadline) budget = rpcDeadline;
+    final watch = Stopwatch()..start();
+    Duration proofRemaining() {
+      final operation = remaining, attempt = budget - watch.elapsed;
+      if (attempt <= Duration.zero) throw StateError('TIMEOUT');
+      return operation < attempt ? operation : attempt;
+    }
+
     try {
-      final actual = _session.binding.revalidate();
-      final tracked = actual.then<void>(
+      final ticket = _session.binding.beginRevalidation(
+        remaining: proofRemaining,
+        scopes: [_session.nativeScope],
+      );
+      final tracked = ticket.settled.then<void>(
         (_) {},
         onError: (Object _, StackTrace __) {},
       );
       _proofs.add(tracked);
       tracked.then<void>((_) => _proofs.remove(tracked)).ignore();
-      await actual.timeout(budget);
+      await ticket.result;
     } on TimeoutException {
       throw StateError('TIMEOUT');
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
     } catch (error) {
       if (error is StateError && error.message == 'RESOURCE_LIMIT') rethrow;
       if (identical(_registry._sessions[_channel], _session))
         _registry.disconnect(_channel);
       throw StateError('UNAUTHORIZED');
+    } finally {
+      watch.stop();
     }
     remaining;
   }

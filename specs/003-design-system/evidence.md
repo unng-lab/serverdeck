@@ -1,5 +1,63 @@
 # Evidence: дизайн003
 
+## Current unit-widget evidence (2026-10-27)
+
+Это фактический checkpoint до нового commit/release. Действует
+[текущий unit/widget и static stage](plan.md#unit-widget-stage-2026-10-27)
+локально и в автоматическом CI; прежние full-cold требования ниже сохраняются
+для исторического этапа/будущей native qualification. Новые T118(003)/T213(021)
+не меняют completed117tasks003 и не закрывают original full-native T207.
+
+Current T204–T212 source snapshot:935inputs, SHA256
+`d5becae6c72629c116fb0fd8203d29c3d03ef1054498cfffeab2b65980cc98e4`.
+`.local/release/T212-checks/all-frozen.json` содержит40files; это freeze
+прежнего source/code review, а не freeze текущей новой policy/documentation.
+
+| Actual receipt (от root, ignored local evidence) | Результат и scope |
+| --- | --- |
+| `.local/release/T212-checks/root-format-exit.json` и log | Literal root format:643files/0changed/exit0, completed2026-10-27T16:03:31.5727824Z |
+| `.local/release/T212-checks/flutter-analyze-exit.json`, `locald-analyze-exit.json`, `windows-analyze-exit.json` и logs | Root Flutter/locald/Windows analyze:0issues, каждый exit0; static scope |
+| `.local/release/T212-checks/flutter-tests-exit.json`, `flutter-tests.jsonl`, `flutter-tests.log` | CURRENT root unit/contract/widget:7505passed+1expected opt-in capture skip, exit0, completed2026-10-27T16:10:52.9656585Z; capture/native acceptance не заявлена |
+| `.local/release/unit-stage-local/results.json`, `protocol-analyze.log`, `protocol-tests.log`, `queue-tests.log` | Completed2026-10-27T16:50:07.3668496Z:protocol analyze0, protocol165passed/exit0, pure accepted-peer queue21passed/exit0; no native/integration |
+| `.local/release/unit-stage-local/reused-code-checks-identity.json` | At2026-10-27T16:53:15.0165523Z:34unchanged Dart/pubspec inputs from completed R3/T212 freeze,0SHA mismatches; связывает переиспользованные code checks с unchanged source, не проверяет новый policy/docs scope |
+| `.local/release/T212-checks/code-review-r3-completed.json` | Completed reviewer `/root/native_control_final_code_spec_review_r3`, reported16:23:15Z:0findings/40frozenfiles/0mismatches, incremental T204–T212 source readiness only. Receipt recorded16:50:40Z is a summary of the completed report retained in compacted task context, **not verbatim report or a new review**; current policy/CI/docs outside scope |
+| `.local/release/T212-checks/links-before-code-review.log`, `code-review-preflight.json` | Prior code-review preflight:linksExit0/diffExit0,1514total/1513OK/0errors/1excluded,40frozeninputs/0mismatches. Новые документы требуют fresh links/diff/review, этот receipt их не покрывает |
+
+T204–T206 реализуют bounded pure scheduler/genuine format2/3 binding,
+T208–T210 — прежние fixture/cancel/setup corrections, T211 — ordinary-close
+serialization, T212 — admission-time immutable write deadline и actual-completion
+observer/sealed forwarding. Это описание implemented source, а не полная
+native acceptance. R1/R2 findings и их fixes/history не стираются: R3 — fresh
+incremental source review после этих corrections; его0findings не заменяет
+невыполненное full native покрытие.
+
+| Retained native receipt | Фактический outcome |
+| --- | --- |
+| `T212-checks/native-green-terminalfocused-ea1a7336ec014638b2165072d730bc6a/result.json` | TerminalFocused2passed/0failed/0skip, phase75662ms, process/runner0, acceptancePassed=true; source before=after d5becae… |
+| `T212-checks/native-green-writeobserverfocused-305267c79b784061b72569dd3535cfd6/result.json` | ObserverFocused8passed/0failed/0skip, phase28362ms, process/runner0, acceptancePassed=true; same source before=after |
+| `T212-checks/native-green-channelfull-153f6d3f2df14ee380f2bb310495e577/result.json` и `user-unit-scope-cancellation.json` | ChannelFull72 interrupted by user scope:8passed/0failed/0skip, no terminal done, phase exit-1/runner1, acceptancePassed=false; source preserved. Это incomplete, не GREEN qualification |
+| `T212-checks/old-red-behavior-record.json` | Два first-RPC format2/3 behavioral RED достигли TERMINAL_HEADER, затем retained-writer oracle failed; fixture1/Dart255/runner1, secondary closed-LiveTest teardown error. Behavioral witness, не GREEN/CI cause |
+| `T212-checks/native-green-terminalfocused-f5270e5b6aea424f97e6c418d642c65f/result.json` | Первый GREEN-labelled attempt exit1 до native phase: historical live actor mismatch, phases=[]; failed receipt сохранён |
+
+Последующий `T212-checks/source-mapping-static-validation.json` отдельно
+подтверждает792historical identities:791unchanged live files+1exact archived
+original actor, current authorized T212 actor проверен отдельно;935source
+inputs preserved. Этот scoped mapping не переписывает первоначальный failed
+precheck и не является native run. Старый mixed-source
+`T211-coverage-audit/audit-20261027T154921940076Z.json` остаётся историей
+99whole files/1007positive cases/1expected SSH skip, **не current full locald
+qualification**. Новые Windows176/grant66/полный Channel72 и full021 не приняты;
+без нового указания пользователя они сейчас не выполняются. Причина CI8
+Windows failures и underlying resolver host crash не установлена.
+
+Actual HEAD/private installed+8:
+`0f1210a8bc44014f3fdf14b68227078023bd9e3a`; workingmetadata+9.
+Новые policy/spec/workflow checks/review и exact-source push/PR unit CI,
++9commit/build/package/install/source archive/merge/tag/source-onlyMIT
+publication в этом checkpoint не заявлены. Уже разрешённые supply actions
+ведутся отдельно с preservation receipts. Source ZIP/SHA256SUMS/MIT не дают
+native distribution/signing/full001/021/005 либо production readiness.
+
 Начато: 2026-10-25; актуализировано: 2026-10-26. Запланированное действие и фактически выполненная проверка фиксируются раздельно. Этот файл не даёт статуса готовности001/021 или63будущим модулям.
 
 ## Текущий принятый UI scope

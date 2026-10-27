@@ -134,6 +134,109 @@ void main() {
       }
 
       test(
+        'format2 write observer captures pending native work and success',
+        () async {
+          final name = pipeName();
+          final host = await start('locald.exe', 'server', name);
+          expect(await host.next(), 'READY');
+          final owner = await connect(host, 'serverdeck.exe', name, 'owner');
+          expect(
+            await host.command('observed-size-refusal'),
+            'REFUSED:RESOURCE_LIMIT,RESOURCE_LIMIT:0',
+          );
+          expect(await host.command('observed-pending'), 'OBSERVED_PENDING:1');
+          expect(await owner.command('read-observed'), 'READ_OBSERVED:8388608');
+          expect(await host.command('observed-result'), 'OBSERVED:1:OK:OK');
+          // Existing byte oracles also detect extra writes after completion.
+          await echo(host, owner);
+          expect(await host.command('disconnect'), 'DISCONNECTED');
+          expect(await owner.command('close'), 'CLOSED');
+          expect(await host.command('close'), 'CLOSED');
+        },
+      );
+
+      test('format2 throwing write observer waits for successful native completion', () async {
+        final name = pipeName();
+        final host = await start('locald.exe', 'server', name);
+        expect(await host.next(), 'READY');
+        final owner = await connect(host, 'serverdeck.exe', name, 'owner');
+        expect(await host.command('observed-throw'), 'OBSERVED_PENDING:1');
+        expect(await owner.command('read-observed'), 'READ_OBSERVED:8388608');
+        expect(
+          await host.command('observed-result'),
+          'OBSERVED:1:OK:SERVICE_UNAVAILABLE',
+        );
+        // The actual success is distinct from the observer's fixed denial;
+        // legacy writes without an observer must still carry exactly 42/43.
+        await echo(host, owner);
+        expect(await host.command('disconnect'), 'DISCONNECTED');
+        expect(await owner.command('close'), 'CLOSED');
+        expect(await host.command('close'), 'CLOSED');
+      });
+
+      test('format2 throwing observer waits for cancellation and replacement works', () async {
+        final name = pipeName();
+        final host = await start('locald.exe', 'server', name);
+        expect(await host.next(), 'READY');
+        final owner = await connect(host, 'serverdeck.exe', name, 'owner');
+        expect(await host.command('observed-throw'), 'OBSERVED_PENDING:1');
+        expect(await host.command('disconnect-peer'), 'DISCONNECTED');
+        expect(
+          await host.command('observed-result'),
+          'OBSERVED:1:SERVICE_UNAVAILABLE:SERVICE_UNAVAILABLE',
+        );
+        expect(await owner.command('close'), 'CLOSED');
+        final mcp = await connect(host, 'mcp.exe', name, 'mcp');
+        // Staleness is decided in the native worker after command admission.
+        // The observer must receive that actual failed operation exactly once.
+        expect(
+          await host.command('observed-old'),
+          'OBSERVED:1:UNAUTHORIZED:UNAUTHORIZED',
+        );
+        expect(
+          await host.command('observed-old-throw'),
+          'OBSERVED:1:UNAUTHORIZED:SERVICE_UNAVAILABLE',
+        );
+        expect(await host.command('old'), 'STALE_DENIED');
+        await echo(host, mcp);
+        expect(await host.command('disconnect'), 'DISCONNECTED');
+        expect(await mcp.command('close'), 'CLOSED');
+        expect(
+          await host.command('observed-close-refusal'),
+          'REFUSED:SERVICE_UNAVAILABLE:0',
+        );
+      });
+
+      test(
+        'format2 quota3 fourth write has no native observer notification',
+        () async {
+          final name = pipeName();
+          final host = await start('locald.exe', 'server', name);
+          expect(await host.next(), 'READY');
+          final owner = await connect(host, 'serverdeck.exe', name, 'owner');
+          expect(
+            await host.command('observed-quota'),
+            'QUOTA:RESOURCE_LIMIT:0',
+          );
+          expect(await host.command('disconnect-peer'), 'DISCONNECTED');
+          expect(
+            await host.command('observed-quota-result'),
+            'OBSERVED:1:SERVICE_UNAVAILABLE:SERVICE_UNAVAILABLE',
+          );
+          expect(
+            await host.next(),
+            'RESULT:SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE',
+          );
+          expect(await owner.command('close'), 'CLOSED');
+          final mcp = await connect(host, 'mcp.exe', name, 'mcp');
+          await echo(host, mcp);
+          expect(await host.command('disconnect'), 'DISCONNECTED');
+          expect(await mcp.command('close'), 'CLOSED');
+          expect(await host.command('close'), 'CLOSED');
+        },
+      );
+
+      test(
         'owner to mcp physical reconnect rejects raw and old epoch IO',
         () async {
           final name = pipeName();

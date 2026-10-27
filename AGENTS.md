@@ -13,6 +13,54 @@
   `lychee "specs/**/*.md"`. Fix broken links before committing.
 - Do not report checks as passed unless they were actually run successfully.
 
+### Current Unit/Widget Stage
+
+- The user explicitly approved this stage on 2026-10-27 for both local checks
+  and automatic GitHub CI. It applies to PR #3 and the source-only
+  `0.2.0-preview.1+9` preview, in accordance with constitution VII (4.0.0).
+  Required checks use unit/widget tests and static analysis only.
+- Use the pinned Flutter 3.47.7 / Dart 3.13.5 SDK via
+  `tools/foundation-sdk.ps1`; SDK preparation resolves locked tooling and
+  verifies identity. It does not authorize native build or fixture scripts.
+  Restore the root and `serverdeck_protocol`, `serverdeck_windows`, and
+  `serverdeck_locald` package dependencies with `pub get --enforce-lockfile`.
+- From the repository root, run the existing format and analysis checks and
+  `flutter test --reporter expanded` against ordinary `test/`. Set
+  `SERVERDECK_NATIVE_CONTROL_RED=0`, clear `DESIGN_CAPTURE_DIR`,
+  `DESIGN_STATE_CAPTURE_DIR`, and `DESIGN_STOCK_CAPTURE_DIR`, and supply no
+  capture `--dart-define` flags. The normal opt-in capture skip is expected.
+- Run `dart analyze` in each affected Dart package; the current automatic
+  gate analyzes `packages/serverdeck_protocol`, `packages/serverdeck_windows`,
+  and `packages/serverdeck_locald`. The additional selected unit commands are:
+  - In `packages/serverdeck_protocol`:
+    `dart test --reporter expanded`.
+  - In `packages/serverdeck_locald`:
+    `dart test test/server_peer_coordination_test.dart --reporter expanded`.
+    This scheduler suite uses fake delegates and completers; its filename
+    does not authorize native peer fixtures.
+- Do not run full `dart test` in `serverdeck_windows`, `serverdeck_locald`,
+  or `serverdeck_mcp` in this stage. Product-native/FFI/Isar/DPAPI, real
+  service/process/pipe/SSH, integration, container/Docker/systemd/Ansible,
+  cold-runner, and native qualification workloads are deferred and not run.
+  Ordinary SDK tooling and the Flutter VM/widget runner are prerequisites
+  of the selected unit tests, not product-native qualification.
+- The automatic push/PR check is `unit-widget-checks` in
+  `.github/workflows/mcp.yml`; require successful results for the reviewed
+  source revision. The preserved `ssh-transport`, `executor-prerequisites`,
+  and `windows` jobs run only with explicit manual
+  `workflow_dispatch` profile `native-full`. The separate Foundation Windows
+  workflow remains manual. Neither manual native profile may be dispatched
+  without a separate user instruction.
+- Record deferred checks as not run; skipped CI jobs and earlier partial or
+  failed runs do not become native passes. This stage gates the current
+  source-preview merge/release only and does not establish full native,
+  runtime, signing, distribution, or product acceptance. Authorized private
+  build/package/install actions retain separate delivery evidence and do
+  not authorize integration tests.
+- Specification link checks and the independent review/fix loop below
+  remain mandatory. A change of validation stage requires explicit user
+  agreement and corresponding updates to rules and CI.
+
 ## Independent Review and Fix Loop
 
 - After changing application code and successfully completing the mandatory

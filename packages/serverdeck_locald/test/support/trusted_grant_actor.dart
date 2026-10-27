@@ -620,18 +620,32 @@ Future<void> scenario(
         if (mode == 'permit-native') {
           r.manifest(root, (m) => (m['sha256'] as Map)['mcp.exe'] = '0' * 64);
         }
+        var admittedWrites = 0;
         await a.fails(
           permit!.write(
             envelope['id'] as String,
             deadline: mode == 'permit-outer'
                 ? Duration.zero
                 : const Duration(seconds: 5),
+            observeNativeCompletion: (_) {
+              admittedWrites++;
+            },
           ),
           mode == 'permit-expired' || mode == 'permit-outer'
               ? 'TIMEOUT'
               : 'UNAUTHORIZED',
         );
-        await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+        a.check(admittedWrites == 0);
+        await a.fails(
+          permit.write(
+            envelope['id'] as String,
+            observeNativeCompletion: (_) {
+              admittedWrites++;
+            },
+          ),
+          'UNAUTHORIZED',
+        );
+        a.check(admittedWrites == 0);
         request.complete();
         await live.server.disconnect();
         final error = await live.next();
@@ -666,7 +680,18 @@ Future<void> scenario(
       if (result == null) {
         final permit = request.openFailure;
         a.check(permit != null);
-        await permit!.write(envelope['id'] as String, deadline: remaining());
+        var admittedWrites = 0;
+        Future<void>? actualWrite;
+        await permit!.write(
+          envelope['id'] as String,
+          deadline: remaining(),
+          observeNativeCompletion: (actual) {
+            admittedWrites++;
+            actualWrite = actual;
+          },
+        );
+        a.check(admittedWrites == 1 && actualWrite != null);
+        await actualWrite;
         await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
       } else {
         await io.write(response, remaining);

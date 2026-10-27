@@ -296,72 +296,147 @@ Future<void> exerciseTrustProbes(
         owner.response!.sessionId,
         'servers.trust.probe',
       );
-      final observation = await owner.peer!.observeNextRevalidationForTest();
-      final operation = id();
-      final invocation = api.prepare(
-        request,
-        request.method,
-        body(),
-        requestId: operation,
-      );
+      TrustedSessionRequest? cancelRequest;
+      TrustedSessionRequest? statusRequest;
       try {
-        await invocation.execute();
-        invocation.close();
-        request.complete();
-        await observation.reached.timeout(const Duration(seconds: 3));
-        if (mode == 'probe-physical-stale') {
-          final current = store.state.profiles[profile]!.toJson();
-          await coordinator.submit(id(), ApiMethod.profilesUpdate, {
-            'profileId': profile,
-            'expectedRevision': current['revision'],
-            for (final field in ['name', 'address', 'port', 'sshUser', 'tags'])
-              field: current[field],
-            'name': 'Changed during native proof',
-            'credential': {'action': 'keep'},
-          }, requester: 'fixture-change');
-          await observation.release();
-          final wait = Stopwatch()..start();
-          Map<String, Object?> state;
-          do {
-            a.check(wait.elapsed < const Duration(seconds: 3));
-            state = await call('servers.trust.probeStatus', {
-              'operationId': operation,
-            });
-            if (state['state'] == 'running')
-              await Future<void>.delayed(const Duration(milliseconds: 5));
-          } while (state['state'] == 'running');
-          a.check(state['code'] == 'REVISION_CONFLICT' && sockets.isEmpty);
-        } else {
-          if (mode == 'probe-physical-detach') {
-            owner.handshake!.close();
-          } else {
-            a.check(
-              (await call('servers.trust.probeCancel', {
-                    'operationId': operation,
-                  }))['cancelled'] ==
-                  true,
-            );
-          }
-          a.check(probes.retainedProbes == 1 && sockets.isEmpty);
-          var drained = false;
-          final closing = probes.close().then<void>((_) {
-            drained = true;
-          });
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-          a.check(!drained && probes.retainedProbes == 1);
-          await observation.release();
-          await closing;
-          a.check(
-            drained &&
-                probes.retainedProbes == 0 &&
-                pool.activeTransports == 0 &&
-                sockets.isEmpty,
+        if (mode == 'probe-physical-cancel') {
+          cancelRequest = await owner.registry.begin(
+            owner.channel,
+            owner.response!.sessionId,
+            'servers.trust.probeCancel',
           );
         }
+        if (mode == 'probe-physical-cancel-rpc') {
+          statusRequest = await owner.registry.begin(
+            owner.channel,
+            owner.response!.sessionId,
+            'servers.trust.probeStatus',
+          );
+        }
+        final observation = await owner.peer!.observeNextRevalidationForTest();
+        final operation = id();
+        TrustedOwnerInvocation? invocation;
+        try {
+          final prepared = api.prepare(
+            request,
+            request.method,
+            body(),
+            requestId: operation,
+          );
+          invocation = prepared;
+          await prepared.execute();
+          prepared.close();
+          request.complete();
+          await observation.reached.timeout(const Duration(seconds: 3));
+          if (mode == 'probe-physical-stale') {
+            final current = store.state.profiles[profile]!.toJson();
+            await coordinator.submit(id(), ApiMethod.profilesUpdate, {
+              'profileId': profile,
+              'expectedRevision': current['revision'],
+              for (final field in [
+                'name',
+                'address',
+                'port',
+                'sshUser',
+                'tags',
+              ])
+                field: current[field],
+              'name': 'Changed during native proof',
+              'credential': {'action': 'keep'},
+            }, requester: 'fixture-change');
+            await observation.release();
+            final wait = Stopwatch()..start();
+            Map<String, Object?> state;
+            do {
+              a.check(wait.elapsed < const Duration(seconds: 3));
+              state = await call('servers.trust.probeStatus', {
+                'operationId': operation,
+              });
+              if (state['state'] == 'running')
+                await Future<void>.delayed(const Duration(milliseconds: 5));
+            } while (state['state'] == 'running');
+            a.check(state['code'] == 'REVISION_CONFLICT' && sockets.isEmpty);
+          } else if (mode == 'probe-physical-cancel-rpc') {
+            // Exercise public admission behind the held proof and retain the
+            // API's fresh effect proof. Release independently of RPC completion.
+            var cancellationSettled = false;
+            final cancellation =
+                call('servers.trust.probeCancel', {
+                  'operationId': operation,
+                }).whenComplete(() {
+                  cancellationSettled = true;
+                });
+            cancellation.ignore();
+            try {
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+              a.check(
+                !cancellationSettled &&
+                    probes.retainedProbes == 1 &&
+                    pool.activeTransports == 0 &&
+                    sockets.isEmpty,
+              );
+              // This service-layer checkpoint reads through an independent
+              // native-admitted request without issuing another held proof.
+              final admittedStatus = statusRequest!;
+              admittedStatus.rpcRemaining;
+              a.check(
+                probes.status(admittedStatus, {
+                      'operationId': operation,
+                    })['state'] ==
+                    'running',
+              );
+              await observation.release();
+              a.check((await cancellation)['cancelled'] == true);
+              await probes.close();
+              // Releasing the proof may start the owned TCP attempt before the
+              // API cancellation reaches the service. Its physical work drains.
+              a.check(probes.retainedProbes == 0 && pool.activeTransports == 0);
+            } finally {
+              await observation.release();
+              await cancellation.then<void>(
+                (_) {},
+                onError: (Object _, StackTrace __) {},
+              );
+            }
+          } else {
+            if (mode == 'probe-physical-detach') {
+              owner.handshake!.close();
+            } else {
+              // Service-layer physical drain coverage uses its own genuine
+              // native-admitted request; the RPC path has separate coverage.
+              final admittedCancel = cancelRequest!;
+              admittedCancel.rpcRemaining;
+              a.check(
+                probes.cancel(admittedCancel, {
+                      'operationId': operation,
+                    })['cancelled'] ==
+                    true,
+              );
+            }
+            a.check(probes.retainedProbes == 1 && sockets.isEmpty);
+            var drained = false;
+            final closing = probes.close().then<void>((_) {
+              drained = true;
+            });
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            a.check(!drained && probes.retainedProbes == 1);
+            await observation.release();
+            await closing;
+            a.check(
+              drained &&
+                  probes.retainedProbes == 0 &&
+                  pool.activeTransports == 0 &&
+                  sockets.isEmpty,
+            );
+          }
+        } finally {
+          invocation?.close();
+          await observation.release();
+        }
       } finally {
-        invocation.close();
+        cancelRequest?.complete();
+        statusRequest?.complete();
         request.complete();
-        await observation.release();
       }
       return;
     }

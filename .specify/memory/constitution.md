@@ -1,17 +1,3 @@
-<!--
-Sync Impact Report (temporary; remove before committing)
-Version: 3.0.0 -> 3.0.1
-Modified principle: III, clarification of secret protection versus ordinary metadata.
-Reason: user confirmed OS protection of all access secrets (SSH keys/passwords/passphrase),
-and rejected application encryption of the whole workspace. This corrects an expanded
-interpretation rather than changing the intended protection of access secrets.
-Added/removed sections: none. Original ratification date and other principles retained.
-Affected: 001 Spec/Plan/Tasks/contracts, 002 Specify, shared requirements and acceptance.
-Transition: replace experimental encrypted aggregate; retain completed task evidence
-as history, require new checks/review before implementation handoff and acceptance.
-TODOs: none. This amendment does not claim that replacement code is implemented.
--->
-
 # ServerDeck Constitution
 
 ## Core Principles
@@ -116,8 +102,19 @@ MUST NOT требоваться вне согласованного scope.
 Flutter-изменения MUST проходить `dart format --output=none --set-exit-if-changed .`,
 `flutter analyze` и `flutter test`. Изменения спецификаций MUST проходить
 `lychee "specs/**/*.md"`. Изменения locald и backend MUST проходить проверки
-затронутых компонентов. Изменения Windows-поведения MUST проверяться нативно;
-для других заявленных платформ MUST проверяться затронутые платформенные сценарии.
+затронутых компонентов в пределах действующего этапа проверки.
+
+Текущий этап разработки, согласованный 2026-10-27, MUST использовать локально
+и в автоматическом GitHub CI только unit/widget-тесты и статические проверки.
+Unit-тесты MUST использовать подмены внешних зависимостей: запуск реальных служб,
+native/FFI/DPAPI fixtures, integration, контейнеров, реальных SSH-соединений
+и cold qualification в этот gate не входит. Полные платформенные проверки
+MUST сохраняться отдельным ручным профилем будущей квалификации и MUST NOT
+запускаться без отдельного указания пользователя. Пропущенные проверки MUST
+фиксироваться как невыполненные, без заявления полной платформенной приёмки.
+Сборка, проверка состава и хешей артефакта и разрешённая локальная установка
+являются действиями поставки; они не разрешают запуск интеграционных тестов.
+Смена этого этапа MUST быть явно согласована и закреплена в правилах и CI.
 
 GitHub Actions MUST выполнять применимые автоматизированные проверки PR и релизов.
 Неуспешные обязательные checks MUST блокировать merge или выпуск.
@@ -207,4 +204,4 @@ SDK, зависимости и инструменты MUST быть зафикс
 обязанностей. Первоначальная дата принятия сохраняется; дата поправки обновляется.
 Временный Sync Impact Report удаляется перед commit после проверки поправки.
 
-**Version**: 3.0.1 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-11
+**Version**: 4.0.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-27

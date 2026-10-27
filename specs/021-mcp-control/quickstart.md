@@ -1,5 +1,50 @@
 # Quickstart and acceptance — 021
 
+## Current unit-widget commands
+
+For PR3/source-only preview `0.2.0-preview.1+9`, follow
+[Constitution4.0.0/VII and current-stage scope](../003-design-system/plan.md#unit-widget-stage-2026-10-27).
+Only static and pure unit/widget checks run locally and in automatic CI.
+This block takes precedence over native/integration/SSH/container/full-cold
+commands below, which are retained as **future qualification procedures**;
+they require a new user instruction before execution.
+
+With the pinned Flutter3.47.7/Dart3.13.5 SDK and locked dependencies, from root:
+
+```powershell
+$env:SERVERDECK_NATIVE_CONTROL_RED = '0'
+dart format --output=none --set-exit-if-changed .
+flutter analyze
+flutter test --reporter expanded
+Push-Location packages/serverdeck_protocol
+try { dart analyze; dart test --reporter expanded } finally { Pop-Location }
+Push-Location packages/serverdeck_windows
+try { dart analyze } finally { Pop-Location }
+Push-Location packages/serverdeck_locald
+try {
+  dart analyze
+  dart test test/server_peer_coordination_test.dart --reporter expanded
+} finally { Pop-Location }
+lychee "specs/**/*.md"
+```
+
+Record every process exit separately; `try/finally` does not assert Dart
+success. Root tests mean ordinary `test/` unit/contract/widget tests, no
+`integration_test` or capture flags. Preserve the expected opt-in capture skip.
+The full protocol suite and selected queue suite use pure fixtures; do not
+run whole locald/Windows/MCP suites or `test-mcp.ps1` for this unit stage.
+A filename or portable label alone does not make SSH/process/FFI tests pure.
+
+After these checks, complete a fresh frozen-input independent policy/spec/
+workflow review/fix loop. Automatic push/PR `unit-widget-checks` success is
+a separate exact-source external gate under003; old native jobs remain
+not-selected/skipped, without native acceptance. Default manual profile is
+unit-widget; explicit `native-full` and Foundation workflows are future
+qualification and are not dispatched now. Actual results are recorded in
+[003 evidence](../003-design-system/evidence.md#current-unit-widget-evidence-2026-10-27).
+Original T207 full-native acceptance and all complete product/native
+qualification remain open.
+
 This guide separates available source entry points from required acceptance.
 For current build and client configuration commands, use the
 [MCP setup guide](../../docs/development/mcp.md). Record actual commands/results
@@ -94,3 +139,35 @@ This is the expected validation procedure for the [composition contract](contrac
 From `packages/serverdeck_locald`, run the new `dart test test/mcp/trusted_services_native_test.dart` and the existing production wire suite `dart test test/mcp/trusted_channel_native_test.dart`. The implementation adds the first command; absence of that test is incomplete T168. Verify shared owner/MCP catalog state, all25 owner routes, custody/role/attach refusals, no effect from stopped prepared grants, common foundation/trust receipts and real drain boundaries. Existing gate observation/owner-service probe builds must retain their explicit compile-time-only selection and ordinary-build refusal. Source-qualified DLL and full Windows/Linux startup/executor acceptance remain separate gates.
 
 Run affected analyzers/component regressions, literal root `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `lychee "specs/**/*.md"` and independent review per AGENTS.md. A failed close must leave outer storage/key/mutex ownership retained; a successful component result does not qualify the full021 product.
+
+## Native control correction validation
+
+T204–T207 validate [accepted-peer control coordination](contracts/native-control.md).
+Use the pinned Flutter3.47.7/Dart3.13.5 foundation SDK and existing isolated
+Windows native fixtures; do not use an installed user's service or real servers.
+From `packages/serverdeck_locald`, run the new pure
+`dart test test/server_peer_coordination_test.dart`, then affected real
+`test/mcp/operational_auth_native_test.dart`, `trusted_auth_native_test.dart`,
+`gateway_native_test.dart`, channel and grant suites serially. Preserve original
+gateway16/17/shared cancellation and channel17-reply oracles. From
+`packages/serverdeck_windows`, run operational/trusted worker native regressions
+serially; direct fourth ordinary native admission must still return RESOURCE_LIMIT.
+The contract describes observation-control occupancy and all refusal/expiry/
+physical-drain outcomes. Pure injected completions do not establish native proof.
+Mandatory root format/analyze/test, affected package analysis, strict spec links,
+fresh independent review and exact-source cold CI remain required. Actual CI8
+causality and successful correction are not inferred from the planned scenarios.
+
+
+T212 adds first-RPC failed-open terminal header/body drain cases for both formats
+and epoch peer.write admission/throwing-observer retention cases to the existing
+owned Windows actors. Run old-source RED and new-source GREEN only against
+independently preserved source snapshots, with the same genuine fixtures; keep
+normal17/16/native3 and original deadlines. Complete all affected channel modes,
+the full Windows package suite (current168 plus the new cases), controlled
+diagnostics (current18), root mandatory/package checks and strict links, then a
+completed fresh independent code/spec review. The draft proposal has no runtime
+evidence. The current frozen run must finish before applying the specification
+amendment, and strict links plus a fresh independent readiness review precede
+production implementation. An unrelated local resolver-host crash is separate
+evidence, not a proved product fault or an accepted workaround.

@@ -16,6 +16,7 @@ import 'package:serverdeck_protocol/validation.dart';
 import 'package:serverdeck_windows/pipe_worker.dart';
 
 import '../storage/state_store.dart';
+import 'native_control_queue.dart';
 import 'owner_service_probe.dart';
 
 part 'operational_sessions.dart';
@@ -129,6 +130,7 @@ sealed class _ServerHandshake<P, R extends _Sessions<P>> {
   final R sessions;
   final OperationalRole role;
   final Uint8List _token;
+  final _nativeScope = NativeControlScope();
   final _watch = Stopwatch()..start();
   late final Duration Function() _clock;
   late final Duration _deadline;
@@ -145,9 +147,11 @@ sealed class _ServerHandshake<P, R extends _Sessions<P>> {
 
   Future<void> _verify() async {
     try {
-      await _binding.revalidate().timeout(_remaining());
+      await _binding.revalidate(remaining: _remaining, scopes: [_nativeScope]);
       _remaining();
       if (_nativeClientRole(_binding) != role) throw StateError('UNAUTHORIZED');
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
     } on TimeoutException {
       throw StateError('TIMEOUT');
     } on StateError catch (error) {
@@ -259,14 +263,28 @@ sealed class _ServerHandshake<P, R extends _Sessions<P>> {
 
   void _disposeToken() {
     _closed = true;
+    _nativeScope.retire();
     _token.fillRange(0, _token.length, 0);
     _watch.stop();
   }
 
   void close() {
+    _binding.retire();
     _disposeToken();
     _removeOwnedSession();
   }
+
+  /// Uses the retained binding after authenticate consumed its token too.
+  /// The channel supplies its original write budget, never a new proof window.
+  Future<void> revalidateForWrite(Duration Function() remaining) async {
+    try {
+      await _binding.revalidate(remaining: remaining);
+    } on NativeControlLocalFailure catch (error) {
+      error.rethrowCause();
+    }
+  }
+
+  Future<void> get nativeControlSettled => _binding.settled;
 
   void _removeOwnedSession() {
     final current = sessions._sessions[channel];
