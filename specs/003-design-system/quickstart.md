@@ -10,7 +10,21 @@
 
 Использовать закреплённые Flutter3.47.7 / Dart3.13.5/framework
 `abaf9c523780a608bd46686fd5e53740a07077f8` и locked dependencies.
-После разрешённого dependency restore, из root:
+Из root сначала восстановить locked dependencies всех пакетов, которые
+обходит root analysis. MCP restore создаёт package configuration для анализа
+и не добавляет MCP tests в выбранный suite:
+
+```powershell
+. ./tools/foundation-sdk.ps1
+Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
+foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald','serverdeck_mcp')) {
+  Push-Location (Join-Path 'packages' $package)
+  try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
+  finally { Pop-Location }
+}
+```
+
+После restore, из root:
 
 ```powershell
 $env:SERVERDECK_NATIVE_CONTROL_RED = '0'

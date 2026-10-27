@@ -22,8 +22,10 @@
 - Use the pinned Flutter 3.47.7 / Dart 3.13.5 SDK via
   `tools/foundation-sdk.ps1`; SDK preparation resolves locked tooling and
   verifies identity. It does not authorize native build or fixture scripts.
-  Restore the root and `serverdeck_protocol`, `serverdeck_windows`, and
-  `serverdeck_locald` package dependencies with `pub get --enforce-lockfile`.
+  Restore the root and `serverdeck_protocol`, `serverdeck_windows`,
+  `serverdeck_locald`, and `serverdeck_mcp` package dependencies with
+  `pub get --enforce-lockfile`. MCP restore supplies package configuration
+  required by root analysis; it does not select the MCP test suite.
 - From the repository root, run the existing format and analysis checks and
   `flutter test --reporter expanded` against ordinary `test/`. Set
   `SERVERDECK_NATIVE_CONTROL_RED=0`, clear `DESIGN_CAPTURE_DIR`,
