@@ -313,9 +313,34 @@ Future<void> client(List<String> args) async {
   }
 }
 
+Future<void> runScenarioFixtureLifecycle({
+  required Future<void> Function() body,
+  required Future<void> Function() cleanup,
+  Future<void> Function({
+    required Future<void> Function() body,
+    required Future<void> Function() cleanup,
+  })?
+  lifecycle,
+}) async {
+  if (lifecycle != null) {
+    await lifecycle(body: body, cleanup: cleanup);
+    return;
+  }
+  try {
+    await body();
+  } finally {
+    await cleanup();
+  }
+}
+
 Future<void> scenario(
   String root,
   String mode, {
+  Future<void> Function({
+    required Future<void> Function() body,
+    required Future<void> Function() cleanup,
+  })?
+  lifecycle,
   Duration initialWallOffset = Duration.zero,
   void Function(PausedProtection)? inspectProtection,
   Future<void> Function(
@@ -380,286 +405,296 @@ Future<void> scenario(
     generation: a.generation,
     elapsed: mode.startsWith('permit-') ? () => monotonic : null,
   );
-  try {
-    final state = store = await StateStore.openMcpOperational(
-      localAppData: local,
-      appRoot: root,
-      lease: lease,
-      custody: custody,
-      receiptKey: key,
-    );
-    var wall = DateTime.now().toUtc().add(initialWallOffset);
-    final service = OwnerGrantService(state, clock: () => wall);
-    var revision = 0;
-    Future<void> write(String op) async {
-      final input = <String, Object?>{
-        'requestId':
-            '22345678-1234-4234-8234-${(revision + 1).toString().padLeft(12, '0')}',
-        'grantId': grantId,
-        if (revision > 0) 'expectedRevision': revision,
-        if (op != 'grant.revoke') ...{
-          'label': 'native fixture',
-          'scopes': [
-            if (withTarget) 'read',
-            if (mode == 'channel-all') 'logs',
-            'author',
-            if (mode == 'channel-all') ...['plan', 'apply'],
-          ],
-          'serverIds': [if (withTarget) '32345678-1234-4234-8234-123456789abc'],
-          'lifetimeSeconds': 300,
-        },
-      };
-      await service.submitOwner(op, input);
-      revision++;
-    }
+  await runScenarioFixtureLifecycle(
+    body: () async {
+      final state = store = await StateStore.openMcpOperational(
+        localAppData: local,
+        appRoot: root,
+        lease: lease,
+        custody: custody,
+        receiptKey: key,
+      );
+      var wall = DateTime.now().toUtc().add(initialWallOffset);
+      final service = OwnerGrantService(state, clock: () => wall);
+      var revision = 0;
+      Future<void> write(String op) async {
+        final input = <String, Object?>{
+          'requestId':
+              '22345678-1234-4234-8234-${(revision + 1).toString().padLeft(12, '0')}',
+          'grantId': grantId,
+          if (revision > 0) 'expectedRevision': revision,
+          if (op != 'grant.revoke') ...{
+            'label': 'native fixture',
+            'scopes': [
+              if (withTarget) 'read',
+              if (mode == 'channel-all') 'logs',
+              'author',
+              if (mode == 'channel-all') ...['plan', 'apply'],
+            ],
+            'serverIds': [
+              if (withTarget) '32345678-1234-4234-8234-123456789abc',
+            ],
+            'lifetimeSeconds': 300,
+          },
+        };
+        await service.submitOwner(op, input);
+        revision++;
+      }
 
-    await write('grant.create');
-    if (mode == 'retired2') await write('grant.replace');
-    if (mode == 'retired3') {
-      await write('grant.replace');
-      await write('grant.replace');
-    }
-    if (!mode.startsWith('retired')) {
-      for (var i = 0; i < 3; i++) await write('grant.replace');
-    }
-    final auth = authority = OperationalMcpAuthority(state, clock: () => wall);
-    if (readyRun != null) {
-      await readyRun(
-        root,
+      await write('grant.create');
+      if (mode == 'retired2') await write('grant.replace');
+      if (mode == 'retired3') {
+        await write('grant.replace');
+        await write('grant.replace');
+      }
+      if (!mode.startsWith('retired')) {
+        for (var i = 0; i < 3; i++) await write('grant.replace');
+      }
+      final auth = authority = OperationalMcpAuthority(
         state,
-        auth,
+        clock: () => wall,
+      );
+      if (readyRun != null) {
+        await readyRun(
+          root,
+          state,
+          auth,
+          registry,
+          write,
+          (duration) => wall = wall.add(duration),
+        );
+        return;
+      }
+      if (mode == 'pool' || mode == 'replay' || mode.startsWith('late-')) {
+        await controlled(root, mode, state, auth, registry, protection, write);
+        return;
+      }
+      final live = pair = await a.Pair.start(
+        root,
+        'mcp.exe',
         registry,
-        write,
-        (duration) => wall = wall.add(duration),
+        mode: mode,
       );
-      return;
-    }
-    if (mode == 'pool' || mode == 'replay' || mode.startsWith('late-')) {
-      await controlled(root, mode, state, auth, registry, protection, write);
-      return;
-    }
-    final live = pair = await a.Pair.start(
-      root,
-      'mcp.exe',
-      registry,
-      mode: mode,
-    );
-    await live.exchange();
-    a.check(await live.next() == 'AUTH:mcp');
-    await a.fails(
-      registry.begin(live.channel, live.response!.sessionId, 'mcp.invoke'),
-      'FORBIDDEN',
-    );
-    if (mode.startsWith('retired'))
-      while (revision < 4) await write('grant.replace');
-    live.child.stdin.writeln('open');
-    final io = OperationalHandshakeIo(live.peer!);
-    final watch = Stopwatch()..start();
-    Duration remaining() => const Duration(seconds: 5) - watch.elapsed;
-    final envelope = StrictCodec().decode(await io.read(remaining));
-    validateRequestEnvelope(envelope);
-    final request = await registry.begin(
-      live.channel,
-      envelope['sessionId'] as String,
-      envelope['method'] as String,
-    );
-    final params = Map<String, Object?>.of(
-      envelope['params'] as Map<String, Object?>,
-    );
-    if (mode == 'badproof' || mode.startsWith('permit-'))
-      params['proof'] = base64Url
-          .encode(List<int>.filled(32, 0))
-          .replaceAll('=', '');
-    if (mode == 'missing') params['grantId'] = requestId;
-    if (mode == 'expired') wall = wall.add(const Duration(seconds: 300));
-    if (mode == 'revoked') await write('grant.revoke');
-    if (mode == 'keyloss') key.close();
-    if (mode == 'closed') auth.close();
-    String? failure;
-    McpOpenResult? result;
-    try {
-      result = await request.openGrant(auth, params);
-    } on StateError catch (error) {
-      failure = error.message;
-    }
-    if (mode == 'current' ||
-        mode.startsWith('router-') ||
-        mode == 'grant-expiry' ||
-        mode == 'serverrepeat' ||
-        mode == 'replace' ||
-        mode == 'revoke' ||
-        mode == 'repeat' ||
-        mode.startsWith('client')) {
-      a.check(result?.revision == 4 && auth.pendingOpens == 0);
-    } else {
-      a.check(
-        failure == (mode == 'keyloss' ? 'STORAGE_BLOCKED' : 'UNAUTHORIZED'),
+      await live.exchange();
+      a.check(await live.next() == 'AUTH:mcp');
+      await a.fails(
+        registry.begin(live.channel, live.response!.sessionId, 'mcp.invoke'),
+        'FORBIDDEN',
       );
-      a.check(registry.count == 0 && auth.pendingOpens == 0);
-      a.check(state.isAutomationReady == (mode != 'keyloss'));
-    }
-    var response = <String, Object?>{
-      'v': 1,
-      'id': envelope['id'],
-      'generation': a.generation,
-      if (result != null)
-        'result': result.toJson()
-      else
-        'error': LocalError(
-          failure == 'STORAGE_BLOCKED'
-              ? ErrorCode.storageBlocked
-              : ErrorCode.unauthorized,
-        ).toJson(),
-    };
-    if (mode.startsWith('permit-')) {
-      final permit = request.openFailure;
-      a.check(permit != null && result == null);
-      a.Pair? replacement;
+      if (mode.startsWith('retired'))
+        while (revision < 4) await write('grant.replace');
+      live.child.stdin.writeln('open');
+      final io = OperationalHandshakeIo(live.peer!);
+      final watch = Stopwatch()..start();
+      Duration remaining() => const Duration(seconds: 5) - watch.elapsed;
+      final envelope = StrictCodec().decode(await io.read(remaining));
+      validateRequestEnvelope(envelope);
+      final request = await registry.begin(
+        live.channel,
+        envelope['sessionId'] as String,
+        envelope['method'] as String,
+      );
+      final params = Map<String, Object?>.of(
+        envelope['params'] as Map<String, Object?>,
+      );
+      if (mode == 'badproof' || mode.startsWith('permit-'))
+        params['proof'] = base64Url
+            .encode(List<int>.filled(32, 0))
+            .replaceAll('=', '');
+      if (mode == 'missing') params['grantId'] = requestId;
+      if (mode == 'expired') wall = wall.add(const Duration(seconds: 300));
+      if (mode == 'revoked') await write('grant.revoke');
+      if (mode == 'keyloss') key.close();
+      if (mode == 'closed') auth.close();
+      String? failure;
+      McpOpenResult? result;
       try {
-        if (mode == 'permit-replaced') {
-          replacement = await a.Pair.start(
-            root,
-            'mcp.exe',
-            registry,
-            channelOverride: live.channel,
-          );
-          await replacement.exchange();
-          a.check(await replacement.next() == 'AUTH:mcp');
-        }
-        if (mode == 'permit-completed') request.complete();
-        if (mode == 'permit-stopped') registry.stop();
-        if (mode == 'permit-expired') monotonic = const Duration(seconds: 5);
-        if (mode == 'permit-lease') monotonic = const Duration(seconds: 60);
-        if (mode == 'permit-native') {
-          r.manifest(root, (m) => (m['sha256'] as Map)['mcp.exe'] = '0' * 64);
-        }
-        await a.fails(
-          permit!.write(
-            envelope['id'] as String,
-            deadline: mode == 'permit-outer'
-                ? Duration.zero
-                : const Duration(seconds: 5),
-          ),
-          mode == 'permit-expired' || mode == 'permit-outer'
-              ? 'TIMEOUT'
-              : 'UNAUTHORIZED',
+        result = await request.openGrant(auth, params);
+      } on StateError catch (error) {
+        failure = error.message;
+      }
+      if (mode == 'current' ||
+          mode.startsWith('router-') ||
+          mode == 'grant-expiry' ||
+          mode == 'serverrepeat' ||
+          mode == 'replace' ||
+          mode == 'revoke' ||
+          mode == 'repeat' ||
+          mode.startsWith('client')) {
+        a.check(result?.revision == 4 && auth.pendingOpens == 0);
+      } else {
+        a.check(
+          failure == (mode == 'keyloss' ? 'STORAGE_BLOCKED' : 'UNAUTHORIZED'),
         );
-        await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+        a.check(registry.count == 0 && auth.pendingOpens == 0);
+        a.check(state.isAutomationReady == (mode != 'keyloss'));
+      }
+      var response = <String, Object?>{
+        'v': 1,
+        'id': envelope['id'],
+        'generation': a.generation,
+        if (result != null)
+          'result': result.toJson()
+        else
+          'error': LocalError(
+            failure == 'STORAGE_BLOCKED'
+                ? ErrorCode.storageBlocked
+                : ErrorCode.unauthorized,
+          ).toJson(),
+      };
+      if (mode.startsWith('permit-')) {
+        final permit = request.openFailure;
+        a.check(permit != null && result == null);
+        a.Pair? replacement;
+        try {
+          if (mode == 'permit-replaced') {
+            replacement = await a.Pair.start(
+              root,
+              'mcp.exe',
+              registry,
+              channelOverride: live.channel,
+            );
+            await replacement.exchange();
+            a.check(await replacement.next() == 'AUTH:mcp');
+          }
+          if (mode == 'permit-completed') request.complete();
+          if (mode == 'permit-stopped') registry.stop();
+          if (mode == 'permit-expired') monotonic = const Duration(seconds: 5);
+          if (mode == 'permit-lease') monotonic = const Duration(seconds: 60);
+          if (mode == 'permit-native') {
+            r.manifest(root, (m) => (m['sha256'] as Map)['mcp.exe'] = '0' * 64);
+          }
+          await a.fails(
+            permit!.write(
+              envelope['id'] as String,
+              deadline: mode == 'permit-outer'
+                  ? Duration.zero
+                  : const Duration(seconds: 5),
+            ),
+            mode == 'permit-expired' || mode == 'permit-outer'
+                ? 'TIMEOUT'
+                : 'UNAUTHORIZED',
+          );
+          await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+          request.complete();
+          await live.server.disconnect();
+          final error = await live.next();
+          a.check(
+            error == 'ERROR:UNAUTHORIZED' ||
+                error == 'ERROR:SERVICE_UNAVAILABLE',
+          );
+          a.check(
+            registry.count == (replacement == null ? 0 : 1) &&
+                auth.pendingOpens == 0,
+          );
+          if (replacement != null) {
+            final ping = await registry.begin(
+              replacement.channel,
+              replacement.response!.sessionId,
+              'session.ping',
+            );
+            ping.complete();
+          }
+          await a.finishClient(live.child);
+          a.check(await live.child.exitCode == 0);
+          return;
+        } finally {
+          await replacement?.close();
+        }
+      }
+      if (mode == 'clientproof')
+        (response['result'] as Map)['proof'] = base64Url
+            .encode(List<int>.filled(32, 0))
+            .replaceAll('=', '');
+      if (mode == 'clientcorrelation') response['id'] = requestId;
+      try {
+        if (result == null) {
+          final permit = request.openFailure;
+          a.check(permit != null);
+          await permit!.write(envelope['id'] as String, deadline: remaining());
+          await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
+        } else {
+          await io.write(response, remaining);
+        }
+      } finally {
         request.complete();
-        await live.server.disconnect();
-        final error = await live.next();
-        a.check(
-          error == 'ERROR:UNAUTHORIZED' || error == 'ERROR:SERVICE_UNAVAILABLE',
+      }
+      a.check(
+        await live.next() ==
+            (result == null
+                ? 'ERROR:$failure'
+                : mode.startsWith('client')
+                ? 'ERROR:UNAUTHORIZED'
+                : 'OPEN:4'),
+      );
+      if (routerRun != null) {
+        await routerRun(
+          root,
+          state,
+          auth,
+          registry,
+          live,
+          write,
+          (duration) => wall = wall.add(duration),
         );
-        a.check(
-          registry.count == (replacement == null ? 0 : 1) &&
-              auth.pendingOpens == 0,
-        );
-        if (replacement != null) {
-          final ping = await registry.begin(
-            replacement.channel,
-            replacement.response!.sessionId,
-            'session.ping',
-          );
-          ping.complete();
-        }
         await a.finishClient(live.child);
         a.check(await live.child.exitCode == 0);
         return;
-      } finally {
-        await replacement?.close();
       }
-    }
-    if (mode == 'clientproof')
-      (response['result'] as Map)['proof'] = base64Url
-          .encode(List<int>.filled(32, 0))
-          .replaceAll('=', '');
-    if (mode == 'clientcorrelation') response['id'] = requestId;
-    try {
-      if (result == null) {
-        final permit = request.openFailure;
-        a.check(permit != null);
-        await permit!.write(envelope['id'] as String, deadline: remaining());
-        await a.fails(permit.write(envelope['id'] as String), 'UNAUTHORIZED');
-      } else {
-        await io.write(response, remaining);
-      }
-    } finally {
-      request.complete();
-    }
-    a.check(
-      await live.next() ==
-          (result == null
-              ? 'ERROR:$failure'
-              : mode.startsWith('client')
-              ? 'ERROR:UNAUTHORIZED'
-              : 'OPEN:4'),
-    );
-    if (routerRun != null) {
-      await routerRun(
-        root,
-        state,
-        auth,
-        registry,
-        live,
-        write,
-        (duration) => wall = wall.add(duration),
-      );
-      await a.finishClient(live.child);
-      a.check(await live.child.exitCode == 0);
-      return;
-    }
-    if (result != null && !mode.startsWith('client') && mode != 'repeat') {
-      final interest = await registry.begin(
-        live.channel,
-        live.response!.sessionId,
-        'mcp.invoke',
-      );
-      a.check(interest.authorizeMcp(scope: McpScope.author).revision == 4);
-      await a.fails(
-        Future.sync(() => interest.authorizeMcp(scope: McpScope.read)),
-        'FORBIDDEN',
-      );
-      await a.fails(
-        Future.sync(() => interest.authorizeMcp(serverId: requestId)),
-        'FORBIDDEN',
-      );
-      if (mode == 'replace' || mode == 'revoke') {
-        await write(mode == 'replace' ? 'grant.replace' : 'grant.revoke');
-        await a.fails(interest.revalidate(), 'UNAUTHORIZED');
-        a.check(registry.count == 0);
-      }
-      if (mode == 'grant-expiry') {
-        wall = wall.add(const Duration(seconds: 300));
-        await a.fails(interest.revalidate(), 'UNAUTHORIZED');
-        a.check(registry.count == 0);
-      }
-      interest.complete();
-      if (mode == 'serverrepeat') {
-        final repeat = await registry.begin(
+      if (result != null && !mode.startsWith('client') && mode != 'repeat') {
+        final interest = await registry.begin(
           live.channel,
           live.response!.sessionId,
-          'mcp.open',
+          'mcp.invoke',
+        );
+        a.check(interest.authorizeMcp(scope: McpScope.author).revision == 4);
+        await a.fails(
+          Future.sync(() => interest.authorizeMcp(scope: McpScope.read)),
+          'FORBIDDEN',
         );
         await a.fails(
-          repeat.openGrant(auth, {'invalid': 'payload'}),
-          'UNAUTHORIZED',
+          Future.sync(() => interest.authorizeMcp(serverId: requestId)),
+          'FORBIDDEN',
         );
-        repeat.complete();
-        a.check(registry.count == 0);
+        if (mode == 'replace' || mode == 'revoke') {
+          await write(mode == 'replace' ? 'grant.replace' : 'grant.revoke');
+          await a.fails(interest.revalidate(), 'UNAUTHORIZED');
+          a.check(registry.count == 0);
+        }
+        if (mode == 'grant-expiry') {
+          wall = wall.add(const Duration(seconds: 300));
+          await a.fails(interest.revalidate(), 'UNAUTHORIZED');
+          a.check(registry.count == 0);
+        }
+        interest.complete();
+        if (mode == 'serverrepeat') {
+          final repeat = await registry.begin(
+            live.channel,
+            live.response!.sessionId,
+            'mcp.open',
+          );
+          await a.fails(
+            repeat.openGrant(auth, {'invalid': 'payload'}),
+            'UNAUTHORIZED',
+          );
+          repeat.complete();
+          a.check(registry.count == 0);
+        }
       }
-    }
-    if (mode == 'repeat') a.check(await live.next() == 'REPEAT_REFUSED');
-    await a.finishClient(live.child);
-    a.check(await live.child.exitCode == 0);
-  } finally {
-    authority?.close();
-    registry.stop();
-    await pair?.close();
-    await store?.close();
-    key.close();
-    await lease.close();
-  }
+      if (mode == 'repeat') a.check(await live.next() == 'REPEAT_REFUSED');
+      await a.finishClient(live.child);
+      a.check(await live.child.exitCode == 0);
+    },
+    cleanup: () async {
+      authority?.close();
+      registry.stop();
+      await pair?.close();
+      await store?.close();
+      key.close();
+      await lease.close();
+    },
+    lifecycle: lifecycle,
+  );
 }
 
 Future<void> main(List<String> args) async {

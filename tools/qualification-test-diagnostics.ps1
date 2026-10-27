@@ -18,7 +18,7 @@ function Get-NativeDiagnosticCodeFingerprint {
 
 function Get-NativeTrustedClientDiagnosticShape {
     param([string[]]$ParentLines,[string[]]$ActorLines,[string[]]$FixtureLines,[string[]]$CompletionLines)
-    if((Get-NativeDiagnosticCodeFingerprint $ParentLines) -cne '532218f525550c18513e305ca21cdc8d69ed87b1dbed437a11274e3f486fe8cd' -or
+    if((Get-NativeDiagnosticCodeFingerprint $ParentLines) -cne '80aab3c3b3ecd3fed8944b086aaf02fb45ea9896444132dd8f6a99b9a5f03cef' -or
         (Get-NativeDiagnosticCodeFingerprint $ActorLines) -cne '6c5ddcaeacc9d77405c8104bbb1005492754d1ce8ecb4892818f12fda7900feb' -or
         (Get-NativeDiagnosticCodeFingerprint $FixtureLines) -cne '1a22ecd7326c3856c80a3ff1970da3d89edb566d7e11f2189d03c3356dc9f695' -or
         (Get-NativeDiagnosticCodeFingerprint $CompletionLines) -cne '985e887321bf0e5975095799f0b70b05f9c611e65ba1e8763c2c26b7336d454f'){return $null}
@@ -234,7 +234,8 @@ expect(
     },
   ),
   0,
-  reason: '${await output}\n${await errors}',
+  reason:
+      '${mode == 'quota' ? gatewayQuotaReasonPrefix(fixture.path) : ''}${await output}\n${await errors}',
 );
 '@
     $helperCode=($HelperLines|Where-Object {-not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
@@ -257,6 +258,22 @@ expect(
     if($declaration.Count -ne 1 -or $exit.Count -ne 1 -or $wrapper.Count -ne 1 -or $cleanup.Count -ne 1 -or
         $declaration[0] -ge $wrapper[0] -or $wrapper[0] -ge $exit[0] -or $exit[0] -ge $cleanup[0]){return $null}
     return @{declarationLine=$declaration[0];producerLines=@($exit[0],($exit[0]+1));cleanupSeparator="`nGATEWAY_FIXTURE_CLEANUP_FAILURE: "}
+}
+
+function Get-NativeGatewayQuotaDiagnosticShape {
+    param([string[]]$GatewayLines,[string[]]$ActorLines,[string[]]$QuotaLines,
+        [string[]]$GrantLines,[string[]]$FixtureLines,[string[]]$HelperLines)
+    # In addition to current inventory byte hashes, bind the complete fixed
+    # causal producer: role/one-attempt reader+writer, typed nullable mapper,
+    # early server observer, opt-in/default lifecycle and primary formatter.
+    # An unrelated Expected/Actual or a private output prefix is insufficient.
+    if((Get-NativeDiagnosticCodeFingerprint $GatewayLines) -cne 'c571e7f0ebf961038b73f734c88e51c376375eeb921ddd9053d73748ce6a3a78' -or
+        (Get-NativeDiagnosticCodeFingerprint $ActorLines) -cne 'e15aec24a2816a640b6d12bc8d1fa82d382e70065e72092619a178b8c45003d9' -or
+        (Get-NativeDiagnosticCodeFingerprint $QuotaLines) -cne '5208ff1f418f5fe93a905f64e79fc986680e856ccabd2fbfa21275b705f8f527' -or
+        (Get-NativeDiagnosticCodeFingerprint $GrantLines) -cne '28bb8f5084569c049b8bd8c1de7996783c1825fe69e5798497466b3bd2f3fc73' -or
+        (Get-NativeDiagnosticCodeFingerprint $FixtureLines) -cne '1a22ecd7326c3856c80a3ff1970da3d89edb566d7e11f2189d03c3356dc9f695' -or
+        (Get-NativeDiagnosticCodeFingerprint $HelperLines) -cne 'bc4bc7ea27723f265b521947e36070dfb0afc60ad0c3bfa8edd320cfeccd9b0f'){return $null}
+    return Get-NativeGatewayDiagnosticShape -GatewayLines $GatewayLines -HelperLines $HelperLines
 }
 
 function Get-NativeBootstrapDiagnosticShape {
@@ -358,10 +375,8 @@ function Write-NativeQualificationTestFailure {
     function Get-DiagnosticLine([string]$File,$Line){
         if(-not $File -or $Line -isnot [ValueType]){return $null}
         $number=[long]$Line
-        $path=Join-Path $NativeIsarRepository $File
-        if((Get-NativeIsarDigest $path) -cne $known[$File].hash){return $null}
-        $lineCount=[IO.File]::ReadAllLines($path).Length
-        if($number -lt 1 -or $number -gt $lineCount){return $null}
+        $lines=Get-CurrentDiagnosticLines $File
+        if($null -eq $lines -or $number -lt 1 -or $number -gt @($lines).Count){return $null}
         return $number
     }
     $report=Join-Path $Directory ($Phase+'.machine.jsonl')
@@ -426,8 +441,19 @@ function Write-NativeQualificationTestFailure {
         return $false
     }
     function Get-CurrentDiagnosticLines([string]$File) {
-        if(-not $known.ContainsKey($File) -or (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $File)) -cne $known[$File].hash){return $null}
-        return [IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $File))
+        if(-not $known.ContainsKey($File)){return $null}
+        try {
+            $path=Join-Path $NativeIsarRepository $File
+            if((Get-NativeIsarDigest $path) -cne $known[$File].hash){return $null}
+            # Preserve String[] even for one line; indexed consumers must
+            # never receive a scalar string and index individual characters.
+            return ,([IO.File]::ReadAllLines($path))
+        } catch {
+            # An unavailable source refuses only facts requiring that proof.
+            # It cannot invalidate an independently readable reporter. Keep
+            # this separate from the reporter parser's fail-closed boundary.
+            return $null
+        }
     }
     $trustProbeCases=@('basic','reservation','quota','role','foreign','cancel','close','retention','gate','success',
         'success-cancel','success-ttl','success-other','success-write-basic','success-write-replay','success-write-cancel',
@@ -461,7 +487,14 @@ function Write-NativeQualificationTestFailure {
     $gatewaySource='packages/serverdeck_locald/test/mcp/gateway_native_test.dart'
     $gatewayHelper='packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart'
     $gatewayActor='packages/serverdeck_locald/test/support/gateway_actor.dart'
-    $gatewayShape=$null
+    $gatewayQuotaHelper='packages/serverdeck_locald/test/support/gateway_quota_fixture.dart'
+    $gatewayGrantActor='packages/serverdeck_locald/test/support/operational_grant_actor.dart'
+    $gatewayQuotaPhases=@('scenario-prepare','server-prepare','server-bootstrap','server-admitted16','server-quota-oracle','server-cancelled16',
+        'server-cancel-oracle','server-child-exit','server-stderr','server-serving','server-cleanup','scenario-cleanup',
+        'bridge-bootstrap','bridge-admission','bridge-cancellation','bridge-completion','bridge-cleanup')
+    $gatewayQuotaCodes=@('SERVICE_UNAVAILABLE','UNSAFE_ENDPOINT','IDENTITY_UNAVAILABLE','TIMEOUT','RESOURCE_LIMIT','UNAUTHORIZED',
+        'INCOMPATIBLE','PREREQUISITE_UNAVAILABLE','FORBIDDEN','FIXTURE_ASSERTION')
+    $gatewayShape=$null;$gatewayQuotaShape=$null
     function Get-GatewayDiagnosticCase($Test,[string]$File,$DeclarationLine) {
         if(-not $gatewayShape -or -not $Test -or $File -cne $gatewaySource -or
             $Test['name'] -isnot [string] -or $Test['url'] -isnot [string] -or
@@ -512,25 +545,30 @@ function Write-NativeQualificationTestFailure {
                 $authShape=Get-NativeTrustedAuthDiagnosticShape $parentLines $actorLines $fixtureLines $startupLines
             }
         }
-        if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($capacityParent) -and $known.ContainsKey($capacityHelper) -and $known.ContainsKey($capacityWriter) -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityParent)) -ceq $known[$capacityParent].hash -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityHelper)) -ceq $known[$capacityHelper].hash -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityWriter)) -ceq $known[$capacityWriter].hash) {
-            $capacityShape=Get-NativeCapacityDiagnosticShape -ParentLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityParent))) `
-                -HelperLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityHelper))) `
-                -WriterLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityWriter)))
+        if($Phase -ceq 'serverdeck_locald-tests') {
+            $parentLines=Get-CurrentDiagnosticLines $capacityParent;$helperLines=Get-CurrentDiagnosticLines $capacityHelper
+            $writerLines=Get-CurrentDiagnosticLines $capacityWriter
+            if($parentLines -and $helperLines -and $writerLines) {
+                $capacityShape=Get-NativeCapacityDiagnosticShape -ParentLines $parentLines -HelperLines $helperLines -WriterLines $writerLines
+            }
+            $parentLines=Get-CurrentDiagnosticLines $gatewaySource;$helperLines=Get-CurrentDiagnosticLines $gatewayHelper
+            if($parentLines -and $helperLines) {
+                $gatewayShape=Get-NativeGatewayDiagnosticShape -GatewayLines $parentLines -HelperLines $helperLines
+            }
+            $quotaSources=@{GatewayLines=$gatewaySource;ActorLines=$gatewayActor;QuotaLines=$gatewayQuotaHelper;
+                GrantLines=$gatewayGrantActor;FixtureLines=$ownedFixture;HelperLines=$gatewayHelper}
+            $quotaLines=@{}
+            foreach($key in $quotaSources.Keys) {
+                $current=Get-CurrentDiagnosticLines $quotaSources[$key]
+                if($current){$quotaLines[$key]=$current}
+            }
+            if($quotaLines.Count -eq 6){$gatewayQuotaShape=Get-NativeGatewayQuotaDiagnosticShape @quotaLines}
         }
-        if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($gatewaySource) -and $known.ContainsKey($gatewayHelper) -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $gatewaySource)) -ceq $known[$gatewaySource].hash -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $gatewayHelper)) -ceq $known[$gatewayHelper].hash) {
-            $gatewayShape=Get-NativeGatewayDiagnosticShape -GatewayLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $gatewaySource))) `
-                -HelperLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $gatewayHelper)))
-        }
-        if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($bootstrapSource) -and $known.ContainsKey($bootstrapPreparation) -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $bootstrapSource)) -ceq $known[$bootstrapSource].hash -and
-            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $bootstrapPreparation)) -ceq $known[$bootstrapPreparation].hash) {
-            $bootstrapShape=Get-NativeBootstrapDiagnosticShape -BootstrapLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $bootstrapSource))) `
-                -PreparationLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $bootstrapPreparation)))
+        if($Phase -ceq 'serverdeck_locald-tests') {
+            $parentLines=Get-CurrentDiagnosticLines $bootstrapSource;$preparationLines=Get-CurrentDiagnosticLines $bootstrapPreparation
+            if($parentLines -and $preparationLines) {
+                $bootstrapShape=Get-NativeBootstrapDiagnosticShape -BootstrapLines $parentLines -PreparationLines $preparationLines
+            }
         }
         Assert-NativeIsarPlainPath $report
         $stream=[IO.File]::Open($report,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
@@ -597,11 +635,16 @@ function Write-NativeQualificationTestFailure {
                                     (Test-OwnedReporterLine $event.stackTrace $authParent $authShape.producerLines)){$authExitCode=$candidateExit}
                             }
                             $gatewayDiagnosticCase=Get-GatewayDiagnosticCase $test $file $declarationLine
+                            $gatewayQuotaCase=Get-CheckedOwnedCase $test $file $declarationLine $gatewayQuotaShape $gatewaySource 'actual native MCP gateway ' @('quota')
                             $gatewayExitCode=$null;$gatewayPrimaryError=$null
                             if($gatewayDiagnosticCase -and $event.error -is [string] -and
                                 ($event.testID -is [int] -or $event.testID -is [long])) {
                                 $gatewayPrimaryError=$event.error
                                 $separator=$gatewayPrimaryError.IndexOf($gatewayShape.cleanupSeparator,[StringComparison]::Ordinal)
+                                if($gatewayDiagnosticCase -ceq 'gateway-quota') {
+                                    $quotaSecondary=$gatewayPrimaryError.IndexOf("`nGATEWAY_QUOTA_SECONDARY_FAILURE:`n",[StringComparison]::Ordinal)
+                                    if($quotaSecondary -ge 0 -and ($separator -lt 0 -or $quotaSecondary -lt $separator)){$separator=$quotaSecondary}
+                                }
                                 if($separator -ge 0){$gatewayPrimaryError=$gatewayPrimaryError.Substring(0,$separator)}
                                 if($gatewayPrimaryError -cmatch '\AExpected: <0>\r?\n[ \t]*Actual: <(?<exit>-?[0-9]{1,10})>\r?\n') {
                                     $candidateExit=[long]$Matches['exit']
@@ -636,7 +679,7 @@ function Write-NativeQualificationTestFailure {
                                     }
                                 }
                             }
-                            $traces=if($null -ne $gatewayExitCode){@($event.stackTrace,$gatewayPrimaryError)}elseif($authScenario -or $clientMode){@($event.stackTrace,$ownedPrimaryError)}else{@($event.stackTrace,$event.error)}
+                            $traces=if($null -ne $gatewayExitCode -or $gatewayDiagnosticCase -ceq 'gateway-quota'){@($event.stackTrace,$gatewayPrimaryError)}elseif($authScenario -or $clientMode){@($event.stackTrace,$ownedPrimaryError)}else{@($event.stackTrace,$event.error)}
                             # Other failures retain their previous ordering. Child
                             # stacks and reporter stacks share hash/line checks and
                             # one total cap, including the prioritized frames above.
@@ -654,7 +697,7 @@ function Write-NativeQualificationTestFailure {
                                 }
                             }
                             $native=[Collections.Generic.List[object]]::new()
-                            $nativeErrorText=if($authScenario -or $clientMode){$ownedPrimaryError}else{[string]$event.error}
+                            $nativeErrorText=if($gatewayDiagnosticCase -ceq 'gateway-quota'){[string]$gatewayPrimaryError}elseif($authScenario -or $clientMode){$ownedPrimaryError}else{[string]$event.error}
                             foreach($match in [regex]::Matches($nativeErrorText,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
                                 $code=[long]$match.Groups['code'].Value
                                 if($code -ge -2147483648 -and $code -le 4294967295){$native.Add(@{kind=$match.Groups['kind'].Value;code=$code});if($native.Count -eq 3){break}}
@@ -716,9 +759,9 @@ function Write-NativeQualificationTestFailure {
                                     $file -ceq 'packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart' -and
                                     $test['url'] -is [string] -and (Resolve-DiagnosticSource $test['url']) -ceq $file -and
                                     ($test['line'] -is [int] -or $test['line'] -is [long])) {
-                                    $trustLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $file))
+                                    $trustLines=Get-CurrentDiagnosticLines $file
                                     $index=[int]$declarationLine-1
-                                    if($index+1 -lt $trustLines.Length -and $trustLines[$index].Trim() -ceq 'test(' -and
+                                    if($trustLines -and $index+1 -lt $trustLines.Length -and $trustLines[$index].Trim() -ceq 'test(' -and
                                         $trustLines[$index+1].Trim() -ceq "'actual native host trust probes `$mode',") {
                                         foreach($case in $trustProbeCases) {
                                             if($test['name'] -is [string] -and $test['name'] -ceq ('actual native host trust probes '+$case)) {
@@ -734,7 +777,8 @@ function Write-NativeQualificationTestFailure {
                                     $test['name'] -ceq 'compiled disconnected pipe read after native disconnect fails promptly without waiting on an unissued event') {
                                     foreach($frame in $frames) {
                                         if($frame.file -cne $file){continue}
-                                        $pipeLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $file))
+                                        $pipeLines=Get-CurrentDiagnosticLines $file
+                                        if(-not $pipeLines){continue}
                                         if($pipeLines[[int]$frame.line-1].Trim() -ceq 'onTimeout: () => throw TimeoutException(') {
                                             $fixtureCase='pipe-disconnected'
                                             if([string]$event.error -cmatch '\ATimeoutException after 0:00:15\.000000: DISCONNECT_FIXTURE_TIMEOUT:(started|connected|disconnected|read-terminated|reuse-cancel-proved)\z') {
@@ -759,11 +803,22 @@ function Write-NativeQualificationTestFailure {
                                 $fixtureExitCode=$gatewayExitCode
                                 $failureKind='fixture-exit'
                             }
+                            if($gatewayQuotaCase -ceq 'quota' -and $fixtureCase -ceq 'gateway-quota' -and $null -ne $gatewayExitCode -and
+                                ($event.testID -is [int] -or $event.testID -is [long]) -and $event.error -is [string] -and
+                                (Test-OwnedReporterLine $event.stackTrace $gatewaySource $gatewayQuotaShape.producerLines) -and
+                                [regex]::Matches($gatewayPrimaryError,'GATEWAY_QUOTA_FIXTURE_FAILURE:').Count -eq 1) {
+                                $quotaPattern='\AExpected: <0>\r?\n[ \t]*Actual: <-?[0-9]{1,10}>\r?\nGATEWAY_QUOTA_FIXTURE_FAILURE:('+($gatewayQuotaPhases -join '|')+'):('+($gatewayQuotaCodes -join '|')+'|-)\nGATEWAY_QUOTA_PRIVATE_OUTPUT:\n'
+                                if($gatewayPrimaryError -cmatch $quotaPattern) {
+                                    $fixturePhase=$Matches[1]
+                                    $safeCode=if($Matches[2] -ceq '-'){$null}else{$Matches[2]}
+                                }
+                            }
                             if($clientMode -and $clientMode -cnotin @('cleanup2','cleanup3') -and $null -ne $fixtureExitCode -and
                                 ($event.testID -is [int] -or $event.testID -is [long]) -and
                                 $event.error -is [string] -and (Test-OwnedReporterLine $event.stackTrace $clientParent $clientShape.producerLines) -and
-                                [regex]::Matches($ownedPrimaryError,'TRUSTED_CLIENT_FIXTURE_FAILURE:').Count -eq 1) {
-                                $markerPattern='\AExpected: <0>\r?\n[ \t]*Actual: <-?[0-9]{1,10}>\r?\nTRUSTED_CLIENT_FIXTURE_FAILURE:('+($clientFailurePhases -join '|')+'):('+($clientFailureCodes -join '|')+'|-)\n'
+                                [regex]::Matches($ownedPrimaryError,'TRUSTED_CLIENT_FIXTURE_FAILURE:').Count -eq 1 -and
+                                [regex]::Matches($ownedPrimaryError,'TRUSTED_CLIENT_PRIVATE_OUTPUT:').Count -eq 1) {
+                                $markerPattern='\AExpected: <0>\r?\n[ \t]*Actual: <-?[0-9]{1,10}>\r?\nTRUSTED_CLIENT_FIXTURE_FAILURE:('+($clientFailurePhases -join '|')+'):('+($clientFailureCodes -join '|')+'|-)\nTRUSTED_CLIENT_PRIVATE_OUTPUT:\n'
                                 if($ownedPrimaryError -cmatch $markerPattern) {
                                     $fixturePhase=$Matches[1]
                                     $safeCode=if($Matches[2] -ceq '-'){$null}else{$Matches[2]}
@@ -785,7 +840,8 @@ function Write-NativeQualificationTestFailure {
                                         $oldCleanup=$frame.file -ceq 'packages/serverdeck_windows/test/mcp_build_bundle_test.dart'
                                         $ownedCleanup=$frame.file -ceq 'packages/serverdeck_windows/test/support/owned_fixture_cleanup.dart'
                                         if(-not $oldCleanup -and -not $ownedCleanup){continue}
-                                        $cleanupLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $frame.file))
+                                        $cleanupLines=Get-CurrentDiagnosticLines $frame.file
+                                        if(-not $cleanupLines){continue}
                                         $index=[int]$frame.line-1
                                         $checkedOldDelete=$oldCleanup -and $index -gt 0 -and
                                             $cleanupLines[$index].Trim() -ceq 'root.deleteSync(recursive: true);' -and

@@ -97,7 +97,7 @@ void main() {
               childExit,
               0,
               reason:
-                  '${record == null ? '' : '${record.reasonMarker}\n'}${await out}\n${await err}',
+                  '${record == null ? '' : '${record.reasonMarker}\n'}TRUSTED_CLIENT_PRIVATE_OUTPUT:\n${await out}\n${await err}',
             );
             expect(await out, contains('PASS:$mode'));
             expect(await err, isEmpty);

@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 
 import '../../../serverdeck_windows/test/mcp_build_bundle_test.dart' as b;
 import '../support/gateway_fixture_cleanup.dart';
+import '../support/gateway_quota_fixture.dart';
 import '../support/native_artifact.dart';
 
 void main() {
@@ -89,7 +90,8 @@ void main() {
                 },
               ),
               0,
-              reason: '${await output}\n${await errors}',
+              reason:
+                  '${mode == 'quota' ? gatewayQuotaReasonPrefix(fixture.path) : ''}${await output}\n${await errors}',
             );
             expect((await output).trim().endsWith('PASS:$mode'), true);
           },

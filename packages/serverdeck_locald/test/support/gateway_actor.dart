@@ -30,9 +30,13 @@ import '../../../serverdeck_mcp/lib/src/local_gateway.dart';
 import '../../../serverdeck_mcp/lib/src/server.dart';
 import '../../../serverdeck_mcp/lib/src/stdio.dart';
 import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
+import 'gateway_quota_fixture.dart';
 import 'operational_auth_actor.dart' as n;
 import 'operational_grant_actor.dart' as g;
 import 'operational_channel_actor.dart' as wire;
+
+String? gatewayQuotaMcpCode(Object error) =>
+    error is McpGatewayFailure ? error.code.wireName : null;
 
 bool pending(String mode) => const {
   'pending',
@@ -362,150 +366,188 @@ final class QueuedPublicationPause implements McpGateway {
 Future<void> bridge(List<String> args) async {
   final root = args[2], mode = args[3];
   n.ownRoot(root);
-  final pipe = await PipeWorker.openOperationalClient(
-    args[1],
-    currentUserSid(),
-    root,
-  );
+  final quota = mode == 'quota'
+      ? GatewayQuotaLifecycle(
+          GatewayQuotaFailureRecorder(
+            root,
+            GatewayQuotaFailureRole.bridge,
+            gatewayCodeOf: gatewayQuotaMcpCode,
+          ),
+          'bridge-bootstrap',
+        )
+      : null;
   try {
-    final session = await OperationalBootstrapClient(
-      pipe: pipe,
-      generation: n.generation,
-      token: n.token,
-    ).authenticate();
-    if (mode == 'owner-deny' || mode == 'missing-grant') {
-      try {
-        await LocalMcpGateway.connect(session);
-        throw StateError('EXPECTED_DENIAL');
-      } on McpGatewayFailure catch (e) {
-        n.check(e.code == ErrorCode.forbidden);
-      }
-      if (mode == 'owner-deny') {
-        final client = OperationalApiClient(session);
-        n.check((await client.call('session.ping', {}))['leaseSeconds'] == 60);
-        await client.close();
-        stdout.writeln('FACTORY_DENIED_SAFE');
-        return;
-      }
-    }
-    await session.openGrant(g.files(root), g.grantId);
-    final gateway = await LocalMcpGateway.connect(session);
-    if (mode == 'queued-cancel') {
-      await Future<void>.delayed(const Duration(seconds: 19));
-      await until(() => File(p.join(root, 'heartbeat.waiting')).existsSync());
-      Map<String, Object?> params(String name) => {
-        'name': 'serverdeck_profiles_create',
-        'arguments': {
-          'requestId': g.requestId,
-          'name': name,
-          'body':
-              ((wire.validationCall()['request'] as Map)['arguments']
-                  as Map)['body'],
-        },
-      };
-      final admitted = [
-        for (var i = 0; i < 15; i++)
-          gateway.start('tools/call', params('admitted')),
-      ];
-      for (final call in admitted) {
-        call.result.ignore();
-      }
-      final queued = gateway.start('tools/call', params('NEVER_ADMIT'));
-      queued.result.ignore();
-      await queued.cancelInterest();
-      stdout.writeln('QUEUED_CANCELLED');
-      await stdin.drain<void>();
-      await gateway.close();
-      return;
-    }
-    if (mode == 'heartbeat' || mode == 'heartbeat-remote-limit') {
-      stdout.writeln('CONNECTED');
-      await Future<void>.delayed(const Duration(seconds: 22));
-      if (mode == 'heartbeat-remote-limit') {
-        try {
-          final unexpected = gateway.start('tools/list', {});
-          unexpected.result.ignore();
-          throw StateError('EXPECTED_HEARTBEAT_RETIREMENT');
-        } on McpGatewayFailure catch (error) {
-          n.check(error.code == ErrorCode.serviceUnavailable);
+    final pipe = await PipeWorker.openOperationalClient(
+      args[1],
+      currentUserSid(),
+      root,
+    );
+    await g.runScenarioFixtureLifecycle(
+      body: () async {
+        final session = await OperationalBootstrapClient(
+          pipe: pipe,
+          generation: n.generation,
+          token: n.token,
+        ).authenticate();
+        if (mode == 'owner-deny' || mode == 'missing-grant') {
+          try {
+            await LocalMcpGateway.connect(session);
+            throw StateError('EXPECTED_DENIAL');
+          } on McpGatewayFailure catch (e) {
+            n.check(e.code == ErrorCode.forbidden);
+          }
+          if (mode == 'owner-deny') {
+            final client = OperationalApiClient(session);
+            n.check(
+              (await client.call('session.ping', {}))['leaseSeconds'] == 60,
+            );
+            await client.close();
+            stdout.writeln('FACTORY_DENIED_SAFE');
+            return;
+          }
         }
-      }
-      stdout.writeln('HEARTBEAT');
-      await stdin.drain<void>();
-      await gateway.close();
-      return;
-    }
-    if (mode == 'quota') {
-      final calls = [
-        for (var i = 0; i < 16; i++)
-          gateway.start('tools/call', {
-            'name': 'serverdeck_profiles_validate',
-            'arguments': (wire.validationCall()['request'] as Map)['arguments'],
-          }),
-      ];
-      for (final call in calls) {
-        call.result.ignore();
-      }
-      final denied = await gateway.start('tools/call', {
-        'name': 'serverdeck_profiles_list',
-      }).result;
-      n.check(
-        (((denied['structuredContent'] as Map)['error'] as Map)['code']) ==
-            'RESOURCE_LIMIT',
-      );
-      try {
-        gateway.start('tools/list', {});
-        throw StateError('EXPECTED_LIMIT');
-      } on McpGatewayFailure catch (error) {
-        n.check(error.code == ErrorCode.resourceLimit);
-      }
-      stdout.writeln('ADMITTED16');
-      // Let all original acknowledgements return before cancel requests compete
-      // for native slots. No service result needs to complete.
-      final commands = StreamIterator(stdin);
-      try {
-        n.check(await commands.moveNext());
-        final cancels = [for (final call in calls) call.cancelInterest()];
-        for (var i = 0; i < calls.length; i++)
-          n.check(identical(cancels[i], calls[i].cancelInterest()));
-        await Future.wait(cancels);
-        stdout.writeln('CANCELLED16');
-        while (await commands.moveNext()) {}
-      } finally {
-        await commands.cancel();
-      }
-      await gateway.close();
-      return;
-    }
-    final output = stdout.nonBlocking;
-    final queuedPublication =
-        mode == 'stdout-revoke' || mode.startsWith('stdout-target-');
-    final code = !mode.startsWith('publish-') && !queuedPublication
-        ? await serveMcpStdio(gateway)
-        : await McpServer(
-            input: stdin,
-            write: (bytes) async {
-              output.add(bytes);
-              await output.flush();
+        await session.openGrant(g.files(root), g.grantId);
+        final gateway = await LocalMcpGateway.connect(session);
+        if (mode == 'queued-cancel') {
+          await Future<void>.delayed(const Duration(seconds: 19));
+          await until(
+            () => File(p.join(root, 'heartbeat.waiting')).existsSync(),
+          );
+          Map<String, Object?> params(String name) => {
+            'name': 'serverdeck_profiles_create',
+            'arguments': {
+              'requestId': g.requestId,
+              'name': name,
+              'body':
+                  ((wire.validationCall()['request'] as Map)['arguments']
+                      as Map)['body'],
             },
-            gateway: queuedPublication
-                ? QueuedPublicationPause(
-                    gateway,
-                    root,
-                    requireTarget: mode.startsWith('stdout-target-'),
-                  )
-                : mode.startsWith('publish-')
-                ? PublicationPause(gateway, root)
-                : gateway,
-            diagnostic: (value) => stderr.writeln('MCP:$value'),
-          ).run();
-    if (code != 0)
-      exit(
-        code,
-      ); // Actual owned process teardown, never force-unlock a live flush.
-    await gateway.close();
-  } finally {
-    await pipe.close();
+          };
+          final admitted = [
+            for (var i = 0; i < 15; i++)
+              gateway.start('tools/call', params('admitted')),
+          ];
+          for (final call in admitted) {
+            call.result.ignore();
+          }
+          final queued = gateway.start('tools/call', params('NEVER_ADMIT'));
+          queued.result.ignore();
+          await queued.cancelInterest();
+          stdout.writeln('QUEUED_CANCELLED');
+          await stdin.drain<void>();
+          await gateway.close();
+          return;
+        }
+        if (mode == 'heartbeat' || mode == 'heartbeat-remote-limit') {
+          stdout.writeln('CONNECTED');
+          await Future<void>.delayed(const Duration(seconds: 22));
+          if (mode == 'heartbeat-remote-limit') {
+            try {
+              final unexpected = gateway.start('tools/list', {});
+              unexpected.result.ignore();
+              throw StateError('EXPECTED_HEARTBEAT_RETIREMENT');
+            } on McpGatewayFailure catch (error) {
+              n.check(error.code == ErrorCode.serviceUnavailable);
+            }
+          }
+          stdout.writeln('HEARTBEAT');
+          await stdin.drain<void>();
+          await gateway.close();
+          return;
+        }
+        if (mode == 'quota') {
+          quota!.phase = 'bridge-admission';
+          final calls = [
+            for (var i = 0; i < 16; i++)
+              gateway.start('tools/call', {
+                'name': 'serverdeck_profiles_validate',
+                'arguments':
+                    (wire.validationCall()['request'] as Map)['arguments'],
+              }),
+          ];
+          for (final call in calls) {
+            call.result.ignore();
+          }
+          final denied = await gateway.start('tools/call', {
+            'name': 'serverdeck_profiles_list',
+          }).result;
+          n.check(
+            (((denied['structuredContent'] as Map)['error'] as Map)['code']) ==
+                'RESOURCE_LIMIT',
+          );
+          try {
+            gateway.start('tools/list', {});
+            throw StateError('EXPECTED_LIMIT');
+          } on McpGatewayFailure catch (error) {
+            n.check(error.code == ErrorCode.resourceLimit);
+          }
+          stdout.writeln('ADMITTED16');
+          // Let all original acknowledgements return before cancel requests compete
+          // for native slots. No service result needs to complete.
+          final commands = StreamIterator(stdin);
+          quota.phase = 'bridge-cancellation';
+          await quota.run(
+            body: () async {
+              n.check(await commands.moveNext());
+              final cancels = [for (final call in calls) call.cancelInterest()];
+              for (var i = 0; i < calls.length; i++)
+                n.check(identical(cancels[i], calls[i].cancelInterest()));
+              await Future.wait(cancels);
+              stdout.writeln('CANCELLED16');
+              quota.phase = 'bridge-completion';
+              while (await commands.moveNext()) {}
+            },
+            cleanup: () async {
+              await commands.cancel();
+            },
+            cleanupPhase: 'bridge-cleanup',
+          );
+          quota.phase = 'bridge-completion';
+          await gateway.close();
+          return;
+        }
+        final output = stdout.nonBlocking;
+        final queuedPublication =
+            mode == 'stdout-revoke' || mode.startsWith('stdout-target-');
+        final code = !mode.startsWith('publish-') && !queuedPublication
+            ? await serveMcpStdio(gateway)
+            : await McpServer(
+                input: stdin,
+                write: (bytes) async {
+                  output.add(bytes);
+                  await output.flush();
+                },
+                gateway: queuedPublication
+                    ? QueuedPublicationPause(
+                        gateway,
+                        root,
+                        requireTarget: mode.startsWith('stdout-target-'),
+                      )
+                    : mode.startsWith('publish-')
+                    ? PublicationPause(gateway, root)
+                    : gateway,
+                diagnostic: (value) => stderr.writeln('MCP:$value'),
+              ).run();
+        if (code != 0)
+          exit(
+            code,
+          ); // Actual owned process teardown, never force-unlock a live flush.
+        await gateway.close();
+      },
+      cleanup: () async {
+        await pipe.close();
+      },
+      lifecycle: quota == null
+          ? null
+          : ({required body, required cleanup}) => quota.run(
+              body: body,
+              cleanup: cleanup,
+              cleanupPhase: 'bridge-cleanup',
+            ),
+    );
+  } catch (error, stack) {
+    quota?.observe(error, stack);
+    rethrow;
   }
 }
 
@@ -572,6 +614,7 @@ final class Wire {
 }
 
 Future<void> main(List<String> args) async {
+  GatewayQuotaLifecycle? quota;
   try {
     containCurrentFixtureTree();
     if (args.first == 'bridge') {
@@ -583,13 +626,46 @@ Future<void> main(List<String> args) async {
       return;
     }
     final mode = args[1];
+    if (mode == 'quota') {
+      n.ownRoot(args[0]);
+      quota = GatewayQuotaLifecycle(
+        GatewayQuotaFailureRecorder(
+          args[0],
+          GatewayQuotaFailureRole.server,
+          gatewayCodeOf: gatewayQuotaMcpCode,
+        ),
+        'scenario-prepare',
+      );
+    }
     await g.scenario(
       args[0],
       'gateway-$mode',
+      lifecycle: quota == null
+          ? null
+          : ({required body, required cleanup}) => quota!.run(
+              body: body,
+              cleanup: cleanup,
+              cleanupPhase: 'scenario-cleanup',
+            ),
       initialWallOffset: mode == 'publish-expiry'
           ? const Duration(seconds: -280)
           : Duration.zero,
       readyRun: (root, store, authority, registry, write, advance) async {
+        if (quota != null) quota.phase = 'server-prepare';
+        Future<void> fixtureLifecycle({
+          required Future<void> Function() body,
+          required Future<void> Function() cleanup,
+        }) => g.runScenarioFixtureLifecycle(
+          body: body,
+          cleanup: cleanup,
+          lifecycle: quota == null
+              ? null
+              : ({required body, required cleanup}) => quota!.run(
+                  body: body,
+                  cleanup: cleanup,
+                  cleanupPhase: 'server-cleanup',
+                ),
+        );
         DateTime? expires;
         if (mode == 'publish-expiry') {
           // Real UTC expiry in20s; server authority's fixture clock remains
@@ -708,634 +784,691 @@ Future<void> main(List<String> args) async {
         OperationalPublicationGate? ownerGate;
         OperationalPublicationLease? held;
         Wire? transport;
-        try {
-          final accepting = worker.accept();
-          child = await Process.start(
-            p.join(root, mode == 'owner-deny' ? 'serverdeck.exe' : 'mcp.exe'),
-            ['bridge', name, root, mode],
-          );
-          final client = transport = Wire(child);
-          await accepting;
-          final peer = await worker.verifyOperationalPeer();
-          registry = nativeRegistry =
-              await OperationalSessions.withNativePublicationGate(
-                generation: n.generation,
-                peer: peer,
-              );
-          router = McpRouter(
-            sessions: registry,
-            authority: authority,
-            services: services,
-          );
-          routerReady = true;
-          ownerGate = await peer.publicationGate(n.generation);
-          final handshake = OperationalServerHandshake(
-            peer: peer,
-            token: n.token,
-            channel: name,
-            sessions: registry,
-          );
-          Future<void> serving;
-          if (controlled(mode)) {
-            serving = control.serve(handshake, authority);
-          } else {
-            channel = OperationalServerChannel(
-              handshake: handshake,
-              server: OperationalApiServer(
-                sessions: registry,
-                authority: authority,
-                router: router,
-                readiness: () => OperationalReadiness(
-                  state: ReadinessState.ready,
+        await fixtureLifecycle(
+          body: () async {
+            if (quota != null) quota.phase = 'server-bootstrap';
+            final accepting = worker.accept();
+            child = await Process.start(
+              p.join(root, mode == 'owner-deny' ? 'serverdeck.exe' : 'mcp.exe'),
+              ['bridge', name, root, mode],
+            );
+            final client = transport = Wire(child!);
+            await accepting;
+            final peer = await worker.verifyOperationalPeer();
+            registry = nativeRegistry =
+                await OperationalSessions.withNativePublicationGate(
                   generation: n.generation,
-                  workspaceId: g.workspaceId,
-                ),
-              ),
+                  peer: peer,
+                );
+            router = McpRouter(
+              sessions: registry,
+              authority: authority,
+              services: services,
             );
-            serving = channel.run();
-          }
-          serving.ignore();
-          if (mode == 'queued-cancel') {
-            n.check(
-              await client.lines.moveNext() &&
-                  client.lines.current == 'QUEUED_CANCELLED',
+            routerReady = true;
+            ownerGate = await peer.publicationGate(n.generation);
+            final handshake = OperationalServerHandshake(
+              peer: peer,
+              token: n.token,
+              channel: name,
+              sessions: registry,
             );
-            File(p.join(root, 'heartbeat.release'))
-                .writeAsStringSync('release');
-            await until(() => control.starts == 15);
-            n.check(control.starts == 15 && control.cancels == 0);
-          } else if (mode == 'heartbeat' || mode == 'heartbeat-remote-limit') {
-            n.check(
-              await client.lines.moveNext() &&
-                  client.lines.current == 'CONNECTED',
-            );
-            final expiry = registry.nextExpiry!;
-            n.check(
-              await client.lines.moveNext().timeout(
-                    const Duration(seconds: 27),
-                  ) &&
-                  client.lines.current == 'HEARTBEAT',
-            );
-            if (mode == 'heartbeat-remote-limit') {
-              await until(() => registry.mcpCount == 0);
-              n.check(control.pings == 1 && control.starts == 0);
-            } else {
-              n.check(
-                registry.nextExpiry! >= expiry + const Duration(seconds: 19),
-              );
-            }
-          } else if (mode == 'quota') {
-            n.check(
-              await client.lines.moveNext() &&
-                  client.lines.current == 'ADMITTED16',
-            );
-            await until(() => services.calls == 16);
-            n.check(router.chargedOperations == 16);
-            child.stdin.writeln('cancel');
-            n.check(
-              await client.lines.moveNext() &&
-                  client.lines.current == 'CANCELLED16',
-            );
-            n.check(
-              services.calls == 16 &&
-                  services.cancels == 16 &&
-                  router.chargedOperations == 16,
-            );
-            for (var i = 0; i < 16; i++) services.finish(i);
-          } else if (mode == 'owner-deny') {
-            n.check(
-              await client.lines.moveNext() &&
-                  client.lines.current == 'FACTORY_DENIED_SAFE',
-            );
-          } else {
-            await client.initialize();
+            Future<void> serving;
             if (controlled(mode)) {
-              if (mode == 'wrong-catalog') {
-                client.send('tools/list', 'bad');
+              serving = control.serve(handshake, authority);
+            } else {
+              channel = OperationalServerChannel(
+                handshake: handshake,
+                server: OperationalApiServer(
+                  sessions: registry,
+                  authority: authority,
+                  router: router,
+                  readiness: () => OperationalReadiness(
+                    state: ReadinessState.ready,
+                    generation: n.generation,
+                    workspaceId: g.workspaceId,
+                  ),
+                ),
+              );
+              serving = channel!.run();
+            }
+            serving.ignore();
+            if (mode == 'queued-cancel') {
+              n.check(
+                await client.lines.moveNext() &&
+                    client.lines.current == 'QUEUED_CANCELLED',
+              );
+              File(p.join(root, 'heartbeat.release'))
+                  .writeAsStringSync('release');
+              await until(() => control.starts == 15);
+              n.check(control.starts == 15 && control.cancels == 0);
+            } else if (mode == 'heartbeat' ||
+                mode == 'heartbeat-remote-limit') {
+              n.check(
+                await client.lines.moveNext() &&
+                    client.lines.current == 'CONNECTED',
+              );
+              final expiry = registry.nextExpiry!;
+              n.check(
+                await client.lines.moveNext().timeout(
+                      const Duration(seconds: 27),
+                    ) &&
+                    client.lines.current == 'HEARTBEAT',
+              );
+              if (mode == 'heartbeat-remote-limit') {
+                await until(() => registry.mcpCount == 0);
+                n.check(control.pings == 1 && control.starts == 0);
+              } else {
+                n.check(
+                  registry.nextExpiry! >= expiry + const Duration(seconds: 19),
+                );
+              }
+            } else if (mode == 'quota') {
+              quota!.phase = 'server-admitted16';
+              final admitted = await client.lines.moveNext();
+              checkGatewayQuotaBridgeBoundary(
+                root,
+                causal: !admitted,
+                check: () {
+                  n.check(admitted && client.lines.current == 'ADMITTED16');
+                },
+              );
+              quota!.phase = 'server-quota-oracle';
+              await until(() => services.calls == 16);
+              n.check(router.chargedOperations == 16);
+              quota!.phase = 'server-cancelled16';
+              child!.stdin.writeln('cancel');
+              final cancelled = await client.lines.moveNext();
+              checkGatewayQuotaBridgeBoundary(
+                root,
+                causal: !cancelled,
+                check: () {
+                  n.check(cancelled && client.lines.current == 'CANCELLED16');
+                },
+              );
+              quota!.phase = 'server-cancel-oracle';
+              n.check(
+                services.calls == 16 &&
+                    services.cancels == 16 &&
+                    router.chargedOperations == 16,
+              );
+              for (var i = 0; i < 16; i++) services.finish(i);
+            } else if (mode == 'owner-deny') {
+              n.check(
+                await client.lines.moveNext() &&
+                    client.lines.current == 'FACTORY_DENIED_SAFE',
+              );
+            } else {
+              await client.initialize();
+              if (controlled(mode)) {
+                if (mode == 'wrong-catalog') {
+                  client.send('tools/list', 'bad');
+                  final reply = await client.next();
+                  n.check(
+                    ((reply['error'] as Map)['message']) == 'INTERNAL' &&
+                        !jsonEncode(reply).contains('NEVER_PUBLISH'),
+                  );
+                } else if (mode == 'wrong-cancel' || mode == 'cancel-timeout') {
+                  client.call('cancel');
+                  await until(() => control.starts == 1);
+                  final watch = Stopwatch()..start();
+                  client.send('notifications/cancelled', null, {
+                    'requestId': 'cancel',
+                  });
+                  client.send('ping', 'alive');
+                  n.check(
+                    (await client.next())['id'] == 'alive' &&
+                        control.cancels == 1,
+                  );
+                  if (mode == 'cancel-timeout')
+                    n.check(
+                      watch.elapsed >= const Duration(milliseconds: 4500) &&
+                          watch.elapsed < const Duration(seconds: 8),
+                    );
+                  client.send('tools/list', 'closed');
+                  final denied = await client.next();
+                  n.check(
+                    (denied['error'] as Map)['message'] ==
+                        'SERVICE_UNAVAILABLE',
+                  );
+                } else {
+                  final watch = Stopwatch()..start();
+                  client.call('fault');
+                  final reply = await client.next();
+                  final error =
+                      (((reply['result'] as Map)['structuredContent']
+                              as Map)['error']
+                          as Map);
+                  n.check(
+                    error['code'] ==
+                        (mode == 'wrong-poll' ? 'INTERNAL' : 'TIMEOUT'),
+                  );
+                  n.check(control.starts == 1);
+                  if (mode == 'rpc-timeout')
+                    n.check(
+                      watch.elapsed >= const Duration(milliseconds: 4500) &&
+                          watch.elapsed < const Duration(seconds: 8),
+                    );
+                  if (mode == 'overall') {
+                    n.check(
+                      watch.elapsed >= const Duration(milliseconds: 34500) &&
+                          watch.elapsed < const Duration(seconds: 40),
+                    );
+                    await until(
+                      () => control.cancels == 1 || registry.mcpCount == 0,
+                    );
+                    n.check(control.polls >= 20 && control.pings >= 1);
+                    n.check(control.cancels <= 1);
+                  }
+                  if (mode == 'rpc-remote') {
+                    n.check(error['retry'] == 'retry-same-request');
+                    client.call('second');
+                    final next = await client.next();
+                    n.check(
+                      (next['result'] as Map)['isError'] == false &&
+                          control.starts == 2,
+                    );
+                  }
+                }
+              } else if (mode == 'basic' || mode == 'missing-grant') {
+                client.send('tools/list', 'catalog', {
+                  '_meta': {'progressToken': 'e\u0301😀'},
+                });
+                final catalog = await client.next();
+                n.check(
+                  catalog['id'] == 'catalog' &&
+                      ((catalog['result'] as Map)['tools'] as List).length == 7,
+                );
+                client.send('tools/call', 'defaults', {
+                  'name': 'serverdeck_profiles_list',
+                });
+                n.check(
+                  ((await client.next())['result'] as Map)['isError'] == false,
+                );
+                n.check(services.inputs.single.isEmpty);
+                client.call('e\u0301😀');
+                final value = await client.next();
+                final observed =
+                    ((value['result'] as Map)['structuredContent']
+                            as Map)['data']
+                        as Map;
+                n.check(
+                  observed['text'] == 'e\u0301😀' &&
+                      observed['counter'] == 9223372036854775807,
+                );
+                n.check(
+                  value['id'] == 'e\u0301😀' &&
+                      ((value['result'] as Map)['structuredContent']
+                              as Map)['ok'] ==
+                          true,
+                );
+                n.check(
+                  services.inputs.last['requestId'] == g.requestId &&
+                      services.inputs.last['name'] == 'e\u0301😀',
+                );
+                n.check(!services.inputs.last.containsKey('_meta'));
+                client.send('tools/call', 'invalid', {
+                  'name': 'serverdeck_unknown',
+                  'arguments': <String, Object?>{},
+                });
+                n.check(
+                  ((await client.next())['error'] as Map)['code'] == -32602 &&
+                      services.calls == 2,
+                );
+              } else if (mode == 'pending') {
+                client.call('pending');
+                await until(() => services.calls == 1);
+                await Future<void>.delayed(const Duration(milliseconds: 600));
+                n.check(services.calls == 1 && router.retainedOperations == 1);
+                services.finish(0);
                 final reply = await client.next();
                 n.check(
-                  ((reply['error'] as Map)['message']) == 'INTERNAL' &&
-                      !jsonEncode(reply).contains('NEVER_PUBLISH'),
+                  reply['id'] == 'pending' &&
+                      (((reply['result'] as Map)['structuredContent']
+                                  as Map)['data']
+                              as Map)['ordinal'] ==
+                          1,
                 );
-              } else if (mode == 'wrong-cancel' || mode == 'cancel-timeout') {
-                client.call('cancel');
-                await until(() => control.starts == 1);
-                final watch = Stopwatch()..start();
+              } else if (mode == 'cancel-ack') {
+                client.call('same');
                 client.send('notifications/cancelled', null, {
-                  'requestId': 'cancel',
+                  'requestId': 'same',
                 });
+                await until(() => services.cancels == 1);
+                n.check(services.calls == 1 && router.chargedOperations == 1);
                 client.send('ping', 'alive');
+                n.check((await client.next())['id'] == 'alive');
+                services.finish(0);
+                // Router retains the cancelled handle receipt for its bounded
+                // retention window, even after actual service work settles.
+                await Future<void>.delayed(const Duration(milliseconds: 30));
+                n.check(router.retainedOperations == 1);
+                client.call('same');
+                await until(() => services.calls == 2);
+                services.finish(1);
+                final reply = await client.next();
                 n.check(
-                  (await client.next())['id'] == 'alive' &&
-                      control.cancels == 1,
+                  reply['id'] == 'same' &&
+                      (((reply['result'] as Map)['structuredContent']
+                                  as Map)['data']
+                              as Map)['ordinal'] ==
+                          2 &&
+                      services.cancels == 1,
                 );
-                if (mode == 'cancel-timeout')
-                  n.check(
-                    watch.elapsed >= const Duration(milliseconds: 4500) &&
-                        watch.elapsed < const Duration(seconds: 8),
-                  );
+              } else if (mode == 'native-loss' || mode == 'expiry') {
+                client.call('fault');
+                await until(() => services.calls == 1);
+                if (mode == 'native-loss') {
+                  await channel!.close();
+                } else {
+                  advance(const Duration(seconds: 300));
+                }
+                final reply = await client.next();
+                n.check(
+                  reply['id'] == 'fault' &&
+                      (reply['result'] as Map)['isError'] == true &&
+                      !jsonEncode(reply).contains('ordinal'),
+                );
+                services.finish(0);
                 client.send('tools/list', 'closed');
                 final denied = await client.next();
                 n.check(
-                  (denied['error'] as Map)['message'] == 'SERVICE_UNAVAILABLE',
+                  denied.containsKey('error') && !denied.containsKey('result'),
                 );
-              } else {
-                final watch = Stopwatch()..start();
-                client.call('fault');
+              } else if (mode == 'eof') {
+                client.call('abandoned');
+                await until(() => services.calls == 1);
+              } else if (mode == 'writer-cancel') {
+                held = await ownerGate!.acquire();
+                client.call('reuse');
+                await until(() => services.calls == 1);
+                await Future<void>.delayed(const Duration(milliseconds: 150));
+                client.send('notifications/cancelled', null, {
+                  'requestId': 'reuse',
+                });
+                client.call('reuse');
+                await until(() => services.calls == 2);
+                await held!.close();
+                held = null;
                 final reply = await client.next();
-                final error =
-                    (((reply['result'] as Map)['structuredContent']
-                            as Map)['error']
-                        as Map);
                 n.check(
-                  error['code'] ==
-                      (mode == 'wrong-poll' ? 'INTERNAL' : 'TIMEOUT'),
+                  reply['id'] == 'reuse' &&
+                      (((reply['result'] as Map)['structuredContent']
+                                  as Map)['data']
+                              as Map)['ordinal'] ==
+                          2,
                 );
-                n.check(control.starts == 1);
-                if (mode == 'rpc-timeout')
-                  n.check(
-                    watch.elapsed >= const Duration(milliseconds: 4500) &&
-                        watch.elapsed < const Duration(seconds: 8),
-                  );
-                if (mode == 'overall') {
-                  n.check(
-                    watch.elapsed >= const Duration(milliseconds: 34500) &&
-                        watch.elapsed < const Duration(seconds: 40),
-                  );
-                  await until(
-                    () => control.cancels == 1 || registry.mcpCount == 0,
-                  );
-                  n.check(control.polls >= 20 && control.pings >= 1);
-                  n.check(control.cancels <= 1);
+                n.check(services.cancels == 0);
+              } else if (mode.startsWith('publish-')) {
+                if (expires != null) {
+                  final left = expires
+                      .subtract(const Duration(seconds: 2))
+                      .difference(DateTime.now().toUtc());
+                  n.check(left > Duration.zero);
+                  await Future<void>.delayed(left);
                 }
-                if (mode == 'rpc-remote') {
-                  n.check(error['retry'] == 'retry-same-request');
-                  client.call('second');
-                  final next = await client.next();
-                  n.check(
-                    (next['result'] as Map)['isError'] == false &&
-                        control.starts == 2,
+                client.call('ordered');
+                await until(
+                  () => File(p.join(root, 'publication.checked')).existsSync(),
+                );
+                if (mode == 'publish-expiry') {
+                  final left = expires!
+                      .add(const Duration(milliseconds: 100))
+                      .difference(DateTime.now().toUtc());
+                  if (left > Duration.zero) await Future<void>.delayed(left);
+                } else {
+                  await gateDenied(
+                    ownerGate!.acquire(
+                      deadline: const Duration(milliseconds: 150),
+                    ),
+                    'TIMEOUT',
                   );
                 }
-              }
-            } else if (mode == 'basic' || mode == 'missing-grant') {
-              client.send('tools/list', 'catalog', {
-                '_meta': {'progressToken': 'e\u0301😀'},
-              });
-              final catalog = await client.next();
-              n.check(
-                catalog['id'] == 'catalog' &&
-                    ((catalog['result'] as Map)['tools'] as List).length == 7,
-              );
-              client.send('tools/call', 'defaults', {
-                'name': 'serverdeck_profiles_list',
-              });
-              n.check(
-                ((await client.next())['result'] as Map)['isError'] == false,
-              );
-              n.check(services.inputs.single.isEmpty);
-              client.call('e\u0301😀');
-              final value = await client.next();
-              final observed =
-                  ((value['result'] as Map)['structuredContent'] as Map)['data']
-                      as Map;
-              n.check(
-                observed['text'] == 'e\u0301😀' &&
-                    observed['counter'] == 9223372036854775807,
-              );
-              n.check(
-                value['id'] == 'e\u0301😀' &&
-                    ((value['result'] as Map)['structuredContent']
-                            as Map)['ok'] ==
-                        true,
-              );
-              n.check(
-                services.inputs.last['requestId'] == g.requestId &&
-                    services.inputs.last['name'] == 'e\u0301😀',
-              );
-              n.check(!services.inputs.last.containsKey('_meta'));
-              client.send('tools/call', 'invalid', {
-                'name': 'serverdeck_unknown',
-                'arguments': <String, Object?>{},
-              });
-              n.check(
-                ((await client.next())['error'] as Map)['code'] == -32602 &&
-                    services.calls == 2,
-              );
-            } else if (mode == 'pending') {
-              client.call('pending');
-              await until(() => services.calls == 1);
-              await Future<void>.delayed(const Duration(milliseconds: 600));
-              n.check(services.calls == 1 && router.retainedOperations == 1);
-              services.finish(0);
-              final reply = await client.next();
-              n.check(
-                reply['id'] == 'pending' &&
-                    (((reply['result'] as Map)['structuredContent']
-                                as Map)['data']
-                            as Map)['ordinal'] ==
-                        1,
-              );
-            } else if (mode == 'cancel-ack') {
-              client.call('same');
-              client.send('notifications/cancelled', null, {
-                'requestId': 'same',
-              });
-              await until(() => services.cancels == 1);
-              n.check(services.calls == 1 && router.chargedOperations == 1);
-              client.send('ping', 'alive');
-              n.check((await client.next())['id'] == 'alive');
-              services.finish(0);
-              // Router retains the cancelled handle receipt for its bounded
-              // retention window, even after actual service work settles.
-              await Future<void>.delayed(const Duration(milliseconds: 30));
-              n.check(router.retainedOperations == 1);
-              client.call('same');
-              await until(() => services.calls == 2);
-              services.finish(1);
-              final reply = await client.next();
-              n.check(
-                reply['id'] == 'same' &&
-                    (((reply['result'] as Map)['structuredContent']
-                                as Map)['data']
-                            as Map)['ordinal'] ==
-                        2 &&
-                    services.cancels == 1,
-              );
-            } else if (mode == 'native-loss' || mode == 'expiry') {
-              client.call('fault');
-              await until(() => services.calls == 1);
-              if (mode == 'native-loss') {
-                await channel!.close();
-              } else {
-                advance(const Duration(seconds: 300));
-              }
-              final reply = await client.next();
-              n.check(
-                reply['id'] == 'fault' &&
+                var changed = false;
+                final mutation = Future<void>(() async {
+                  if (mode != 'publish-order') return;
+                  await revokeThroughOwner();
+                  changed = true;
+                });
+                mutation.ignore();
+                if (mode == 'publish-order') {
+                  await until(() => mutationEntered);
+                  await Future<void>.delayed(const Duration(milliseconds: 50));
+                  n.check(!changed);
+                }
+                File(p.join(root, 'publication.release'))
+                    .writeAsStringSync('release');
+                final reply = await client.next();
+                await mutation;
+                if (mode == 'publish-expiry') {
+                  n.check(
                     (reply['result'] as Map)['isError'] == true &&
-                    !jsonEncode(reply).contains('ordinal'),
-              );
-              services.finish(0);
-              client.send('tools/list', 'closed');
-              final denied = await client.next();
-              n.check(
-                denied.containsKey('error') && !denied.containsKey('result'),
-              );
-            } else if (mode == 'eof') {
-              client.call('abandoned');
-              await until(() => services.calls == 1);
-            } else if (mode == 'writer-cancel') {
-              held = await ownerGate.acquire();
-              client.call('reuse');
-              await until(() => services.calls == 1);
-              await Future<void>.delayed(const Duration(milliseconds: 150));
-              client.send('notifications/cancelled', null, {
-                'requestId': 'reuse',
-              });
-              client.call('reuse');
-              await until(() => services.calls == 2);
-              await held.close();
-              held = null;
-              final reply = await client.next();
-              n.check(
-                reply['id'] == 'reuse' &&
-                    (((reply['result'] as Map)['structuredContent']
-                                as Map)['data']
-                            as Map)['ordinal'] ==
-                        2,
-              );
-              n.check(services.cancels == 0);
-            } else if (mode.startsWith('publish-')) {
-              if (expires != null) {
-                final left = expires
-                    .subtract(const Duration(seconds: 2))
-                    .difference(DateTime.now().toUtc());
-                n.check(left > Duration.zero);
-                await Future<void>.delayed(left);
-              }
-              client.call('ordered');
-              await until(
-                () => File(p.join(root, 'publication.checked')).existsSync(),
-              );
-              if (mode == 'publish-expiry') {
-                final left = expires!
-                    .add(const Duration(milliseconds: 100))
-                    .difference(DateTime.now().toUtc());
-                if (left > Duration.zero) await Future<void>.delayed(left);
-              } else {
+                        !jsonEncode(reply).contains('ordinal'),
+                  );
+                } else {
+                  n.check(
+                    changed && (reply['result'] as Map)['isError'] == false,
+                  );
+                  client.call('after');
+                  final denied = await client.next();
+                  n.check(
+                    (denied['result'] as Map)['isError'] == true &&
+                        services.calls == 1,
+                  );
+                }
+              } else if (mode == 'stdout-stop') {
+                File(p.join(root, 'gateway-fixture-phase'))
+                    .writeAsStringSync('call');
+                client.call('blocked');
+                await until(() => services.calls == 1);
+                await publicationHeld(root);
                 await gateDenied(
-                  ownerGate.acquire(
+                  ownerGate!.acquire(
                     deadline: const Duration(milliseconds: 150),
                   ),
                   'TIMEOUT',
                 );
-              }
-              var changed = false;
-              final mutation = Future<void>(() async {
-                if (mode != 'publish-order') return;
-                await revokeThroughOwner();
-                changed = true;
-              });
-              mutation.ignore();
-              if (mode == 'publish-order') {
-                await until(() => mutationEntered);
-                await Future<void>.delayed(const Duration(milliseconds: 50));
-                n.check(!changed);
-              }
-              File(p.join(root, 'publication.release'))
-                  .writeAsStringSync('release');
-              final reply = await client.next();
-              await mutation;
-              if (mode == 'publish-expiry') {
+                File(p.join(root, 'gateway-fixture-phase'))
+                    .writeAsStringSync('child-exit');
                 n.check(
-                  (reply['result'] as Map)['isError'] == true &&
+                  await child!.exitCode.timeout(const Duration(seconds: 13)) ==
+                      2,
+                );
+                File(p.join(root, 'gateway-fixture-phase'))
+                    .writeAsStringSync('abandon');
+                await gateDenied(ownerGate!.acquire(), 'SERVICE_UNAVAILABLE');
+                await until(() => ownerGate!.activeAcquisitions == 0);
+                File(p.join(root, 'gateway-fixture-phase'))
+                    .writeAsStringSync('gate-close');
+                await n.fails(ownerGate!.close(), 'SERVICE_UNAVAILABLE');
+              } else if (mode == 'stdout-revoke' || targetMode) {
+                final grantBefore = jsonEncode(
+                  store.operational.automation.grants[g.grantId]!.toJson(),
+                );
+                final storeRevisionBefore = store.state.storeRevision;
+                client.call('first', target: targetMode);
+                await until(() => services.calls == 1);
+                await publicationHeld(root);
+                client.call('stale', target: targetMode);
+                await until(() => services.calls == 2);
+                n.check(services.results.every((result) => result.isCompleted));
+                if (targetMode) {
+                  await until(
+                    () =>
+                        File(p.join(root, 'publication.result-ready'))
+                            .existsSync(),
+                  );
+                }
+                var changed = false;
+                final mutation = Future<void>(() async {
+                  if (targetMode) {
+                    await changeTargetThroughOwner();
+                  } else {
+                    await revokeThroughOwner();
+                  }
+                  changed = true;
+                });
+                mutation.ignore();
+                await until(() => mutationEntered);
+                await Future<void>.delayed(const Duration(milliseconds: 80));
+                n.check(!changed);
+                if (targetMode) {
+                  n.check(
+                    store.state.profiles[targetId]!.toJson()['address'] ==
+                            '127.0.0.1' &&
+                        store.state.storeRevision == storeRevisionBefore,
+                  );
+                }
+                final first = await client.next();
+                if (targetMode) {
+                  n.check(
+                    ((((first['result'] as Map)['structuredContent']
+                                as Map)['data']
+                            as Map)['address']) ==
+                        '127.0.0.1',
+                  );
+                }
+                n.check(
+                  first['id'] == 'first' &&
+                      (((first['result'] as Map)['structuredContent']
+                                      as Map)['data']
+                                  as Map)['large']
+                              .toString()
+                              .length ==
+                          1024 * 1024,
+                );
+                await mutation;
+                n.check(changed);
+                if (targetMode) {
+                  final failed = mode == 'stdout-target-failure';
+                  n.check(
+                    store.state.receipts.containsKey(
+                          '92345678-1234-4234-8234-123456789abc',
+                        ) ==
+                        !failed,
+                  );
+                  n.check(
+                    store.state.profiles[targetId]!.toJson()['address'] ==
+                        (failed ? '127.0.0.1' : '127.0.0.2'),
+                  );
+                  n.check(
+                    store.state.storeRevision ==
+                        (failed
+                            ? storeRevisionBefore
+                            : (BigInt.parse(storeRevisionBefore) + BigInt.one)
+                                  .toString()),
+                  );
+                  n.check(
+                    jsonEncode(
+                          store.operational.automation.grants[g.grantId]!
+                              .toJson(),
+                        ) ==
+                        grantBefore,
+                  );
+                  n.check(
+                    registry.mcpCount == 0 && !registry.targetChangesBlocked,
+                  );
+                }
+                await until(
+                  () => File(p.join(root, 'publication.queued')).existsSync(),
+                );
+                File(p.join(root, 'publication.mutated'))
+                    .writeAsStringSync('mutated');
+                final second = await client.next();
+                n.check(
+                  second['id'] == 'stale' &&
+                      (second['result'] as Map)['isError'] == true &&
+                      !jsonEncode(second).contains('ordinal') &&
+                      !jsonEncode(second).contains('127.0.0.1') &&
+                      !jsonEncode(second).contains('address') &&
+                      !jsonEncode(second).contains('large'),
+                );
+                if (targetMode) {
+                  client.call('retired', target: true);
+                  final retired = await client.next();
+                  n.check(
+                    retired['id'] == 'retired' &&
+                        (retired['result'] as Map)['isError'] == true &&
+                        services.calls == 2,
+                  );
+                  final fresh = await n.Pair.start(root, 'mcp.exe', registry);
+                  try {
+                    await fresh.exchange();
+                    n.check(await fresh.next() == 'AUTH:mcp');
+                    final open = await registry.begin(
+                      fresh.channel,
+                      fresh.response!.sessionId,
+                      'mcp.open',
+                    );
+                    try {
+                      await open.openGrant(
+                        authority,
+                        await g.signedParams(root, fresh),
+                      );
+                    } finally {
+                      open.complete();
+                    }
+                    n.check(registry.mcpCount == 1);
+                  } finally {
+                    await fresh.close();
+                  }
+                }
+              } else if (mode == 'revoke') {
+                held = await ownerGate!.acquire();
+                client.call('queued');
+                await until(() => services.calls == 1);
+                await Future<void>.delayed(const Duration(milliseconds: 300));
+                await write('grant.revoke');
+                await held!.close();
+                held = null;
+                final reply = await client.next();
+                n.check(
+                  reply['id'] == 'queued' &&
+                      (reply['result'] as Map)['isError'] == true &&
                       !jsonEncode(reply).contains('ordinal'),
                 );
               } else {
-                n.check(
-                  changed && (reply['result'] as Map)['isError'] == false,
-                );
-                client.call('after');
-                final denied = await client.next();
-                n.check(
-                  (denied['result'] as Map)['isError'] == true &&
-                      services.calls == 1,
-                );
+                throw StateError('UNKNOWN_MODE');
               }
-            } else if (mode == 'stdout-stop') {
+            }
+            if (mode == 'stdout-stop')
               File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('call');
-              client.call('blocked');
-              await until(() => services.calls == 1);
-              await publicationHeld(root);
-              await gateDenied(
-                ownerGate.acquire(deadline: const Duration(milliseconds: 150)),
-                'TIMEOUT',
-              );
-              File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('child-exit');
-              n.check(
-                await child.exitCode.timeout(const Duration(seconds: 13)) == 2,
-              );
-              File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('abandon');
-              await gateDenied(ownerGate.acquire(), 'SERVICE_UNAVAILABLE');
-              await until(() => ownerGate!.activeAcquisitions == 0);
-              File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('gate-close');
-              await n.fails(ownerGate.close(), 'SERVICE_UNAVAILABLE');
-            } else if (mode == 'stdout-revoke' || targetMode) {
-              final grantBefore = jsonEncode(
-                store.operational.automation.grants[g.grantId]!.toJson(),
-              );
-              final storeRevisionBefore = store.state.storeRevision;
-              client.call('first', target: targetMode);
-              await until(() => services.calls == 1);
-              await publicationHeld(root);
-              client.call('stale', target: targetMode);
-              await until(() => services.calls == 2);
-              n.check(services.results.every((result) => result.isCompleted));
-              if (targetMode) {
-                await until(
-                  () =>
-                      File(p.join(root, 'publication.result-ready'))
-                          .existsSync(),
-                );
-              }
-              var changed = false;
-              final mutation = Future<void>(() async {
-                if (targetMode) {
-                  await changeTargetThroughOwner();
-                } else {
-                  await revokeThroughOwner();
-                }
-                changed = true;
-              });
-              mutation.ignore();
-              await until(() => mutationEntered);
-              await Future<void>.delayed(const Duration(milliseconds: 80));
-              n.check(!changed);
-              if (targetMode) {
-                n.check(
-                  store.state.profiles[targetId]!.toJson()['address'] ==
-                          '127.0.0.1' &&
-                      store.state.storeRevision == storeRevisionBefore,
-                );
-              }
-              final first = await client.next();
-              if (targetMode) {
-                n.check(
-                  ((((first['result'] as Map)['structuredContent']
-                              as Map)['data']
-                          as Map)['address']) ==
-                      '127.0.0.1',
-                );
-              }
-              n.check(
-                first['id'] == 'first' &&
-                    (((first['result'] as Map)['structuredContent']
-                                    as Map)['data']
-                                as Map)['large']
-                            .toString()
-                            .length ==
-                        1024 * 1024,
-              );
-              await mutation;
-              n.check(changed);
-              if (targetMode) {
-                final failed = mode == 'stdout-target-failure';
-                n.check(
-                  store.state.receipts.containsKey(
-                        '92345678-1234-4234-8234-123456789abc',
-                      ) ==
-                      !failed,
-                );
-                n.check(
-                  store.state.profiles[targetId]!.toJson()['address'] ==
-                      (failed ? '127.0.0.1' : '127.0.0.2'),
-                );
-                n.check(
-                  store.state.storeRevision ==
-                      (failed
-                          ? storeRevisionBefore
-                          : (BigInt.parse(storeRevisionBefore) + BigInt.one)
-                                .toString()),
-                );
-                n.check(
-                  jsonEncode(
-                        store.operational.automation.grants[g.grantId]!
-                            .toJson(),
-                      ) ==
-                      grantBefore,
-                );
-                n.check(
-                  registry.mcpCount == 0 && !registry.targetChangesBlocked,
-                );
-              }
-              await until(
-                () => File(p.join(root, 'publication.queued')).existsSync(),
-              );
-              File(p.join(root, 'publication.mutated'))
-                  .writeAsStringSync('mutated');
-              final second = await client.next();
-              n.check(
-                second['id'] == 'stale' &&
-                    (second['result'] as Map)['isError'] == true &&
-                    !jsonEncode(second).contains('ordinal') &&
-                    !jsonEncode(second).contains('127.0.0.1') &&
-                    !jsonEncode(second).contains('address') &&
-                    !jsonEncode(second).contains('large'),
-              );
-              if (targetMode) {
-                client.call('retired', target: true);
-                final retired = await client.next();
-                n.check(
-                  retired['id'] == 'retired' &&
-                      (retired['result'] as Map)['isError'] == true &&
-                      services.calls == 2,
-                );
-                final fresh = await n.Pair.start(root, 'mcp.exe', registry);
-                try {
-                  await fresh.exchange();
-                  n.check(await fresh.next() == 'AUTH:mcp');
-                  final open = await registry.begin(
-                    fresh.channel,
-                    fresh.response!.sessionId,
-                    'mcp.open',
-                  );
-                  try {
-                    await open.openGrant(
-                      authority,
-                      await g.signedParams(root, fresh),
-                    );
-                  } finally {
-                    open.complete();
-                  }
-                  n.check(registry.mcpCount == 1);
-                } finally {
-                  await fresh.close();
-                }
-              }
-            } else if (mode == 'revoke') {
-              held = await ownerGate.acquire();
-              client.call('queued');
-              await until(() => services.calls == 1);
-              await Future<void>.delayed(const Duration(milliseconds: 300));
-              await write('grant.revoke');
-              await held.close();
-              held = null;
-              final reply = await client.next();
-              n.check(
-                reply['id'] == 'queued' &&
-                    (reply['result'] as Map)['isError'] == true &&
-                    !jsonEncode(reply).contains('ordinal'),
+                  .writeAsStringSync('finish-client');
+            if (quota != null) quota.phase = 'server-child-exit';
+            await n.finishClient(child!);
+            if (quota != null) {
+              final actualExit = await child!.exitCode;
+              checkGatewayQuotaBridgeBoundary(
+                root,
+                causal: actualExit != 0,
+                check: () {
+                  n.check(actualExit == (mode == 'stdout-stop' ? 2 : 0));
+                },
               );
             } else {
-              throw StateError('UNKNOWN_MODE');
+              n.check(await child!.exitCode == (mode == 'stdout-stop' ? 2 : 0));
             }
-          }
-          if (mode == 'stdout-stop')
-            File(p.join(root, 'gateway-fixture-phase'))
-                .writeAsStringSync('finish-client');
-          await n.finishClient(child);
-          n.check(await child.exitCode == (mode == 'stdout-stop' ? 2 : 0));
-          final diagnostics = await client.errors;
-          n.check(
-            diagnostics.isEmpty ||
-                (mode == 'stdout-stop' &&
-                    diagnostics.contains('MCP:WRITE_FAILED') &&
-                    diagnostics.contains('MCP:CLOSE_FAILED') &&
-                    diagnostics
-                        .trim()
-                        .split('\n')
-                        .every(
-                          (line) => const {
-                            'MCP:WRITE_FAILED',
-                            'MCP:CLOSE_FAILED',
-                            'MCP:CANCEL_FAILED',
-                          }.contains(line.trim()),
-                        )) ||
-                ((mode == 'wrong-cancel' ||
-                        mode == 'cancel-timeout' ||
-                        mode == 'overall') &&
-                    diagnostics.trim() == 'MCP:CANCEL_FAILED'),
-          );
-          if (mode == 'stdout-stop')
-            File(p.join(root, 'gateway-fixture-phase'))
-                .writeAsStringSync('serving');
-          await serving.timeout(const Duration(seconds: 12));
-          if (mode == 'eof')
-            n.check(services.cancels == 1 && services.calls == 1);
-        } finally {
-          await held?.close();
-          for (var i = 0; i < services.results.length; i++) {
-            services.finish(i);
-          }
-          try {
+            if (quota != null) quota.phase = 'server-stderr';
+            final diagnostics = await client.errors;
+            checkGatewayQuotaBridgeBoundary(
+              root,
+              causal: quota != null && diagnostics.isNotEmpty,
+              check: () {
+                n.check(
+                  diagnostics.isEmpty ||
+                      (mode == 'stdout-stop' &&
+                          diagnostics.contains('MCP:WRITE_FAILED') &&
+                          diagnostics.contains('MCP:CLOSE_FAILED') &&
+                          diagnostics
+                              .trim()
+                              .split('\n')
+                              .every(
+                                (line) => const {
+                                  'MCP:WRITE_FAILED',
+                                  'MCP:CLOSE_FAILED',
+                                  'MCP:CANCEL_FAILED',
+                                }.contains(line.trim()),
+                              )) ||
+                      ((mode == 'wrong-cancel' ||
+                              mode == 'cancel-timeout' ||
+                              mode == 'overall') &&
+                          diagnostics.trim() == 'MCP:CANCEL_FAILED'),
+                );
+              },
+            );
             if (mode == 'stdout-stop')
               File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('cleanup-channel');
-            if (channel != null) await channel.close();
-          } finally {
-            if (routerReady) router.close();
-            if (mode == 'stdout-stop')
-              File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('cleanup-child');
-            child?.kill();
-            if (child != null) await child.exitCode;
-            if (mode == 'stdout-stop')
-              File(p.join(root, 'gateway-fixture-phase'))
-                  .writeAsStringSync('cleanup-lines');
-            await transport?.lines.cancel();
-            await mutationOwner?.close();
-            await foundation?.close();
-            foundationKey?.close();
-            try {
-              try {
+                  .writeAsStringSync('serving');
+            if (quota != null) quota.phase = 'server-serving';
+            await serving.timeout(const Duration(seconds: 12));
+            if (mode == 'eof')
+              n.check(services.cancels == 1 && services.calls == 1);
+          },
+          cleanup: () async {
+            await held?.close();
+            for (var i = 0; i < services.results.length; i++) {
+              services.finish(i);
+            }
+            await fixtureLifecycle(
+              body: () async {
                 if (mode == 'stdout-stop')
                   File(p.join(root, 'gateway-fixture-phase'))
-                      .writeAsStringSync('cleanup-gate');
-                await ownerGate?.close();
-              } on StateError catch (error) {
-                if (mode != 'stdout-stop' ||
-                    error.message != 'SERVICE_UNAVAILABLE')
-                  rethrow;
-              }
-            } finally {
-              if (mode == 'stdout-stop')
-                File(p.join(root, 'gateway-fixture-phase'))
-                    .writeAsStringSync('cleanup-worker');
-              try {
-                try {
-                  await nativeRegistry?.close();
-                } on StateError catch (error) {
-                  if (mode != 'stdout-stop' ||
-                      error.message != 'SERVICE_UNAVAILABLE')
-                    rethrow;
-                }
-              } finally {
-                await worker.close();
-              }
-            }
-          }
-        }
+                      .writeAsStringSync('cleanup-channel');
+                if (channel != null) await channel!.close();
+              },
+              cleanup: () async {
+                if (routerReady) router.close();
+                if (mode == 'stdout-stop')
+                  File(p.join(root, 'gateway-fixture-phase'))
+                      .writeAsStringSync('cleanup-child');
+                child?.kill();
+                if (child != null) await child!.exitCode;
+                if (mode == 'stdout-stop')
+                  File(p.join(root, 'gateway-fixture-phase'))
+                      .writeAsStringSync('cleanup-lines');
+                await transport?.lines.cancel();
+                await mutationOwner?.close();
+                await foundation?.close();
+                foundationKey?.close();
+                await fixtureLifecycle(
+                  body: () async {
+                    try {
+                      if (mode == 'stdout-stop')
+                        File(p.join(root, 'gateway-fixture-phase'))
+                            .writeAsStringSync('cleanup-gate');
+                      await ownerGate?.close();
+                    } on StateError catch (error) {
+                      if (mode != 'stdout-stop' ||
+                          error.message != 'SERVICE_UNAVAILABLE')
+                        rethrow;
+                    }
+                  },
+                  cleanup: () async {
+                    if (mode == 'stdout-stop')
+                      File(p.join(root, 'gateway-fixture-phase'))
+                          .writeAsStringSync('cleanup-worker');
+                    await fixtureLifecycle(
+                      body: () async {
+                        try {
+                          await nativeRegistry?.close();
+                        } on StateError catch (error) {
+                          if (mode != 'stdout-stop' ||
+                              error.message != 'SERVICE_UNAVAILABLE')
+                            rethrow;
+                        }
+                      },
+                      cleanup: () async {
+                        await worker.close();
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
       },
     );
     stdout.writeln('PASS:$mode');
   } catch (error, stack) {
+    quota?.observe(error, stack);
     stderr.writeln('GATEWAY_FIXTURE_FAILED');
-    if (error is McpGatewayFailure) stderr.writeln(error.code.wireName);
-    if (error is StateError &&
-        const {
-          'TIMEOUT',
-          'UNAUTHORIZED',
-          'SERVICE_UNAVAILABLE',
-          'RESOURCE_LIMIT',
-          'FORBIDDEN',
-        }.contains(error.message))
-      stderr.writeln(error.message);
-    stderr.writeln(stack.toString().split('\n').take(8).join('\n'));
+    if (quota != null ||
+        (args.length > 3 && args[0] == 'bridge' && args[3] == 'quota')) {
+      stderr.writeln(formatGatewayQuotaFailure(error, stack));
+    } else {
+      if (error is McpGatewayFailure) stderr.writeln(error.code.wireName);
+      if (error is StateError &&
+          const {
+            'TIMEOUT',
+            'UNAUTHORIZED',
+            'SERVICE_UNAVAILABLE',
+            'RESOURCE_LIMIT',
+            'FORBIDDEN',
+          }.contains(error.message))
+        stderr.writeln(error.message);
+      stderr.writeln(stack.toString().split('\n').take(8).join('\n'));
+    }
     exitCode = 1;
   }
 }

@@ -132,6 +132,10 @@ function Test-TrustedClientFailureDiagnosticProjection {
                 if($event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
                     -not $event.error.Contains($baselineMarker+"`n"+$PrivateMarker+"`n#0 actor ("+$actorUri+':40:1)') -or
                     ($both -and -not $event.error.Contains($separator))) {throw 'Expected real owned numeric assertion and exact first reason marker/actor/aggregate.'}
+                # Adapt only this cloned T114 matrix. The shared real reporter
+                # baseline remains unchanged for T115; T117 has its own actual
+                # parent-expression/reader reporter below.
+                $event.error=$event.error.Replace($baselineMarker+"`n",$baselineMarker+"`nTRUSTED_CLIENT_PRIVATE_OUTPUT:`n")
                 $event.error=$event.error.Replace($baselineMarker,$marker)
                 $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
                 if($case.ContainsKey('legacy')){$event.error=$event.error.Replace($marker+"`n",'');$event.stackTrace=$PrivateMarker}
@@ -214,6 +218,7 @@ function Test-TrustedClientFailureDiagnosticProjection {
     $mutations=@(
         @('ParentLines','const Duration(seconds: 35)','const Duration(seconds: 36)'),
         @('ParentLines','final record = readTrustedClientFailure(fixture.path);','final record = null;'),
+        @('ParentLines','TRUSTED_CLIENT_PRIVATE_OUTPUT:','PRIVATE_OTHER_OUTPUT:'),
         @('ParentLines','cleanup: fixture.close,','cleanup: () async {},'),
         @('ActorLines','failures.record(phase, error)',"failures.record('prepare', error)"),
         @('ActorLines','await finishTrustedClientProcess();','finishTrustedClientProcess();'),
@@ -1022,6 +1027,710 @@ function Test-BootstrapDiagnosticProjection {
     }
     'QUALIFICATION_REAL_BOOTSTRAP_REPORTER_BODY_PREPARATION_17_FIXED_PHASES_SOURCE_HASH_DECLARATION_ID_BOUND_AND_PRIVACY_NEGATIVES_PASSED'
 }
+# Ignored T116 draft. Dot-source only after the existing controlled helpers.
+# This file contains no SDK/native/build/network invocation and changes no
+# canonical source. The caller supplies decoded, real package:test JSON lines.
+# Advisory draft only. Dot-source after the controlled projection helper.
+# Contains no SDK/native/build/network invocation. Does not modify/lock Dart.
+# Deliberately emits no qualification-group marker; integrate under existing T116.
+function Test-GatewayQuotaSourceIoDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawQuota,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $parent='packages/serverdeck_locald/test/mcp/gateway_native_test.dart'
+    $actor='packages/serverdeck_locald/test/support/gateway_actor.dart'
+    $quota='packages/serverdeck_locald/test/support/gateway_quota_fixture.dart'
+    $parentUri=([Uri](Join-Path $NativeIsarRepository $parent)).AbsoluteUri
+    $actorUri=([Uri](Join-Path $NativeIsarRepository $actor)).AbsoluteUri
+    $parentLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $parent))
+    $declarations=@(for($index=0;$index+1 -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq 'test(' -and $parentLines[$index+1].Trim() -ceq "'actual native MCP gateway `$mode',"){$index+1}
+    })
+    $producers=@(for($index=0;$index+1 -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq 'expect(' -and $parentLines[$index+1].Trim() -ceq 'await child.exitCode.timeout('){$index+1}
+    })
+    $starts=@($RawQuota|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' quota body')})
+    if($declarations.Count -ne 1 -or $producers.Count -ne 1 -or $starts.Count -ne 1){throw 'T116 source IO expected one actual body test/declaration/producer.'}
+    $target=$starts[0].test.id;$declaration=$declarations[0];$producer=$producers[0];$errorCount=0
+    $events=[string[]]@(foreach($raw in $RawQuota) {
+        if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+        if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+        $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+        if($event.type -ceq 'suite'){$event.suite.path=$parentUri}
+        if($event.type -ceq 'testStart') {
+            $event.test.name='actual native MCP gateway quota';$event.test.url=$parentUri;$event.test.line=$declaration
+        }
+        if($event.type -ceq 'error') {
+            $errorCount++
+            if($event.error -isnot [string] -or $event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                -not $event.error.Contains("GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:SERVICE_UNAVAILABLE`nGATEWAY_QUOTA_PRIVATE_OUTPUT:`n") -or
+                -not $event.error.Contains($PrivateMarker) -or -not $event.error.Contains("#0 actor (${actorUri}:40:1)")) {
+                throw 'T116 source IO expected actual numeric assertion, marker/boundary and primary actor.'
+            }
+            # Adapt only metadata/reporter frame, as in the existing T116 matrix.
+            $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+        }
+        $event|ConvertTo-Json -Depth 30 -Compress
+    })
+    if($errorCount -ne 1){throw 'T116 source IO expected exactly one actual reporter assertion.'}
+
+    # Local function scope shadows only the single requested path. Every other
+    # digest call still executes the actual production digest ScriptBlock. A
+    # fresh projection is used for each fault and recovery; no source is edited.
+    $originalDigest=(Get-Item Function:\Get-NativeIsarDigest).ScriptBlock
+    $ioFault=@{path=$null;kind=$null;hits=0}
+    function Get-NativeIsarDigest {
+        param([Parameter(Mandatory)][string]$Path)
+        if($null -ne $ioFault.path -and [IO.Path]::GetFullPath($Path) -ceq $ioFault.path) {
+            $ioFault.hits++
+            if($ioFault.kind -ceq 'io'){throw [IO.IOException]::new($PrivateMarker+' source IO')}
+            if($ioFault.kind -ceq 'access'){throw [UnauthorizedAccessException]::new($PrivateMarker+' source access')}
+            throw 'T116 source IO fault mode mismatch.'
+        }
+        & $originalDigest -Path $Path
+    }
+    function Assert-QuotaIoBaseline($Failure,[string]$Label) {
+        if($Failure.fixtureCase -cne 'gateway-quota' -or $Failure.failureKind -cne 'fixture-exit' -or
+            $Failure.fixtureExitCode -ne 1 -or $Failure.fixturePhase -cne 'scenario-prepare' -or
+            $Failure.safeCode -cne 'SERVICE_UNAVAILABLE' -or $Failure.declarationLine -ne $declaration -or
+            @($Failure.sourceFrames|Where-Object {$_.file -ceq $actor -and $_.line -eq 40}).Count -ne 1) {
+            throw ('T116 source IO baseline/recovery mismatch: '+$Label)
+        }
+    }
+    $baseline=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label 'T116 source IO baseline'
+    Assert-QuotaIoBaseline $baseline 'initial'
+    foreach($fault in @(
+        @{file=$quota;kind='io';label='quota-io'},
+        @{file=$quota;kind='access';label='quota-access'},
+        @{file=$actor;kind='io';label='actor-io'},
+        @{file=$parent;kind='io';label='parent-io'})) {
+        $ioFault.path=[IO.Path]::GetFullPath((Join-Path $NativeIsarRepository $fault.file));$ioFault.kind=$fault.kind;$ioFault.hits=0
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label ('T116 source '+$fault.label)
+        if($ioFault.hits -lt 1){throw ('T116 source IO exact digest fault was not exercised: '+$fault.label)}
+        if($null -ne $failure.fixturePhase -or $null -ne $failure.safeCode){throw ('T116 unavailable source supplied new phase/code: '+$fault.label)}
+        foreach($frame in $failure.sourceFrames){if($frame.file -ceq $fault.file){throw ('T116 unavailable source supplied frame: '+$fault.label)}}
+        if($fault.file -ceq $parent) {
+            if($null -ne $failure.declarationLine -or $null -ne $failure.fixtureExitCode -or $null -ne $failure.failureKind){
+                throw 'T116 unavailable parent supplied declaration or numeric exit.'
+            }
+        } elseif($failure.fixtureCase -cne 'gateway-quota' -or $failure.failureKind -cne 'fixture-exit' -or
+            $failure.fixtureExitCode -ne 1 -or $failure.declarationLine -ne $declaration) {
+            throw ('T116 optional source IO suppressed independent legacy numeric exit: '+$fault.label)
+        }
+        $encoded=$failure|ConvertTo-Json -Depth 30 -Compress
+        foreach($private in @('GATEWAY_QUOTA_FIXTURE_FAILURE:','GATEWAY_QUOTA_PRIVATE_OUTPUT:','GATEWAY_QUOTA_SECONDARY_FAILURE:',
+            'GATEWAY_FIXTURE_CLEANUP_FAILURE:','actual native MCP gateway ')) {
+            if($encoded.Contains($private)){throw ('T116 source IO private framing escaped: '+$fault.label)}
+        }
+        $ioFault.path=$null;$ioFault.kind=$null;$ioFault.hits=0
+        $restored=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label ('T116 source restored '+$fault.label)
+        Assert-QuotaIoBaseline $restored $fault.label
+        if($ioFault.hits -ne 0){throw 'T116 source IO inactive fault was unexpectedly exercised.'}
+    }
+
+    # A local source refusal must not consume reporter/parser failure. Invalid
+    # JSON follows valid failure + done events so partial facts must be cleared.
+    $ioFault.path=[IO.Path]::GetFullPath((Join-Path $NativeIsarRepository $quota));$ioFault.kind='io';$ioFault.hits=0
+    $directory=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($directory)
+    [IO.File]::WriteAllLines((Join-Path $directory 'serverdeck_locald-tests.machine.jsonl'),[string[]]@($events+'{"type":'),[Text.UTF8Encoding]::new($false))
+    Write-NativeQualificationTestFailure -Directory $directory -Phase 'serverdeck_locald-tests' -SourceSnapshot $Snapshot -ControlledFixture
+    $proofPath=Join-Path $directory 'safe-test-failure-serverdeck_locald-tests.json'
+    $proof=Read-NativeIsarArtifactJson $proofPath;$safe=[IO.File]::ReadAllText($proofPath)
+    if($ioFault.hits -lt 1 -or $proof.schemaVersion -ne 1 -or $proof.status -cne 'unavailable-reporter' -or $proof.reporterComplete -or
+        $proof.failures.Count -ne 0 -or -not $proof.controlledFixture -or $proof.fullAcceptance -or $proof.distributionReady -or $proof.activated -or
+        $safe.Contains($PrivateMarker) -or $safe.Contains('GATEWAY_QUOTA_') -or $safe.Contains('Expected:') -or $safe.Contains('stackTrace')) {
+        throw 'T116 source IO weakened malformed reporter refusal/privacy.'
+    }
+    $ioFault.path=$null;$ioFault.kind=$null
+    $restored=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label 'T116 source restored after malformed reporter'
+    Assert-QuotaIoBaseline $restored 'after malformed reporter'
+}
+
+# Real ReadAllLines refusal, with source bytes copied only into this ignored
+# diagnostic mirror. The production source paths are never opened exclusively.
+# Call alongside the preceding helper under the existing T116 group.
+function Test-GatewayQuotaSourceReadIoDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawQuota,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $sourceRepository=$NativeIsarRepository
+    $sources=@(
+        'packages/serverdeck_locald/test/mcp/gateway_native_test.dart',
+        'packages/serverdeck_locald/test/support/gateway_actor.dart',
+        'packages/serverdeck_locald/test/support/gateway_quota_fixture.dart',
+        'packages/serverdeck_locald/test/support/operational_grant_actor.dart',
+        'packages/serverdeck_windows/test/support/trusted_client_fixture.dart',
+        'packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart')
+    $mirror=Join-Path $sourceRepository ('.local/release/T116-T117-diagnostics-round2/source-read-io-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory((Join-Path $mirror '.local'))
+    foreach($source in $sources) {
+        $targetPath=Join-Path $mirror $source
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($targetPath))
+        [IO.File]::Copy((Join-Path $sourceRepository $source),$targetPath,$false)
+        $entries=@($Snapshot.files|Where-Object {$_.file -ceq $source})
+        if($entries.Count -ne 1 -or (Get-NativeIsarDigest $targetPath) -cne $entries[0].sha256){throw 'T116 source read IO mirror is not byte-identical to inventory.'}
+    }
+    $selected=@{sha256=$Snapshot.sha256;files=@($Snapshot.files|Where-Object {$_.file -cin $sources})}
+    if($selected.files.Count -ne 6){throw 'T116 source read IO expected exactly six mirrored inventory files.'}
+    # Function-local repository binding also directs owned output directories to
+    # the mirror. All diagnostic locations are remapped to those identical bytes.
+    $NativeIsarRepository=$mirror
+    $parent=$sources[0];$actor=$sources[1];$quota=$sources[2]
+    $parentUri=([Uri](Join-Path $mirror $parent)).AbsoluteUri
+    $parentLines=[IO.File]::ReadAllLines((Join-Path $mirror $parent))
+    $declarations=@(for($index=0;$index+1 -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq 'test(' -and $parentLines[$index+1].Trim() -ceq "'actual native MCP gateway `$mode',"){$index+1}
+    })
+    $producers=@(for($index=0;$index+1 -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq 'expect(' -and $parentLines[$index+1].Trim() -ceq 'await child.exitCode.timeout('){$index+1}
+    })
+    $starts=@($RawQuota|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' quota body')})
+    if($declarations.Count -ne 1 -or $producers.Count -ne 1 -or $starts.Count -ne 1){throw 'T116 source read IO expected one actual body test/declaration/producer.'}
+    $target=$starts[0].test.id;$declaration=$declarations[0];$producer=$producers[0];$errorCount=0
+    $events=[string[]]@(foreach($raw in $RawQuota) {
+        if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+        if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+        $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+        if($event.type -ceq 'suite'){$event.suite.path=$parentUri}
+        if($event.type -ceq 'testStart') {
+            $event.test.name='actual native MCP gateway quota';$event.test.url=$parentUri;$event.test.line=$declaration
+        }
+        if($event.type -ceq 'error') {
+            $errorCount++
+            if($event.error -isnot [string] -or $event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                -not $event.error.Contains("GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:SERVICE_UNAVAILABLE`nGATEWAY_QUOTA_PRIVATE_OUTPUT:`n") -or
+                -not $event.error.Contains($PrivateMarker)) {
+                throw 'T116 source read IO expected actual numeric assertion and marker/boundary.'
+            }
+            foreach($source in $sources) {
+                $originalUri=([Uri](Join-Path $sourceRepository $source)).AbsoluteUri
+                $mirrorUri=([Uri](Join-Path $mirror $source)).AbsoluteUri
+                $event.error=$event.error.Replace($originalUri,$mirrorUri)
+            }
+            $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+        }
+        $event|ConvertTo-Json -Depth 30 -Compress
+    })
+    if($errorCount -ne 1){throw 'T116 source read IO expected exactly one actual reporter assertion.'}
+
+    $originalDigest=(Get-Item Function:\Get-NativeIsarDigest).ScriptBlock
+    $readFault=@{active=$false;hits=0;path=[IO.Path]::GetFullPath((Join-Path $mirror $quota))}
+    $readLocks=[Collections.Generic.List[IDisposable]]::new()
+    function Get-NativeIsarDigest {
+        param([Parameter(Mandatory)][string]$Path)
+        $hash=& $originalDigest -Path $Path
+        if($readFault.active -and [IO.Path]::GetFullPath($Path) -ceq $readFault.path) {
+            # Hash the real, identical mirror bytes first, then make only the
+            # following real ReadAllLines call fail through Windows sharing.
+            $readLocks.Add([IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None))
+            $readFault.hits++
+        }
+        return $hash
+    }
+    $baseline=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label 'T116 mirror source read IO baseline'
+    if($baseline.fixturePhase -cne 'scenario-prepare' -or $baseline.safeCode -cne 'SERVICE_UNAVAILABLE' -or
+        $baseline.fixtureCase -cne 'gateway-quota' -or $baseline.fixtureExitCode -ne 1 -or $baseline.failureKind -cne 'fixture-exit') {
+        throw 'T116 mirror source read IO baseline mismatch.'
+    }
+    try {
+        $readFault.active=$true
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label 'T116 mirror source read IO refusal'
+        if($readFault.hits -lt 1 -or $readLocks.Count -lt 1 -or $null -ne $failure.fixturePhase -or $null -ne $failure.safeCode -or
+            $failure.fixtureCase -cne 'gateway-quota' -or $failure.fixtureExitCode -ne 1 -or $failure.failureKind -cne 'fixture-exit' -or
+            $failure.declarationLine -ne $declaration) {
+            throw 'T116 real mirror ReadAllLines refusal lost independent legacy exit or supplied new phase/code.'
+        }
+        foreach($frame in $failure.sourceFrames){if($frame.file -ceq $quota){throw 'T116 unreadable mirror source supplied source frame.'}}
+    } finally {
+        $readFault.active=$false
+        foreach($handle in $readLocks){$handle.Dispose()}
+        $readLocks.Clear()
+    }
+    $restored=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events $events -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label 'T116 mirror source read IO restored'
+    if($restored.fixturePhase -cne 'scenario-prepare' -or $restored.safeCode -cne 'SERVICE_UNAVAILABLE' -or
+        $restored.fixtureCase -cne 'gateway-quota' -or $restored.fixtureExitCode -ne 1 -or $restored.failureKind -cne 'fixture-exit' -or
+        $restored.declarationLine -ne $declaration -or
+        @($restored.sourceFrames|Where-Object {$_.file -ceq $actor -and $_.line -eq 40}).Count -ne 1) {
+        throw 'T116 mirror source read IO recovery retained refusal/cache poison.'
+    }
+    # A one-line source travels through the PowerShell pipeline as a scalar.
+    # Its character length must never become the source-frame line bound.
+    $single='packages/serverdeck_locald/test/support/controlled_source_one_line.dart'
+    $singlePath=Join-Path $mirror $single
+    [IO.File]::WriteAllText($singlePath,('// '+$PrivateMarker+"`n"),[Text.UTF8Encoding]::new($false))
+    $singleUri=([Uri]$singlePath).AbsoluteUri
+    $withSingle=@{sha256=$selected.sha256;files=@($selected.files)+@(@{file=$single;sha256=Get-NativeIsarDigest $singlePath})}
+    foreach($singleLine in @(1,2)) {
+        $singleEvents=[string[]]@(foreach($json in $events) {
+            $event=$json|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'error'){$event.stackTrace+="`n#1 single (${singleUri}:${singleLine}:1)"}
+            $event|ConvertTo-Json -Depth 30 -Compress
+        })
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $withSingle -Events $singleEvents -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label ('T116 one-line source '+$singleLine)
+        $actualSingle=@($failure.sourceFrames|Where-Object {$_.file -ceq $single})
+        if(($singleLine -eq 1 -and ($actualSingle.Count -ne 1 -or $actualSingle[0].line -ne 1)) -or
+            ($singleLine -eq 2 -and $actualSingle.Count -ne 0)) {throw 'T116 one-line source frame bound used scalar string length.'}
+    }
+    foreach($branch in @(
+        @{file='packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart';phase='serverdeck_locald-tests';text='test(';
+            name='actual native host trust probes basic';error=('TimeoutException after 0:00:55.000000: '+$PrivateMarker);case=$null;fixturePhase=$null},
+        @{file='packages/serverdeck_windows/test/pipe_disconnected_test.dart';phase='serverdeck_windows-tests';text='onTimeout: () => throw TimeoutException(';
+            name='compiled disconnected pipe read after native disconnect fails promptly without waiting on an unissued event';
+            error='TimeoutException after 0:00:15.000000: DISCONNECT_FIXTURE_TIMEOUT:started';case='pipe-disconnected';fixturePhase='started'})) {
+        $branchPath=Join-Path $mirror $branch.file
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($branchPath))
+        [IO.File]::WriteAllText($branchPath,($branch.text+"`n"),[Text.UTF8Encoding]::new($false))
+        $branchUri=([Uri]$branchPath).AbsoluteUri
+        $branchSnapshot=@{sha256=$selected.sha256;files=@($selected.files)+@(@{file=$branch.file;sha256=Get-NativeIsarDigest $branchPath})}
+        $branchEvents=[string[]]@(foreach($json in $events) {
+            $event=$json|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$branchUri}
+            if($event.type -ceq 'testStart'){$event.test.name=$branch.name;$event.test.url=$branchUri;$event.test.line=1}
+            if($event.type -ceq 'error'){$event.error=$branch.error;$event.stackTrace="#0 branch (${branchUri}:1:1)"}
+            $event|ConvertTo-Json -Depth 30 -Compress
+        })
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $branchSnapshot -Events $branchEvents -Phase $branch.phase -PrivateMarker $PrivateMarker -Label ('T116 one-line indexed source '+$branch.file)
+        if($failure.declarationLine -ne 1 -or $failure.failureKind -cne 'timeout' -or $failure.fixtureCase -cne $branch.case -or
+            $failure.fixturePhase -cne $branch.fixturePhase -or $null -ne $failure.safeCode -or $null -ne $failure.fixtureExitCode -or
+            $failure.sourceFrames.Count -ne 1 -or $failure.sourceFrames[0].file -cne $branch.file -or $failure.sourceFrames[0].line -ne 1) {
+            throw ('T116 one-line indexed source lost independent reporter/line facts: '+$branch.file)
+        }
+    }
+}
+
+function Test-GatewayQuotaFailureDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawQuota,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $sources=[ordered]@{
+        GatewayLines='packages/serverdeck_locald/test/mcp/gateway_native_test.dart'
+        ActorLines='packages/serverdeck_locald/test/support/gateway_actor.dart'
+        QuotaLines='packages/serverdeck_locald/test/support/gateway_quota_fixture.dart'
+        GrantLines='packages/serverdeck_locald/test/support/operational_grant_actor.dart'
+        FixtureLines='packages/serverdeck_windows/test/support/trusted_client_fixture.dart'
+        HelperLines='packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart'
+    }
+    $lines=@{};$uris=@{}
+    foreach($key in $sources.Keys) {
+        $lines[$key]=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $sources[$key]))
+        $uris[$key]=([Uri](Join-Path $NativeIsarRepository $sources[$key])).AbsoluteUri
+    }
+    $parentUri=$uris.GatewayLines;$actorUri=$uris.ActorLines;$helperUri=$uris.HelperLines
+    $modeLoop=[regex]::Matches(($lines.GatewayLines -join "`n"),'(?s)for \(final mode in \[(?<cases>.*?)\]\) \{')
+    $modes=if($modeLoop.Count -eq 1){@([regex]::Matches($modeLoop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})}else{@()}
+    $expectedModes=@('basic','quota','queued-cancel','heartbeat','heartbeat-remote-limit','wrong-catalog','wrong-poll','wrong-cancel',
+        'rpc-timeout','rpc-remote','overall','cancel-timeout','missing-grant','owner-deny','pending','cancel-ack','native-loss',
+        'expiry','revoke','stdout-revoke','stdout-target-change','stdout-target-failure','stdout-stop','writer-cancel','publish-order','publish-expiry','eof')
+    $declarations=@(for($index=0;$index+1 -lt $lines.GatewayLines.Length;$index++) {
+        if($lines.GatewayLines[$index].Trim() -ceq 'test(' -and $lines.GatewayLines[$index+1].Trim() -ceq "'actual native MCP gateway `$mode',"){$index+1}
+    })
+    $producers=@(for($index=0;$index+1 -lt $lines.GatewayLines.Length;$index++) {
+        if($lines.GatewayLines[$index].Trim() -ceq 'expect(' -and $lines.GatewayLines[$index+1].Trim() -ceq 'await child.exitCode.timeout('){$index+1}
+    })
+    $bodyLines=@(for($index=0;$index -lt $lines.HelperLines.Length;$index++) {
+        if($lines.HelperLines[$index].Trim() -ceq 'await body();'){$index+1}
+    })
+    if(($modes -join '|') -cne ($expectedModes -join '|') -or $modes.Count -ne 27 -or
+        $declarations.Count -ne 1 -or $producers.Count -ne 1 -or $bodyLines.Count -ne 1) {
+        throw 'T116 expected exact 27 gateway cases, one declaration/70s zero-exit producer and unchanged helper body.'
+    }
+    $declaration=$declarations[0];$producer=$producers[0];$bodyLine=$bodyLines[0]
+    $starts=@{}
+    foreach($kind in @('body','both')) {
+        $matches=@($RawQuota|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' quota '+$kind)})
+        if($matches.Count -ne 1){throw ('T116 expected real quota reporter case: '+$kind)}
+        $starts[$kind]=$matches[0].test.id
+    }
+    $phases=@('scenario-prepare','server-prepare','server-bootstrap','server-admitted16','server-quota-oracle','server-cancelled16',
+        'server-cancel-oracle','server-child-exit','server-stderr','server-serving','server-cleanup','scenario-cleanup',
+        'bridge-bootstrap','bridge-admission','bridge-cancellation','bridge-completion','bridge-cleanup')
+    $codes=@('SERVICE_UNAVAILABLE','UNSAFE_ENDPOINT','IDENTITY_UNAVAILABLE','TIMEOUT','RESOURCE_LIMIT','UNAUTHORIZED',
+        'INCOMPATIBLE','PREREQUISITE_UNAVAILABLE','FORBIDDEN','FIXTURE_ASSERTION','-')
+    $baselineMarker='GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:SERVICE_UNAVAILABLE'
+    $boundary="GATEWAY_QUOTA_PRIVATE_OUTPUT:`n"
+    $quotaSeparator="`nGATEWAY_QUOTA_SECONDARY_FAILURE:`n"
+    $parentSeparator="`nGATEWAY_FIXTURE_CLEANUP_FAILURE: "
+    $cases=[Collections.Generic.List[hashtable]]::new()
+    # The first checked phase/code assertion is the regression RED against
+    # HEAD. No new getter is called until this assertion has been evaluated.
+    foreach($fixturePhase in $phases){foreach($code in $codes){$cases.Add(@{
+        variant='phase-code-'+$fixturePhase+'-'+$code;fixturePhase=$fixturePhase;code=$code;positive=$true;both=$true
+    })}}
+    if($cases.Count -ne 187){throw 'T116 expected 17 phases x (10 codes plus null).'}
+    foreach($mode in $modes){$cases.Add(@{variant='legacy-'+$mode;mode=$mode;legacy=$true})}
+    foreach($mode in $modes|Where-Object {$_ -cne 'quota'}){$cases.Add(@{variant='nonquota-'+$mode;mode=$mode;nonquota=$true})}
+    $negatives=@('secondary-duplicate','both-primary','primary-frames-bound','earliest-parent-separator','primary-native-errors',
+        'exit-signed','exit-unsigned','exit-minimum','exit-maximum',
+        'absent-record','corrupt-record','unreadable-record','bridge-only-record','raw-stdout-marker','raw-stdout-marker-boundary',
+        'raw-stderr-marker','duplicate-primary','nonfirst-marker','marker-only-secondary','marker-in-stack-only',
+        'secondary-producer-only','secondary-exit-only','parent-cleanup-only','pass-assertion','timeout',
+        'missing-boundary','wrong-boundary','boundary-case','boundary-nonfirst','boundary-extra','boundary-duplicate','boundary-crlf',
+        'unknown-phase','unknown-code','lowercase-code','extra-field','partial-marker','marker-suffix','marker-crlf','marker-nonascii','marker-oversize',
+        'exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional','exit-nonnumeric','exit-prefix','exit-no-line-end','wrong-expected',
+        'without-producer','unrelated-producer','helper-producer','invalid-producer','unknown-producer','error-type','event-id-type',
+        'unknown-name','suffixed-name','name-type','wrong-url','unknown-url','missing-url','wrong-suite','missing-suite','wrong-suite-path',
+        'wrong-phase','invalid-declaration','unrelated-declaration','null-declaration','declaration-type','fractional-declaration',
+        'test-id-type','test-id-negative','suite-id-type')
+    foreach($variant in $negatives){$cases.Add(@{variant=$variant})}
+    foreach($key in $sources.Keys){foreach($kind in @('changed','missing')){$cases.Add(@{variant=$kind+'-'+$key;sourceKey=$key;sourceKind=$kind})}}
+    foreach($case in $cases) {
+        $variant=$case.variant
+        $mode=if($case.ContainsKey('mode')){$case.mode}else{'quota'}
+        $fixturePhase=if($case.ContainsKey('fixturePhase')){$case.fixturePhase}else{'scenario-prepare'}
+        $code=if($case.ContainsKey('code')){$case.code}else{'SERVICE_UNAVAILABLE'}
+        $marker='GATEWAY_QUOTA_FIXTURE_FAILURE:'+$fixturePhase+':'+$code
+        $both=($case.ContainsKey('both') -and $case.both) -or $variant -cin @('secondary-duplicate','both-primary','primary-frames-bound',
+            'earliest-parent-separator','primary-native-errors','marker-only-secondary','secondary-producer-only','secondary-exit-only','parent-cleanup-only')
+        $target=$starts[$(if($both){'both'}else{'body'})]
+        $events=foreach($raw in $RawQuota) {
+            if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+            if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+            $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite') {
+                $event.suite.path=$parentUri
+                if($variant -ceq 'missing-suite'){continue}
+                if($variant -ceq 'wrong-suite-path'){$event.suite.path=$actorUri}
+            }
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual native MCP gateway '+$mode;$event.test.url=$parentUri;$event.test.line=$declaration
+                switch($variant) {
+                    'unknown-name' {$event.test.name='actual native MCP gateway '+$PrivateMarker}
+                    'suffixed-name' {$event.test.name+=$PrivateMarker}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-url' {$event.test.url=$actorUri}
+                    'unknown-url' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'wrong-suite' {$event.test.suiteID=999999}
+                    'invalid-declaration' {$event.test.line=999999}
+                    'unrelated-declaration' {$event.test.line=1}
+                    'null-declaration' {$event.test.line=$null}
+                    'declaration-type' {$event.test.line=[string]$declaration}
+                    'fractional-declaration' {$event.test.line=[double]$declaration}
+                    'test-id-type' {$event.test.id=[string]$target}
+                    'test-id-negative' {$event.test.id=-1}
+                    'suite-id-type' {$event.test.suiteID=[string]$event.test.suiteID}
+                }
+            }
+            if($event.type -ceq 'error') {
+                if($event.error -isnot [string] -or $event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                    -not $event.error.Contains($baselineMarker+"`n"+$boundary) -or
+                    -not $event.error.Contains($PrivateMarker) -or -not $event.error.Contains("#0 actor (${actorUri}:40:1)") -or
+                    [regex]::Matches($event.error,'GATEWAY_QUOTA_FIXTURE_FAILURE:').Count -ne 1 -or
+                    ($both -and (-not $event.error.Contains($quotaSeparator) -or -not $event.error.Contains($parentSeparator)))) {
+                    throw 'T116 expected real numeric assertion, actual marker/boundary, primary actor and actual nested/parent aggregate.'
+                }
+                $event.error=$event.error.Replace($baselineMarker,$marker)
+                $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+                if($case.ContainsKey('legacy')){$event.error=$event.error.Replace($marker+"`n"+$boundary,'')}
+                switch($variant) {
+                    'secondary-duplicate' {$event.error+="`n"+$marker+"`n"+$boundary+$marker}
+                    'duplicate-primary' {$event.error=$event.error.Replace($marker+"`n",$marker+"`n"+$marker+"`n")}
+                    'nonfirst-marker' {$event.error=$event.error.Replace($marker+"`n",$PrivateMarker+"`n"+$marker+"`n")}
+                    {$_ -cin @('absent-record','corrupt-record','unreadable-record','bridge-only-record')} {$event.error=$event.error.Replace($marker+"`n",'')}
+                    'raw-stdout-marker' {$event.error=$event.error.Replace($marker+"`n"+$boundary,$boundary+$marker+"`n")}
+                    'raw-stdout-marker-boundary' {$event.error=$event.error.Replace($marker+"`n"+$boundary,$boundary+$marker+"`n"+$boundary)}
+                    'raw-stderr-marker' {$event.error=$event.error.Replace($marker+"`n",'')+"`n"+$marker}
+                    'marker-only-secondary' {$event.error=$event.error.Replace($marker+"`n",'')+"`n"+$marker+"`n"+$boundary}
+                    'marker-in-stack-only' {$event.error=$event.error.Replace($marker+"`n",'');$event.stackTrace+="`n"+$marker+"`n"+$boundary}
+                    'missing-boundary' {$event.error=$event.error.Replace($boundary,'')}
+                    'wrong-boundary' {$event.error=$event.error.Replace($boundary,"PRIVATE_OTHER_OUTPUT:`n")}
+                    'boundary-case' {$event.error=$event.error.Replace($boundary,"gateway_quota_private_output:`n")}
+                    'boundary-nonfirst' {$event.error=$event.error.Replace($boundary,$PrivateMarker+"`n"+$boundary)}
+                    'boundary-extra' {$event.error=$event.error.Replace($boundary,"GATEWAY_QUOTA_PRIVATE_OUTPUT:extra`n")}
+                    'boundary-duplicate' {$event.error=$event.error.Replace($boundary,$boundary+$boundary)}
+                    'boundary-crlf' {$event.error=$event.error.Replace($boundary,"GATEWAY_QUOTA_PRIVATE_OUTPUT:`r`n")}
+                    'unknown-phase' {$event.error=$event.error.Replace($marker,'GATEWAY_QUOTA_FIXTURE_FAILURE:'+ $PrivateMarker+':SERVICE_UNAVAILABLE')}
+                    'unknown-code' {$event.error=$event.error.Replace($marker,'GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:'+ $PrivateMarker)}
+                    'lowercase-code' {$event.error=$event.error.Replace($marker,'GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:service_unavailable')}
+                    'extra-field' {$event.error=$event.error.Replace($marker,$marker+':extra')}
+                    'partial-marker' {$event.error=$event.error.Replace($marker,'GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare')}
+                    'marker-suffix' {$event.error=$event.error.Replace($marker,$marker+' ')}
+                    'marker-crlf' {$event.error=$event.error.Replace($marker+"`n",$marker+"`r`n")}
+                    'marker-nonascii' {$event.error=$event.error.Replace($marker,'GATEWAY_QUOTA_FIXTURE_FAILURE:подготовка:SERVICE_UNAVAILABLE')}
+                    'marker-oversize' {$event.error=$event.error.Replace($marker,('GATEWAY_QUOTA_FIXTURE_FAILURE:'+('scenario-prepare'*30)+':SERVICE_UNAVAILABLE'))}
+                    'exit-signed' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-1073741819>')}
+                    'exit-unsigned' {$event.error=$event.error.Replace('Actual: <1>','Actual: <3221225477>')}
+                    'exit-minimum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483648>')}
+                    'exit-maximum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967295>')}
+                    'exit-zero' {$event.error=$event.error.Replace('Actual: <1>','Actual: <0>')}
+                    'exit-too-low' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483649>')}
+                    'exit-too-high' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967296>')}
+                    'exit-plus' {$event.error=$event.error.Replace('Actual: <1>','Actual: <+1>')}
+                    'exit-fractional' {$event.error=$event.error.Replace('Actual: <1>','Actual: <1.0>')}
+                    'exit-nonnumeric' {$event.error=$event.error.Replace('Actual: <1>',('Actual: <'+$PrivateMarker+'>'))}
+                    'exit-prefix' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'exit-no-line-end' {$event.error="Expected: <0>`n  Actual: <1>"}
+                    'wrong-expected' {$event.error=$event.error.Replace('Expected: <0>','Expected: <1>')}
+                    'without-producer' {$event.stackTrace=$PrivateMarker}
+                    'unrelated-producer' {$event.stackTrace="#0 parent (${parentUri}:${declaration}:1)"}
+                    'helper-producer' {$event.stackTrace="#0 helper (${helperUri}:${bodyLine}:1)"}
+                    'invalid-producer' {$event.stackTrace="#0 parent (${parentUri}:999999:1)"}
+                    'unknown-producer' {$event.stackTrace="#0 private (file:///C:/${PrivateMarker}/private.dart:${producer}:1)"}
+                    'secondary-producer-only' {$event.stackTrace=$PrivateMarker;$event.error+="`n#9 parent (${parentUri}:${producer}:1)"}
+                    'secondary-exit-only' {$event.error=$PrivateMarker+$quotaSeparator+$event.error}
+                    'parent-cleanup-only' {$event.error=$PrivateMarker+$parentSeparator+$event.error}
+                    'pass-assertion' {$event.error="Expected: <true>`n  Actual: <false>`n"+$event.error.Substring($event.error.IndexOf($marker));$event.stackTrace="#0 parent (${parentUri}:$($producer+30):1)"}
+                    'timeout' {$event.error='Bad state: GATEWAY_NATIVE_TIMEOUT:stdout-stop';$event.stackTrace="#0 parent (${parentUri}:${producer}:1)"}
+                    'event-id-type' {$event.testID=[string]$target}
+                    'error-type' {$event.error=@{private=$PrivateMarker}}
+                    'earliest-parent-separator' {
+                        $cut=$event.error.IndexOf($quotaSeparator,[StringComparison]::Ordinal)
+                        $event.error=$event.error.Substring(0,$cut)+$parentSeparator+$PrivateMarker+"`n#0 secondary (${actorUri}:41:1)"+$quotaSeparator+$marker
+                    }
+                    'primary-native-errors' {
+                        $event.error=$event.error.Replace($quotaSeparator,"`nOS Error: NT_ATTRIBUTES_STATUS, errno = -1073741819"+$quotaSeparator+
+                            'OS Error: WIN32_DRIVE_TYPE, errno = 6'+"`n")
+                    }
+                    'primary-frames-bound' {
+                        $event.error=$event.error.Replace($quotaSeparator,"`n#3 actor (${actorUri}:40:1)`n#4 actor (${actorUri}:42:1)`n#5 actor (${actorUri}:43:1)`n#6 invalid (${actorUri}:999999:1)"+$quotaSeparator)
+                    }
+                }
+                if($variant -cin @('both-primary','primary-frames-bound')){$event.stackTrace+="`n#1 helper (${helperUri}:${bodyLine}:1)`n#2 wrapper (${parentUri}:${declaration}:1)"}
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $selected=$Snapshot
+        if($case.ContainsKey('sourceKey')) {
+            $selected=Get-ControlledOwnedDiagnosticSnapshot -Snapshot $Snapshot -Changed $sources[$case.sourceKey] -Missing:($case.sourceKind -ceq 'missing')
+        }
+        $phase=if($variant -ceq 'wrong-phase'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events ([string[]]$events) -Phase $phase -PrivateMarker $PrivateMarker -Label ('T116 '+$variant)
+        $expectNew=($case.ContainsKey('positive') -and $case.positive) -or $variant -cin @('secondary-duplicate','both-primary','primary-frames-bound',
+            'earliest-parent-separator','primary-native-errors','boundary-duplicate','exit-signed','exit-unsigned','exit-minimum','exit-maximum')
+        $expectedCode=if($code -ceq '-'){$null}else{$code}
+        if(($expectNew -and ($failure.fixturePhase -cne $fixturePhase -or $failure.safeCode -cne $expectedCode)) -or
+            (-not $expectNew -and ($null -ne $failure.fixturePhase -or $null -ne $failure.safeCode))) {
+            throw ('T116 controlled phase/code regression: '+$variant+'; phase='+$failure.fixturePhase+'; code='+$failure.safeCode)
+        }
+        # Explicitly retain independent T112 numeric contracts for all27
+        # original cases, all26 nonquota exclusions and numeric boundaries.
+        $checkLegacy=$expectNew -or $case.ContainsKey('legacy') -or $case.ContainsKey('nonquota')
+        $expectedExit=switch($variant){'exit-signed'{-1073741819L};'exit-unsigned'{3221225477L};'exit-minimum'{-2147483648L};'exit-maximum'{4294967295L};default{1L}}
+        if($checkLegacy -and ($failure.fixtureCase -cne ('gateway-'+$mode) -or $failure.fixtureExitCode -ne $expectedExit -or $failure.failureKind -cne 'fixture-exit')) {
+            throw ('T116 independent T112 case/numeric exit changed: '+$variant)
+        }
+        if($case.ContainsKey('sourceKey') -and $case.sourceKey -cin @('ActorLines','QuotaLines','GrantLines','FixtureLines') -and
+            ($failure.fixtureCase -cne 'gateway-quota' -or $failure.fixtureExitCode -ne 1 -or $failure.failureKind -cne 'fixture-exit')) {
+            throw ('T116 new-only stale/missing dependency suppressed independent legacy numeric exit: '+$variant)
+        }
+        if($variant -cin @('exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional','exit-nonnumeric','exit-prefix','exit-no-line-end',
+            'wrong-expected','without-producer','unrelated-producer','helper-producer','invalid-producer','unknown-producer','secondary-producer-only',
+            'secondary-exit-only','parent-cleanup-only','pass-assertion','error-type','event-id-type') -and
+            ($null -ne $failure.fixtureExitCode -or $null -ne $failure.failureKind)) {
+            throw ('T116 invalid or secondary evidence created numeric exit: '+$variant)
+        }
+        $expectedNative=if($variant -ceq 'primary-native-errors'){1}else{0}
+        if($failure.nativeErrors.Count -ne $expectedNative -or ($expectedNative -eq 1 -and
+            ($failure.nativeErrors[0].kind -cne 'NT_ATTRIBUTES_STATUS' -or $failure.nativeErrors[0].code -ne -1073741819L))) {
+            throw ('T116 primary native error bound/secondary exclusion changed: '+$variant)
+        }
+        if($checkLegacy -and ($failure.sourceFrames.Count -lt 1 -or $failure.sourceFrames[0].file -cne $sources.ActorLines -or $failure.sourceFrames[0].line -ne 40)) {
+            throw ('T116 primary actor priority lost: '+$variant)
+        }
+        if($both) {foreach($frame in $failure.sourceFrames){if($frame.file -ceq $sources.ActorLines -and $frame.line -eq 41){throw ('T116 secondary actor frame escaped: '+$variant)}}}
+        if($variant -cin @('secondary-exit-only','parent-cleanup-only') -and
+            @($failure.sourceFrames|Where-Object {$_.file -ceq $sources.ActorLines}).Count -ne 0) {
+            throw ('T116 secondary-only nested reason became primary source evidence: '+$variant)
+        }
+        if($variant -ceq 'primary-frames-bound' -and ($failure.sourceFrames.Count -ne 3 -or $failure.sourceFrames[1].line -ne 42 -or $failure.sourceFrames[2].line -ne 43)) {
+            throw 'T116 current primary frame cap/dedup/order changed.'
+        }
+        if($variant -ceq 'both-primary' -and ($failure.sourceFrames.Count -ne 3 -or $failure.sourceFrames[1].file -cne $sources.GatewayLines -or
+            $failure.sourceFrames[1].line -ne $producer -or $failure.sourceFrames[2].file -cne $sources.HelperLines -or $failure.sourceFrames[2].line -ne $bodyLine)) {
+            throw 'T116 actor/parent/helper primary frame priority changed.'
+        }
+        # Invoke-ControlledOwnedDiagnosticProjection checks schema, cap, raw
+        # sentinels/paths/messages. Check the new private framing explicitly.
+        $encoded=$failure|ConvertTo-Json -Depth 30 -Compress
+        foreach($private in @('GATEWAY_QUOTA_FIXTURE_FAILURE:','GATEWAY_QUOTA_PRIVATE_OUTPUT:','GATEWAY_QUOTA_SECONDARY_FAILURE:',
+            'GATEWAY_FIXTURE_CLEANUP_FAILURE:','actual native MCP gateway ')) {
+            if($encoded.Contains($private)){throw ('T116 private quota framing escaped: '+$variant)}
+        }
+        if($case.ContainsKey('sourceKey')) {
+            foreach($frame in $failure.sourceFrames){if($frame.file -ceq $sources[$case.sourceKey]){throw ('T116 stale/missing source frame escaped: '+$variant)}}
+        }
+    }
+    # These cases pass the actual prefix reader and extracted actual parent
+    # expression. Only metadata and the checked reporter frame are adapted;
+    # the real error/reason is never repaired or rewritten for this assertion.
+    foreach($kind in @('absent','corrupt','bridge-only','raw-marker','raw-marker-boundary','raw-stderr-marker')) {
+        $actualStarts=@($RawQuota|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' quota '+$kind)})
+        if($actualStarts.Count -ne 1){throw ('T116 expected actual-reader/expression reporter case: '+$kind)}
+        $target=$actualStarts[0].test.id;$errorCount=0
+        $events=foreach($raw in $RawQuota) {
+            if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+            if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+            $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$parentUri}
+            if($event.type -ceq 'testStart'){$event.test.name='actual native MCP gateway quota';$event.test.url=$parentUri;$event.test.line=$declaration}
+            if($event.type -ceq 'error') {
+                $errorCount++
+                if($event.error -isnot [string] -or $event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                    -not $event.error.Contains($PrivateMarker) -or -not $event.error.Contains("#0 actor (${actorUri}:40:1)") -or
+                    -not $event.error.Contains($boundary)) {throw ('T116 actual absent-record reporter shape changed: '+$kind)}
+                $firstBoundary=$event.error.IndexOf($boundary,[StringComparison]::Ordinal)
+                $firstMarker=$event.error.IndexOf('GATEWAY_QUOTA_FIXTURE_FAILURE:',[StringComparison]::Ordinal)
+                if($firstMarker -ge 0 -and $firstMarker -lt $firstBoundary){throw ('T116 absent/corrupt/bridge-only record produced authoritative marker: '+$kind)}
+                $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        if($errorCount -ne 1){throw ('T116 expected exactly one actual reporter assertion: '+$kind)}
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events ([string[]]$events) -Phase 'serverdeck_locald-tests' -PrivateMarker $PrivateMarker -Label ('T116 actual '+$kind)
+        if($null -ne $failure.fixturePhase -or $null -ne $failure.safeCode -or $failure.fixtureCase -cne 'gateway-quota' -or
+            $failure.failureKind -cne 'fixture-exit' -or $failure.fixtureExitCode -ne 1 -or $failure.nativeErrors.Count -ne 0 -or
+            $failure.sourceFrames.Count -lt 1 -or $failure.sourceFrames[0].file -cne $sources.ActorLines -or $failure.sourceFrames[0].line -ne 40) {
+            throw ('T116 actual reader/expression absent-record authority regression: '+$kind)
+        }
+        $encoded=$failure|ConvertTo-Json -Depth 30 -Compress
+        foreach($private in @('GATEWAY_QUOTA_FIXTURE_FAILURE:','GATEWAY_QUOTA_PRIVATE_OUTPUT:','GATEWAY_QUOTA_SECONDARY_FAILURE:')) {
+            if($encoded.Contains($private)){throw ('T116 actual reader/expression private framing escaped: '+$kind)}
+        }
+    }
+    # Existing 256KiB event and16MiB reporter limits remain fail-closed with
+    # quota markers present, including no partial diagnostic fields.
+    foreach($bound in @('event','reporter')) {
+        $directory=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($directory)
+        $reportPath=Join-Path $directory 'serverdeck_locald-tests.machine.jsonl'
+        $large=if($bound -ceq 'event'){
+            @{type='error';testID=$starts.body;error=$baselineMarker+"`n"+$boundary+$PrivateMarker+('x'*256KB);stackTrace=$PrivateMarker}|ConvertTo-Json -Depth 5 -Compress
+        }else{($PrivateMarker+"`n"+('x'*1KB)+"`n")*16385}
+        [IO.File]::WriteAllText($reportPath,$large,[Text.UTF8Encoding]::new($false))
+        Write-NativeQualificationTestFailure -Directory $directory -Phase 'serverdeck_locald-tests' -SourceSnapshot $Snapshot -ControlledFixture
+        $path=Join-Path $directory 'safe-test-failure-serverdeck_locald-tests.json'
+        $proof=Read-NativeIsarArtifactJson $path;$safe=[IO.File]::ReadAllText($path)
+        if($proof.schemaVersion -ne 1 -or $proof.status -cne 'unavailable-reporter' -or $proof.reporterComplete -or
+            $proof.failures.Count -ne 0 -or -not $proof.controlledFixture -or $proof.fullAcceptance -or $proof.distributionReady -or $proof.activated -or
+            $safe.Contains($PrivateMarker) -or $safe.Contains('GATEWAY_QUOTA_') -or $safe.Contains('Expected:') -or $safe.Contains('stackTrace')) {
+            throw ('T116 quota reporter bound/privacy changed: '+$bound)
+        }
+    }
+    # Current-source proof and every mutation use in-memory arrays only.
+    $shape=Get-NativeGatewayQuotaDiagnosticShape @lines
+    if(-not $shape -or $shape.declarationLine -ne $declaration -or $producer -notin $shape.producerLines){throw 'T116 current6 source shape/declaration/producer refused.'}
+    foreach($key in $sources.Keys) {
+        $arguments=@{};foreach($other in $sources.Keys){$arguments[$other]=$lines[$other]}
+        $arguments[$key]=@($lines[$key])+@("const privateExample = '''",$PrivateMarker,"''';")
+        if(Get-NativeGatewayQuotaDiagnosticShape @arguments){throw ('T116 multiline literal source accepted: '+$key)}
+        $arguments[$key]=@()
+        if(Get-NativeGatewayQuotaDiagnosticShape @arguments){throw ('T116 empty source accepted: '+$key)}
+    }
+    $mutations=@(
+        @('GatewayLines','const Duration(seconds: 70)','const Duration(seconds: 71)'),
+        @('GatewayLines',"              0,`n              reason:","              1,`n              reason:"),
+        @('GatewayLines',"mode == 'quota' ? gatewayQuotaReasonPrefix(fixture.path) : ''","mode != 'quota' ? gatewayQuotaReasonPrefix(fixture.path) : ''"),
+        @('GatewayLines','cleanup: fixture.close,','cleanup: () async {},'),
+        @('ActorLines',"quota!.phase = 'server-admitted16';","quota!.phase = 'server-bootstrap';"),
+        @('ActorLines','causal: !admitted,','causal: true,'),
+        @('ActorLines','causal: actualExit != 0,','causal: true,'),
+        @('ActorLines','causal: quota != null && diagnostics.isNotEmpty,','causal: true,'),
+        @('ActorLines','gatewayCodeOf: gatewayQuotaMcpCode,','gatewayCodeOf: (_) => null,'),
+        @('ActorLines','lifecycle: quota == null','lifecycle: quota != null'),
+        @('QuotaLines','if (_attempted) return;','if (false) return;'),
+        @('QuotaLines','_attempted = true;','_attempted = false;'),
+        @('QuotaLines','handle.readSync(129)','handle.readSync(130)'),
+        @('QuotaLines','byte > 127','byte > 255'),
+        @('QuotaLines','GatewayQuotaFailureRole.server);','GatewayQuotaFailureRole.bridge);'),
+        @('QuotaLines','final record = causal','final record = true'),
+        @('QuotaLines','code = gatewayCodeOf?.call(error);','code = error.toString();'),
+        @('QuotaLines','onFirstFailure: observe,','onFirstFailure: null,'),
+        @('QuotaLines','secondary.insert(0,','secondary.insert(1,'),
+        @('QuotaLines','stack = error.primaryStack;','stack = error.secondaryStack;'),
+        @('QuotaLines','stack = error.boundaryStack;','stack = StackTrace.current;'),
+        @('QuotaLines','error = error.boundaryError;','break;'),
+        @('QuotaLines','.take(8)','.take(9)'),
+        @('QuotaLines','GATEWAY_QUOTA_PRIVATE_OUTPUT:','PRIVATE_OTHER_OUTPUT:'),
+        @('QuotaLines','GATEWAY_QUOTA_SECONDARY_FAILURE:','PRIVATE_OTHER_SECONDARY:'),
+        @('QuotaLines',"'server-admitted16',","'server-admitted',"),
+        @('QuotaLines',"'FIXTURE_ASSERTION',","'INTERNAL',"),
+        @('GrantLines','await lifecycle(body: body, cleanup: cleanup);','lifecycle(body: body, cleanup: cleanup);'),
+        @('GrantLines','if (lifecycle != null) {','if (lifecycle == null) {'),
+        @('FixtureLines','await body();','body();'),
+        @('FixtureLines','await cleanup();','cleanup();'),
+        @('FixtureLines','primaryStack,','stack,'),
+        @('HelperLines','GATEWAY_FIXTURE_CLEANUP_FAILURE:','PRIVATE_OTHER_CLEANUP:'),
+        @('HelperLines','await cleanup();','cleanup();'))
+    foreach($mutation in $mutations) {
+        $original=$lines[$mutation[0]] -join "`n";$changed=$original.Replace($mutation[1],$mutation[2])
+        if($changed -ceq $original){throw ('T116 required mutation did not touch frozen source: '+$mutation[0]+' '+$mutation[1])}
+        $arguments=@{};foreach($key in $sources.Keys){$arguments[$key]=$lines[$key]}
+        $arguments[$mutation[0]]=$changed -split '\r?\n'
+        if(Get-NativeGatewayQuotaDiagnosticShape @arguments){throw ('T116 altered required source contract accepted: '+$mutation[0]+' '+$mutation[1])}
+    }
+    Test-GatewayQuotaSourceIoDiagnosticProjection -Snapshot $Snapshot -RawQuota $RawQuota -PrivateMarker $PrivateMarker
+    Test-GatewayQuotaSourceReadIoDiagnosticProjection -Snapshot $Snapshot -RawQuota $RawQuota -PrivateMarker $PrivateMarker
+    'QUALIFICATION_GATEWAY_QUOTA_17_PHASES_10_CODES_NULL_187_PRIMARY_AGGREGATE_LEGACY27_NONQUOTA26_SOURCE6_BOUNDS_PRIVACY_PASSED'
+}
+
+function Test-TrustedClientPrivateBoundaryDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][object[]]$RawBoundary,[Parameter(Mandatory)][string]$PrivateMarker)
+    $parent='packages/serverdeck_windows/test/trusted_client_native_test.dart'
+    $actor='packages/serverdeck_windows/test/support/trusted_client_actor.dart'
+    $parentUri=([Uri](Join-Path $NativeIsarRepository $parent)).AbsoluteUri
+    $actorUri=([Uri](Join-Path $NativeIsarRepository $actor)).AbsoluteUri
+    $lines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $parent))
+    $declaration=@(for($i=0;$i+1 -lt $lines.Length;$i++){if($lines[$i].Trim() -ceq 'test(' -and $lines[$i+1].Trim() -ceq "'actual format3 bootstrap and RPC client `$mode',"){$i+1}})
+    $producer=@(for($i=0;$i+1 -lt $lines.Length;$i++){if($lines[$i].Trim() -ceq 'expect(' -and $lines[$i+1].Trim() -ceq 'childExit,'){$i+1}})
+    if($declaration.Count -ne 1 -or $producer.Count -ne 1){throw 'T117 actual known declaration/producer not unique.'}
+    $marker='TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:TIMEOUT'
+    $boundary="TRUSTED_CLIENT_PRIVATE_OUTPUT:`n"
+    $actual=@('absent-stdout','corrupt-stdout','unreadable-stdout','absent-framed-stdout','absent-stderr','valid-benign','valid-duplicate')
+    $variants=$actual+@('missing-boundary','wrong-boundary','lowercase-boundary','spaced-boundary','boundary-crlf','extra-boundary','nonfirst-boundary',
+        'secondary-only-marker','secondary-only-exit','secondary-only-frame','primary-evidence-after-boundary')
+    foreach($variant in $variants) {
+        $source=if($variant -in $actual){$variant}else{'valid-benign'}
+        $starts=@($RawBoundary|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' boundary '+$source)})
+        if($starts.Count -ne 1){throw ('T117 expected actual expression/reader reporter case: '+$source)}
+        $target=$starts[0].test.id
+        $events=foreach($raw in $RawBoundary) {
+            if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+            if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+            $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$parentUri}
+            if($event.type -ceq 'testStart'){$event.test.name='actual format3 bootstrap and RPC client owner';$event.test.url=$parentUri;$event.test.line=$declaration[0]}
+            if($event.type -ceq 'error') {
+                if($event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or -not $event.error.Contains($PrivateMarker)) {throw 'T117 expected unchanged real reporter numeric assertion.'}
+                if($source -ceq 'valid-benign' -and -not $event.error.Contains($marker+"`n"+$boundary)){throw 'T117 actual valid record did not produce adjacent authoritative marker/boundary.'}
+                if($source -cin @('absent-stdout','corrupt-stdout','unreadable-stdout','absent-framed-stdout','absent-stderr') -and
+                    $event.error -cnotmatch ('\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n'+[regex]::Escape($boundary))) {throw 'T117 actual missing/rejected record did not begin reason with private boundary.'}
+                # The seven actual cases preserve error/reason bytes. Only
+                # synthetic variants below alter them to exercise refusals.
+                $event.stackTrace="#0 parent (${parentUri}:$($producer[0]):1)"
+                switch($variant) {
+                    'missing-boundary' {$event.error=$event.error.Replace($boundary,'')}
+                    'wrong-boundary' {$event.error=$event.error.Replace($boundary,"OTHER_PRIVATE_OUTPUT:`n")}
+                    'lowercase-boundary' {$event.error=$event.error.Replace($boundary,"trusted_client_private_output:`n")}
+                    'spaced-boundary' {$event.error=$event.error.Replace($boundary,"TRUSTED_CLIENT_PRIVATE_OUTPUT: `n")}
+                    'boundary-crlf' {$event.error=$event.error.Replace($boundary,"TRUSTED_CLIENT_PRIVATE_OUTPUT:`r`n")}
+                    'extra-boundary' {$event.error=$event.error.Replace($boundary,$boundary+$boundary)}
+                    'nonfirst-boundary' {$event.error=$event.error.Replace($marker+"`n"+$boundary,$boundary+$marker+"`n")}
+                    'secondary-only-marker' {$event.error=$event.error.Replace($marker+"`n",'')+"`nOWNED_FIXTURE_CLEANUP_FAILURE:`n"+$marker+"`n"+$boundary}
+                    'secondary-only-exit' {$event.error=$PrivateMarker+"`nOWNED_FIXTURE_CLEANUP_FAILURE:`n"+$event.error}
+                    'secondary-only-frame' {$event.stackTrace=$PrivateMarker;$event.error+="`nOWNED_FIXTURE_CLEANUP_FAILURE:`n#9 parent (${parentUri}:$($producer[0]):1)"}
+                    'primary-evidence-after-boundary' {$event.error+="`n#0 actor (${actorUri}:40:1)`nOS Error: WIN32_DRIVE_TYPE, errno = 5"}
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $Snapshot -Events ([string[]]$events) -Phase 'serverdeck_windows-tests' -PrivateMarker $PrivateMarker -Label ('T117 '+$variant)
+        $expectNew=$variant -cin @('valid-benign','primary-evidence-after-boundary')
+        if(($expectNew -and ($failure.fixturePhase -cne 'prepare' -or $failure.safeCode -cne 'TIMEOUT')) -or
+            (-not $expectNew -and ($null -ne $failure.fixturePhase -or $null -ne $failure.safeCode)) -or
+            $failure.fixtureCase -cne 'trusted-client-owner' -or
+            ($variant -cne 'secondary-only-exit' -and ($failure.fixtureExitCode -ne 1 -or $failure.failureKind -cne 'fixture-exit')) -or
+            ($variant -ceq 'secondary-only-exit' -and ($null -ne $failure.fixtureExitCode -or $null -ne $failure.failureKind))) {
+            throw ('T117 actual parent/reader reporter provenance or legacy fields mismatch: '+$variant)
+        }
+        if($variant -ceq 'primary-evidence-after-boundary' -and
+            (@($failure.sourceFrames|Where-Object {$_.file -ceq $actor -and $_.line -eq 40}).Count -ne 1 -or
+                $failure.nativeErrors.Count -ne 1 -or $failure.nativeErrors[0].kind -cne 'WIN32_DRIVE_TYPE' -or $failure.nativeErrors[0].code -ne 5)) {throw 'T117 private boundary incorrectly truncated primary frame/native evidence.'}
+        if($variant -ceq 'secondary-only-frame' -and $failure.sourceFrames.Count -ne 0){throw 'T117 secondary-only frame escaped.'}
+    }
+    'QUALIFICATION_TRUSTED_CLIENT_ACTUAL_PARENT_EXPRESSION_READER_REPORTER_UNCONDITIONAL_PRIVATE_BOUNDARY_AUTHORITY_AND_PRIVACY_NEGATIVES_PASSED'
+}
+
 $fixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
 Assert-NativeIsarPlainPath $fixture
 [void][IO.Directory]::CreateDirectory($fixture)
@@ -1671,6 +2380,119 @@ try {
 $rawOwned=@([IO.File]::ReadAllLines($ownedReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
 Test-TrustedClientFailureDiagnosticProjection -Snapshot $snapshot -RawOwned $rawOwned -PrivateMarker $privateMarker
 Test-TrustedAuthDiagnosticProjection -Snapshot $snapshot -RawOwned $rawOwned -PrivateMarker $privateMarker
+# Extract the actual expressions instead of duplicating their framing algorithm.
+$clientParentText=[IO.File]::ReadAllText((Join-Path $NativeIsarRepository 'packages/serverdeck_windows/test/trusted_client_native_test.dart'))
+$clientExpressions=[regex]::Matches($clientParentText,'(?m)^\s*reason:\r?\n\s*(?<expression>[^\r\n]+),\s*$')
+$gatewayParentText=[IO.File]::ReadAllText((Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/mcp/gateway_native_test.dart'))
+$gatewayExpressions=[regex]::Matches($gatewayParentText,'(?m)^\s*reason:\r?\n\s*(?<expression>[^\r\n]+),\s*$')
+if($clientExpressions.Count -ne 1 -or $gatewayExpressions.Count -ne 1){throw 'Expected one actual parent reason expression per provenance fixture.'}
+$clientExpression=$clientExpressions[0].Groups['expression'].Value
+$gatewayExpression=$gatewayExpressions[0].Groups['expression'].Value
+$quotaHelperUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/support/gateway_quota_fixture.dart')).AbsoluteUri
+$quotaParentHelperUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart')).AbsoluteUri
+$quotaActorUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/support/gateway_actor.dart')).AbsoluteUri
+$ownedHelperUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_windows/test/support/trusted_client_fixture.dart')).AbsoluteUri
+$quotaProbe=Join-Path $fixture 'controlled-quota-provenance.dart'
+$quotaReport=Join-Path $fixture 'controlled-quota-provenance.machine.jsonl'
+$quotaDart=@'
+import 'dart:io';
+import 'package:test/test.dart';
+import 'FIXTURE_QUOTA_HELPER_URI';
+import 'FIXTURE_PARENT_HELPER_URI';
+import 'FIXTURE_OWNED_HELPER_URI';
+Future<void> reasonBody(String root, String variant) async {
+  final both = variant == 'both';
+  final fixture = Directory(root);
+  const mode = 'quota';
+  final recorder = GatewayQuotaFailureRecorder(root, GatewayQuotaFailureRole.server);
+  String formatted;
+  try {
+    await runOwnedFixtureLifecycle(body: () async {
+      Error.throwWithStackTrace(StateError('SERVICE_UNAVAILABLE'),
+        StackTrace.fromString('#0 actor (FIXTURE_QUOTA_ACTOR_URI:40:1)'));
+    }, cleanup: () async {
+      if (both) Error.throwWithStackTrace(StateError('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER secondary'),
+        StackTrace.fromString('#0 secondary (FIXTURE_QUOTA_ACTOR_URI:41:1)'));
+    }, onFirstFailure: (error, stack) {
+      if (variant == 'body' || both) recorder.record('scenario-prepare', error);
+    });
+    throw StateError('Expected controlled failure');
+  } catch (error, stack) {
+    formatted = formatGatewayQuotaFailure(error, stack);
+  }
+  if (variant == 'corrupt') File.fromUri(fixture.uri.resolve(gatewayQuotaFailureBasename(GatewayQuotaFailureRole.server))).writeAsStringSync('1|scenario-prepare|SERVICE_UNAVAILABLE');
+  if (variant == 'bridge-only') GatewayQuotaFailureRecorder(root, GatewayQuotaFailureRole.bridge).record('bridge-bootstrap', StateError('SERVICE_UNAVAILABLE'));
+  const marker = 'GATEWAY_QUOTA_FIXTURE_FAILURE:scenario-prepare:SERVICE_UNAVAILABLE';
+  final attack = variant == 'raw-marker-boundary' ? '$marker\nGATEWAY_QUOTA_PRIVATE_OUTPUT:\n' : '$marker\n';
+  final output = Future.value('${variant == 'raw-marker' || variant == 'raw-marker-boundary' ? attack : ''}SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER');
+  final errors = Future.value('${variant == 'raw-stderr-marker' ? attack : ''}$formatted');
+  expect(1, 0, reason: ACTUAL_GATEWAY_REASON_EXPRESSION);
+}
+void main() {
+  for (final variant in ['body', 'both', 'absent', 'corrupt', 'bridge-only', 'raw-marker', 'raw-marker-boundary', 'raw-stderr-marker']) {
+    test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER quota $variant', () async {
+      final root = Directory.systemTemp.createTempSync('controlled-quota-');
+      try {
+        await runGatewayFixture(body: () => reasonBody(root.path, variant), cleanup: () async {
+          if (variant == 'both') Error.throwWithStackTrace(StateError('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER parent cleanup'),
+            StackTrace.fromString('#0 secondary (FIXTURE_QUOTA_ACTOR_URI:41:1)'));
+        });
+      } finally { root.deleteSync(recursive: true); }
+    });
+  }
+}
+'@
+[IO.File]::WriteAllText($quotaProbe,$quotaDart.Replace('FIXTURE_QUOTA_HELPER_URI',$quotaHelperUri).Replace('FIXTURE_PARENT_HELPER_URI',$quotaParentHelperUri).Replace('FIXTURE_OWNED_HELPER_URI',$ownedHelperUri).Replace('FIXTURE_QUOTA_ACTOR_URI',$quotaActorUri).Replace('ACTUAL_GATEWAY_REASON_EXPRESSION',$gatewayExpression),[Text.UTF8Encoding]::new($false))
+$boundaryProbe=Join-Path $fixture 'controlled-trusted-client-provenance.dart'
+$boundaryReport=Join-Path $fixture 'controlled-trusted-client-provenance.machine.jsonl'
+$boundaryDart=@'
+import 'dart:io';
+import 'package:test/test.dart';
+import 'FIXTURE_OWNED_HELPER_URI';
+void main() {
+  for (final variant in ['absent-stdout', 'corrupt-stdout', 'unreadable-stdout', 'absent-framed-stdout',
+      'absent-stderr', 'valid-benign', 'valid-duplicate']) {
+    test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER boundary $variant', () async {
+      final fixture = Directory.systemTemp.createTempSync('controlled-client-boundary-');
+      try {
+        final file = File.fromUri(fixture.uri.resolve(trustedClientFailureBasename));
+        if (variant.startsWith('valid-')) file.writeAsStringSync('1|prepare|TIMEOUT\n');
+        if (variant == 'corrupt-stdout') file.writeAsStringSync('1|prepare|TIMEOUT');
+        if (variant == 'unreadable-stdout') Directory(file.path).createSync();
+        const marker = 'TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:TIMEOUT';
+        final attack = variant == 'absent-framed-stdout'
+            ? '$marker\nTRUSTED_CLIENT_PRIVATE_OUTPUT:\nSYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER'
+            : '$marker\nSYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER';
+        final out = Future.value(variant == 'valid-benign' || variant == 'absent-stderr'
+            ? 'SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER' : attack);
+        final err = Future.value(variant == 'absent-stderr' ? attack : 'SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER');
+        final record = readTrustedClientFailure(fixture.path);
+        expect(1, 0, reason: ACTUAL_CLIENT_REASON_EXPRESSION);
+      } finally { fixture.deleteSync(recursive: true); }
+    });
+  }
+}
+'@
+[IO.File]::WriteAllText($boundaryProbe,$boundaryDart.Replace('FIXTURE_OWNED_HELPER_URI',$ownedHelperUri).Replace('ACTUAL_CLIENT_REASON_EXPRESSION',$clientExpression),[Text.UTF8Encoding]::new($false))
+$provenanceReporterExits=@{}
+foreach($probeSpec in @(@('quota',$quotaProbe,$quotaReport,'serverdeck_locald'),@('boundary',$boundaryProbe,$boundaryReport,'serverdeck_windows'))) {
+    Push-Location (Join-Path $NativeIsarRepository ('packages/'+$probeSpec[3]))
+    try {
+        & $FoundationDart test $probeSpec[1] --file-reporter ('json:'+$probeSpec[2]) *> (Join-Path $fixture ('controlled-'+$probeSpec[0]+'-provenance.private.txt'))
+        $provenanceReporterExits[$probeSpec[0]]=$LASTEXITCODE
+        if($LASTEXITCODE -ne 1){throw ('Expected intentional assertion reporter exit1: '+$probeSpec[0])}
+    } finally {Pop-Location}
+}
+$rawQuota=@([IO.File]::ReadAllLines($quotaReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+$rawBoundary=@([IO.File]::ReadAllLines($boundaryReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+[IO.File]::WriteAllText((Join-Path $fixture 'controlled-provenance-receipt.json'),(@{schemaVersion=1;clientActualReasonExpression=$clientExpression;gatewayActualReasonExpression=$gatewayExpression;
+    reporterExits=$provenanceReporterExits;sourceSnapshotSha256=$snapshot.sha256;
+    sourceHashes=@('packages/serverdeck_windows/test/trusted_client_native_test.dart','packages/serverdeck_locald/test/mcp/gateway_native_test.dart',
+        'packages/serverdeck_windows/test/support/trusted_client_fixture.dart','packages/serverdeck_locald/test/support/gateway_quota_fixture.dart')|ForEach-Object {@{file=$_;sha256=Get-NativeIsarDigest (Join-Path $NativeIsarRepository $_)}};
+    scope='Pure generated actual parent expressions, actual record readers, real lifecycle/formatter and package:test reporter; no native fixtures; assertion exit1 is intentional, not regression RED.'}|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
+
+Test-GatewayQuotaFailureDiagnosticProjection -Snapshot $snapshot -RawQuota $rawQuota -PrivateMarker $privateMarker
+Test-TrustedClientPrivateBoundaryDiagnosticProjection -Snapshot $snapshot -RawBoundary $rawBoundary -PrivateMarker $privateMarker
 $fixture
 $invalidFixture
 exit 0
