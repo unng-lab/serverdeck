@@ -89,3 +89,25 @@ T110/T111 локальные проверки завершены: root628/0/anal
 ### T110/T111: fresh independent review завершён
 
 t110_t111_independent_review завершён без замечаний; отдельный read-only diagnostics subaudit также0. Все9size/SHA review-T110-T111.json совпали в начале и конце, HEAD2af сохранён. Проверены bootstrap preparation/ownership/cleanup, сохранность прежних behavior/oracles/deadlines, fixed17phase/36case projection и installer+5 literal guard; cached local evidence не расширено до coldCI. T110/T111 закрыты только в локальном implementation/checks/review scope, T001–T109 и все RED сохранены. После этой записи обязательны fresh links и отдельный recording audit до commit. Новый exact commit, terminal successful CI, build/install/source/tag/merge/publication ещё не выполнены для+5.
+
+
+## T112: release gate остаётся открытым
+
+CI5push40413693379 failed gateway-quota на stderr assertion при close119, до owned delete121; первичная причина могла быть замещена finally. PRCI5 пока выполняется, merge/tag/source release не выполнены. Установленная private+5/source ZIP5 подтверждены независимым artifact audit, но не подменяют exact successful CI. T112 сохраняет primary+secondary private error/stack в прежнем body-owned cleanup lifetime и добавляет строго проверенный bounded gateway exit projection; runtime/oracles/deadlines/actor/provider не меняет по гипотезам. T001–T111 сохранены. Следующий metadata+6 требует своих checks/reviews/commit/terminalCI/build/install/source/tag/publication; workspace и старые установки сохраняются. Spec readiness review выполняется после links до implementation.
+
+
+## T113: sourcebuilt capacity reproduction и bounded sync fixture
+
+Оба Windows CI5 failed: push gateway-quota masking и PR trust-probe-success-write-capacity55s. T112 сохраняет обе gateway ошибки; T113 сохраняет все capacity oracles/commits/map/timeouts и заменяет лишь async maintenance на отдельные sync transactions с yield16, добавляя fixed safe stages/buckets. Actual CI phase/cause не доказана. Новый sourcebuilt artifact и unchanged private baseline сначала выполняются после полного cachedT112; не активировать candidate и не менять обычные bundles/provider. Затем нужны same-artifact after-run, cached36 и все указанные local checks/reviews. Полный T112cached run не выдаётся за T113/coldCI. Metadata+6 остаётся общей будущей revision двух задач; installed+5/data/история сохраняются, full exact new CI/merge/tag/source publication ещё обязательны. Новая T113 проходит strict links/readiness review до implementation.
+
+
+## T112/T113: локальные проверки закончены, review pending
+
+T112 полный cached serialnative936passed/1skip54m26exit0 предшествовал T113Dart edits. T113 root632/0/analyze0/7505pass1skip4m40, localdanalyze0/cached36pass1m51, helper10GREEN и meaningfulRED, fullcontrolled14successful groups/exit0. Sourcebuilt197-file unqualified artifact c45bf.../fe475... использован для oldasync baseline4502ms и newcase4043ms с16raw/ID rollback+recovery/replay/revoke oracles; source/provider/bundle preservation подтверждены. Одна пара не устанавливает CI55s cause. Operational formatter longpaths/import-boundary capsule RED исправлены только переносом privateinputs вне source tree, без ослабления guard/receipts; mapping/oldRED retained. Root appsources/protocols/provideractivation не менялись.
+
+Следующий gate — fresh independent code/spec/helper+6 review, затем recording audit перед commit. T112/T113 остаютсяunchecked; metadata+6 не собран/не установлен/не опубликован, actualprivate+5/data сохраняются. Новый exact successful full CI, commit/build/install/source/tag/merge/publication имеют отдельные receipts. Source-only/unsigned-private/signing/native-distribution/full001/021/005 boundaries прежние.
+
+
+### T112/T113: fresh independent implementation review завершён
+
+t112_t113_independent_review завершён0findings; отдельный completed PowerShell/helper+6 subaudit также0. На завершение01:32:21Z все14bytes/SHA review-T112-T113.json совпали, HEAD5461dad сохранён. Подтверждены scoped requirements/implementation/oracles, meaningfulRED/GREEN, actual checks и отдельность historicalfullT112/cached36/sameartifactpair/fullcoldCI. T112/T113 закрыты только в local implementation/checks/review scope; все113unique tasks и прежние RED/history сохранены. Причины двух CI5failures не объявлены доказанными/устранёнными. После этой записи выполняются fresh links и отдельный recording audit3docs до commit. Metadata+6 ещё не имеет новых commit/CI/build/install/source/tag/merge/publication receipts; installedprivate+5/workspace сохраняются. Exact terminal successful full CI остаётся обязательным перед merge/tag/source release, binary/signing/native distribution/full001/021/005 boundaries прежние.

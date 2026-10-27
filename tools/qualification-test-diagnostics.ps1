@@ -1,6 +1,218 @@
 . "$PSScriptRoot/native-artifact-source-snapshot.ps1"
 . "$PSScriptRoot/native-isar-artifact-inputs.ps1"
 
+function Get-NativeCapacityDiagnosticShape {
+    param([string[]]$ParentLines,[string[]]$HelperLines,[string[]]$WriterLines)
+    $phases=@('capacity-start','capacity-reader-ready')+@(0..20|ForEach-Object {'capacity-prefill-'+($_*1000)})+@(
+        'capacity-full','capacity-confirm-refused','capacity-reader-released','capacity-recovery-confirm','capacity-recovered',
+        'capacity-replay-verified','capacity-revoke-verified','capacity-complete')
+    $parent=($ParentLines|Where-Object {$_.Trim() -and -not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
+    $helper=($HelperLines|Where-Object {$_.Trim() -and -not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
+    $writer=($WriterLines|Where-Object {$_.Trim() -and -not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
+    $producer=@'
+await child.exitCode.timeout(
+  const Duration(seconds: 55),
+  onTimeout: mode == 'success-write-capacity'
+      ? () {
+          final phase = readCapacityFixturePhase(fixture.path);
+          throw TimeoutException(
+            'TRUST_CAPACITY_FIXTURE_TIMEOUT:$phase',
+            const Duration(seconds: 55),
+          );
+        }
+      : null,
+),
+'@
+    $checkedProducer=($producer -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    $fileContract=@'
+File _phaseFile(String root) =>
+    File('$root${Platform.pathSeparator}$capacityFixturePhaseFileName');
+void writeCapacityFixturePhase(String root, String phase) {
+  final checked = capacityFixturePhaseTokens.contains(phase)
+      ? phase
+      : capacityFixtureUnknownPhase;
+  try {
+    _phaseFile(root)
+        .writeAsStringSync('$checked\n', encoding: ascii, flush: true);
+  } catch (_) {
+  }
+}
+String readCapacityFixturePhase(String root) {
+  try {
+    final input = _phaseFile(root).openSync();
+    try {
+      if (input.lengthSync() > 64) return capacityFixtureUnknownPhase;
+      final bytes = input.readSync(65);
+      if (bytes.isEmpty || bytes.length > 64 || input.lengthSync() > 64) {
+        return capacityFixtureUnknownPhase;
+      }
+      final value = ascii.decode(bytes, allowInvalid: false);
+      if (!value.endsWith('\n')) return capacityFixtureUnknownPhase;
+      final phase = value.substring(0, value.length - 1);
+      return capacityFixturePhaseTokens.contains(phase)
+          ? phase
+          : capacityFixtureUnknownPhase;
+    } finally {
+      input.closeSync();
+    }
+  } catch (_) {
+    return capacityFixtureUnknownPhase;
+  }
+}
+'@
+    $checkedFile=($fileContract -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    $writerGuard=@'
+void capacityPhase(String phase) {
+  if (mode == 'probe-success-write-capacity') {
+    writeCapacityFixturePhase(root, phase);
+  }
+}
+'@
+    $checkedGuard=($writerGuard -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    $commit=@'
+final full = await prefillCapacityFixture(
+  commitSync: () => db.writeTxnSync(() {
+    db.storedSettings.putSync(
+      StoredSettings()
+        ..id = 1
+        ..payload = alternate,
+    );
+    db.storedSettings.putSync(
+      StoredSettings()
+        ..id = 1
+        ..payload = original,
+    );
+  }),
+  isCapacityFailure: isNativeCapacityFailure,
+  onBucket: (completed) => capacityPhase('capacity-prefill-$completed'),
+);
+'@
+    $checkedCommit=($commit -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    $tokens=[regex]::Matches($helper,'(?s)const capacityFixturePhaseTokens = <String>\{(?<tokens>.*?)\};')
+    $expectedTokens=($phases|ForEach-Object {"'"+$_+"',"}) -join "`n"
+    if($tokens.Count -ne 1 -or $tokens[0].Groups['tokens'].Value.Trim() -cne $expectedTokens -or
+        -not $helper.Contains("const capacityFixturePhaseFileName = 'trust-capacity-fixture-phase';") -or
+        -not $helper.Contains("const capacityFixtureUnknownPhase = 'unknown';") -or -not $helper.Contains($checkedFile) -or
+        -not $parent.Contains("import '../support/capacity_fixture.dart';") -or -not $parent.Contains($checkedProducer) -or
+        -not $writer.Contains("import 'capacity_fixture.dart';") -or -not $writer.Contains($checkedGuard) -or
+        -not $writer.Contains($checkedCommit) -or [regex]::Matches($writer,'capacityPhase\(').Count -ne 12){return $null}
+    foreach($phase in $phases) {
+        if($phase.StartsWith('capacity-prefill-')){continue}
+        if(-not $writer.Contains("capacityPhase('"+$phase+"');")){return $null}
+    }
+    $declaration=@();$awaitLine=@();$throwLine=@()
+    for($index=0;$index+1 -lt $ParentLines.Length;$index++) {
+        if($ParentLines[$index].Trim() -ceq 'test(' -and $ParentLines[$index+1].Trim() -ceq "'actual native host trust probes `$mode',"){$declaration+=$index+1}
+        if($ParentLines[$index].Trim() -ceq 'await child.exitCode.timeout(' -and $ParentLines[$index+1].Trim() -ceq 'const Duration(seconds: 55),'){$awaitLine+=$index+1}
+        if($ParentLines[$index].Trim() -ceq 'throw TimeoutException(' -and $ParentLines[$index+1].Trim() -ceq "'TRUST_CAPACITY_FIXTURE_TIMEOUT:`$phase',"){$throwLine+=$index+1}
+    }
+    if($declaration.Count -ne 1 -or $awaitLine.Count -ne 1 -or $throwLine.Count -ne 1 -or $declaration[0] -ge $awaitLine[0] -or $awaitLine[0] -ge $throwLine[0]){return $null}
+    return @{declarationLine=$declaration[0];producerLines=@($awaitLine[0],$throwLine[0],($throwLine[0]+1),($throwLine[0]+2));
+        errorPattern=('\ATimeoutException after 0:00:55\.000000: TRUST_CAPACITY_FIXTURE_TIMEOUT:('+((@($phases)+@('unknown')|ForEach-Object {[regex]::Escape($_)}) -join '|')+')\z')}
+}
+
+function Get-NativeGatewayDiagnosticShape {
+    param([string[]]$GatewayLines,[string[]]$HelperLines)
+    # A fixed test-only source contract. Callers also require current hashes
+    # for both files; arbitrary Expected/Actual assertions are insufficient.
+    $helper=@'
+class GatewayFixtureFailure implements Exception {
+  const GatewayFixtureFailure({
+    required this.primaryError,
+    required this.primaryStackTrace,
+    required this.cleanupError,
+    required this.cleanupStackTrace,
+  });
+
+  final Object primaryError;
+  final StackTrace primaryStackTrace;
+  final Object cleanupError;
+  final StackTrace cleanupStackTrace;
+
+  @override
+  String toString() =>
+      '$primaryError\nGATEWAY_FIXTURE_CLEANUP_FAILURE: $cleanupError\n'
+      '$cleanupStackTrace';
+}
+
+Future<void> runGatewayFixture({
+  required Future<void> Function() body,
+  required Future<void> Function() cleanup,
+}) async {
+  ({Object error, StackTrace stackTrace})? primaryFailure;
+  try {
+    await body();
+  } catch (error, stackTrace) {
+    primaryFailure = (error: error, stackTrace: stackTrace);
+  }
+
+  try {
+    await cleanup();
+  } catch (error, stackTrace) {
+    final primary = primaryFailure;
+    if (primary != null) {
+      Error.throwWithStackTrace(
+        GatewayFixtureFailure(
+          primaryError: primary.error,
+          primaryStackTrace: primary.stackTrace,
+          cleanupError: error,
+          cleanupStackTrace: stackTrace,
+        ),
+        primary.stackTrace,
+      );
+    }
+    Error.throwWithStackTrace(error, stackTrace);
+  }
+
+  final primary = primaryFailure;
+  if (primary != null) {
+    Error.throwWithStackTrace(primary.error, primary.stackTrace);
+  }
+}
+'@
+    $producer=@'
+expect(
+  await child.exitCode.timeout(
+    const Duration(seconds: 70),
+    onTimeout: () {
+      final phase = File(
+        p.join(fixture.path, 'gateway-fixture-phase'),
+      );
+      final value = phase.existsSync()
+          ? phase.readAsStringSync()
+          : '';
+      final safe = RegExp(r'^[a-z-]{1,40}$').hasMatch(value)
+          ? value
+          : 'unknown';
+      throw StateError('GATEWAY_NATIVE_TIMEOUT:$safe');
+    },
+  ),
+  0,
+  reason: '${await output}\n${await errors}',
+);
+'@
+    $helperCode=($HelperLines|Where-Object {-not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
+    $checkedHelper=($helper -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    $gatewayCode=($GatewayLines|ForEach-Object {$_.Trim()}) -join "`n"
+    $checkedProducer=($producer -split '\r?\n'|ForEach-Object {$_.Trim()}) -join "`n"
+    if($helperCode.Trim() -cne $checkedHelper -or -not $gatewayCode.Contains($checkedProducer) -or
+        -not $gatewayCode.Contains("import '../support/gateway_fixture_cleanup.dart';")){return $null}
+    $declaration=@();$exit=@();$wrapper=@();$cleanup=@()
+    for($index=0;$index -lt $GatewayLines.Length;$index++) {
+        $text=$GatewayLines[$index].Trim()
+        if($text -ceq 'test(' -and $index+1 -lt $GatewayLines.Length -and
+            $GatewayLines[$index+1].Trim() -ceq "'actual native MCP gateway `$mode',"){$declaration+=$index+1}
+        if($text -ceq 'expect(' -and $index+1 -lt $GatewayLines.Length -and
+            $GatewayLines[$index+1].Trim() -ceq 'await child.exitCode.timeout('){$exit+=$index+1}
+        if($text -ceq 'await runGatewayFixture(' -and $index+1 -lt $GatewayLines.Length -and
+            $GatewayLines[$index+1].Trim() -ceq 'body: () async {'){$wrapper+=$index+1}
+        if($text -ceq 'cleanup: fixture.close,'){$cleanup+=$index+1}
+    }
+    if($declaration.Count -ne 1 -or $exit.Count -ne 1 -or $wrapper.Count -ne 1 -or $cleanup.Count -ne 1 -or
+        $declaration[0] -ge $wrapper[0] -or $wrapper[0] -ge $exit[0] -or $exit[0] -ge $cleanup[0]){return $null}
+    return @{declarationLine=$declaration[0];producerLines=@($exit[0],($exit[0]+1));cleanupSeparator="`nGATEWAY_FIXTURE_CLEANUP_FAILURE: "}
+}
+
 function Get-NativeBootstrapDiagnosticShape {
     param([string[]]$BootstrapLines,[string[]]$PreparationLines)
     # This is a deliberately fixed source contract, not a parser for arbitrary
@@ -143,6 +355,43 @@ function Write-NativeQualificationTestFailure {
         'admission-clock','reserved-cancel','physical-cancel','physical-detach','physical-stale')
     $bootstrapSource='packages/serverdeck_locald/test/bootstrap_native_test.dart'
     $bootstrapPreparation='packages/serverdeck_locald/test/support/bootstrap_preparation.dart'
+    $capacityParent='packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart'
+    $capacityHelper='packages/serverdeck_locald/test/support/capacity_fixture.dart'
+    $capacityWriter='packages/serverdeck_locald/test/support/trust_write_scenarios.dart'
+    $capacityShape=$null
+    function Get-CapacityDiagnosticPhase($Test,[string]$File,$DeclarationLine,$DiagnosticError,$DiagnosticTrace) {
+        if(-not $capacityShape -or -not $Test -or $File -cne $capacityParent -or $DiagnosticError -isnot [string] -or
+            $Test['name'] -isnot [string] -or $Test['name'] -cne 'actual native host trust probes success-write-capacity' -or
+            $Test['url'] -isnot [string] -or (Resolve-DiagnosticSource $Test['url']) -cne $capacityParent -or
+            ($Test['id'] -isnot [int] -and $Test['id'] -isnot [long]) -or $Test['id'] -lt 0 -or
+            ($Test['suiteID'] -isnot [int] -and $Test['suiteID'] -isnot [long]) -or $suites[[string]$Test['suiteID']] -cne $capacityParent -or
+            ($Test['line'] -isnot [int] -and $Test['line'] -isnot [long]) -or $DeclarationLine -ne $capacityShape.declarationLine -or
+            $Test['line'] -ne $capacityShape.declarationLine -or $DiagnosticError -cnotmatch $capacityShape.errorPattern){return $null}
+        $candidatePhase=$Matches[1]
+        foreach($frame in [regex]::Matches([string]$DiagnosticTrace,$framePattern)) {
+            $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+            if($frameFile -cne $capacityParent){continue}
+            $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+            if($frameLine -in $capacityShape.producerLines){return $candidatePhase}
+        }
+        return $null
+    }
+    $gatewaySource='packages/serverdeck_locald/test/mcp/gateway_native_test.dart'
+    $gatewayHelper='packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart'
+    $gatewayActor='packages/serverdeck_locald/test/support/gateway_actor.dart'
+    $gatewayShape=$null
+    function Get-GatewayDiagnosticCase($Test,[string]$File,$DeclarationLine) {
+        if(-not $gatewayShape -or -not $Test -or $File -cne $gatewaySource -or
+            $Test['name'] -isnot [string] -or $Test['url'] -isnot [string] -or
+            ($Test['id'] -isnot [int] -and $Test['id'] -isnot [long]) -or
+            ($Test['line'] -isnot [int] -and $Test['line'] -isnot [long]) -or
+            (Resolve-DiagnosticSource $Test['url']) -cne $gatewaySource -or
+            $DeclarationLine -ne $gatewayShape.declarationLine -or $Test['line'] -ne $gatewayShape.declarationLine){return $null}
+        foreach($case in $gatewayCases) {
+            if($Test['name'] -ceq ('actual native MCP gateway '+$case)){return 'gateway-'+$case}
+        }
+        return $null
+    }
     $bootstrapShape=$null;$bootstrapStarts=0;$bootstrapStates=@{}
     function Get-BootstrapDiagnosticCase($Test) {
         if(-not $bootstrapShape -or -not $Test -or $Test['name'] -isnot [string] -or
@@ -167,6 +416,20 @@ function Write-NativeQualificationTestFailure {
     $tests=@{};$suites=@{};$failures=[Collections.Generic.List[object]]::new()
     $complete=$false;$status='missing-reporter'
     try {
+        if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($capacityParent) -and $known.ContainsKey($capacityHelper) -and $known.ContainsKey($capacityWriter) -and
+            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityParent)) -ceq $known[$capacityParent].hash -and
+            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityHelper)) -ceq $known[$capacityHelper].hash -and
+            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityWriter)) -ceq $known[$capacityWriter].hash) {
+            $capacityShape=Get-NativeCapacityDiagnosticShape -ParentLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityParent))) `
+                -HelperLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityHelper))) `
+                -WriterLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $capacityWriter)))
+        }
+        if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($gatewaySource) -and $known.ContainsKey($gatewayHelper) -and
+            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $gatewaySource)) -ceq $known[$gatewaySource].hash -and
+            (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $gatewayHelper)) -ceq $known[$gatewayHelper].hash) {
+            $gatewayShape=Get-NativeGatewayDiagnosticShape -GatewayLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $gatewaySource))) `
+                -HelperLines ([IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $gatewayHelper)))
+        }
         if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($bootstrapSource) -and $known.ContainsKey($bootstrapPreparation) -and
             (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $bootstrapSource)) -ceq $known[$bootstrapSource].hash -and
             (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $bootstrapPreparation)) -ceq $known[$bootstrapPreparation].hash) {
@@ -220,20 +483,63 @@ function Write-NativeQualificationTestFailure {
                                 if(-not $file){$file=$suites[[string]$test['suiteID']]}
                                 $declarationLine=Get-DiagnosticLine $file $test['line']
                             }
+                            $framePattern='(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)'
+                            $gatewayDiagnosticCase=Get-GatewayDiagnosticCase $test $file $declarationLine
+                            $gatewayExitCode=$null;$gatewayPrimaryError=$null
+                            if($gatewayDiagnosticCase -and $event.error -is [string] -and
+                                ($event.testID -is [int] -or $event.testID -is [long])) {
+                                $gatewayPrimaryError=$event.error
+                                $separator=$gatewayPrimaryError.IndexOf($gatewayShape.cleanupSeparator,[StringComparison]::Ordinal)
+                                if($separator -ge 0){$gatewayPrimaryError=$gatewayPrimaryError.Substring(0,$separator)}
+                                if($gatewayPrimaryError -cmatch '\AExpected: <0>\r?\n[ \t]*Actual: <(?<exit>-?[0-9]{1,10})>\r?\n') {
+                                    $candidateExit=[long]$Matches['exit']
+                                    if($candidateExit -ne 0 -and $candidateExit -ge -2147483648 -and $candidateExit -le 4294967295) {
+                                        # Check the producer before applying the shared frame
+                                        # cap. A secondary cleanup stack cannot prove it.
+                                        foreach($trace in @($event.stackTrace,$gatewayPrimaryError)) {
+                                            foreach($frame in [regex]::Matches([string]$trace,$framePattern)) {
+                                                $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+                                                if($frameFile -cne $gatewaySource){continue}
+                                                $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+                                                if($frameLine -in $gatewayShape.producerLines){$gatewayExitCode=$candidateExit;break}
+                                            }
+                                            if($null -ne $gatewayExitCode){break}
+                                        }
+                                    }
+                                }
+                            }
                             $frames=[Collections.Generic.List[object]]::new()
                             $frameKeys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-                            # Child stacks may be nested in expect's reason. Apply the
-                            # same source/hash/line checks and one total bound to both.
-                            foreach($trace in @($event.stackTrace,$event.error)) {
-                                foreach($frame in [regex]::Matches([string]$trace,'(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)')){
+                            # In a checked gateway exit, primary actor reason frames
+                            # precede wrapper frames. Secondary aggregate text stays
+                            # private and never supplies primary source evidence.
+                            if($null -ne $gatewayExitCode) {
+                                foreach($frame in [regex]::Matches($gatewayPrimaryError,$framePattern)) {
                                     $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+                                    if($frameFile -cne $gatewayActor){continue}
                                     $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
-                                    if($frameFile -and $frameLine -and $frameKeys.Add($frameFile+':'+$frameLine)){
+                                    if($frameLine -and $frameKeys.Add($frameFile+':'+$frameLine)) {
                                         $frames.Add(@{file=$frameFile;line=$frameLine})
                                         if($frames.Count -eq 3){break}
                                     }
                                 }
-                                if($frames.Count -eq 3){break}
+                            }
+                            $traces=if($null -ne $gatewayExitCode){@($event.stackTrace,$gatewayPrimaryError)}else{@($event.stackTrace,$event.error)}
+                            # Other failures retain their previous ordering. Child
+                            # stacks and reporter stacks share hash/line checks and
+                            # one total cap, including the prioritized frames above.
+                            if($frames.Count -lt 3) {
+                                foreach($trace in $traces) {
+                                    foreach($frame in [regex]::Matches([string]$trace,$framePattern)){
+                                        $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+                                        $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+                                        if($frameFile -and $frameLine -and $frameKeys.Add($frameFile+':'+$frameLine)){
+                                            $frames.Add(@{file=$frameFile;line=$frameLine})
+                                            if($frames.Count -eq 3){break}
+                                        }
+                                    }
+                                    if($frames.Count -eq 3){break}
+                                }
                             }
                             $native=[Collections.Generic.List[object]]::new()
                             foreach($match in [regex]::Matches([string]$event.error,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
@@ -250,6 +556,10 @@ function Write-NativeQualificationTestFailure {
                                 $bootstrapStates[$key].case -ceq $bootstrapCase) {
                                 $fixtureCase=$bootstrapCase
                                 $fixturePhase=$bootstrapStates[$key].phase
+                            }
+                            if($event.testID -is [int] -or $event.testID -is [long]) {
+                                $capacityPhase=Get-CapacityDiagnosticPhase $test $file $declarationLine $event.error $event.stackTrace
+                                if($capacityPhase){$fixturePhase=$capacityPhase}
                             }
                             if($declarationLine) {
                                 if([string]$event.error -cmatch '^TimeoutException(?: after [0-9]{1,3}:[0-5][0-9]:[0-5][0-9]\.[0-9]{6})?:') {
@@ -330,6 +640,10 @@ function Write-NativeQualificationTestFailure {
                                     $fixtureExitCode=$candidateExit
                                     $failureKind='fixture-exit'
                                 }
+                            }
+                            if($null -ne $gatewayExitCode -and $fixtureCase -ceq $gatewayDiagnosticCase) {
+                                $fixtureExitCode=$gatewayExitCode
+                                $failureKind='fixture-exit'
                             }
                             # A cleanup exception can mask the actor outcome. Export
                             # only fixed Windows delete codes from the known owned

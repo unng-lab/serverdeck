@@ -5,6 +5,306 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/qualification-test-diagnostics.ps1"
 
+function Test-CapacityPhaseDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][object[]]$RawCapacity,[Parameter(Mandatory)][string]$PrivateMarker)
+    $parentSource='packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart'
+    $helperSource='packages/serverdeck_locald/test/support/capacity_fixture.dart'
+    $writerSource='packages/serverdeck_locald/test/support/trust_write_scenarios.dart'
+    $parentUri=([Uri](Join-Path $NativeIsarRepository $parentSource)).AbsoluteUri
+    $parentLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $parentSource))
+    $helperLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $helperSource))
+    $writerLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $writerSource))
+    $declaration=@(for($index=1;$index -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq "'actual native host trust probes `$mode'," -and $parentLines[$index-1].Trim() -ceq 'test('){$index}
+    })
+    $producer=@(for($index=0;$index -lt $parentLines.Length;$index++) {
+        if($parentLines[$index].Trim() -ceq 'throw TimeoutException('){$index+1}
+    })
+    $modeLoop=[regex]::Matches(($parentLines -join "`n"),'(?s)for \(final mode in \[(?<cases>.*?)\]\) \{')
+    $modes=@([regex]::Matches($modeLoop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})
+    if($declaration.Count -ne 1 -or $producer.Count -ne 1 -or $modes.Count -ne 36){throw 'Expected checked capacity parent declaration/producer and 36 modes.'}
+    $declaration=$declaration[0];$producer=$producer[0]
+    $phases=@('capacity-start','capacity-reader-ready')+@(0..20|ForEach-Object {'capacity-prefill-'+($_*1000)})+@(
+        'capacity-full','capacity-confirm-refused','capacity-reader-released','capacity-recovery-confirm','capacity-recovered',
+        'capacity-replay-verified','capacity-revoke-verified','capacity-complete','unknown')
+    $rawError=@($RawCapacity|Where-Object {$_.type -ceq 'error'})[0];$target=$rawError.testID
+    if($rawError.error -cne 'TimeoutException after 0:00:55.000000: TRUST_CAPACITY_FIXTURE_TIMEOUT:capacity-start') {
+        throw 'Expected real Dart fixed55s capacity timeout reporter shape.'
+    }
+    $variants=$phases+@($modes|Where-Object {$_ -cne 'success-write-capacity'}|ForEach-Object {'mode-'+$_})+@(
+        'unknown-token','wrong-prefix','wrong-duration','missing-duration','prefixed-error','suffixed-error','multiline-token','partial-token',
+        'oversize-token','non-ascii-token','error-type','event-bound','unknown-name','name-type','wrong-source','unknown-source','missing-url',
+        'wrong-suite','missing-suite','wrong-package','invalid-line','unrelated-line','null-line','line-type','fractional-line','id-type',
+        'changed-parent','changed-helper','changed-writer','missing-helper','missing-writer','without-producer','invalid-producer','foreign-producer')
+    foreach($variant in $variants) {
+        $mode=if($variant.StartsWith('mode-')){$variant.Substring(5)}else{'success-write-capacity'}
+        $token=if($variant -in $phases){$variant}else{'capacity-start'}
+        $events=foreach($rawEvent in $RawCapacity) {
+            if($rawEvent.type -ceq 'testStart' -and $rawEvent.test.id -ne $target){continue}
+            if($rawEvent.type -cin @('print','error','testDone') -and $rawEvent.testID -ne $target){continue}
+            $event=$rawEvent|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$parentUri;if($variant -ceq 'missing-suite'){continue}}
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual native host trust probes '+$mode;$event.test.url=$parentUri;$event.test.line=$declaration
+                switch($variant) {
+                    'unknown-name' {$event.test.name+=$PrivateMarker}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-source' {$event.test.url=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/mcp/gateway_native_test.dart')).AbsoluteUri}
+                    'unknown-source' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'wrong-suite' {$event.test.suiteID=999999}
+                    'invalid-line' {$event.test.line=999999}
+                    'unrelated-line' {$event.test.line=$producer}
+                    'null-line' {$event.test.line=$null}
+                    'line-type' {$event.test.line=[string]$declaration}
+                    'fractional-line' {$event.test.line=[double]$declaration}
+                    'id-type' {$event.test.id=[string]$target}
+                }
+            }
+            if($event.type -ceq 'error') {
+                $event.error=$event.error.Replace(':capacity-start',(':'+$token))
+                $event.stackTrace="#0 capacity (${parentUri}:${producer}:1)`n#1 private (file:///C:/${PrivateMarker}/private.dart:9:2)"
+                switch($variant) {
+                    'unknown-token' {$event.error=$event.error.Replace(':capacity-start',(':'+$PrivateMarker))}
+                    'wrong-prefix' {$event.error=$event.error.Replace('TRUST_CAPACITY_FIXTURE_TIMEOUT:','PRIVATE_CAPACITY_TIMEOUT:')}
+                    'wrong-duration' {$event.error=$event.error.Replace('0:00:55.000000','0:00:54.000000')}
+                    'missing-duration' {$event.error=$event.error.Replace(' after 0:00:55.000000','')}
+                    'prefixed-error' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'suffixed-error' {$event.error+=$PrivateMarker}
+                    'multiline-token' {$event.error+="`n"+$PrivateMarker}
+                    'partial-token' {$event.error=$event.error.Replace(':capacity-start',':capacity-star')}
+                    'oversize-token' {$event.error=$event.error.Replace(':capacity-start',(':'+('capacity-start'*10)))}
+                    'non-ascii-token' {$event.error=$event.error.Replace(':capacity-start',':capacity-старт')}
+                    'error-type' {$event.error=@{private=$PrivateMarker}}
+                    'event-bound' {$event.error=$PrivateMarker+('x'*256KB)}
+                    'without-producer' {$event.stackTrace=$PrivateMarker}
+                    'invalid-producer' {$event.stackTrace="#0 capacity (${parentUri}:1:1)"}
+                    'foreign-producer' {$event.stackTrace='#0 foreign (package:serverdeck_windows/native_attributes.dart:65:1)'}
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'));[void][IO.Directory]::CreateDirectory($caseFixture)
+        $phase=if($variant -ceq 'wrong-package'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),[string[]]$events,[Text.UTF8Encoding]::new($false))
+        $selected=$Snapshot
+        if($variant -in @('changed-parent','changed-helper','changed-writer','missing-helper','missing-writer')) {
+            $changed=if($variant -ceq 'changed-parent'){$parentSource}elseif($variant.EndsWith('writer')){$writerSource}else{$helperSource}
+            $selected=@{sha256=$Snapshot.sha256;files=@($Snapshot.files|ForEach-Object {
+                if($_.file -ceq $changed){if(-not $variant.StartsWith('missing-')){@{file=$changed;sha256=('0'*64)}}}else{$_}
+            })}
+        }
+        Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+        $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json');$proof=Read-NativeIsarArtifactJson $casePath;$safe=[IO.File]::ReadAllText($casePath)
+        if($proof.schemaVersion -ne 1 -or -not $proof.controlledFixture -or $proof.fullAcceptance -or $proof.distributionReady -or $proof.activated -or
+            $safe.Contains($PrivateMarker) -or $safe.Contains('TRUST_CAPACITY_FIXTURE_TIMEOUT:') -or $safe.Contains('actual native host trust probes ') -or
+            $safe.Contains('file:///') -or $safe.Contains('C:/') -or $safe.Contains('stackTrace') -or $safe.Contains('999999') -or $safe.Contains('0:00:55')) {
+            throw ('Capacity phase privacy/schema mismatch: '+$variant)
+        }
+        if($variant -ceq 'event-bound') {
+            if($proof.status -cne 'unavailable-reporter' -or $proof.reporterComplete -or $proof.failures.Count -ne 0){throw 'Capacity reporter event bound changed.'}
+            continue
+        }
+        if($proof.status -cne 'failed-test-details' -or -not $proof.reporterComplete -or $proof.failures.Count -ne 1){throw ('Capacity reporter status mismatch: '+$variant)}
+        $failure=$proof.failures[0];$expectPhase=$variant -in $phases
+        $expectCase=$variant -notin @('unknown-name','name-type','wrong-source','unknown-source','missing-url','wrong-package','invalid-line','unrelated-line','null-line','line-type','fractional-line','changed-parent')
+        if(($expectPhase -and $failure.fixturePhase -cne $token) -or (-not $expectPhase -and $null -ne $failure.fixturePhase) -or
+            ($expectCase -and $failure.fixtureCase -cne ('trust-probe-'+$mode)) -or (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            $null -ne $failure.fixtureExitCode -or $null -ne $failure.safeCode -or $failure.nativeErrors.Count -ne 0 -or $failure.sourceFrames.Count -gt 3) {
+            throw ('Capacity fixed phase/case/source mismatch: '+$variant)
+        }
+        $expectTimeout=$variant -notin @('prefixed-error','error-type','invalid-line','null-line','line-type','changed-parent')
+        if(($expectTimeout -and $failure.failureKind -cne 'timeout') -or (-not $expectTimeout -and $null -ne $failure.failureKind)) {
+            throw ('Capacity prior timeout classification changed: '+$variant)
+        }
+    }
+    $parentText=$parentLines -join "`n";$helperText=$helperLines -join "`n";$writerText=$writerLines -join "`n"
+    foreach($text in @($parentText.Replace('const Duration(seconds: 55)','const Duration(seconds: 56)'),
+        $parentText.Replace("mode == 'success-write-capacity'","mode == 'success-write-basic'"),$parentText.Replace('TRUST_CAPACITY_FIXTURE_TIMEOUT:','PRIVATE_TIMEOUT:'))) {
+        if(Get-NativeCapacityDiagnosticShape -ParentLines ($text -split '\r?\n') -HelperLines $helperLines -WriterLines $writerLines){throw 'Altered capacity parent producer accepted.'}
+    }
+    foreach($text in @($helperText.Replace('> 64','> 65'),$helperText.Replace('allowInvalid: false','allowInvalid: true'),
+        $helperText.Replace("value.endsWith('\n')","value.isNotEmpty"),$helperText.Replace("'capacity-prefill-1000'","'capacity-prefill-1001'"))) {
+        if(Get-NativeCapacityDiagnosticShape -ParentLines $parentLines -HelperLines ($text -split '\r?\n') -WriterLines $writerLines){throw 'Altered capacity helper bounds/token contract accepted.'}
+    }
+    foreach($text in @($writerText.Replace("mode == 'probe-success-write-capacity'","mode == 'probe-success-write-basic'"),
+        $writerText.Replace("capacityPhase('capacity-prefill-`$completed')","capacityPhase('capacity-prefill-999')"),$writerText.Replace('db.writeTxnSync(()','db.writeTxn(()'))) {
+        if(Get-NativeCapacityDiagnosticShape -ParentLines $parentLines -HelperLines $helperLines -WriterLines ($text -split '\r?\n')){throw 'Altered capacity actor writer contract accepted.'}
+    }
+    'QUALIFICATION_CAPACITY_31_FIXED_PHASES_UNKNOWN_FALLBACK_35_OTHER_MODES_SOURCE_HASH_55S_PRODUCER_BOUNDS_AND_PRIVACY_NEGATIVES_PASSED'
+}
+
+function Test-GatewayExitDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][object[]]$RawGateway,
+        [Parameter(Mandatory)][string]$PrivateMarker)
+    $gatewaySource='packages/serverdeck_locald/test/mcp/gateway_native_test.dart'
+    $helperSource='packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart'
+    $actorSource='packages/serverdeck_locald/test/support/gateway_actor.dart'
+    $gatewayUri=([Uri](Join-Path $NativeIsarRepository $gatewaySource)).AbsoluteUri
+    $helperUri=([Uri](Join-Path $NativeIsarRepository $helperSource)).AbsoluteUri
+    $actorUri=([Uri](Join-Path $NativeIsarRepository $actorSource)).AbsoluteUri
+    $gatewayLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $gatewaySource))
+    $helperLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $helperSource))
+    $modeLoop=[regex]::Matches(($gatewayLines -join "`n"),'(?s)for \(final mode in \[(?<cases>.*?)\]\) \{')
+    if($modeLoop.Count -ne 1){throw 'Expected one checked gateway mode loop.'}
+    $modes=@([regex]::Matches($modeLoop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})
+    $declaration=@(for($index=1;$index -lt $gatewayLines.Length;$index++) {
+        if($gatewayLines[$index].Trim() -ceq "'actual native MCP gateway `$mode'," -and $gatewayLines[$index-1].Trim() -ceq 'test('){$index}
+    })
+    $producer=@(for($index=1;$index -lt $gatewayLines.Length;$index++) {
+        if($gatewayLines[$index].Trim() -ceq 'await child.exitCode.timeout(' -and $gatewayLines[$index-1].Trim() -ceq 'expect('){$index}
+    })
+    $bodyLine=@(for($index=0;$index -lt $helperLines.Length;$index++) {
+        if($helperLines[$index].Trim() -ceq 'await body();'){$index+1}
+    })
+    if($modes.Count -ne 27 -or $declaration.Count -ne 1 -or $producer.Count -ne 1 -or $bodyLine.Count -ne 1) {
+        throw 'Expected 27 gateway modes and checked declaration, zero-exit producer and helper body.'
+    }
+    $declaration=$declaration[0];$producer=$producer[0];$bodyLine=$bodyLine[0]
+    $bodyStart=@($RawGateway|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' gateway body')})
+    $bothStart=@($RawGateway|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' gateway both')})
+    if($bodyStart.Count -ne 1 -or $bothStart.Count -ne 1){throw 'Expected real body-only and aggregate gateway reporter cases.'}
+    $variants=$modes+@('exit-signed','exit-unsigned','exit-minimum','exit-maximum','both-primary-actor-before-wrappers','primary-frames-bound',
+        'changed-actor','unknown-actor','unknown-mode','suffixed-name','name-type','wrong-source','unknown-source','missing-url','wrong-phase',
+        'invalid-declaration','unrelated-declaration','null-declaration','declaration-type','fractional-declaration',
+        'changed-gateway','changed-helper','missing-helper','exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional',
+        'exit-nonnumeric','exit-prefixed','exit-no-line-end','wrong-expected','error-type','without-producer','helper-producer',
+        'secondary-producer-only','secondary-exit-only')
+    foreach($variant in $variants) {
+        $both=$variant -in @('both-primary-actor-before-wrappers','primary-frames-bound','secondary-producer-only','secondary-exit-only')
+        $target=if($both){$bothStart[0].test.id}else{$bodyStart[0].test.id}
+        $mode=if($variant -in $modes){$variant}else{'quota'}
+        $events=foreach($rawEvent in $RawGateway) {
+            if($rawEvent.type -ceq 'testStart' -and $rawEvent.test.id -ne $target){continue}
+            if($rawEvent.type -cin @('print','error','testDone') -and $rawEvent.testID -ne $target){continue}
+            $event=$rawEvent|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite'){$event.suite.path=$gatewayUri}
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual native MCP gateway '+$mode;$event.test.url=$gatewayUri;$event.test.line=$declaration
+                switch($variant) {
+                    'unknown-mode' {$event.test.name='actual native MCP gateway '+$PrivateMarker}
+                    'suffixed-name' {$event.test.name+=$PrivateMarker}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-source' {$event.test.url=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart')).AbsoluteUri}
+                    'unknown-source' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'invalid-declaration' {$event.test.line=999999}
+                    'unrelated-declaration' {$event.test.line=1}
+                    'null-declaration' {$event.test.line=$null}
+                    'declaration-type' {$event.test.line=[string]$declaration}
+                    'fractional-declaration' {$event.test.line=[double]$declaration}
+                }
+            }
+            if($event.type -ceq 'error') {
+                if($event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                    -not $event.error.Contains($PrivateMarker) -or -not $event.error.Contains($actorUri) -or
+                    ($both -and -not $event.error.Contains("`nGATEWAY_FIXTURE_CLEANUP_FAILURE: "))) {
+                    throw 'Expected actual body/aggregate reporter numeric assertion prefix and private nested reason.'
+                }
+                $event.stackTrace="#0 gateway (${gatewayUri}:${producer}:1)"
+                switch($variant) {
+                    'exit-signed' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-1073741819>')}
+                    'exit-unsigned' {$event.error=$event.error.Replace('Actual: <1>','Actual: <3221225477>')}
+                    'exit-minimum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483648>')}
+                    'exit-maximum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967295>')}
+                    'exit-zero' {$event.error=$event.error.Replace('Actual: <1>','Actual: <0>')}
+                    'exit-too-low' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483649>')}
+                    'exit-too-high' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967296>')}
+                    'exit-plus' {$event.error=$event.error.Replace('Actual: <1>','Actual: <+1>')}
+                    'exit-fractional' {$event.error=$event.error.Replace('Actual: <1>','Actual: <1.0>')}
+                    'exit-nonnumeric' {$event.error=$event.error.Replace('Actual: <1>',('Actual: <'+$PrivateMarker+'>'))}
+                    'exit-prefixed' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'exit-no-line-end' {$event.error="Expected: <0>`n  Actual: <1>"}
+                    'wrong-expected' {$event.error=$event.error.Replace('Expected: <0>','Expected: <1>')}
+                    'error-type' {$event.error=@{private=$PrivateMarker}}
+                    'without-producer' {$event.stackTrace=$PrivateMarker}
+                    'helper-producer' {$event.stackTrace="#0 helper (${helperUri}:${bodyLine}:1)"}
+                    'secondary-producer-only' {
+                        $event.stackTrace="#0 helper (${helperUri}:${bodyLine}:1)"
+                        $event.error+="`n#9 secondary (${gatewayUri}:${producer}:1)"
+                    }
+                    'secondary-exit-only' {$event.error=$PrivateMarker+"`nGATEWAY_FIXTURE_CLEANUP_FAILURE: "+$event.error}
+                    'unknown-actor' {$event.error=$event.error.Replace($actorUri,('file:///C:/'+$PrivateMarker+'/private.dart'))}
+                }
+                if($variant -in @('both-primary-actor-before-wrappers','primary-frames-bound')) {
+                    $event.stackTrace="#0 gateway (${gatewayUri}:${producer}:1)`n#1 helper (${helperUri}:${bodyLine}:1)`n#2 wrapper (${gatewayUri}:${declaration}:1)"
+                }
+                if($variant -ceq 'primary-frames-bound') {
+                    $event.error=$event.error.Replace("`nGATEWAY_FIXTURE_CLEANUP_FAILURE: ",
+                        "`n#3 actor (${actorUri}:40:1)`n#4 actor (${actorUri}:42:1)`n#5 actor (${actorUri}:43:1)`n#6 invalid (${actorUri}:999999:1)`nGATEWAY_FIXTURE_CLEANUP_FAILURE: ")
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $caseFixture=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($caseFixture)
+        $phase=if($variant -ceq 'wrong-phase'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        [IO.File]::WriteAllLines((Join-Path $caseFixture ($phase+'.machine.jsonl')),[string[]]$events,[Text.UTF8Encoding]::new($false))
+        $selected=$Snapshot
+        if($variant -in @('changed-gateway','changed-helper','missing-helper','changed-actor')) {
+            $changed=if($variant -ceq 'changed-gateway'){$gatewaySource}elseif($variant -ceq 'changed-actor'){$actorSource}else{$helperSource}
+            $selected=@{sha256=$Snapshot.sha256;files=@($Snapshot.files|ForEach-Object {
+                if($_.file -ceq $changed) {if($variant -cne 'missing-helper'){@{file=$changed;sha256=('0'*64)}}}else{$_}
+            })}
+        }
+        Write-NativeQualificationTestFailure -Directory $caseFixture -Phase $phase -SourceSnapshot $selected -ControlledFixture
+        $casePath=Join-Path $caseFixture ('safe-test-failure-'+$phase+'.json');$caseProof=Read-NativeIsarArtifactJson $casePath
+        $safe=[IO.File]::ReadAllText($casePath)
+        if($caseProof.schemaVersion -ne 1 -or $caseProof.status -cne 'failed-test-details' -or -not $caseProof.controlledFixture -or
+            -not $caseProof.reporterComplete -or $caseProof.failures.Count -ne 1 -or $caseProof.fullAcceptance -or $caseProof.distributionReady -or $caseProof.activated -or
+            $safe.Contains($PrivateMarker) -or $safe.Contains('actual native MCP gateway ') -or $safe.Contains('GATEWAY_FIXTURE_CLEANUP_FAILURE:') -or
+            $safe.Contains('file:///') -or $safe.Contains('C:/') -or $safe.Contains('stackTrace') -or $safe.Contains('Expected:') -or $safe.Contains('999999')) {
+            throw ('Gateway controlled projection privacy/schema mismatch: '+$variant)
+        }
+        $failure=$caseProof.failures[0]
+        $expectCase=$variant -notin @('unknown-mode','suffixed-name','name-type','wrong-source','invalid-declaration','null-declaration','declaration-type','changed-gateway')
+        $expectExit=$variant -in $modes -or $variant -in @('exit-signed','exit-unsigned','exit-minimum','exit-maximum',
+            'both-primary-actor-before-wrappers','primary-frames-bound','changed-actor','unknown-actor')
+        $expectedExit=switch($variant){'exit-signed'{-1073741819L};'exit-unsigned'{3221225477L};'exit-minimum'{-2147483648L};'exit-maximum'{4294967295L};default{1L}}
+        if(($expectCase -and $failure.fixtureCase -cne ('gateway-'+$mode)) -or (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            ($expectExit -and ($failure.failureKind -cne 'fixture-exit' -or $failure.fixtureExitCode -ne $expectedExit)) -or
+            (-not $expectExit -and ($null -ne $failure.failureKind -or $null -ne $failure.fixtureExitCode)) -or
+            $null -ne $failure.fixturePhase -or $null -ne $failure.safeCode -or $failure.nativeErrors.Count -ne 0 -or $failure.sourceFrames.Count -gt 3) {
+            throw ('Gateway checked numeric exit/case projection mismatch: '+$variant)
+        }
+        if($expectExit -and $variant -notin @('changed-actor','unknown-actor') -and
+            ($failure.sourceFrames.Count -lt 1 -or $failure.sourceFrames[0].file -cne $actorSource -or $failure.sourceFrames[0].line -ne 40)) {
+            throw ('Gateway primary actor frame was lost behind wrapper frames: '+$variant)
+        }
+        if($variant -ceq 'both-primary-actor-before-wrappers' -and
+            ($failure.sourceFrames.Count -ne 3 -or $failure.sourceFrames[1].file -cne $gatewaySource -or $failure.sourceFrames[1].line -ne $producer -or
+                $failure.sourceFrames[2].file -cne $helperSource -or $failure.sourceFrames[2].line -ne $bodyLine)) {
+            throw 'Gateway aggregate primary frame priority/order changed.'
+        }
+        if($variant -ceq 'primary-frames-bound' -and
+            ($failure.sourceFrames.Count -ne 3 -or $failure.sourceFrames[1].line -ne 42 -or $failure.sourceFrames[2].line -ne 43)) {
+            throw 'Gateway primary actor frame cap or dedup changed.'
+        }
+        if($expectExit) {
+            foreach($frame in $failure.sourceFrames) {
+                if($frame.file -ceq $actorSource -and $frame.line -eq 41){throw 'Secondary cleanup actor frame became primary evidence.'}
+                if($variant -ceq 'changed-actor' -and $frame.file -ceq $actorSource){throw 'Stale gateway actor frame was exported.'}
+            }
+        }
+    }
+    $gatewayText=$gatewayLines -join "`n";$helperText=$helperLines -join "`n"
+    foreach($mutation in @($gatewayText.Replace('const Duration(seconds: 70)','const Duration(seconds: 71)'),
+        $gatewayText.Replace("              0,`n              reason:","              1,`n              reason:"),
+        $gatewayText.Replace('cleanup: fixture.close,','cleanup: () async {},'))) {
+        if(Get-NativeGatewayDiagnosticShape -GatewayLines ($mutation -split '\r?\n') -HelperLines $helperLines) {
+            throw 'Gateway altered zero-exit producer or cleanup binding was accepted.'
+        }
+    }
+    foreach($mutation in @($helperText.Replace("GATEWAY_FIXTURE_CLEANUP_FAILURE:","PRIVATE_OTHER_CLEANUP:"),
+        $helperText.Replace('await cleanup();','cleanup();'),$helperText.Replace('primary.stackTrace,','stackTrace,'))) {
+        if(Get-NativeGatewayDiagnosticShape -GatewayLines $gatewayLines -HelperLines ($mutation -split '\r?\n')) {
+            throw 'Gateway altered primary/cleanup helper contract was accepted.'
+        }
+    }
+    'QUALIFICATION_GATEWAY_CHECKED_NUMERIC_EXIT_SIGNED_UNSIGNED_PRIMARY_ACTOR_PRIORITY_AGGREGATE_HASH_BOUNDS_AND_PRIVACY_NEGATIVES_PASSED'
+}
+
 function Test-TrustProbeDiagnosticProjection {
     param([Parameter(Mandatory)]$Snapshot,
         [Parameter(Mandatory)][object[]]$RawTimeout,
@@ -19,8 +319,9 @@ function Test-TrustProbeDiagnosticProjection {
         if($trustLines[$index].Trim() -ceq "'actual native host trust probes `$mode'," -and
             $trustLines[$index-1].Trim() -ceq 'test('){$index}
     })
-    $exitLine=@(for($index=0;$index -lt $trustLines.Length;$index++) {
-        if($trustLines[$index].Trim() -ceq 'await child.exitCode.timeout(const Duration(seconds: 55)),'){$index+1}
+    $exitLine=@(for($index=0;$index+1 -lt $trustLines.Length;$index++) {
+        if($trustLines[$index].Trim() -ceq 'await child.exitCode.timeout(' -and
+            $trustLines[$index+1].Trim() -ceq 'const Duration(seconds: 55),'){$index+1}
     })
     if($trustModes.Count -ne 36 -or $declaration.Count -ne 1 -or $exitLine.Count -ne 1) {
         throw 'Expected 36 fixed trust probe modes, one checked declaration and unchanged child deadline.'
@@ -869,6 +1170,62 @@ try {
 } finally {Pop-Location}
 $rawBootstrap=@([IO.File]::ReadAllLines($bootstrapReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
 Test-BootstrapDiagnosticProjection -Fixture $fixture -Snapshot $snapshot -RawBootstrap $rawBootstrap -PrivateMarker $privateMarker
+
+# The real helper must preserve the assertion prefix for both a single error
+# and a body/cleanup aggregate. The generated fixture has no native imports.
+$gatewayProbe=Join-Path $fixture 'controlled-gateway-exit.dart'
+$gatewayReport=Join-Path $fixture 'controlled-gateway-exit.machine.jsonl'
+$gatewayHelperUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/support/gateway_fixture_cleanup.dart')).AbsoluteUri
+$gatewayActorUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_locald/test/support/gateway_actor.dart')).AbsoluteUri
+$gatewayDart=@'
+import 'package:test/test.dart';
+import 'FIXTURE_GATEWAY_HELPER_URI';
+Future<void> body() async {
+  expect(1, 0, reason: 'SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER primary\n'
+    '#0 actor (FIXTURE_GATEWAY_ACTOR_URI:40:1)\n'
+    '#1 private (file:///C:/SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER/private.dart:9:2)');
+}
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER gateway body', () async {
+    await runGatewayFixture(body: body, cleanup: () async {});
+  });
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER gateway both', () async {
+    await runGatewayFixture(body: body, cleanup: () async {
+      Error.throwWithStackTrace(StateError('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER cleanup'),
+        StackTrace.fromString('#0 secondary (FIXTURE_GATEWAY_ACTOR_URI:41:1)'));
+    });
+  });
+}
+'@
+[IO.File]::WriteAllText($gatewayProbe,$gatewayDart.Replace('FIXTURE_GATEWAY_HELPER_URI',$gatewayHelperUri).Replace('FIXTURE_GATEWAY_ACTOR_URI',$gatewayActorUri),[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_locald')
+try {
+    & $FoundationDart test $gatewayProbe --file-reporter "json:$gatewayReport" *> (Join-Path $fixture 'controlled-gateway-exit.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled gateway body/aggregate assertions unexpectedly passed.'}
+} finally {Pop-Location}
+$rawGateway=@([IO.File]::ReadAllLines($gatewayReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+Test-GatewayExitDiagnosticProjection -Snapshot $snapshot -RawGateway $rawGateway -PrivateMarker $privateMarker
+
+# Throw directly with the real Dart Duration55s shape; this generated probe
+# does not wait55s, use native APIs or claim a capacity fixture execution.
+$capacityProbe=Join-Path $fixture 'controlled-capacity-timeout.dart'
+$capacityReport=Join-Path $fixture 'controlled-capacity-timeout.machine.jsonl'
+[IO.File]::WriteAllText($capacityProbe,@'
+import 'dart:async';
+import 'package:test/test.dart';
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER capacity timeout', () {
+    throw TimeoutException('TRUST_CAPACITY_FIXTURE_TIMEOUT:capacity-start', const Duration(seconds: 55));
+  });
+}
+'@,[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_locald')
+try {
+    & $FoundationDart test $capacityProbe --file-reporter "json:$capacityReport" *> (Join-Path $fixture 'controlled-capacity-timeout.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled capacity timeout unexpectedly passed.'}
+} finally {Pop-Location}
+$rawCapacity=@([IO.File]::ReadAllLines($capacityReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+Test-CapacityPhaseDiagnosticProjection -Snapshot $snapshot -RawCapacity $rawCapacity -PrivateMarker $privateMarker
 $fixture
 $invalidFixture
 exit 0

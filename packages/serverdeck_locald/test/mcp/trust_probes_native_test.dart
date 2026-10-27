@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -5,6 +6,7 @@ import 'package:serverdeck_windows/process.dart';
 import 'package:test/test.dart';
 
 import '../../../serverdeck_windows/test/mcp_build_bundle_test.dart' as b;
+import '../support/capacity_fixture.dart';
 import '../support/native_artifact.dart';
 
 void main() {
@@ -114,7 +116,18 @@ void main() {
               errors = b.boundedOutput(child.stderr);
           fixture.errors.add(errors);
           expect(
-            await child.exitCode.timeout(const Duration(seconds: 55)),
+            await child.exitCode.timeout(
+              const Duration(seconds: 55),
+              onTimeout: mode == 'success-write-capacity'
+                  ? () {
+                      final phase = readCapacityFixturePhase(fixture.path);
+                      throw TimeoutException(
+                        'TRUST_CAPACITY_FIXTURE_TIMEOUT:$phase',
+                        const Duration(seconds: 55),
+                      );
+                    }
+                  : null,
+            ),
             0,
             reason: '${await output}\n${await errors}',
           );
