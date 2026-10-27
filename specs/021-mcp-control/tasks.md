@@ -1733,7 +1733,7 @@ not authorization to close or skip the existing whole-product gates.
 
 ## Current unit-widget stage (2026-10-27)
 
-- [ ] T213 [US1 current-stage acceptance] Record implemented T204–T212 source and current local unit/widget/static acceptance under the explicit user instruction, Constitution4.0.0/VII and [003 stage gate](../003-design-system/plan.md#unit-widget-stage-2026-10-27). Synchronize plan/spec/quickstart/native-control with the stage while preserving every earlier task line/marker and full native oracles. Run root literal format/Flutter analyze/ordinary test suite, affected protocol/Windows/locald analyze, full pure protocol suite and only locald `test/server_peer_coordination_test.dart` with RED disabled; record actual per-command exits/counts/source scope. Run fresh strict links/diff and complete a fresh frozen-input independent policy/spec/workflow review/fix loop. Record scoped completed R3 provenance separately from this new review, focused native passes separately from the interrupted ChannelFull and all not-run future qualification. Source implementation acceptance does not close original T207/full-native acceptance. Exact-source automatic push/PR `unit-widget-checks` and separately authorized source-preview/private-install receipts remain the003 T118/external release gate; no future CI/install pass is implied here.
+- [x] T213 [US1 current-stage acceptance] Record implemented T204–T212 source and current local unit/widget/static acceptance under the explicit user instruction, Constitution4.0.0/VII and [003 stage gate](../003-design-system/plan.md#unit-widget-stage-2026-10-27). Synchronize plan/spec/quickstart/native-control with the stage while preserving every earlier task line/marker and full native oracles. Run root literal format/Flutter analyze/ordinary test suite, affected protocol/Windows/locald analyze, full pure protocol suite and only locald `test/server_peer_coordination_test.dart` with RED disabled; record actual per-command exits/counts/source scope. Run fresh strict links/diff and complete a fresh frozen-input independent policy/spec/workflow review/fix loop. Record scoped completed R3 provenance separately from this new review, focused native passes separately from the interrupted ChannelFull and all not-run future qualification. Source implementation acceptance does not close original T207/full-native acceptance. Exact-source automatic push/PR `unit-widget-checks` and separately authorized source-preview/private-install receipts remain the003 T118/external release gate; no future CI/install pass is implied here.
 
 Original T204–T212 include mixed implementation and native/full acceptance
 requirements. Their unchanged unchecked markers do not mean the source was
@@ -1744,3 +1744,9 @@ qualification; native/integration/FFI/DPAPI/real-SSH/container/cold workloads
 must not run now without a new user instruction. Current unit success, old
 focused passes, partial8passes and skipped native CI cannot be summed into
 full-native or full021 acceptance.
+
+T213 completed for the previously recorded source46959af only: scoped checks,
+fresh policy review and preservation of deferred native acceptance are recorded
+in [003 evidence](../003-design-system/evidence.md#завершение-preview9-2026-10-27).
+The ordinary0.2.0 metadata/source release is003 T119; it changes no021 product
+requirement, protocol, implementation or native acceptance marker.

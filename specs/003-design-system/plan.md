@@ -1,5 +1,34 @@
 # Implementation Plan: Дизайн и доступность
 
+## Обычный выпуск 0.2.0 (2026-10-27)
+
+Пользователь поручил выбрать номер по SemVer и опубликовать только исходники
+обычным релизом. Накопленные новые функции и дизайн образуют минорный `0.2.0`;
+это завершение линии `0.2.0-preview.1+9`, без новых продуктовых изменений.
+Flutter metadata — `0.2.0+10`: номер сборки увеличивается после9, а публичные
+tag/title/archive используют `v0.2.0`, `0.2.0`, `ServerDeck-0.2.0-source.zip`.
+
+Текущий unit/widget/static stage ниже и Constitution VII продолжают действовать.
+Workflow и выбранные suites не меняются; перед merge/tag/publication нужны
+новые successful push и PR unit checks точного нового commit с проверкой
+source/base/test-merge parents/tree/workflow/current attempts. Новый отдельный
+CI seal не изменяет прежние receipts. Native/integration профили не запускаются.
+
+Публичных assets ровно два: source ZIP и `SHA256SUMS.txt`, лицензия MIT.
+ZIP comment и каждый Git blob связываются с новым проверенным commit;
+четыре canonical design pins сохраняются. В verifier отдельно проверяются
+release version `0.2.0` и pubspec version `0.2.0+10`. GitHub release имеет
+`prerelease=false`, tag указывает на проверенный source commit, а tree merged
+main совпадает с ним. После публикации проверяются remote tag/assets/digests
+и скачанные байты. Предыдущие preview tag/assets/evidence сохраняются.
+
+В этот выпуск не входят Windows binary, новая локальная установка, подпись,
+native distribution или полная001/021/005 acceptance. Уже установленная
+private preview9 остаётся отдельным ранее проверенным артефактом. Обычный
+source release не заявляет production readiness сервиса или платформ.
+Запись прежнего результата — [evidence](evidence.md#завершение-preview9-2026-10-27),
+передача текущего scope — [handoff](handoff.md#обычный-source-release-020).
+
 ## Unit-widget stage (2026-10-27)
 
 Явное решение пользователя и [Constitution4.0.0, VII](../../.specify/memory/constitution.md)
