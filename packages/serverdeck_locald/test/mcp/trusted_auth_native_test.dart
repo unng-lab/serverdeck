@@ -8,6 +8,7 @@ import 'package:serverdeck_windows/security.dart';
 
 import '../../../serverdeck_windows/test/mcp_build_bundle_test.dart' as b;
 import '../../../serverdeck_windows/test/support/native_fixture_job.dart';
+import '../../../serverdeck_windows/test/support/trusted_client_fixture.dart';
 
 void main() {
   late Directory compiledRoot;
@@ -56,44 +57,48 @@ void main() {
       fixture.document['workspaceSchema'] = 3;
       fixture.write();
       StreamIterator<String>? lines;
-      try {
-        final server = await Process.start(p.join(fixture.path, 'locald.exe'), [
-          'scenario',
-          fixture.path,
-          'orphan',
-        ]);
-        fixture.children.add(server);
-        fixture.errors.add(b.boundedOutput(server.stderr));
-        lines = StreamIterator(
-          server.stdout.transform(utf8.decoder).transform(const LineSplitter()),
-        );
-        expect(
-          await lines.moveNext().timeout(const Duration(seconds: 10)),
-          isTrue,
-        );
-        expect(lines.current, matches(r'^CHILD:[1-9][0-9]{0,9}$'));
-        final child = RetainedProcessIdentity.open(
-          int.parse(lines.current.substring(6)),
-        );
-        fixture.identities.add(child);
-        expect(
-          p.equals(child.imagePath, p.join(fixture.path, 'mcp.exe')),
-          isTrue,
-        );
-        expect(child.sid, currentUserSid());
-        child.revalidate();
-        server.kill();
-        await server.exitCode.timeout(const Duration(seconds: 10));
-        final watch = Stopwatch()..start();
-        while (!fixtureProcessExited(child) &&
-            watch.elapsed < const Duration(seconds: 5)) {
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-        }
-        expect(fixtureProcessExited(child), isTrue);
-      } finally {
-        await lines?.cancel();
-        await fixture.close();
-      }
+      await runOwnedFixtureLifecycle(
+        body: () async {
+          final server = await Process.start(
+            p.join(fixture.path, 'locald.exe'),
+            ['scenario', fixture.path, 'orphan'],
+          );
+          fixture.children.add(server);
+          fixture.errors.add(b.boundedOutput(server.stderr));
+          lines = StreamIterator(
+            server.stdout
+                .transform(utf8.decoder)
+                .transform(const LineSplitter()),
+          );
+          expect(
+            await lines!.moveNext().timeout(const Duration(seconds: 10)),
+            isTrue,
+          );
+          expect(lines!.current, matches(r'^CHILD:[1-9][0-9]{0,9}$'));
+          final child = RetainedProcessIdentity.open(
+            int.parse(lines!.current.substring(6)),
+          );
+          fixture.identities.add(child);
+          expect(
+            p.equals(child.imagePath, p.join(fixture.path, 'mcp.exe')),
+            isTrue,
+          );
+          expect(child.sid, currentUserSid());
+          child.revalidate();
+          server.kill();
+          await server.exitCode.timeout(const Duration(seconds: 10));
+          final watch = Stopwatch()..start();
+          while (!fixtureProcessExited(child) &&
+              watch.elapsed < const Duration(seconds: 5)) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+          expect(fixtureProcessExited(child), isTrue);
+        },
+        cleanup: () async {
+          await lines?.cancel();
+          await fixture.close();
+        },
+      );
     },
     testOn: 'windows',
   );
@@ -136,24 +141,27 @@ void main() {
         fixture.document['format'] = 3;
         fixture.document['workspaceSchema'] = 3;
         fixture.write();
-        try {
-          final child = await Process.start(
-            p.join(fixture.path, 'locald.exe'),
-            ['scenario', fixture.path, scenario],
-          );
-          fixture.children.add(child);
-          final output = b.boundedOutput(child.stdout),
-              errors = b.boundedOutput(child.stderr);
-          fixture.errors.add(errors);
-          expect(
-            await child.exitCode.timeout(const Duration(seconds: 70)),
-            0,
-            reason: '${await output}\n${await errors}',
-          );
-          expect((await output).trim(), 'PASS:$scenario');
-        } finally {
-          await fixture.close();
-        }
+        await runOwnedFixtureLifecycle(
+          body: () async {
+            final child = await Process.start(
+              p.join(fixture.path, 'locald.exe'),
+              ['scenario', fixture.path, scenario],
+            );
+            fixture.children.add(child);
+            final output = b.boundedOutput(child.stdout),
+                errors = b.boundedOutput(child.stderr);
+            fixture.errors.add(errors);
+            expect(
+              await child.exitCode.timeout(const Duration(seconds: 70)),
+              0,
+              reason: '${await output}\n${await errors}',
+            );
+            expect((await output).trim(), 'PASS:$scenario');
+          },
+          cleanup: () async {
+            await fixture.close();
+          },
+        );
       },
       testOn: 'windows',
       timeout: const Timeout(Duration(seconds: 90)),

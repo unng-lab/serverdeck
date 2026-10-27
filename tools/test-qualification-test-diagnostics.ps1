@@ -5,6 +5,416 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/qualification-test-diagnostics.ps1"
 
+# Controlled owned-fixture cases use decoded real package:test body/both
+# reporters. Source mutations remain in memory; native fixtures are not run.
+
+function Invoke-ControlledOwnedDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][string[]]$Events,
+        [Parameter(Mandatory)][string]$Phase,[Parameter(Mandatory)][string]$PrivateMarker,
+        [Parameter(Mandatory)][string]$Label)
+    $directory=Join-Path $NativeIsarRepository ('.local/native-qualification-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($directory)
+    [IO.File]::WriteAllLines((Join-Path $directory ($Phase+'.machine.jsonl')),$Events,[Text.UTF8Encoding]::new($false))
+    Write-NativeQualificationTestFailure -Directory $directory -Phase $Phase -SourceSnapshot $Snapshot -ControlledFixture
+    $path=Join-Path $directory ('safe-test-failure-'+$Phase+'.json')
+    $proof=Read-NativeIsarArtifactJson $path;$safe=[IO.File]::ReadAllText($path)
+    if($proof.schemaVersion -ne 1 -or $proof.status -cne 'failed-test-details' -or -not $proof.controlledFixture -or
+        -not $proof.reporterComplete -or $proof.failures.Count -ne 1 -or $proof.fullAcceptance -or $proof.distributionReady -or $proof.activated -or
+        $safe.Contains($PrivateMarker) -or $safe.Contains('TRUSTED_CLIENT_FIXTURE_FAILURE:') -or
+        $safe.Contains('OWNED_FIXTURE_CLEANUP_FAILURE:') -or $safe.Contains('actual format3 ') -or
+        $safe.Contains('file:///') -or $safe.Contains('C:/') -or $safe.Contains('stackTrace') -or
+        $safe.Contains('Expected:') -or $safe.Contains('999999')) {
+        throw ('Owned controlled projection privacy/schema mismatch: '+$Label)
+    }
+    if($proof.failures[0].sourceFrames.Count -gt 3){throw ('Owned primary frame bound exceeded: '+$Label)}
+    return $proof.failures[0]
+}
+
+function Get-ControlledOwnedDiagnosticSnapshot {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][string]$Changed,[switch]$Missing)
+    if(@($Snapshot.files|Where-Object {$_.file -ceq $Changed}).Count -ne 1){throw ('Expected one source inventory entry: '+$Changed)}
+    return @{sha256=$Snapshot.sha256;files=@($Snapshot.files|ForEach-Object {
+        if($_.file -ceq $Changed){if(-not $Missing){@{file=$Changed;sha256=('0'*64)}}}else{$_}
+    })}
+}
+
+function Test-TrustedClientFailureDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][object[]]$RawOwned,[Parameter(Mandatory)][string]$PrivateMarker)
+    $parentSource='packages/serverdeck_windows/test/trusted_client_native_test.dart'
+    $actorSource='packages/serverdeck_windows/test/support/trusted_client_actor.dart'
+    $fixtureSource='packages/serverdeck_windows/test/support/trusted_client_fixture.dart'
+    $completionSource='packages/serverdeck_windows/test/support/trusted_client_completion.dart'
+    $parentUri=([Uri](Join-Path $NativeIsarRepository $parentSource)).AbsoluteUri
+    $actorUri=([Uri](Join-Path $NativeIsarRepository $actorSource)).AbsoluteUri
+    $fixtureUri=([Uri](Join-Path $NativeIsarRepository $fixtureSource)).AbsoluteUri
+    $parentLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $parentSource))
+    $actorLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $actorSource))
+    $fixtureLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $fixtureSource))
+    $completionLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $completionSource))
+    $modes=@('owner','cleanup2','cleanup3','mcp','grant','grant-bad-proof','grant-repeat','codes','quota','receipts',
+        'connection','bad-connection','bad-connect','bad-connect-status','bad-connect-cancel','bad-disconnect','readiness2',
+        'bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize','invalid-json','timeout',
+        'eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation','hello-build','hello-version',
+        'hello-shape','bootstrap-timeout')
+    $ordinary=@($modes|Where-Object {$_ -cnotin @('cleanup2','cleanup3')})
+    $loop=[regex]::Matches(($parentLines -join "`n"),'(?s)for \(final mode in \[(?<cases>.*?)\]\) \{')
+    $actualModes=if($loop.Count -eq 1){@([regex]::Matches($loop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})}else{@()}
+    $declarations=@(for($i=0;$i+1 -lt $parentLines.Length;$i++) {
+        if($parentLines[$i].Trim() -ceq 'test(' -and $parentLines[$i+1].Trim() -ceq "'actual format3 bootstrap and RPC client `$mode',"){$i+1}
+    })
+    $producers=@(for($i=0;$i+2 -lt $parentLines.Length;$i++) {
+        if($parentLines[$i].Trim() -ceq 'expect(' -and $parentLines[$i+1].Trim() -ceq 'childExit,' -and $parentLines[$i+2].Trim() -ceq '0,'){$i+1}
+    })
+    $bodyLines=@(for($i=0;$i -lt $fixtureLines.Length;$i++){if($fixtureLines[$i].Trim() -ceq 'await body();'){$i+1}})
+    if(($actualModes -join '|') -cne ($modes -join '|') -or $ordinary.Count -ne 35 -or $declarations.Count -ne 1 -or $producers.Count -ne 1 -or $bodyLines.Count -ne 1) {
+        throw 'Expected exact 37 trusted-client modes, 35 ordinary modes and actual declaration/zero-exit/helper body lines.'
+    }
+    $declaration=$declarations[0];$producer=$producers[0];$bodyLine=$bodyLines[0]
+    $starts=@{};foreach($kind in @('body','both')) {
+        $matches=@($RawOwned|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' owned '+$kind)})
+        if($matches.Count -ne 1){throw ('Expected real owned reporter case: '+$kind)};$starts[$kind]=$matches[0].test.id
+    }
+    $phases=@('prepare','bootstrap','rpc-read','rpc-write','completion','cleanup-child','cleanup-worker')
+    $codes=@('SERVICE_UNAVAILABLE','UNSAFE_ENDPOINT','IDENTITY_UNAVAILABLE','TIMEOUT','RESOURCE_LIMIT','UNAUTHORIZED','INCOMPATIBLE','PREREQUISITE_UNAVAILABLE','-')
+    $baselineMarker='TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:SERVICE_UNAVAILABLE'
+    $separator="`nOWNED_FIXTURE_CLEANUP_FAILURE:`n"
+    $cases=[Collections.Generic.List[hashtable]]::new()
+    # Positive cases are deliberately first: an old projector must fail here,
+    # before the source-shape getter added by this change is ever called.
+    foreach($mode in $ordinary){$cases.Add(@{variant='ordinary-'+$mode;mode=$mode;positive=$true;both=$false})}
+    foreach($fixturePhase in $phases){foreach($code in $codes){$cases.Add(@{variant='phase-code-'+$fixturePhase+'-'+$code;fixturePhase=$fixturePhase;code=$code;positive=$true;both=$true})}}
+    foreach($mode in $modes){$cases.Add(@{variant='legacy-'+$mode;mode=$mode;legacy=$true})}
+    foreach($mode in @('cleanup2','cleanup3')){$cases.Add(@{variant='excluded-'+$mode;mode=$mode})}
+    $negatives=@('secondary-duplicate','primary-frames-bound','both-primary','exit-signed','exit-unsigned','exit-minimum','exit-maximum',
+        'duplicate-primary','nonfirst-marker','raw-stderr-marker','marker-only-secondary','secondary-producer-only','marker-in-stack-only',
+        'unknown-phase','unknown-code','lowercase-code','extra-field','partial-marker','marker-suffix','marker-crlf','marker-nonascii','marker-oversize',
+        'exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional','exit-nonnumeric','exit-prefix','exit-no-line-end','wrong-expected',
+        'without-producer','unrelated-producer','helper-producer','invalid-producer','unknown-producer','error-type','event-id-type',
+        'unknown-name','suffixed-name','name-type','wrong-url','unknown-url','missing-url','wrong-suite','missing-suite','wrong-suite-path',
+        'wrong-phase','invalid-declaration','unrelated-declaration','null-declaration','declaration-type','fractional-declaration',
+        'changed-parent','changed-actor','changed-fixture','changed-completion','missing-actor','missing-fixture','missing-completion')
+    foreach($variant in $negatives){$cases.Add(@{variant=$variant})}
+    foreach($case in $cases) {
+        $variant=$case.variant;$mode=if($case.ContainsKey('mode')){$case.mode}else{'owner'}
+        $fixturePhase=if($case.ContainsKey('fixturePhase')){$case.fixturePhase}else{'prepare'}
+        $code=if($case.ContainsKey('code')){$case.code}else{'SERVICE_UNAVAILABLE'}
+        $both=($case.ContainsKey('both') -and $case.both) -or $variant -in @('secondary-duplicate','primary-frames-bound','both-primary','marker-only-secondary','secondary-producer-only')
+        $target=$starts[$(if($both){'both'}else{'body'})]
+        $marker='TRUSTED_CLIENT_FIXTURE_FAILURE:'+$fixturePhase+':'+$code
+        $events=foreach($raw in $RawOwned) {
+            if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+            if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+            $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite') {
+                $event.suite.path=$parentUri
+                if($variant -ceq 'missing-suite'){continue}
+                if($variant -ceq 'wrong-suite-path'){$event.suite.path=$actorUri}
+            }
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual format3 bootstrap and RPC client '+$mode;$event.test.url=$parentUri;$event.test.line=$declaration
+                if($case.ContainsKey('legacy')){$event.test.line=1}
+                switch($variant) {
+                    'unknown-name' {$event.test.name='actual format3 bootstrap and RPC client '+$PrivateMarker}
+                    'suffixed-name' {$event.test.name+=$PrivateMarker}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-url' {$event.test.url=$actorUri}
+                    'unknown-url' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'wrong-suite' {$event.test.suiteID=999999}
+                    'invalid-declaration' {$event.test.line=999999}
+                    'unrelated-declaration' {$event.test.line=1}
+                    'null-declaration' {$event.test.line=$null}
+                    'declaration-type' {$event.test.line=[string]$declaration}
+                    'fractional-declaration' {$event.test.line=[double]$declaration}
+                }
+            }
+            if($event.type -ceq 'error') {
+                if($event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or
+                    -not $event.error.Contains($baselineMarker+"`n"+$PrivateMarker+"`n#0 actor ("+$actorUri+':40:1)') -or
+                    ($both -and -not $event.error.Contains($separator))) {throw 'Expected real owned numeric assertion and exact first reason marker/actor/aggregate.'}
+                $event.error=$event.error.Replace($baselineMarker,$marker)
+                $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+                if($case.ContainsKey('legacy')){$event.error=$event.error.Replace($marker+"`n",'');$event.stackTrace=$PrivateMarker}
+                switch($variant) {
+                    'secondary-duplicate' {$event.error+="`n"+$marker+"`n"+$marker}
+                    'duplicate-primary' {$event.error=$event.error.Replace($marker+"`n",$marker+"`n"+$marker+"`n")}
+                    'nonfirst-marker' {$event.error=$event.error.Replace($marker+"`n",$PrivateMarker+"`n"+$marker+"`n")}
+                    'raw-stderr-marker' {$event.error=$event.error.Replace($marker+"`n",'')+"`n"+$marker}
+                    'marker-only-secondary' {$event.error=$event.error.Replace($marker+"`n",'')+"`n"+$marker}
+                    'marker-in-stack-only' {$event.error=$event.error.Replace($marker+"`n",'');$event.stackTrace+="`n"+$marker}
+                    'unknown-phase' {$event.error=$event.error.Replace($marker,'TRUSTED_CLIENT_FIXTURE_FAILURE:'+ $PrivateMarker+':SERVICE_UNAVAILABLE')}
+                    'unknown-code' {$event.error=$event.error.Replace($marker,'TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:'+ $PrivateMarker)}
+                    'lowercase-code' {$event.error=$event.error.Replace($marker,'TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:service_unavailable')}
+                    'extra-field' {$event.error=$event.error.Replace($marker,$marker+':extra')}
+                    'partial-marker' {$event.error=$event.error.Replace($marker,'TRUSTED_CLIENT_FIXTURE_FAILURE:prepare')}
+                    'marker-suffix' {$event.error=$event.error.Replace($marker,$marker+' ')}
+                    'marker-crlf' {$event.error=$event.error.Replace($marker+"`n",$marker+"`r`n")}
+                    'marker-nonascii' {$event.error=$event.error.Replace($marker,'TRUSTED_CLIENT_FIXTURE_FAILURE:подготовка:SERVICE_UNAVAILABLE')}
+                    'marker-oversize' {$event.error=$event.error.Replace($marker,('TRUSTED_CLIENT_FIXTURE_FAILURE:'+('prepare'*30)+':SERVICE_UNAVAILABLE'))}
+                    'exit-signed' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-1073741819>')}
+                    'exit-unsigned' {$event.error=$event.error.Replace('Actual: <1>','Actual: <3221225477>')}
+                    'exit-minimum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483648>')}
+                    'exit-maximum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967295>')}
+                    'exit-zero' {$event.error=$event.error.Replace('Actual: <1>','Actual: <0>')}
+                    'exit-too-low' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483649>')}
+                    'exit-too-high' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967296>')}
+                    'exit-plus' {$event.error=$event.error.Replace('Actual: <1>','Actual: <+1>')}
+                    'exit-fractional' {$event.error=$event.error.Replace('Actual: <1>','Actual: <1.0>')}
+                    'exit-nonnumeric' {$event.error=$event.error.Replace('Actual: <1>',('Actual: <'+$PrivateMarker+'>'))}
+                    'exit-prefix' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'exit-no-line-end' {$event.error="Expected: <0>`n  Actual: <1>"}
+                    'wrong-expected' {$event.error=$event.error.Replace('Expected: <0>','Expected: <1>')}
+                    'without-producer' {$event.stackTrace=$PrivateMarker}
+                    'unrelated-producer' {$event.stackTrace="#0 parent (${parentUri}:${declaration}:1)"}
+                    'helper-producer' {$event.stackTrace="#0 helper (${fixtureUri}:${bodyLine}:1)"}
+                    'invalid-producer' {$event.stackTrace="#0 parent (${parentUri}:999999:1)"}
+                    'unknown-producer' {$event.stackTrace="#0 private (file:///C:/${PrivateMarker}/private.dart:${producer}:1)"}
+                    'secondary-producer-only' {$event.stackTrace=$PrivateMarker;$event.error+="`n#9 parent (${parentUri}:${producer}:1)"}
+                    'event-id-type' {$event.testID=[string]$target}
+                    'error-type' {$event.error=@{private=$PrivateMarker}}
+                    'primary-frames-bound' {
+                        $event.error=$event.error.Replace($separator,"`n#3 actor (${actorUri}:40:1)`n#4 actor (${actorUri}:42:1)`n#5 actor (${actorUri}:43:1)`n#6 invalid (${actorUri}:999999:1)"+$separator)
+                        $event.stackTrace+="`n#1 helper (${fixtureUri}:${bodyLine}:1)"
+                    }
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $selected=$Snapshot
+        if($variant -cmatch '\A(changed|missing)-(parent|actor|fixture|completion)\z') {
+            $changed=switch($Matches[2]){'parent'{$parentSource};'actor'{$actorSource};'fixture'{$fixtureSource};'completion'{$completionSource}}
+            $selected=Get-ControlledOwnedDiagnosticSnapshot -Snapshot $Snapshot -Changed $changed -Missing:($Matches[1] -ceq 'missing')
+        }
+        $phase=if($variant -ceq 'wrong-phase'){'serverdeck_locald-tests'}else{'serverdeck_windows-tests'}
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events ([string[]]$events) -Phase $phase -PrivateMarker $PrivateMarker -Label ('T114 '+$variant)
+        $expectNew=($case.ContainsKey('positive') -and $case.positive) -or $variant -in @('secondary-duplicate','primary-frames-bound','both-primary','exit-signed','exit-unsigned','exit-minimum','exit-maximum')
+        $expectCase=$variant -cnotin @('unknown-name','suffixed-name','name-type','wrong-url','invalid-declaration','null-declaration','declaration-type','changed-parent')
+        $expectExit=$expectCase -and $variant -cnotin @('exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional','exit-nonnumeric','exit-prefix','exit-no-line-end','wrong-expected','error-type')
+        $expectedExit=switch($variant){'exit-signed'{-1073741819L};'exit-unsigned'{3221225477L};'exit-minimum'{-2147483648L};'exit-maximum'{4294967295L};default{1L}}
+        $expectedCode=if($code -ceq '-'){$null}else{$code}
+        if(($expectNew -and ($failure.fixturePhase -cne $fixturePhase -or $failure.safeCode -cne $expectedCode)) -or
+            (-not $expectNew -and ($null -ne $failure.fixturePhase -or $null -ne $failure.safeCode)) -or
+            ($expectCase -and $failure.fixtureCase -cne ('trusted-client-'+$mode)) -or (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            ($expectExit -and ($failure.fixtureExitCode -ne $expectedExit -or $failure.failureKind -cne 'fixture-exit')) -or
+            (-not $expectExit -and ($null -ne $failure.fixtureExitCode -or $null -ne $failure.failureKind)) -or $failure.nativeErrors.Count -ne 0) {
+            throw ('T114 marker/new fields versus independent legacy fields mismatch: '+$variant)
+        }
+        if($both -and $expectNew) {foreach($frame in $failure.sourceFrames){if($frame.file -ceq $actorSource -and $frame.line -eq 41){throw ('T114 secondary cleanup frame escaped: '+$variant)}}}
+        if($variant -ceq 'changed-actor' -and @($failure.sourceFrames|Where-Object {$_.file -ceq $actorSource}).Count -ne 0){throw 'T114 stale actor frame escaped.'}
+        if($variant -ceq 'primary-frames-bound' -and $failure.sourceFrames.Count -ne 3){throw 'T114 common primary frame cap was not filled.'}
+    }
+    # Mutation tests use memory only, after all reporter positives/negatives.
+    $shape=Get-NativeTrustedClientDiagnosticShape -ParentLines $parentLines -ActorLines $actorLines -FixtureLines $fixtureLines -CompletionLines $completionLines
+    if(-not $shape -or $shape.declarationLine -ne $declaration -or $producer -notin $shape.producerLines){throw 'T114 current source shape/declaration/producer rejected.'}
+    $changedZero=[string[]]$parentLines.Clone();$changedZero[$producer+1]='              1,'
+    if(Get-NativeTrustedClientDiagnosticShape -ParentLines $changedZero -ActorLines $actorLines -FixtureLines $fixtureLines -CompletionLines $completionLines){throw 'T114 altered expected-zero assertion accepted.'}
+    $multiline=@($parentLines)+@("const privateExample = '''",$PrivateMarker,"''';")
+    if(Get-NativeTrustedClientDiagnosticShape -ParentLines $multiline -ActorLines $actorLines -FixtureLines $fixtureLines -CompletionLines $completionLines){throw 'T114 multiline Dart literal was normalized into a trusted source contract.'}
+    $texts=@{ParentLines=($parentLines -join "`n");ActorLines=($actorLines -join "`n");FixtureLines=($fixtureLines -join "`n");CompletionLines=($completionLines -join "`n")}
+    $mutations=@(
+        @('ParentLines','const Duration(seconds: 35)','const Duration(seconds: 36)'),
+        @('ParentLines','final record = readTrustedClientFailure(fixture.path);','final record = null;'),
+        @('ParentLines','cleanup: fixture.close,','cleanup: () async {},'),
+        @('ActorLines','failures.record(phase, error)',"failures.record('prepare', error)"),
+        @('ActorLines','await finishTrustedClientProcess();','finishTrustedClientProcess();'),
+        @('FixtureLines','OWNED_FIXTURE_CLEANUP_FAILURE:','PRIVATE_OTHER_CLEANUP:'),
+        @('FixtureLines','if (_recorded) return;','if (false) return;'),
+        @('FixtureLines','handle.readSync(129)','handle.readSync(130)'),
+        @('FixtureLines','byte > 127','byte > 255'),
+        @('CompletionLines','TRUSTED_CLIENT_EXIT_ACK','PRIVATE_OTHER_EXIT_ACK'),
+        @('CompletionLines','const Duration(seconds: 5)','const Duration(seconds: 6)'),
+        @('CompletionLines','await within(received.future);','within(received.future);'))
+    foreach($mutation in $mutations) {
+        $text=$texts[$mutation[0]];$changed=$text.Replace($mutation[1],$mutation[2]);if($changed -ceq $text){throw ('T114 mutation did not touch source: '+$mutation[1])}
+        $arguments=@{ParentLines=$parentLines;ActorLines=$actorLines;FixtureLines=$fixtureLines;CompletionLines=$completionLines};$arguments[$mutation[0]]=$changed -split '\r?\n'
+        if(Get-NativeTrustedClientDiagnosticShape @arguments){throw ('T114 altered required source contract accepted: '+$mutation[1])}
+    }
+    'QUALIFICATION_TRUSTED_CLIENT_35_ORDINARY_7_PHASES_8_CODES_NULL_PRIMARY_AGGREGATE_LEGACY37_SOURCE_HASH_BOUNDS_PRIVACY_PASSED'
+}
+
+function Test-TrustedAuthDiagnosticProjection {
+    param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][object[]]$RawOwned,[Parameter(Mandatory)][string]$PrivateMarker)
+    $parentSource='packages/serverdeck_locald/test/mcp/trusted_auth_native_test.dart'
+    $actorSource='packages/serverdeck_locald/test/support/trusted_auth_actor.dart'
+    $fixtureSource='packages/serverdeck_windows/test/support/trusted_client_fixture.dart'
+    $startupSource='packages/serverdeck_locald/test/support/trusted_auth_fixture.dart'
+    $inputActor='packages/serverdeck_windows/test/support/trusted_client_actor.dart'
+    $parentUri=([Uri](Join-Path $NativeIsarRepository $parentSource)).AbsoluteUri
+    $actorUri=([Uri](Join-Path $NativeIsarRepository $actorSource)).AbsoluteUri
+    $fixtureUri=([Uri](Join-Path $NativeIsarRepository $fixtureSource)).AbsoluteUri
+    $inputActorUri=([Uri](Join-Path $NativeIsarRepository $inputActor)).AbsoluteUri
+    $parentLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $parentSource))
+    $actorLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $actorSource))
+    $fixtureLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $fixtureSource))
+    $startupLines=[IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $startupSource))
+    $scenarios=@('roles','native-gate','stale-close','proofs','quota','expiry','close','snapshot','deadline','client','framing','tamper',
+        'owner-context','owner-context-detach','owner-context-expiry','owner-context-budget','owner-context-native','owner-context-stop',
+        'owner-context-physical','owner-connection','owner-connection-budget','owner-connection-detach','owner-connection-native',
+        'owner-connection-stop','owner-connection-physical')
+    $loop=[regex]::Matches(($parentLines -join "`n"),'(?s)for \(final scenario in \[(?<cases>.*?)\]\) \{')
+    $actualScenarios=if($loop.Count -eq 1){@([regex]::Matches($loop[0].Groups['cases'].Value,"(?m)^\s*'(?<case>[a-z0-9-]+)',\s*$")|ForEach-Object {$_.Groups['case'].Value})}else{@()}
+    $declarations=@(for($i=0;$i+1 -lt $parentLines.Length;$i++) {
+        if($parentLines[$i].Trim() -ceq 'test(' -and $parentLines[$i+1].Trim() -ceq "'actual format3 API1.1 bootstrap and session `$scenario',"){$i+1}
+    })
+    $producers=@(for($i=0;$i+2 -lt $parentLines.Length;$i++) {
+        if($parentLines[$i].Trim() -ceq 'expect(' -and $parentLines[$i+1].Trim() -ceq 'await child.exitCode.timeout(const Duration(seconds: 70)),' -and $parentLines[$i+2].Trim() -ceq '0,'){$i+1}
+    })
+    $passLines=@(for($i=0;$i -lt $parentLines.Length;$i++){if($parentLines[$i].Trim() -ceq "expect((await output).trim(), 'PASS:`$scenario');"){$i+1}})
+    $bodyLines=@(for($i=0;$i -lt $fixtureLines.Length;$i++){if($fixtureLines[$i].Trim() -ceq 'await body();'){$i+1}})
+    if(($actualScenarios -join '|') -cne ($scenarios -join '|') -or $scenarios.Count -ne 25 -or $declarations.Count -ne 1 -or $producers.Count -ne 1 -or $passLines.Count -ne 1 -or $bodyLines.Count -ne 1) {
+        throw 'Expected exact 25 trusted-auth scenarios and actual declaration/zero-exit/PASS/helper lines.'
+    }
+    $declaration=$declarations[0];$producer=$producers[0];$passLine=$passLines[0];$bodyLine=$bodyLines[0]
+    $starts=@{};foreach($kind in @('body','both')) {
+        $matches=@($RawOwned|Where-Object {$_.type -ceq 'testStart' -and $_.test.name -ceq ($PrivateMarker+' owned '+$kind)})
+        if($matches.Count -ne 1){throw ('Expected real owned reporter case: '+$kind)};$starts[$kind]=$matches[0].test.id
+    }
+    $baselineMarker='TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:SERVICE_UNAVAILABLE';$separator="`nOWNED_FIXTURE_CLEANUP_FAILURE:`n"
+    $variants=@($scenarios|ForEach-Object {'scenario-'+$_})+@('both-primary','primary-frames-bound','secondary-duplicate','unknown-reason-actor',
+        'exit-signed','exit-unsigned','exit-minimum','exit-maximum','cleanup-only','pass-assertion','legacy-bad-state','raw-client-marker',
+        'secondary-exit-only','secondary-producer-only','raw-stderr-exit','private-stack-exit','exit-zero','exit-too-low','exit-too-high',
+        'exit-plus','exit-fractional','exit-nonnumeric','exit-prefix','exit-no-line-end','wrong-expected','error-type',
+        'unknown-name','suffixed-name','child-mode','orphan','name-type','wrong-url','unknown-url','missing-url','wrong-suite','missing-suite',
+        'wrong-suite-path','wrong-phase','invalid-declaration','unrelated-declaration','null-declaration','declaration-type','fractional-declaration',
+        'without-producer','helper-producer','unrelated-source-line','invalid-source-line','unknown-source-line','event-id-type',
+        'changed-parent','changed-actor','changed-fixture','changed-startup','missing-actor','missing-fixture','missing-startup')
+    foreach($variant in $variants) {
+        $scenario=if($variant.StartsWith('scenario-')){$variant.Substring(9)}else{'quota'}
+        $both=$variant -in @('both-primary','primary-frames-bound','secondary-duplicate','secondary-exit-only','secondary-producer-only')
+        $target=$starts[$(if($both){'both'}else{'body'})]
+        $events=foreach($raw in $RawOwned) {
+            if($raw.type -ceq 'testStart' -and $raw.test.id -ne $target){continue}
+            if($raw.type -cin @('print','error','testDone') -and $raw.testID -ne $target){continue}
+            $event=$raw|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json -AsHashtable
+            if($event.type -ceq 'suite') {
+                $event.suite.path=$parentUri
+                if($variant -ceq 'missing-suite'){continue}
+                if($variant -ceq 'wrong-suite-path'){$event.suite.path=$actorUri}
+            }
+            if($event.type -ceq 'testStart') {
+                $event.test.name='actual format3 API1.1 bootstrap and session '+$scenario;$event.test.url=$parentUri;$event.test.line=$declaration
+                switch($variant) {
+                    'unknown-name' {$event.test.name='actual format3 API1.1 bootstrap and session '+$PrivateMarker}
+                    'suffixed-name' {$event.test.name+=$PrivateMarker}
+                    'child-mode' {$event.test.name='actual format3 API1.1 bootstrap and session client-worker'}
+                    'orphan' {$event.test.name='hard-killed fixture owner cannot leave its native client child'}
+                    'name-type' {$event.test.name=@{private=$PrivateMarker}}
+                    'wrong-url' {$event.test.url=$actorUri}
+                    'unknown-url' {$event.test.url='file:///C:/'+$PrivateMarker+'/private.dart'}
+                    'missing-url' {$event.test.url=$null}
+                    'wrong-suite' {$event.test.suiteID=999999}
+                    'invalid-declaration' {$event.test.line=999999}
+                    'unrelated-declaration' {$event.test.line=1}
+                    'null-declaration' {$event.test.line=$null}
+                    'declaration-type' {$event.test.line=[string]$declaration}
+                    'fractional-declaration' {$event.test.line=[double]$declaration}
+                }
+            }
+            if($event.type -ceq 'error') {
+                if($event.error -cnotmatch '\AExpected: <0>\r?\n[ \t]*Actual: <1>\r?\n' -or -not $event.error.Contains($baselineMarker+"`n") -or
+                    -not $event.error.Contains($inputActorUri) -or ($both -and -not $event.error.Contains($separator))) {
+                    throw 'Expected real owned numeric assertion and private primary actor/aggregate.'
+                }
+                $event.error=$event.error.Replace($baselineMarker+"`n",'').Replace($inputActorUri,$actorUri)
+                $event.stackTrace="#0 parent (${parentUri}:${producer}:1)"
+                switch($variant) {
+                    'secondary-duplicate' {$event.error+="`nExpected: <0>`n  Actual: <4294967295>`n"+$baselineMarker}
+                    'unknown-reason-actor' {$event.error=$event.error.Replace($actorUri,('file:///C:/'+$PrivateMarker+'/private.dart'))}
+                    'exit-signed' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-1073741819>')}
+                    'exit-unsigned' {$event.error=$event.error.Replace('Actual: <1>','Actual: <3221225477>')}
+                    'exit-minimum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483648>')}
+                    'exit-maximum' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967295>')}
+                    'exit-zero' {$event.error=$event.error.Replace('Actual: <1>','Actual: <0>')}
+                    'exit-too-low' {$event.error=$event.error.Replace('Actual: <1>','Actual: <-2147483649>')}
+                    'exit-too-high' {$event.error=$event.error.Replace('Actual: <1>','Actual: <4294967296>')}
+                    'exit-plus' {$event.error=$event.error.Replace('Actual: <1>','Actual: <+1>')}
+                    'exit-fractional' {$event.error=$event.error.Replace('Actual: <1>','Actual: <1.0>')}
+                    'exit-nonnumeric' {$event.error=$event.error.Replace('Actual: <1>',('Actual: <'+$PrivateMarker+'>'))}
+                    'exit-prefix' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'exit-no-line-end' {$event.error="Expected: <0>`n  Actual: <1>"}
+                    'wrong-expected' {$event.error=$event.error.Replace('Expected: <0>','Expected: <1>')}
+                    'cleanup-only' {$event.error='Bad state: '+$PrivateMarker;$event.stackTrace="#0 cleanup (${parentUri}:${passLine}:1)"}
+                    'pass-assertion' {$event.error="Expected: 'PASS:$scenario'`n  Actual: '$PrivateMarker'`n";$event.stackTrace="#0 parent (${parentUri}:${passLine}:1)"}
+                    'legacy-bad-state' {$event.error='Bad state: SERVICE_UNAVAILABLE';$event.stackTrace="#0 parent (${parentUri}:${passLine}:1)"}
+                    'raw-client-marker' {$event.error=$event.error.Replace($PrivateMarker,$baselineMarker+"`n"+$PrivateMarker)}
+                    'secondary-exit-only' {$event.error=$PrivateMarker+$separator+$event.error}
+                    'raw-stderr-exit' {$event.error=$PrivateMarker+"`n"+$event.error}
+                    'private-stack-exit' {$event.stackTrace+="`n"+$event.error;$event.error=$PrivateMarker}
+                    'without-producer' {$event.stackTrace=$PrivateMarker}
+                    'helper-producer' {$event.stackTrace="#0 helper (${fixtureUri}:${bodyLine}:1)"}
+                    'unrelated-source-line' {$event.stackTrace="#0 parent (${parentUri}:1:1)"}
+                    'invalid-source-line' {$event.stackTrace="#0 parent (${parentUri}:999999:1)"}
+                    'unknown-source-line' {$event.stackTrace="#0 private (file:///C:/${PrivateMarker}/private.dart:${producer}:1)"}
+                    'secondary-producer-only' {$event.stackTrace=$PrivateMarker;$event.error+="`n#9 parent (${parentUri}:${producer}:1)"}
+                    'event-id-type' {$event.testID=[string]$target}
+                    'error-type' {$event.error=@{private=$PrivateMarker}}
+                    'primary-frames-bound' {
+                        $event.error=$event.error.Replace($separator,"`n#3 actor (${actorUri}:40:1)`n#4 actor (${actorUri}:42:1)`n#5 actor (${actorUri}:43:1)`n#6 invalid (${actorUri}:999999:1)"+$separator)
+                        $event.stackTrace+="`n#1 helper (${fixtureUri}:${bodyLine}:1)"
+                    }
+                }
+            }
+            $event|ConvertTo-Json -Depth 30 -Compress
+        }
+        $selected=$Snapshot
+        if($variant -cmatch '\A(changed|missing)-(parent|actor|fixture|startup)\z') {
+            $changed=switch($Matches[2]){'parent'{$parentSource};'actor'{$actorSource};'fixture'{$fixtureSource};'startup'{$startupSource}}
+            $selected=Get-ControlledOwnedDiagnosticSnapshot -Snapshot $Snapshot -Changed $changed -Missing:($Matches[1] -ceq 'missing')
+        }
+        $phase=if($variant -ceq 'wrong-phase'){'serverdeck_windows-tests'}else{'serverdeck_locald-tests'}
+        $failure=Invoke-ControlledOwnedDiagnosticProjection -Snapshot $selected -Events ([string[]]$events) -Phase $phase -PrivateMarker $PrivateMarker -Label ('T115 '+$variant)
+        $expectCase=$variant -cnotin @('unknown-name','suffixed-name','child-mode','orphan','name-type','wrong-url','unknown-url','missing-url',
+            'wrong-suite','missing-suite','wrong-suite-path','wrong-phase','invalid-declaration','unrelated-declaration','null-declaration',
+            'declaration-type','fractional-declaration','without-producer','helper-producer','unrelated-source-line','invalid-source-line',
+            'unknown-source-line','secondary-producer-only','event-id-type','changed-parent','changed-actor','changed-fixture','changed-startup',
+            'missing-actor','missing-fixture','missing-startup')
+        $expectExit=$expectCase -and $variant -cnotin @('cleanup-only','pass-assertion','legacy-bad-state','secondary-exit-only','raw-stderr-exit',
+            'private-stack-exit','exit-zero','exit-too-low','exit-too-high','exit-plus','exit-fractional','exit-nonnumeric','exit-prefix',
+            'exit-no-line-end','wrong-expected','error-type')
+        $expectedExit=switch($variant){'exit-signed'{-1073741819L};'exit-unsigned'{3221225477L};'exit-minimum'{-2147483648L};'exit-maximum'{4294967295L};default{1L}}
+        if(($expectCase -and $failure.fixtureCase -cne ('trusted-auth-'+$scenario)) -or (-not $expectCase -and $null -ne $failure.fixtureCase) -or
+            ($expectExit -and ($failure.fixtureExitCode -ne $expectedExit -or $failure.failureKind -cne 'fixture-exit')) -or
+            (-not $expectExit -and ($null -ne $failure.fixtureExitCode -or $null -ne $failure.failureKind)) -or
+            $null -ne $failure.fixturePhase -or $null -ne $failure.safeCode -or $failure.nativeErrors.Count -ne 0) {
+            throw ('T115 exact case/primary exit/null phase-code mismatch: '+$variant)
+        }
+        if($both -and $expectCase) {foreach($frame in $failure.sourceFrames){if($frame.file -ceq $actorSource -and $frame.line -eq 41){throw ('T115 secondary cleanup frame escaped: '+$variant)}}}
+        if($variant -ceq 'primary-frames-bound' -and $failure.sourceFrames.Count -ne 3){throw 'T115 common primary frame cap was not filled.'}
+        # Refusal of new family metadata must not erase independently valid old
+        # source frames. A stale actor loses its own frame, not the parent frame.
+        if($variant -cin @('changed-actor','changed-fixture','changed-startup','missing-actor','missing-fixture','missing-startup') -and
+            @($failure.sourceFrames|Where-Object {$_.file -ceq $parentSource -and $_.line -eq $producer}).Count -ne 1) {
+            throw ('T115 stale dependency erased valid generic parent evidence: '+$variant)
+        }
+        if($variant -cin @('changed-actor','missing-actor') -and @($failure.sourceFrames|Where-Object {$_.file -ceq $actorSource}).Count -ne 0){throw 'T115 stale actor frame escaped.'}
+    }
+    $shape=Get-NativeTrustedAuthDiagnosticShape -ParentLines $parentLines -ActorLines $actorLines -FixtureLines $fixtureLines -StartupLines $startupLines
+    if(-not $shape -or $shape.declarationLine -ne $declaration -or $producer -notin $shape.producerLines){throw 'T115 current source shape/declaration/producer rejected.'}
+    $changedZero=[string[]]$parentLines.Clone();$changedZero[$producer+1]='              1,'
+    if(Get-NativeTrustedAuthDiagnosticShape -ParentLines $changedZero -ActorLines $actorLines -FixtureLines $fixtureLines -StartupLines $startupLines){throw 'T115 altered expected-zero assertion accepted.'}
+    $multiline=@($parentLines)+@("const privateExample = '''",$PrivateMarker,"''';")
+    if(Get-NativeTrustedAuthDiagnosticShape -ParentLines $multiline -ActorLines $actorLines -FixtureLines $fixtureLines -StartupLines $startupLines){throw 'T115 multiline Dart literal was normalized into a trusted source contract.'}
+    $texts=@{ParentLines=($parentLines -join "`n");ActorLines=($actorLines -join "`n");FixtureLines=($fixtureLines -join "`n");StartupLines=($startupLines -join "`n")}
+    $mutations=@(
+        @('ParentLines','const Duration(seconds: 70)','const Duration(seconds: 71)'),
+        @('ParentLines','await runOwnedFixtureLifecycle(','runOwnedFixtureLifecycle('),
+        @('ParentLines',"expect((await output).trim(), 'PASS:`$scenario');",'expect(await output, isNotEmpty);'),
+        @('ActorLines','return runTrustedAuthStartup<Pair>(','return runUntrustedAuthStartup<Pair>('),
+        @('ActorLines','registry.stop();',''),
+        @('ActorLines','for (final pair in pairs.reversed) await pair.close();','for (final pair in pairs) await pair.close();'),
+        @('FixtureLines','OWNED_FIXTURE_CLEANUP_FAILURE:','PRIVATE_OTHER_CLEANUP:'),
+        @('FixtureLines','await cleanup();','cleanup();'),
+        @('StartupLines','started = true;','started = false;'),
+        @('StartupLines','if (!started) await cleanup();','await cleanup();'),
+        @('StartupLines','result = await start();','await start();'))
+    foreach($mutation in $mutations) {
+        $text=$texts[$mutation[0]];$changed=$text.Replace($mutation[1],$mutation[2]);if($changed -ceq $text){throw ('T115 mutation did not touch source: '+$mutation[1])}
+        $arguments=@{ParentLines=$parentLines;ActorLines=$actorLines;FixtureLines=$fixtureLines;StartupLines=$startupLines};$arguments[$mutation[0]]=$changed -split '\r?\n'
+        if(Get-NativeTrustedAuthDiagnosticShape @arguments){throw ('T115 altered required source contract accepted: '+$mutation[1])}
+    }
+    'QUALIFICATION_TRUSTED_AUTH_EXACT25_PRIMARY_NUMERIC_EXIT_AGGREGATE_NULL_PHASE_CODE_SOURCE_HASH_BOUNDS_PRIVACY_PASSED'
+}
+
 function Test-CapacityPhaseDiagnosticProjection {
     param([Parameter(Mandatory)]$Snapshot,[Parameter(Mandatory)][object[]]$RawCapacity,[Parameter(Mandatory)][string]$PrivateMarker)
     $parentSource='packages/serverdeck_locald/test/mcp/trust_probes_native_test.dart'
@@ -1226,6 +1636,41 @@ try {
 } finally {Pop-Location}
 $rawCapacity=@([IO.File]::ReadAllLines($capacityReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
 Test-CapacityPhaseDiagnosticProjection -Snapshot $snapshot -RawCapacity $rawCapacity -PrivateMarker $privateMarker
+
+# Real generic lifecycle reporter shapes, with synthetic private reasons only.
+# No pipe/native/process fixture is imported by this generated probe.
+$ownedProbe=Join-Path $fixture 'controlled-owned-fixture.dart'
+$ownedReport=Join-Path $fixture 'controlled-owned-fixture.machine.jsonl'
+$ownedHelperUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_windows/test/support/trusted_client_fixture.dart')).AbsoluteUri
+$ownedActorUri=([Uri](Join-Path $NativeIsarRepository 'packages/serverdeck_windows/test/support/trusted_client_actor.dart')).AbsoluteUri
+$ownedDart=@'
+import 'package:test/test.dart';
+import 'FIXTURE_OWNED_HELPER_URI';
+Future<void> body() async {
+  expect(1, 0, reason: 'TRUSTED_CLIENT_FIXTURE_FAILURE:prepare:SERVICE_UNAVAILABLE\n'
+    'SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER\n#0 actor (FIXTURE_OWNED_ACTOR_URI:40:1)');
+}
+void main() {
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER owned body', () async {
+    await runOwnedFixtureLifecycle(body: body, cleanup: () async {});
+  });
+  test('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER owned both', () async {
+    await runOwnedFixtureLifecycle(body: body, cleanup: () async {
+      Error.throwWithStackTrace(StateError('SYNTHETIC_PRIVATE_DIAGNOSTIC_MARKER cleanup'),
+        StackTrace.fromString('#0 secondary (FIXTURE_OWNED_ACTOR_URI:41:1)'));
+    });
+  });
+}
+'@
+[IO.File]::WriteAllText($ownedProbe,$ownedDart.Replace('FIXTURE_OWNED_HELPER_URI',$ownedHelperUri).Replace('FIXTURE_OWNED_ACTOR_URI',$ownedActorUri),[Text.UTF8Encoding]::new($false))
+Push-Location (Join-Path $NativeIsarRepository 'packages/serverdeck_windows')
+try {
+    & $FoundationDart test $ownedProbe --file-reporter "json:$ownedReport" *> (Join-Path $fixture 'controlled-owned-fixture.private.txt')
+    if($LASTEXITCODE -eq 0){throw 'Controlled owned fixture assertions unexpectedly passed.'}
+} finally {Pop-Location}
+$rawOwned=@([IO.File]::ReadAllLines($ownedReport)|ForEach-Object {$_|ConvertFrom-Json -AsHashtable})
+Test-TrustedClientFailureDiagnosticProjection -Snapshot $snapshot -RawOwned $rawOwned -PrivateMarker $privateMarker
+Test-TrustedAuthDiagnosticProjection -Snapshot $snapshot -RawOwned $rawOwned -PrivateMarker $privateMarker
 $fixture
 $invalidFixture
 exit 0

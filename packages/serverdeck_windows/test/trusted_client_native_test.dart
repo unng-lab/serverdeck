@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import 'mcp_build_bundle_test.dart' as b;
+import 'support/trusted_client_fixture.dart';
 
 void main() {
   late Directory root;
@@ -66,37 +67,43 @@ void main() {
       'actual format3 bootstrap and RPC client $mode',
       () async {
         final fixture = b.Fixture(executable);
-        try {
-          fixture.document['format'] = mode == 'cleanup2' ? 2 : 3;
-          fixture.document['workspaceSchema'] = mode == 'cleanup2' ? 2 : 3;
-          fixture.write();
-          final name =
-              r'\\.\pipe\ServerDeckNext.v1.' +
-              List.generate(
-                32,
-                (_) => Random.secure()
-                    .nextInt(256)
-                    .toRadixString(16)
-                    .padLeft(2, '0'),
-              ).join() +
-              '.0';
-          final child = await Process.start(
-            p.join(fixture.path, 'locald.exe'),
-            ['server', fixture.path, name, mode],
-          );
-          fixture.children.add(child);
-          final out = b.boundedOutput(child.stdout),
-              err = b.boundedOutput(child.stderr);
-          expect(
-            await child.exitCode.timeout(const Duration(seconds: 35)),
-            0,
-            reason: '${await out}\n${await err}',
-          );
-          expect(await out, contains('PASS:$mode'));
-          expect(await err, isEmpty);
-        } finally {
-          await fixture.close();
-        }
+        await runOwnedFixtureLifecycle(
+          body: () async {
+            fixture.document['format'] = mode == 'cleanup2' ? 2 : 3;
+            fixture.document['workspaceSchema'] = mode == 'cleanup2' ? 2 : 3;
+            fixture.write();
+            final name =
+                r'\\.\pipe\ServerDeckNext.v1.' +
+                List.generate(
+                  32,
+                  (_) => Random.secure()
+                      .nextInt(256)
+                      .toRadixString(16)
+                      .padLeft(2, '0'),
+                ).join() +
+                '.0';
+            final child = await Process.start(
+              p.join(fixture.path, 'locald.exe'),
+              ['server', fixture.path, name, mode],
+            );
+            fixture.children.add(child);
+            final out = b.boundedOutput(child.stdout),
+                err = b.boundedOutput(child.stderr);
+            final childExit = await child.exitCode.timeout(
+              const Duration(seconds: 35),
+            );
+            final record = readTrustedClientFailure(fixture.path);
+            expect(
+              childExit,
+              0,
+              reason:
+                  '${record == null ? '' : '${record.reasonMarker}\n'}${await out}\n${await err}',
+            );
+            expect(await out, contains('PASS:$mode'));
+            expect(await err, isEmpty);
+          },
+          cleanup: fixture.close,
+        );
       },
       testOn: 'windows',
       timeout: const Timeout(Duration(seconds: 50)),

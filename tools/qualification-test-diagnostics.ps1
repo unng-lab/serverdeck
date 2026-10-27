@@ -1,6 +1,52 @@
 . "$PSScriptRoot/native-artifact-source-snapshot.ps1"
 . "$PSScriptRoot/native-isar-artifact-inputs.ps1"
 
+function Get-NativeDiagnosticCodeFingerprint {
+    param([string[]]$Lines)
+    # Extra fixed-source contract, in addition to the current inventory byte
+    # hashes. Code changes fail closed; comments, indentation and CRLF do not
+    # tie the known producer to a particular checkout's line-ending settings.
+    # These checked files have no multiline literals. Refuse their addition
+    # rather than normalizing potentially meaningful literal whitespace.
+    $source=$Lines -join "`n"
+    if($source.Contains("'''") -or $source.Contains('"""')){return $null}
+    $code=($Lines|Where-Object {$_.Trim() -and -not $_.TrimStart().StartsWith('//')}|ForEach-Object {$_.Trim()}) -join "`n"
+    $digest=[Security.Cryptography.SHA256]::Create()
+    try {return [BitConverter]::ToString($digest.ComputeHash([Text.Encoding]::UTF8.GetBytes($code))).Replace('-','').ToLowerInvariant()}
+    finally {$digest.Dispose()}
+}
+
+function Get-NativeTrustedClientDiagnosticShape {
+    param([string[]]$ParentLines,[string[]]$ActorLines,[string[]]$FixtureLines,[string[]]$CompletionLines)
+    if((Get-NativeDiagnosticCodeFingerprint $ParentLines) -cne '532218f525550c18513e305ca21cdc8d69ed87b1dbed437a11274e3f486fe8cd' -or
+        (Get-NativeDiagnosticCodeFingerprint $ActorLines) -cne '6c5ddcaeacc9d77405c8104bbb1005492754d1ce8ecb4892818f12fda7900feb' -or
+        (Get-NativeDiagnosticCodeFingerprint $FixtureLines) -cne '1a22ecd7326c3856c80a3ff1970da3d89edb566d7e11f2189d03c3356dc9f695' -or
+        (Get-NativeDiagnosticCodeFingerprint $CompletionLines) -cne '985e887321bf0e5975095799f0b70b05f9c611e65ba1e8763c2c26b7336d454f'){return $null}
+    $declaration=@();$producer=@()
+    for($index=0;$index+1 -lt $ParentLines.Length;$index++) {
+        if($ParentLines[$index].Trim() -ceq 'test(' -and $ParentLines[$index+1].Trim() -ceq "'actual format3 bootstrap and RPC client `$mode',"){$declaration+=$index+1}
+        if($ParentLines[$index].Trim() -ceq 'expect(' -and $ParentLines[$index+1].Trim() -ceq 'childExit,'){$producer+=$index+1}
+    }
+    if($declaration.Count -ne 1 -or $producer.Count -ne 1 -or $declaration[0] -ge $producer[0]){return $null}
+    return @{declarationLine=$declaration[0];producerLines=@($producer[0],($producer[0]+1))}
+}
+
+function Get-NativeTrustedAuthDiagnosticShape {
+    param([string[]]$ParentLines,[string[]]$ActorLines,[string[]]$FixtureLines,[string[]]$StartupLines)
+    if((Get-NativeDiagnosticCodeFingerprint $ParentLines) -cne '1da69613ff61bf2280857b7c5347b90d3beaa7ff6949fd45eed7ce78bbf4a854' -or
+        (Get-NativeDiagnosticCodeFingerprint $ActorLines) -cne '928ab1265aa26e955172a31bbba0a1ac947f6220477f5035bf7682978328af2c' -or
+        (Get-NativeDiagnosticCodeFingerprint $FixtureLines) -cne '1a22ecd7326c3856c80a3ff1970da3d89edb566d7e11f2189d03c3356dc9f695' -or
+        (Get-NativeDiagnosticCodeFingerprint $StartupLines) -cne 'ffca4f75f11cfe1cdf52700b734d1e67ef3e355a1feb1cd2ee1215f0266f4419'){return $null}
+    $declaration=@();$producer=@();$end=@()
+    for($index=0;$index+1 -lt $ParentLines.Length;$index++) {
+        if($ParentLines[$index].Trim() -ceq 'test(' -and $ParentLines[$index+1].Trim() -ceq "'actual format3 API1.1 bootstrap and session `$scenario',"){$declaration+=$index+1}
+        if($ParentLines[$index].Trim() -ceq 'expect(' -and $ParentLines[$index+1].Trim() -ceq 'await child.exitCode.timeout(const Duration(seconds: 70)),'){$producer+=$index+1}
+        if($ParentLines[$index].Trim() -ceq 'timeout: const Timeout(Duration(seconds: 90)),'){$end+=$index+1}
+    }
+    if($declaration.Count -ne 1 -or $producer.Count -ne 1 -or $end.Count -ne 1 -or $declaration[0] -ge $producer[0] -or $producer[0] -ge $end[0]){return $null}
+    return @{declarationLine=$declaration[0];producerLines=@($producer[0],($producer[0]+1));endLine=$end[0]}
+}
+
 function Get-NativeCapacityDiagnosticShape {
     param([string[]]$ParentLines,[string[]]$HelperLines,[string[]]$WriterLines)
     $phases=@('capacity-start','capacity-reader-ready')+@(0..20|ForEach-Object {'capacity-prefill-'+($_*1000)})+@(
@@ -347,6 +393,42 @@ function Write-NativeQualificationTestFailure {
         'readiness2','bad-receipt','bad-retry','unknown-code','bad-field','wrong-id','wrong-generation','oversize',
         'invalid-json','timeout','eof','duplicate','single-use','wrong-token','bad-proof','hello-role','hello-generation',
         'hello-build','hello-version','hello-shape','bootstrap-timeout')
+    $trustedAuthCases=@('roles','native-gate','stale-close','proofs','quota','expiry','close','snapshot','deadline','client','framing','tamper',
+        'owner-context','owner-context-detach','owner-context-expiry','owner-context-budget','owner-context-native','owner-context-stop','owner-context-physical',
+        'owner-connection','owner-connection-budget','owner-connection-detach','owner-connection-native','owner-connection-stop','owner-connection-physical')
+    $clientFailurePhases=@('prepare','bootstrap','rpc-read','rpc-write','completion','cleanup-child','cleanup-worker')
+    $clientFailureCodes=@('SERVICE_UNAVAILABLE','UNSAFE_ENDPOINT','IDENTITY_UNAVAILABLE','TIMEOUT','RESOURCE_LIMIT','UNAUTHORIZED','INCOMPATIBLE','PREREQUISITE_UNAVAILABLE')
+    $ownedSeparator="`nOWNED_FIXTURE_CLEANUP_FAILURE:`n"
+    $clientParent='packages/serverdeck_windows/test/trusted_client_native_test.dart'
+    $clientActor='packages/serverdeck_windows/test/support/trusted_client_actor.dart'
+    $ownedFixture='packages/serverdeck_windows/test/support/trusted_client_fixture.dart'
+    $clientCompletion='packages/serverdeck_windows/test/support/trusted_client_completion.dart'
+    $authParent='packages/serverdeck_locald/test/mcp/trusted_auth_native_test.dart'
+    $authActor='packages/serverdeck_locald/test/support/trusted_auth_actor.dart'
+    $authStartup='packages/serverdeck_locald/test/support/trusted_auth_fixture.dart'
+    $clientShape=$null;$authShape=$null
+    function Get-CheckedOwnedCase($Test,[string]$File,$DeclarationLine,$Shape,[string]$ExpectedFile,[string]$Prefix,[string[]]$Cases) {
+        if(-not $Shape -or -not $Test -or $File -cne $ExpectedFile -or $Test['name'] -isnot [string] -or
+            $Test['url'] -isnot [string] -or (Resolve-DiagnosticSource $Test['url']) -cne $ExpectedFile -or
+            ($Test['id'] -isnot [int] -and $Test['id'] -isnot [long]) -or $Test['id'] -lt 0 -or
+            ($Test['suiteID'] -isnot [int] -and $Test['suiteID'] -isnot [long]) -or $suites[[string]$Test['suiteID']] -cne $ExpectedFile -or
+            ($Test['line'] -isnot [int] -and $Test['line'] -isnot [long]) -or $Test['line'] -ne $Shape.declarationLine -or $DeclarationLine -ne $Shape.declarationLine){return $null}
+        foreach($case in $Cases){if($Test['name'] -ceq ($Prefix+$case)){return $case}}
+        return $null
+    }
+    function Test-OwnedReporterLine($Trace,[string]$ExpectedFile,[long[]]$Lines,[long]$Start=0,[long]$End=0) {
+        foreach($frame in [regex]::Matches([string]$Trace,$framePattern)) {
+            $frameFile=Resolve-DiagnosticSource $frame.Groups['uri'].Value
+            if($frameFile -cne $ExpectedFile){continue}
+            $frameLine=Get-DiagnosticLine $frameFile ([long]$frame.Groups['line'].Value)
+            if($frameLine -and ($frameLine -in $Lines -or ($Start -gt 0 -and $frameLine -ge $Start -and $frameLine -le $End))){return $true}
+        }
+        return $false
+    }
+    function Get-CurrentDiagnosticLines([string]$File) {
+        if(-not $known.ContainsKey($File) -or (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $File)) -cne $known[$File].hash){return $null}
+        return [IO.File]::ReadAllLines((Join-Path $NativeIsarRepository $File))
+    }
     $trustProbeCases=@('basic','reservation','quota','role','foreign','cancel','close','retention','gate','success',
         'success-cancel','success-ttl','success-other','success-write-basic','success-write-replay','success-write-cancel',
         'success-write-ttl','success-write-cas','success-write-foreign','success-write-duplicate','success-write-reservation',
@@ -416,6 +498,20 @@ function Write-NativeQualificationTestFailure {
     $tests=@{};$suites=@{};$failures=[Collections.Generic.List[object]]::new()
     $complete=$false;$status='missing-reporter'
     try {
+        if($Phase -ceq 'serverdeck_windows-tests') {
+            $parentLines=Get-CurrentDiagnosticLines $clientParent;$actorLines=Get-CurrentDiagnosticLines $clientActor
+            $fixtureLines=Get-CurrentDiagnosticLines $ownedFixture;$completionLines=Get-CurrentDiagnosticLines $clientCompletion
+            if($parentLines -and $actorLines -and $fixtureLines -and $completionLines) {
+                $clientShape=Get-NativeTrustedClientDiagnosticShape $parentLines $actorLines $fixtureLines $completionLines
+            }
+        }
+        if($Phase -ceq 'serverdeck_locald-tests') {
+            $parentLines=Get-CurrentDiagnosticLines $authParent;$actorLines=Get-CurrentDiagnosticLines $authActor
+            $fixtureLines=Get-CurrentDiagnosticLines $ownedFixture;$startupLines=Get-CurrentDiagnosticLines $authStartup
+            if($parentLines -and $actorLines -and $fixtureLines -and $startupLines) {
+                $authShape=Get-NativeTrustedAuthDiagnosticShape $parentLines $actorLines $fixtureLines $startupLines
+            }
+        }
         if($Phase -ceq 'serverdeck_locald-tests' -and $known.ContainsKey($capacityParent) -and $known.ContainsKey($capacityHelper) -and $known.ContainsKey($capacityWriter) -and
             (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityParent)) -ceq $known[$capacityParent].hash -and
             (Get-NativeIsarDigest (Join-Path $NativeIsarRepository $capacityHelper)) -ceq $known[$capacityHelper].hash -and
@@ -484,6 +580,22 @@ function Write-NativeQualificationTestFailure {
                                 $declarationLine=Get-DiagnosticLine $file $test['line']
                             }
                             $framePattern='(?m)(?<uri>package:[A-Za-z0-9_]+/[^\s():]+|file:///[^\s()]+?|^[^\s():]+\.dart)(?::|\s+)(?<line>[0-9]+):(?<column>[0-9]+)'
+                            $clientMode=Get-CheckedOwnedCase $test $file $declarationLine $clientShape $clientParent 'actual format3 bootstrap and RPC client ' $trustedClientCases
+                            $authScenario=Get-CheckedOwnedCase $test $file $declarationLine $authShape $authParent 'actual format3 API1.1 bootstrap and session ' $trustedAuthCases
+                            if($event.testID -isnot [int] -and $event.testID -isnot [long]){$authScenario=$null}
+                            if($authScenario -and -not (Test-OwnedReporterLine $event.stackTrace $authParent @() $authShape.declarationLine $authShape.endLine)){$authScenario=$null}
+                            $ownedPrimaryError=[string]$event.error
+                            if($clientMode -or $authScenario) {
+                                $secondary=$ownedPrimaryError.IndexOf($ownedSeparator,[StringComparison]::Ordinal)
+                                if($secondary -ge 0){$ownedPrimaryError=$ownedPrimaryError.Substring(0,$secondary)}
+                            }
+                            $authExitCode=$null
+                            if($authScenario -and $event.error -is [string] -and ($event.testID -is [int] -or $event.testID -is [long]) -and
+                                $ownedPrimaryError -cmatch '\AExpected: <0>\r?\n[ \t]*Actual: <(?<exit>-?[0-9]{1,10})>\r?\n') {
+                                $candidateExit=[long]$Matches['exit']
+                                if($candidateExit -ne 0 -and $candidateExit -ge -2147483648 -and $candidateExit -le 4294967295 -and
+                                    (Test-OwnedReporterLine $event.stackTrace $authParent $authShape.producerLines)){$authExitCode=$candidateExit}
+                            }
                             $gatewayDiagnosticCase=Get-GatewayDiagnosticCase $test $file $declarationLine
                             $gatewayExitCode=$null;$gatewayPrimaryError=$null
                             if($gatewayDiagnosticCase -and $event.error -is [string] -and
@@ -524,7 +636,7 @@ function Write-NativeQualificationTestFailure {
                                     }
                                 }
                             }
-                            $traces=if($null -ne $gatewayExitCode){@($event.stackTrace,$gatewayPrimaryError)}else{@($event.stackTrace,$event.error)}
+                            $traces=if($null -ne $gatewayExitCode){@($event.stackTrace,$gatewayPrimaryError)}elseif($authScenario -or $clientMode){@($event.stackTrace,$ownedPrimaryError)}else{@($event.stackTrace,$event.error)}
                             # Other failures retain their previous ordering. Child
                             # stacks and reporter stacks share hash/line checks and
                             # one total cap, including the prioritized frames above.
@@ -542,13 +654,15 @@ function Write-NativeQualificationTestFailure {
                                 }
                             }
                             $native=[Collections.Generic.List[object]]::new()
-                            foreach($match in [regex]::Matches([string]$event.error,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
+                            $nativeErrorText=if($authScenario -or $clientMode){$ownedPrimaryError}else{[string]$event.error}
+                            foreach($match in [regex]::Matches($nativeErrorText,'OS Error: (?<kind>NT_ATTRIBUTES_STATUS|WIN32_DRIVE_TYPE|WIN32_REPARSE_POINT), errno = (?<code>-?[0-9]{1,10})')){
                                 $code=[long]$match.Groups['code'].Value
                                 if($code -ge -2147483648 -and $code -le 4294967295){$native.Add(@{kind=$match.Groups['kind'].Value;code=$code});if($native.Count -eq 3){break}}
                             }
                             $safeCode=$null
                             if([string]$event.error -cmatch '^Bad state: (IDENTITY_UNAVAILABLE|PROTECTION_UNAVAILABLE|SECURITY_UNAVAILABLE|UNSAFE_PATH|RESOURCE_LIMIT|SERVICE_UNAVAILABLE|INTERNAL|WORKSPACE_CHILD_FAILED|WORKSPACE_CHILD_TIMEOUT)$'){$safeCode=$Matches[1]}
                             $fixtureCase=$null;$failureKind=$null;$fixtureExitCode=$null;$fixturePhase=$null
+                            if($authScenario){$fixtureCase='trusted-auth-'+$authScenario}
                             $bootstrapCase=Get-BootstrapDiagnosticCase $test
                             $key=[string]$event.testID
                             if(($event.testID -is [int] -or $event.testID -is [long]) -and $bootstrapCase -and
@@ -644,6 +758,20 @@ function Write-NativeQualificationTestFailure {
                             if($null -ne $gatewayExitCode -and $fixtureCase -ceq $gatewayDiagnosticCase) {
                                 $fixtureExitCode=$gatewayExitCode
                                 $failureKind='fixture-exit'
+                            }
+                            if($clientMode -and $clientMode -cnotin @('cleanup2','cleanup3') -and $null -ne $fixtureExitCode -and
+                                ($event.testID -is [int] -or $event.testID -is [long]) -and
+                                $event.error -is [string] -and (Test-OwnedReporterLine $event.stackTrace $clientParent $clientShape.producerLines) -and
+                                [regex]::Matches($ownedPrimaryError,'TRUSTED_CLIENT_FIXTURE_FAILURE:').Count -eq 1) {
+                                $markerPattern='\AExpected: <0>\r?\n[ \t]*Actual: <-?[0-9]{1,10}>\r?\nTRUSTED_CLIENT_FIXTURE_FAILURE:('+($clientFailurePhases -join '|')+'):('+($clientFailureCodes -join '|')+'|-)\n'
+                                if($ownedPrimaryError -cmatch $markerPattern) {
+                                    $fixturePhase=$Matches[1]
+                                    $safeCode=if($Matches[2] -ceq '-'){$null}else{$Matches[2]}
+                                }
+                            }
+                            if($authScenario) {
+                                $fixturePhase=$null;$safeCode=$null
+                                if($null -ne $authExitCode){$fixtureExitCode=$authExitCode;$failureKind='fixture-exit'}
                             }
                             # A cleanup exception can mask the actor outcome. Export
                             # only fixed Windows delete codes from the known owned
