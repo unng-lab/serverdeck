@@ -1,0 +1,134 @@
+{
+  "version": "1.0",
+  "themes": {
+    "dark": {
+      "bg": "#0C121C",
+      "surface": "#151E2B",
+      "raised": "#1D2939",
+      "hover": "#253246",
+      "selected": "#173E43",
+      "text": "#EAF0F7",
+      "muted": "#A7B5C7",
+      "border": "#35465E",
+      "control": "#8192A8",
+      "accent": "#64DFC5",
+      "onAccent": "#0C121C",
+      "accentHover": "#8CEBD7",
+      "focus": "#7DCFFF",
+      "disabled": "#A7B5C7",
+      "available": "#72DBAC",
+      "unavailable": "#FF9DA5",
+      "unknown": "#BCC7D6",
+      "warning": "#FFC47A",
+      "error": "#FF8D98",
+      "running": "#86C9FF",
+      "success": "#72DBAC",
+      "chart2": "#C5ABFF",
+      "chart3": "#FFC47A"
+    },
+    "light": {
+      "bg": "#F3F6FA",
+      "surface": "#FFFFFF",
+      "raised": "#EAF0F6",
+      "hover": "#E2EAF3",
+      "selected": "#D9F1EC",
+      "text": "#172337",
+      "muted": "#526279",
+      "border": "#CDD7E4",
+      "control": "#718198",
+      "accent": "#087565",
+      "onAccent": "#FFFFFF",
+      "accentHover": "#075E51",
+      "focus": "#006AAB",
+      "disabled": "#526279",
+      "available": "#137346",
+      "unavailable": "#B62D42",
+      "unknown": "#586579",
+      "warning": "#915000",
+      "error": "#B6203C",
+      "running": "#1765A8",
+      "success": "#137346",
+      "chart2": "#7650B4",
+      "chart3": "#915000"
+    }
+  },
+  "shared": {
+    "space.1": 4,
+    "space.2": 8,
+    "space.3": 12,
+    "space.4": 16,
+    "space.6": 24,
+    "space.8": 32,
+    "space.12": 48,
+    "radius.control": 8,
+    "radius.card": 12,
+    "radius.dialog": 16,
+    "stroke.icon": 1.5,
+    "size.icon": 20,
+    "size.control": 36,
+    "size.row.dense": 36,
+    "size.row.default": 44,
+    "size.focus": 2,
+    "size.focusGap": 2,
+    "font.ui": "Noto Sans",
+    "font.mono": "Noto Sans Mono",
+    "font.body": 14,
+    "font.body.line": 20,
+    "font.table": 13,
+    "font.table.line": 20,
+    "font.log": 13,
+    "font.log.line": 20,
+    "font.title": 24,
+    "font.title.line": 32,
+    "font.label": 12,
+    "font.label.line": 16,
+    "motion.fast": 120,
+    "motion.normal": 180,
+    "shadow.dark": "none",
+    "shadow.light": "0 4 16 rgba(23,35,55,0.10)"
+  },
+  "status": [
+    {
+      "token": "available",
+      "label": "Доступен",
+      "symbol": "circle",
+      "meaning": "SSH-соединение установлено"
+    },
+    {
+      "token": "unavailable",
+      "label": "Недоступен",
+      "symbol": "cross",
+      "meaning": "Подключение не установлено"
+    },
+    {
+      "token": "unknown",
+      "label": "Неизвестно",
+      "symbol": "question",
+      "meaning": "Данные ещё не получены"
+    },
+    {
+      "token": "warning",
+      "label": "Предупреждение",
+      "symbol": "triangle",
+      "meaning": "Требуется внимание"
+    },
+    {
+      "token": "error",
+      "label": "Ошибка",
+      "symbol": "octagon",
+      "meaning": "Операция не выполнена"
+    },
+    {
+      "token": "running",
+      "label": "Выполнение",
+      "symbol": "arc",
+      "meaning": "Операция продолжается"
+    },
+    {
+      "token": "success",
+      "label": "Успех",
+      "symbol": "check",
+      "meaning": "Операция завершена"
+    }
+  ]
+}

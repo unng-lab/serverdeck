@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      source_gen:combining_builder:
+        options:
+          # Isar 3.3.2 emits index convenience methods that invoke its pinned
+          # experimental API. Keep the exemption in generated output only.
+          ignore_for_file:
+            - experimental_member_use

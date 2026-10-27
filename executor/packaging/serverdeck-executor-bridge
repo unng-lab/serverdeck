@@ -1,0 +1,9 @@
+#!/opt/serverdeck-executor/venv/bin/python -I
+import sys
+sys.path.insert(0, "/usr/lib/serverdeck-executor")
+from serverdeck_executor.bridge import main
+from serverdeck_executor.codec import Rejected
+try:
+    main()
+except (Rejected, OSError, EOFError):
+    sys.exit(1)

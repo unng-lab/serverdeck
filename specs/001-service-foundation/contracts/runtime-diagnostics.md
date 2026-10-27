@@ -1,0 +1,34 @@
+# UI runtime diagnostics — T230 / T231
+
+[Plan](../plan.md), [tasks](../tasks.md), [UI](ui-validation.md). Source: Constitution III, FR-123, FR-SVC-016, SC-SVC-004. This contract closes F230's missing runtime design; implementation and acceptance remain T231.
+
+## Ownership and scope
+
+`lib/diagnostics/ui_runtime_diagnostics.dart` owns FlutterError.onError, root-isolate PlatformDispatcher.instance.onError and ErrorWidget.builder. Production `lib/main.dart` installs it before runApp. No new dependency, data entity, Local API method, right, migration or service action. No zone replacement. Other isolates/locald retain their existing safe-code contracts. The guard does not suppress domain errors, claim remote-host health, save drafts, repeat mutations, reset storage or change trust/readiness.
+
+## Safe payload
+
+Three fixed fault categories: framework `SERVERDECK_UI_FRAMEWORK_INTERNAL`, unhandled root-isolate `SERVERDECK_UI_UNHANDLED_INTERNAL`, observer/sink/reentrant failure `SERVERDECK_UI_DIAGNOSTIC_HANDLER_FAILED`. A typed UiRuntimeFault contains only its category; its string form is that constant. It holds no original error, stack, context, identifier, collector or reference to an input object. No original toString, stack filtering or informationCollector is invoked.
+
+Before delegation, create new FlutterErrorDetails with this fault, StackTrace.empty, library `ServerDeck UI`, fixed ErrorDescription `Локальная ошибка интерфейса`, no informationCollector or stackFilter. Framework silent may be copied as a boolean; all other original fields are discarded. Platform errors use the unhandled category. This rule applies equally in debug/release and to errors already carrying a domain exception: only the runtime guard's source category is reported here.
+
+## Callback rules
+
+- Install separately captures current framework/platform handlers unless they are already this guard's own stable callbacks. Repeated install with unchanged globals delegates once; replacing a handler and installing again captures the replacement. Never retain the guard as its own predecessor. No restoration API is exposed by production; tests save/restore globals directly.
+- Captured predecessors belong to immutable handler-owned bindings, not one mutable global delegate slot. Restoring an earlier saved guard callback must restore its original delegation behavior. Recognize owned callbacks across installations and reuse their intended predecessor instead of stacking guard delegates. Ownership metadata must be weak/collectable or otherwise not retain discarded observers/test contexts indefinitely. Reentrancy state is binding-owned and always cleared; restored hooks cannot inherit another test's observer or active flag.
+- Framework callback invokes the captured observer exactly once with sanitized details. With no observer it emits only the framework fixed category to the console sink. If the observer or console sink throws, throw only a new handler-failure UiRuntimeFault with StackTrace.empty, never the original error or observer exception. Unexpected test/framework failures remain observable; normal test binding gets the sanitized error rather than being silently bypassed.
+- Platform callback invokes its captured observer once with sanitized UiRuntimeFault/StackTrace.empty. A true result means consumed. Absent/false observer triggers one sanitized framework report. A throwing platform observer instead reports the fixed handler-failure category through that framework path. The guard always returns true to prevent the engine from printing the original error/stack. If framework reporting itself throws, attempt only the fixed handler-failure console category, swallowing a second sink failure so original platform fallback cannot run. Failure of every diagnostic sink cannot guarantee output; it must still not expose the original payload.
+- Separate framework/platform reentrancy flags are cleared in finally. A reentrant framework report raises only the safe handler-failure fault with empty stack instead of invoking its observer again. A reentrant platform event uses only a best-effort fixed handler-failure category and returns true. No recursive delegation or raw fallback.
+- Console output consists solely of the fixed category. It never interpolates details. Existing observers may use the sanitized payload, but cannot receive source exceptions, paths, stack/context or collectors through this boundary. Adversarial code replacing global hooks after installation is outside this guard; normal startup installs them as above.
+
+## Last-resort rendering
+
+ErrorWidget.builder ignores original details and does not invoke its previous builder. It returns ErrorWidget.withDetails with a nonempty fixed message in both modes: `Локальная ошибка интерфейса ServerDeck. Перезапустите клиент и проверьте результат сохранения.` No raw exception, library, context, stack or diagnostic collector enters the widget. This low-dependency fallback must work without Theme/MediaQuery/material ancestors; regular service errors continue using the existing themed readiness views. A framework error does not establish whether a pending mutation committed; the message offers result verification after restart, with no automatic save/retry.
+
+## Acceptance and lifecycle
+
+T231 tests install on the real globals and restore them after every test. Inject synthetic password/key/passphrase/private-path markers in exception, stack, library, context and informationCollector. Prove no original toString/collector invocation, sanitized observer fields, bounded exactly-once delegation and fixed console/rendered text. Cover repeated install, replacement observers, null/false/throwing observers, reentrancy and console failure; platform always handled. Report/render faults remain observable rather than converting unexpected test failures into success. Guard callbacks themselves do no repository or mutation work.
+
+Also save installation A hooks, replace observers/install B, restore A hooks and report another fault: only A's original observer receives it once, with safe data. Repeat with null predecessors. This verifies lifecycle isolation without a production reset API.
+
+Run root format/analyze/test, relevant package checks and compiled credential UI regression to verify normal startup/observers/old ten-step route. Add compiled acceptance-only injected framework/platform/fallback faults with captured output/render assertions; instrumented target is separate from normal entry and synthetic marker inputs are excluded from ordinary file scans. No test controls in the production entry. Preserve failed runs and normal saved data. Independent fresh code/package review and applicable links are required; file-only T228 and aggregate T229 do not prove T231. Full T204/Q05/001.1 remains open pending its other surfaces/manual gates; exact denied operations stay deferred without retry/bypass.

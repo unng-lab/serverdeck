@@ -1,0 +1,133 @@
+# Feature Specification: MCP и делегируемые Ansible-профили
+
+**Feature**: `021-mcp-control`
+**Created**: 2026-10-21
+**Status**: Design review3 завершён без замечаний, готов к поэтапной реализации. Implement начат; рабочая MCP-функция и приёмка не завершены.
+**Planning**: [Plan](plan.md), [Tasks](tasks.md), [Contracts](contracts/mcp.md), [Quickstart](quickstart.md).
+**Input**: Управление ServerDeck из Codex и других ИИ через MCP: настройки, состояние, журналы, установка приложений и создание/изменение делегируемых Ansible-профилей.
+
+## Clarifications
+
+### Session 2026-10-21
+
+- ИИ получает только MCP tools, без выдачи SSH-ключей или произвольного shell. UI использует тот же сервис и правила; перевод самого UI на MCP не требуется.
+- ИИ должен уметь создавать и изменять сами Ansible-профили, а не только запускать встроенные.
+- Q: Где выполнять изолированную приёмку executor вместо отдельной VM? → A: Использовать Docker и GitHub runners; проект публичный. Реальная systemd Docker fixture допускается для приёмки, mock-only проверки — нет; container init restart учитывается отдельно от host kernel reboot.
+
+## User Scenarios & Testing
+
+### User Story 1 — Подключить ИИ и получить состояние (Priority: P1)
+
+Владелец разрешает MCP-клиенту выбранные серверы и чтения. ИИ находит сервер, получает состояние, настройки, ПО и журналы. UI показывает те же объекты; сохранённые настройки остаются после выхода ИИ.
+
+**Why this priority**: Убирает необходимость выдавать ИИ SSH-доступ и вести отдельную модель инфраструктуры.
+**Independent Test**: Один locald, UI, два MCP-клиента, disposable Linux и отказной транспорт; Ansible не требуется.
+**Acceptance Scenarios**:
+
+1. **AC-MCP-1A Given** разрешение только на A, **When** ИИ перечисляет серверы и читает состояние/настройки/журнал A, **Then** B и его данные недоступны; наблюдения имеют источник, время, полноту, а UI показывает те же объекты.
+2. **AC-MCP-1B Given** отзыв, истечение срока, смена credentials или host key, **When** приходит задержанный ответ чтения, **Then** он не выдаёт прежние данные; изменённый ключ блокирует доступ до решения владельца.
+3. **AC-MCP-1C Given** закрытые UI и ИИ, **When** ИИ подключается снова, **Then** сохранены настройки, серверы и история; чтения не выдаются за непрерывный сбор и не восстанавливаются скрыто.
+
+### User Story 2 — Создать и изменить Ansible-профиль (Priority: P1)
+
+ИИ читает каталог, создаёт профиль и новые ревизии шагов/параметров. ServerDeck хранит содержимое, происхождение и изменения. Запуск ссылается на неизменную ревизию; изменение черновика не меняет ранее согласованный код.
+
+**Why this priority**: Автоматизация живёт в ServerDeck и развивается через ИИ.
+**Independent Test**: Создание, две конкурентные правки, validation failure, новая ревизия после согласования и рестарт; сервер для авторства не требуется.
+**Acceptance Scenarios**:
+
+1. **AC-MCP-2A Given** право author, **When** ИИ создаёт профиль и меняет его, **Then** обе ревизии доступны в UI/MCP с составом, автором и digest; конфликт не теряет первую правку. В пустом пространстве author-only разрешение не требует сервера и позволяет подготовить профили; чтение серверов/запуск при этом запрещены.
+2. **AC-MCP-2B Given** разрешённая ревизия, **When** сохранена новая с иными эффектами, **Then** старые задания не меняются, новая не наследует разрешение, validation не меняет сервер. Также одинаковое body у A/r1 и A/r2 либо у A/r1 и B/r1 не даёт права запуска новой ревизии/другого профиля; metadata-only правка не исключение.
+3. **AC-MCP-2C Given** недопустимые шаги, источники или секреты, **When** запрошены validation/run, **Then** возвращаются структурированные причины без исполнения, скрытой загрузки или утечки в диагностику.
+
+### User Story 3 — Делегировать настройку и установку (Priority: P1)
+
+Владелец разрешает ИИ определённые ревизии, цели и диапазоны параметров на срок. ИИ строит план и запускает подходящее изменение либо передаёт запрос владельцу. Сервис сохраняет desired state, исполняет Ansible и проверяет результат. Установка приложений использует этот же путь с требованиями 006.
+
+**Why this priority**: MCP должен доводить управление до проверенного результата.
+**Independent Test**: Disposable Ubuntu24.04 amd64 systemd Docker fixture on GitHub runners (or explicitly owned VM): служба, конфигурационный файл, PostgreSQL и ClickHouse, конфликт, обрыв, отмена и отзыв.
+**Acceptance Scenarios**:
+
+1. **AC-MCP-3A Given** подходящая делегация, **When** ИИ применяет настройку/установку, **Then** один durable job и проверенный результат видны UI/MCP; последующее чтение выявляет drift без автоматической записи.
+2. **AC-MCP-3B Given** выход за цели/параметры/срок или новая ревизия, **When** запрошен apply, **Then** нет исполнения; возможен запрос владельцу с точной целью/эффектами, ИИ не подтверждает его сам.
+3. **AC-MCP-3C Given** потеря ответа или сбой после эффекта, **When** другой клиент повторяет запрос/recovery, **Then** нет двойного запуска; unknown удерживает physical-host lock, reconciliation не запускает новый playbook.
+4. **AC-MCP-3D Given** отзыв во время задания, **When** достигнута безопасная граница, **Then** следующие эффекты запрещены, уже произошедшие сохранены; отзыв не обещает rollback текущей операции.
+
+### Edge Cases
+
+- UI и два ИИ правят одну ревизию или запускают задания через разные профили одного физического хоста.
+- Инструкции внутри logs/profile остаются недоверенными данными, не расширяют полномочия.
+- Executor/Ansible отсутствуют или несовместимы: нет скрытой установки/shell fallback, обычное чтение продолжает работать.
+- Закрытие MCP-клиента не отменяет durable job, не стирает историю/lock и не разрешает повтор.
+- Переполнение журналов, секретные параметры, просроченный план, отозванная ревизия и неизвестный storage format объясняются явно.
+
+## Requirements
+
+### Scope и зависимости
+
+021 владеет MCP, ИИ grants/delegation и авторством Ansible-профилей. [001](../001-service-foundation/spec.md) остаётся владельцем locald, storage, SSH, доверия и jobs; [002](../002-security-storage/spec.md) — защиты секретов; [006](../006-software-installation/spec.md) — критериев установки; [009](../009-observability/spec.md) — расширенных журналов; [010](../010-system-service-management/spec.md)/[013](../013-files-diagnostics/spec.md) — соответствующих системных/конфигурационных действий.
+
+Порядок: 001.1 → 021.1 с необходимыми чтениями 001.2 → 021.2 → jobs 001.3/006 и 021.3. Номер 021 не означает ожидания всех 020 пакетов. Возможности 007–020 автоматически не добавляются в scope; при реализации используют тот же вход. Public network MCP, multi-user SaaS, provisioning и неограниченный shell не входят в первую поставку.
+
+«Только MCP» — граница доступа ИИ в продукте: locald/executor выполняют SSH внутри сервиса. Это не обещает запретить владельцу отдельный SSH-клиент или изолировать процесс с полными правами того же пользователя ОС.
+
+### Functional Requirements
+
+- **FR-MCP-001**: Стандартные MCP-клиенты MUST обнаруживать и вызывать tools без SDK конкретной ИИ-компании. Stdout содержит только протокол; несовместимость версии/lifecycle явная.
+- **FR-MCP-002**: Единственный locald MUST владеть серверами, настройками, наблюдениями, автоматизацией, разрешениями и jobs. UI/MCP используют одни ID/ревизии/правила. ИИ не получает credentials, туннель, raw SSH или shell tool.
+- **FR-MCP-003**: Владелец MUST выдавать/видеть/отзывать отдельные grants: цели, read/logs/author/plan/apply, точные ревизии профилей, параметры и срок. Default deny; чтение/авторство не дают apply, grant management или подтверждение доверия.
+- **FR-MCP-004**: Locald MUST проверять полномочия каждого вызова, перед новым эффектом и выдачей результата. Отзыв/срок/ревизии цели, доступа и доверия инвалидируют прежние планы и задержанные чтения; рестарт не восстанавливает отозванные права.
+- **FR-MCP-005**: Tools MUST предоставлять inventory/state/configuration и bounded logs с фильтрами/курсорoм, источником/временем и stale/denied/unsupported/incomplete/dropped. Бюджеты 001 общие с UI; raw logs не сохраняются в основной БД.
+- **FR-MCP-006**: Author MUST создавать, перечислять, читать, сравнивать, проверять, изменять и архивировать профили. Ревизия содержит назначение, среду, шаги, параметры, права, эффекты, post-checks, версию/digest/автора. История неизменна; validation не исполняет профиль.
+- **FR-MCP-007**: Новая ревизия MUST NOT наследовать право исполнения или менять старую. Контракт задаёт поддержанные шаги и проверяемую область эффектов; произвольные plugins/loaders/shell и обход executor запрещены, ограничения видны до запуска.
+- **FR-MCP-008**: План MUST сохранять exact inputs, desired state, ревизии профиля/рецепта, эффекты, host identity, credentials/trust revision, предусловия и post-checks. Drift — отличие desired/observed со временем; reconcile не исправляет сервер автоматически.
+- **FR-MCP-009**: Apply MUST требовать согласия на неизменный план либо действующей делегации на тройку (profileId, revision, bodyDigest), цели и параметры. Иначе approval-required; только владелец через доверенный UI расширяет права/подтверждает запрос. Подходящая делегация не требует повторного UI-подтверждения каждого запуска.
+- **FR-MCP-010**: Установка MUST использовать тот же plan/job/Ansible путь и все требования 006: package pins, fresh preflight, соседние данные, защита NetBird, SQL post-check. Exit Ansible не заменяет проверку результата.
+- **FR-MCP-011**: Изменения MUST использовать expected revision и durable request identity; duplicate возвращает прежний job, другой input с тем же id отклонён. Один physical-host writer для UI/ИИ/контроллеров; unknown сохраняет lock до установления исхода.
+- **FR-MCP-012**: Jobs MUST иметь status, упорядоченные bounded events/progress, отмену и reconciliation. Отмена до старта не пишет; после старта останавливает будущие шаги на безопасной границе без обещания rollback. MCP disconnect не отменяет durable job и не провоцирует повтор.
+- **FR-MCP-013**: Runtime MUST объявлять совместимость/prerequisites control node/Ansible/target до apply; чтение их не устанавливает. Секреты не попадают в argv, обычные файлы, stdout/events. Runtime готовит владелец отдельным действием; profiles/read работают без него.
+- **FR-MCP-014**: UI MUST показывать grants/scope/срок/отзыв, профили/изменения, запросы согласия, desired/observed и jobs с теми же результатами, что MCP. История содержит origin client и основание полномочий без секретов.
+- **FR-MCP-015**: Обновление MUST сохранять данные новой реализации 001, добавлять структуры атомарно с явной версией и отказом несовместимости без reset. Hard cutover старого сервиса не повторяется для нового пространства.
+- **FR-MCP-016**: Поставка MUST включать MCP entry point, совместимые UI/locald, tool schemas, примеры независимых клиентов, prerequisites check и изолированную воспроизводимую приёмку; реальные сохранённые серверы не подключаются автоматически.
+
+### Key Entities
+
+- **Client grant**: отдельная идентичность ИИ, права/цели/срок/ревизия/отзыв.
+- **Automation revision**: неизменное содержимое, типизированные параметры, digest, автор, родитель, совместимость/post-checks.
+- **Delegation**: разрешённые ревизии, границы параметров/целей, срок, владелец/отзыв.
+- **Plan / desired state / observation / job**: общие сущности locald с origin/grant/profile revision, намерение отдельно от результата.
+- **Approval request**: ожидающий решения владельца неизменный план, не самостоятельное право ИИ.
+
+## Success Criteria
+
+### Measurable Outcomes
+
+- **SC-MCP-001**: Два независимых стандартных клиента проходят discovery → state/logs → profile create/update → plan → apply/status на одном пространстве; UI показывает те же ревизии/job ID.
+- **SC-MCP-002**: Все AC-MCP-1A–3D проходят, включая отказы/границы; запрещённые действия не меняют сервер, seeded credentials отсутствуют в ответах/диагностике.
+- **SC-MCP-003**: Повтор до/после потери ответа и рестарта создаёт ровно один job/эффект; unknown/конкуренция не допускают второго writer.
+- **SC-MCP-004**: Реальная изолированная приёмка подтверждает службу/файл, PostgreSQL/ClickHouse, drift и post-checks; mock-only результат gate не закрывает.
+- **SC-MCP-005**: Авторство/сохранённое состояние работают без Ansible; исполнение объясняет недоступность. Все лимиты 001 соблюдаются суммарно для UI/ИИ.
+- **SC-MCP-006**: Миграция сохраняет профили/секреты/настройки/историю новой реализации; mandatory checks и completed independent review не имеют незакрытых подтверждённых замечаний.
+
+## Assumptions
+
+The existing native freshness/bounds requirements are further specified by
+[accepted-peer control coordination](contracts/native-control.md), implemented
+as the scoped T204–T207 correction to US1/FR-MCP-004/005. It preserves the native3
+and logical16 limits and introduces no new wire or storage format. Its design,
+implementation and acceptance are separately reviewed; the historical readiness
+statement above does not claim this correction has passed those gates.
+
+The current explicit unit/widget/static stage, locally and in automatic CI,
+is defined by Constitution4.0.0/VII and the
+[003 stage record](../003-design-system/plan.md#unit-widget-stage-2026-10-27),
+with separate [T213 acceptance](tasks.md#current-unit-widget-stage-2026-10-27).
+It changes no product FR/AC or native-control oracle; implemented source and
+scoped unit evidence do not close original T207/full-native correction
+acceptance or establish full021/platform/distribution readiness.
+
+- Windows первая, Ubuntu 24.04 amd64/systemd первая target; обязательное облако/смена Flutter/Dart/Isar не требуются.
+- Локальный stdio MCP достаточен для первой поставки; remote MCP требует отдельного auth/network design.
+- Авторство означает поддержанное декларативное содержимое, исполняемое Ansible. Неограниченное выполнение скачанного playbook не подразумевается; выразительность определяется Plan/контрактом до реализации.
+- ИИ не подтверждает host key и не выдаёт себе права. Владелец подготавливает credentials/trust; дальнейшие разрешённые действия не требуют лишнего повторного согласия.
+- Completed tasks 001 сохраняются; интеграция добавляется новыми задачами с отдельной приёмкой.

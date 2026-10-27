@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "status": "incomplete-native-chain",
+  "sources": [
+    {
+      "id": "isar-3.3.2/NOTICE",
+      "file": "isar-NOTICE.txt",
+      "url": "https://raw.githubusercontent.com/isar-community/isar-community/4c2cd02d4e5c17b7edca89d141d1729ddc1698ff/NOTICE",
+      "sourceCommit": "4c2cd02d4e5c17b7edca89d141d1729ddc1698ff",
+      "sha256": "e9c699c01ab3b6201ddff1f8b317f72ec65bd1b0dca61eb4ef515448e0d4cb13"
+    },
+    {
+      "id": "mdbx-sys-13.7.0/MPL-2.0",
+      "file": "MPL-2.0.txt",
+      "url": "https://www.mozilla.org/media/MPL/2.0/index.f75d2927d3c1.txt",
+      "sourceCommit": "",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+    },
+    {
+      "id": "libmdbx-source/LICENSE",
+      "file": "libmdbx-LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/isar-community/libmdbx/924581bdc8a1e217139c1d286c1ffb0ef0f9d14d/LICENSE",
+      "sourceCommit": "924581bdc8a1e217139c1d286c1ffb0ef0f9d14d",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "id": "libmdbx-source/NOTICE",
+      "file": "libmdbx-NOTICE.txt",
+      "url": "https://raw.githubusercontent.com/isar-community/libmdbx/924581bdc8a1e217139c1d286c1ffb0ef0f9d14d/NOTICE",
+      "sourceCommit": "924581bdc8a1e217139c1d286c1ffb0ef0f9d14d",
+      "sha256": "651f71b46c6bb0046d2122df7f9def9cb24f4dc28c5b11cef059f66565cda30f"
+    },
+    {
+      "id": "libmdbx-source/COPYRIGHT",
+      "file": "libmdbx-COPYRIGHT.txt",
+      "url": "https://raw.githubusercontent.com/isar-community/libmdbx/924581bdc8a1e217139c1d286c1ffb0ef0f9d14d/COPYRIGHT",
+      "sourceCommit": "924581bdc8a1e217139c1d286c1ffb0ef0f9d14d",
+      "sha256": "14d17dfaa57c8d3546cd4714e95a40fbb58950a31dcd6a6b0f4149cd68c897b8"
+    }
+  ]
+}

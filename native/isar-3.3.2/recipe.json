@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "product": "serverdeck-isar-native",
+  "bindingVersion": "3.3.2",
+  "target": "x86_64-pc-windows-msvc",
+  "isar": {
+    "commit": "4c2cd02d4e5c17b7edca89d141d1729ddc1698ff",
+    "url": "https://codeload.github.com/isar-community/isar-community/zip/4c2cd02d4e5c17b7edca89d141d1729ddc1698ff",
+    "sha256": "5e1af95510c4da216d548610ec50efad96ce8a35f95af98169d62e93228ca426"
+  },
+  "mdbx": {
+    "commit": "924581bdc8a1e217139c1d286c1ffb0ef0f9d14d",
+    "tag": "v0.13.8-temp-upstream-fix",
+    "url": "https://codeload.github.com/isar-community/libmdbx/zip/924581bdc8a1e217139c1d286c1ffb0ef0f9d14d",
+    "sha256": "a0c823fdfab1d60496c200bfcf538f198c09c31f083a112e8d1963af86142c1b"
+  },
+  "cargoLockSha256": "90065515cd9feae9f8d7b21f09e506bd87e32dccc1252a2c1627ad627f7ad260",
+  "rust": {
+    "version": "1.88.0",
+    "rustcCommit": "6b00bc3880198600130e1cf62b8f8a93494488cc",
+    "components": [
+      {
+        "name": "rustc",
+        "url": "https://static.rust-lang.org/dist/2025-06-26/rustc-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "8ae5e29324b60137c9c7fdd7af8537289f420d6b670f03f895195bd749d8d99f"
+      },
+      {
+        "name": "cargo",
+        "url": "https://static.rust-lang.org/dist/2025-06-26/cargo-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "c0a84985c164a6db42244b59176414d5690fa1bc6dd8aa8052f0f1be3604c0e0"
+      },
+      {
+        "name": "rust-std",
+        "url": "https://static.rust-lang.org/dist/2025-06-26/rust-std-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "1b5e3c24ac79aa362ff83ac32f635f4019434eac5b98c25dfa04a12b01ba00b3"
+      }
+    ]
+  },
+  "libclang": {
+    "version": "18.1.1",
+    "url": "https://files.pythonhosted.org/packages/0b/2d/3f480b1e1d31eb3d6de5e3ef641954e5c67430d5ac93b7fa7e07589576c7/libclang-18.1.1-py2.py3-none-win_amd64.whl",
+    "sha256": "4dd2d3b82fab35e2bf9ca717d7b63ac990a3519c7e312f19fa8e86dcc712f7fb",
+    "dllEntry": "libclang-18.1.1.data/platlib/clang/native/libclang.dll",
+    "dllSha256": "b13ec96d9a036d6c6c36dd09e00415ead7acc7fcfd40e721bf33ea86b3490f9d"
+  },
+  "msvc": {
+    "vsInstallationVersion": "17.14.36811.4",
+    "vcToolsVersion": "14.44.35207",
+    "windowsSdkVersion": "10.0.26100.0"
+  },
+  "licenseTexts": [
+    {
+      "file": "licenses/MPL-2.0.txt",
+      "source": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+      "id": "MPL-2.0",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+    }
+  ]
+}

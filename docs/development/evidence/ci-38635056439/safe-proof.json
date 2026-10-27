@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "compatibility-passed-unreviewed",
+  "hosted": true,
+  "revision": "60d8d3d22a0867ddc7344a7290f7047a600e2510",
+  "runId": "38635056439",
+  "runAttempt": "1",
+  "sourceSnapshotSha256": "81a3c6fcb695ff7768fbe0d01772ffaa5174606b8ee68eae45f770df1badf6d4",
+  "receiptSha256": "f718a2326bc69c25b3c3af59e0de661a0cccd274d5ec97a46f8ab2f31013ed30",
+  "artifactManifestSha256": "ee48d19a0d361fc2bde137767a0fc4dcbb71445d051184077cce222ab8f777cc",
+  "compiledRuntimeDiagnostics": true,
+  "fullAcceptance": false,
+  "distributionReady": false,
+  "activated": false
+}

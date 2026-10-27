@@ -1,19 +1,71 @@
 # ServerDeck
 
-Local-first Flutter desktop client for managing your Linux servers over SSH.
+Исходный код проекта распространяется по [лицензии MIT](LICENSE).
+Сторонние компоненты сохраняют собственные лицензии и notices.
 
-Product brief: [specification](specs/001-server-management-client/spec.md),
-[technical plan](specs/001-server-management-client/plan.md),
-[tasks](specs/001-server-management-client/tasks.md),
-[Logs research](docs/logs-research.md).
+Новая реализация ServerDeck разрабатывается с нуля. В checkout реализованы
+Windows-клиент, общий локальный сервис и stdio MCP-мост: управление доступом,
+SSH-подключениями, состоянием и логами, авторство типизированных Ansible-профилей,
+планы и задания. Код исполнителя и установки приложений также добавлен.
+Полная приёмка текущей реализации и квалификация рецептов ещё не завершены.
 
-The first target is Windows desktop: server inventory, installed-software inventory,
-systemd logs, basic hardware activity and reproducible installation jobs for
-PostgreSQL and ClickHouse. An optional backend synchronizes metadata; ordinary
-server access must work without it or a cloud-provider API.
+Запуск, сборка и доступные проверки описаны в
+[инструкции разработчика](docs/development/foundation.md).
+Сборка общего комплекта, выдача доступа ИИ и подключение MCP описаны в
+[инструкции MCP](docs/development/mcp.md).
+Фактические результаты и оставшиеся ограничения — в
+[журнале проверки](docs/development/foundation-verification.md).
 
-Status: requirements and proposed design only. No application, runner, backend,
-host installation or runtime tests have been implemented. Tool versions and
-third-party recipe compatibility still need verification. No real server addresses,
-credentials or log contents are included. License selection is pending; public
-repository visibility does not grant permission to copy third-party code.
+Первый пакет описывает целостный сервис: клиент/locald, владение данными,
+запуск/Local API/завершение и полный маршрут профиль → SSH → реальные сведения.
+Он разделён на этапы: текущий 001.1 создаёт локальную основу, 001.2 добавляет SSH,
+001.3 — задания. Остальные пакеты расширяют его компоненты.
+
+## Спецификации
+
+- [Последовательность 21 пакета и этапов](specs/README.md).
+- [Подробные бизнес-требования](specs/business-requirements.md).
+- [Трассировка требований и приёмки](specs/traceability.md).
+- [Машиночитаемая очередь](specs/sequence.json).
+- [Первый пакет: основа сервиса](specs/001-service-foundation/spec.md).
+- [MCP и делегируемые Ansible-профили](specs/021-mcp-control/spec.md): единый сервис UI/ИИ, состояние/журналы, авторство и управляемое исполнение. [Tasks 021](specs/021-mcp-control/tasks.md) различает исходники и принятую реализацию.
+- [Правила работы и независимого ревью](AGENTS.md).
+- [Конституция проекта](.specify/memory/constitution.md).
+
+Переход — **hard cutover**: новая реализация начинает с пустого пространства,
+без импорта старых профилей, данных, credentials, доверия и заданий,
+без совместимости со старым API и зависимости от старых MR.
+Последующие обновления новой реализации сохраняют её собственные данные.
+Удаление кода из checkout не удаляет данные установленного приложения,
+учётные данные ОС и данные управляемых серверов.
+
+## Spec Kit
+
+Сохранены `.specify/` и `.agents/skills/speckit-*`.
+Выполнен Specify, подготовлены [Plan](specs/001-service-foundation/plan.md)
+с контрактами/моделью и [Tasks 001.1](specs/001-service-foundation/tasks.md).
+Implement продолжается; выполненные задачи отмечены в Tasks с evidence.
+Для MCP подготовлены [Plan 021](specs/021-mcp-control/plan.md) и
+[Tasks 021](specs/021-mcp-control/tasks.md); пересекающиеся пакеты обновлены.
+Старые результаты проверки не закрывают новые gates.
+
+Доступные автоматические сценарии можно запустить последовательно через
+`./tools/test-foundation-available.ps1`; `-ListOnly` показывает 14 фаз.
+Это частичная приёмка: полный набор Q01–Q12 и этап 001.1 остаются открытыми.
+
+```powershell
+$env:SPECIFY_FEATURE_DIRECTORY='specs/001-service-foundation'
+& .specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly
+lychee "specs/**/*.md"
+```
+
+Этапы реализуются и сливаются последовательно, отдельными MR.
+После применимых проверок обязателен цикл независимого ревью по AGENTS.md:
+отдельный сабагент → исправления → повторные проверки → новый ревьювер
+до отсутствия подтверждённых замечаний.
+
+## Материалы
+
+[Брендбук](docs/brandbook/README.html) и исследования в `docs/` сохранены.
+Документы о прежних сборках и проверках относятся к удалённой реализации;
+они не являются инструкциями запуска этого checkout или приёмкой нового сервиса.

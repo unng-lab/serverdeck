@@ -6,6 +6,11 @@ server repositories, log provider, detail controller/screens and selected test
 sources. No source was changed or copied, and no tests/application were executed.
 Findings describe code behavior, not verified runtime guarantees.
 
+Provenance note: IDs below are the original research labels. In the canonical spec,
+BR-L05 retains the initial spec's failure/freshness meaning; research BR-L05 timing
+and raw fields map to BR-L04. BR-L06 is retained explicitly for desktop selection
+and newest-first viewing. See traceability.md; source identifiers are not erased.
+
 | Observed behavior | Business need in ServerDeck |
 | --- | --- |
 | Multiple saved SSH servers, names, ports, password/key authentication | BR-S01: user manages several servers from one desktop |

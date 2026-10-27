@@ -1,0 +1,12 @@
+.git
+.local
+.dart_tool
+build
+output
+tmp
+work
+**/__pycache__
+**/*.pyc
+**/*.dpapi
+.env*
+**/.env*

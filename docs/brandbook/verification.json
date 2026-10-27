@@ -1,0 +1,12 @@
+{
+  "pages": 29,
+  "contrast_pairs": 164,
+  "contrast_pass": true,
+  "minimum_text": 4.621482803216785,
+  "minimum_non_text": 3.2662861705408455,
+  "pdf_text_check": true,
+  "all_svg_fonts_checked": true,
+  "text_page_bounds_checked": true,
+  "logo_png_transparency_checked": true,
+  "logo_svg_outlines_checked": true
+}

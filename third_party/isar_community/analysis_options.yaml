@@ -1,0 +1,7 @@
+# Preserve upstream generated-binding analyzer exclusion without its dev lint package.
+analyzer:
+  exclude:
+    - lib/src/native/bindings.dart
+    # Upstream's unused legacy web backend imports dart:indexed_db, removed
+    # from the pinned SDK. ServerDeck's native Windows runtime is the target.
+    - lib/src/web/**

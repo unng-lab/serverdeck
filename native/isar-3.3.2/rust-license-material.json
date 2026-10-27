@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "product": "serverdeck-isar-native",
+  "bindingVersion": "3.3.2",
+  "rustVersion": "1.88.0",
+  "target": "x86_64-pc-windows-msvc",
+  "scope": "Exact pinned SDK copyright/license catalogues; runtime and build-tool categories separated; not exact linked crate inventory",
+  "archives": [
+    {
+      "name": "rustc",
+      "url": "https://static.rust-lang.org/dist/2025-06-26/rustc-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+      "sha256": "8ae5e29324b60137c9c7fdd7af8537289f420d6b670f03f895195bd749d8d99f"
+    },
+    {
+      "name": "cargo",
+      "url": "https://static.rust-lang.org/dist/2025-06-26/cargo-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+      "sha256": "c0a84985c164a6db42244b59176414d5690fa1bc6dd8aa8052f0f1be3604c0e0"
+    },
+    {
+      "name": "rust-std",
+      "url": "https://static.rust-lang.org/dist/2025-06-26/rust-std-1.88.0-x86_64-pc-windows-msvc.tar.gz",
+      "sha256": "1b5e3c24ac79aa362ff83ac32f635f4019434eac5b98c25dfa04a12b01ba00b3"
+    }
+  ],
+  "files": [
+    {
+      "id": "rust-runtime-copyright",
+      "sourceArchive": "rust-std",
+      "sourceRelative": "rust-rust-std/rust-std-1.88.0-x86_64-pc-windows-msvc/COPYRIGHT",
+      "destination": "licenses/rust/runtime/COPYRIGHT",
+      "role": "runtime distribution copyright",
+      "sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",
+      "length": 1571
+    },
+    {
+      "id": "rust-runtime-apache",
+      "sourceArchive": "rust-std",
+      "sourceRelative": "rust-rust-std/rust-std-1.88.0-x86_64-pc-windows-msvc/LICENSE-APACHE",
+      "destination": "licenses/rust/runtime/LICENSE-APACHE",
+      "role": "runtime distribution license",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "length": 9723
+    },
+    {
+      "id": "rust-runtime-mit",
+      "sourceArchive": "rust-std",
+      "sourceRelative": "rust-rust-std/rust-std-1.88.0-x86_64-pc-windows-msvc/LICENSE-MIT",
+      "destination": "licenses/rust/runtime/LICENSE-MIT",
+      "role": "runtime distribution license",
+      "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+      "length": 1068
+    },
+    {
+      "id": "rust-library-catalogue",
+      "sourceArchive": "rustc",
+      "sourceRelative": "rust-rustc/rustc-1.88.0-x86_64-pc-windows-msvc/rustc/share/doc/rust/COPYRIGHT-library.html",
+      "destination": "licenses/rust/runtime/COPYRIGHT-library.html",
+      "role": "SDK supplied library copyright/license catalogue; conservative scope",
+      "sha256": "3d3f60160f5214efa0a7fd804102d02ce9ea6af04b5249a19eeb243450246ae9",
+      "length": 376423
+    },
+    {
+      "id": "rust-compiler-catalogue",
+      "sourceArchive": "rustc",
+      "sourceRelative": "rust-rustc/rustc-1.88.0-x86_64-pc-windows-msvc/rustc/share/doc/rust/COPYRIGHT.html",
+      "destination": "licenses/rust/build-tools/COPYRIGHT.html",
+      "role": "SDK compiler copyright/license catalogue; not asserted linked runtime",
+      "sha256": "2bd426a843b7d2cc1c4f6600fbe4d15b90a1cb526e26c987b8b7165b98336de1",
+      "length": 12706866
+    },
+    {
+      "id": "cargo-apache",
+      "sourceArchive": "cargo",
+      "sourceRelative": "rust-cargo/cargo-1.88.0-x86_64-pc-windows-msvc/cargo/share/doc/cargo/LICENSE-APACHE",
+      "destination": "licenses/rust/build-tools/CARGO-LICENSE-APACHE",
+      "role": "build tool license; Cargo binary not distributed",
+      "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb",
+      "length": 10860
+    },
+    {
+      "id": "cargo-mit",
+      "sourceArchive": "cargo",
+      "sourceRelative": "rust-cargo/cargo-1.88.0-x86_64-pc-windows-msvc/cargo/share/doc/cargo/LICENSE-MIT",
+      "destination": "licenses/rust/build-tools/CARGO-LICENSE-MIT",
+      "role": "build tool license; Cargo binary not distributed",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+      "length": 1023
+    },
+    {
+      "id": "cargo-third-party",
+      "sourceArchive": "cargo",
+      "sourceRelative": "rust-cargo/cargo-1.88.0-x86_64-pc-windows-msvc/cargo/share/doc/cargo/LICENSE-THIRD-PARTY",
+      "destination": "licenses/rust/build-tools/CARGO-LICENSE-THIRD-PARTY",
+      "role": "build tool third-party notices; Cargo binary not distributed",
+      "sha256": "cbc759b1f17a2ac38fe3eb9e9563b1a08ba0f900611c49faaf68b46907b6d898",
+      "length": 68430
+    }
+  ]
+}

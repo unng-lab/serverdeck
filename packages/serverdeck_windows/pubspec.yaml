@@ -1,0 +1,15 @@
+name: serverdeck_windows
+description: Windows security and local IPC primitives.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: '>=3.13.5 <4.0.0'
+dependencies:
+  cryptography: 2.9.0
+  serverdeck_protocol:
+    path: ../serverdeck_protocol
+  win32: 6.4.0
+  ffi: 2.2.0
+  path: 1.9.1
+dev_dependencies:
+  test: 1.31.1

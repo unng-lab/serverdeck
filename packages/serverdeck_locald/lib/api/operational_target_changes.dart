@@ -1,0 +1,231 @@
+part of 'operational_auth.dart';
+
+/// Internal owner-service synchronization; never a wire or authority capability.
+final class _TargetChanges {
+  _TargetChanges(this.registry, this.gate);
+  final _Sessions<Object?> registry;
+  final OperationalPublicationGate gate;
+  final _interests = <_TargetChangeInterest>{};
+  Future<void>? _closeFuture;
+
+  Future<T> runAuthority<T>(
+    Future<T> Function() effect,
+    Duration deadline, {
+    void Function(Future<void>)? observeNativeCompletion,
+  }) async {
+    if (gate.isClosed) throw StateError('SERVICE_UNAVAILABLE');
+    if (deadline <= Duration.zero) throw StateError('TIMEOUT');
+    final budget = deadline < rpcDeadline ? deadline : rpcDeadline;
+    final watch = Stopwatch()..start();
+    OperationalPublicationLease? lease;
+    final acquiring = gate.beginAcquire(deadline: budget);
+    var observerFailed = false;
+    try {
+      observeNativeCompletion?.call(acquiring.settled);
+    } catch (_) {
+      observerFailed = true;
+    }
+    try {
+      lease = await acquiring.result;
+      try {
+        observeNativeCompletion?.call(lease.done);
+      } catch (_) {
+        observerFailed = true;
+      }
+      if (observerFailed) throw StateError('SERVICE_UNAVAILABLE');
+      if (watch.elapsed >= budget) throw StateError('TIMEOUT');
+      if (registry._stopping) throw StateError('SERVICE_UNAVAILABLE');
+      return await effect();
+    } catch (_) {
+      if (observerFailed) throw StateError('SERVICE_UNAVAILABLE');
+      rethrow;
+    } finally {
+      try {
+        await lease?.close();
+      } finally {
+        if (observerFailed) await acquiring.settled;
+      }
+    }
+  }
+
+  Future<OperationalTargetChangeLease> begin(
+    Duration deadline, {
+    bool reconciled = false,
+  }) {
+    if (gate.isClosed) return Future.error(StateError('SERVICE_UNAVAILABLE'));
+    if (deadline <= Duration.zero) return Future.error(StateError('TIMEOUT'));
+    if (_interests.length >= 16)
+      return Future.error(StateError('RESOURCE_LIMIT'));
+    final interest = _TargetChangeInterest(
+      this,
+      deadline < rpcDeadline ? deadline : rpcDeadline,
+      reconciled: reconciled,
+    );
+    _interests.add(interest);
+    interest.run().ignore();
+    return interest.result.future;
+  }
+
+  void retireMcp() {
+    var failed = false;
+    for (final entry in registry._sessions.entries.toList()) {
+      if (entry.value.role != OperationalRole.mcp) continue;
+      try {
+        registry.disconnect(entry.key);
+      } catch (_) {
+        failed = true;
+      }
+    }
+    if (failed) throw StateError('UNAUTHORIZED');
+  }
+
+  void finish(_TargetChangeInterest interest) {
+    _interests.remove(interest);
+    if (!interest.done.isCompleted) interest.done.complete();
+  }
+
+  void stop() {
+    gate.close().ignore();
+  }
+
+  Future<void> close() => _closeFuture ??= Future.wait<void>([
+    gate.close(),
+    for (final interest in _interests.toList()) interest.done.future,
+  ]).then<void>((_) {});
+}
+
+final class _TargetChangeInterest {
+  _TargetChangeInterest(this.owner, this.budget, {this.reconciled = false}) {
+    result.future.ignore();
+    done.future.ignore();
+  }
+  final _TargetChanges owner;
+  final Duration budget;
+  final bool reconciled;
+  final watch = Stopwatch()..start();
+  final result = Completer<OperationalTargetChangeLease>();
+  final done = Completer<void>();
+  OperationalPublicationLease? native;
+  Future<void>? _releaseFuture;
+
+  Future<void> run() async {
+    var transferred = false;
+    try {
+      native = await owner.gate.acquire(deadline: budget);
+      if (watch.elapsed >= budget) throw StateError('TIMEOUT');
+      if (owner.registry._stopping) throw StateError('SERVICE_UNAVAILABLE');
+      if (!reconciled) owner.retireMcp();
+      if (watch.elapsed >= budget) throw StateError('TIMEOUT');
+      if (owner.registry._stopping) throw StateError('SERVICE_UNAVAILABLE');
+      // No await between final retirement and transferring mutation ownership.
+      result.complete(OperationalTargetChangeLease._(this));
+      transferred = true;
+    } catch (error) {
+      final code =
+          error is StateError &&
+              const {
+                'TIMEOUT',
+                'RESOURCE_LIMIT',
+                'UNAUTHORIZED',
+                'SERVICE_UNAVAILABLE',
+              }.contains(error.message)
+          ? error.message
+          : 'SERVICE_UNAVAILABLE';
+      result.completeError(StateError(code));
+      try {
+        // A logical acquisition failure can precede its real worker cleanup.
+        // This gate is private to this registry's bounded mutation interests.
+        // Retain the fence/charge until all current native acquisition work ends.
+        while (owner.gate.activeAcquisitions != 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        if (!reconciled) owner.retireMcp();
+      } finally {
+        await native?.close();
+      }
+    } finally {
+      if (!transferred) owner.finish(this);
+    }
+  }
+
+  Future<void> release() {
+    if (_releaseFuture != null) return _releaseFuture!;
+    final completion = Completer<void>();
+    _releaseFuture = completion.future;
+    completion.future.ignore();
+    Future<void>(() async {
+      try {
+        await native!.close();
+      } finally {
+        owner.finish(this);
+      }
+    }).then(
+      completion.complete,
+      onError: (Object _) =>
+          completion.completeError(StateError('SERVICE_UNAVAILABLE')),
+    );
+    return completion.future;
+  }
+}
+
+/// Opaque, idempotent mutation lease. The last real release ends its open fence.
+/// The service releases only after actual commit/rollback and invalidation.
+final class OperationalTargetChangeLease {
+  OperationalTargetChangeLease._(this._interest);
+  final _TargetChangeInterest _interest;
+  Future<void> close() => _interest.release();
+}
+
+/// Same native ownership/open fence, with retirement after the actual delta.
+final class TrustedReconciledTargetChangeLease {
+  TrustedReconciledTargetChangeLease._(this._interest);
+  final _TargetChangeInterest _interest;
+  void retireAffected(Set<String> profileIds) {
+    if (!_interest.reconciled ||
+        _interest.native == null ||
+        _interest._releaseFuture != null)
+      throw StateError('SERVICE_UNAVAILABLE');
+    if (profileIds.length > 250) throw StateError('RESOURCE_LIMIT');
+    for (final id in profileIds) requireUuid(id);
+    if (profileIds.isEmpty) return;
+    final registry = _interest.owner.registry;
+    var failed = false;
+    for (final entry in registry._sessions.entries.toList()) {
+      final session = entry.value;
+      if (session.role != OperationalRole.mcp) continue;
+      if (session.grant != null &&
+          !profileIds.any(session.grant!.policy.allowsServer))
+        continue;
+      try {
+        registry.disconnect(entry.key);
+      } catch (_) {
+        failed = true;
+      }
+    }
+    if (failed) {
+      try {
+        registry.stop();
+      } catch (_) {
+        /* All matching retirement was attempted. */
+      }
+      throw StateError('SERVICE_UNAVAILABLE');
+    }
+  }
+
+  void retireAll() {
+    if (_interest._releaseFuture != null)
+      throw StateError('SERVICE_UNAVAILABLE');
+    try {
+      _interest.owner.retireMcp();
+    } catch (_) {
+      try {
+        _interest.owner.registry.stop();
+      } catch (_) {
+        /* Fail closed. */
+      }
+      throw StateError('SERVICE_UNAVAILABLE');
+    }
+  }
+
+  Future<void> close() => _interest.release();
+}

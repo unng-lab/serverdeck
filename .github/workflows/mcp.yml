@@ -1,0 +1,161 @@
+name: MCP automatic checks
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Explicit validation profile; native-full retains the existing real fixtures'
+        required: true
+        default: unit-widget
+        type: choice
+        options:
+          - unit-widget
+          - native-full
+  push:
+    branches: ['feature/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  unit-widget-checks:
+    name: unit-widget-checks
+    if: github.event_name != 'workflow_dispatch' || inputs.profile == 'unit-widget'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      SERVERDECK_NATIVE_CONTROL_RED: '0'
+      DESIGN_CAPTURE_DIR: ''
+      DESIGN_STATE_CAPTURE_DIR: ''
+      DESIGN_STOCK_CAPTURE_DIR: ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verified pinned SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'unit-sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'unit-sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Prepare pinned SDK dependencies and verify identity
+        timeout-minutes: 15
+        shell: pwsh
+        run: ./tools/prepare-foundation-sdk.ps1
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
+          foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald','serverdeck_mcp')) {
+            Push-Location (Join-Path 'packages' $package)
+            try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
+            finally { Pop-Location }
+          }
+      - name: Format and static analysis
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationDart @('format','--output=none','--set-exit-if-changed','.')
+          Invoke-FoundationCommand $FoundationFlutter @('analyze')
+          foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald')) {
+            Push-Location (Join-Path 'packages' $package)
+            try { Invoke-FoundationCommand $FoundationDart @('analyze') }
+            finally { Pop-Location }
+          }
+      - name: Root unit and widget tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationFlutter @('test','--reporter','expanded')
+      - name: Protocol unit tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_protocol
+          try { Invoke-FoundationCommand $FoundationDart @('test','--reporter','expanded') }
+          finally { Pop-Location }
+      - name: Pure accepted-peer scheduler unit tests
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_locald
+          try { Invoke-FoundationCommand $FoundationDart @('test','test/server_peer_coordination_test.dart','--reporter','expanded') }
+          finally { Pop-Location }
+  ssh-transport:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.13.5'
+      - name: Locked dependencies and portable SSH tests
+        working-directory: packages/serverdeck_locald
+        run: |
+          dart pub get --enforce-lockfile
+          dart analyze lib/remote/ssh_transport.dart test/ssh_transport_test.dart test/ssh_transport_container_test.dart
+          dart test test/ssh_transport_test.dart --reporter expanded
+      - name: Real disposable OpenSSH qualification
+        run: bash tools/test-ssh-container.sh
+  executor-prerequisites:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker systemd and locked Ansible prerequisites
+        run: bash tools/test-executor-container.sh
+  windows:
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'native-full'
+    runs-on: windows-2022
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned hosted MSVC
+        shell: pwsh
+        run: ./tools/prepare-foundation-hosted-msvc.ps1
+      - name: Install verified pinned SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'foundation-sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'foundation-sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Prepare pinned SDK dependencies
+        shell: pwsh
+        run: ./tools/prepare-foundation-sdk.ps1
+      - name: MCP transport checks
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Push-Location packages/serverdeck_mcp
+          try {
+            Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile')
+            Invoke-FoundationCommand $FoundationDart @('analyze')
+            Invoke-FoundationCommand $FoundationDart @('test')
+          } finally { Pop-Location }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+      - name: Prepare hash-locked loopback SSH fixture
+        shell: pwsh
+        run: |
+          $fixturePython = & ./tools/prepare-trust-probe-fixture.ps1
+          "SERVERDECK_TRUST_FIXTURE_PYTHON=$fixturePython" >> $env:GITHUB_ENV
+      - name: Source-built native library and root/package automatic suites
+        shell: pwsh
+        run: ./tools/test-foundation-cold-runner.ps1
+      - name: Preserve safe proof only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-automatic-safe-proof
+          path: |
+            .local/cold-runner-*/safe-*.json
+            .local/native-qualification-*/safe-*.json
+            .local/native-build-progress-*/safe-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

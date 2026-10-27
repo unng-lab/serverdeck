@@ -1,0 +1,24 @@
+name: serverdeck_locald
+description: Sole owner of the protected local workspace.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: '>=3.13.5 <4.0.0'
+dependencies:
+  serverdeck_protocol:
+    path: ../serverdeck_protocol
+  serverdeck_windows:
+    path: ../serverdeck_windows
+  isar_community:
+    path: ../../third_party/isar_community
+  cryptography: 2.9.0
+  path: 1.9.1
+  dartssh2: 4.1.0
+dev_dependencies:
+  isar_community_generator: 3.3.2
+  build_runner: 2.10.5
+  test: 1.31.1
+dependency_overrides:
+  # Generator and runtime must resolve the same repository-owned ABI3.3.2 source.
+  isar_community:
+    path: ../../third_party/isar_community

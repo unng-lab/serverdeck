@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "product": "serverdeck-isar-native",
+  "bindingVersion": "3.3.2",
+  "cargoLockSha256": "90065515cd9feae9f8d7b21f09e506bd87e32dccc1252a2c1627ad627f7ad260",
+  "scope": "supplemental texts for included vendor source; not exact linked-binary inventory or full license completion",
+  "canonicalTemplatePolicy": "Preserve SPDX placeholders unchanged. Declare published authors separately; never fabricate original copyright holder/year. Preserve all notices present in package sources.",
+  "texts": [
+    {
+      "id": "standard-MIT",
+      "file": "licenses/supplemental/standard-MIT.txt",
+      "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+      "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+    },
+    {
+      "id": "jni-MIT",
+      "file": "licenses/supplemental/jni-MIT.txt",
+      "source": "https://raw.githubusercontent.com/jni-rs/jni-sys/64d77b7a5f119d7b55b4e2c169a4668067ff59e6/LICENSE-MIT",
+      "sha256": "1d85bd754b04ceec93e98e890edd1fa3c6a22e81bcb32135806beeccefa51cd1"
+    },
+    {
+      "id": "jni-Apache",
+      "file": "licenses/supplemental/jni-Apache.txt",
+      "source": "https://raw.githubusercontent.com/jni-rs/jni-sys/64d77b7a5f119d7b55b4e2c169a4668067ff59e6/LICENSE-APACHE",
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+    },
+    {
+      "id": "ndk-MIT",
+      "file": "licenses/supplemental/ndk-MIT.txt",
+      "source": "https://raw.githubusercontent.com/rust-windowing/android-ndk-rs/10f2ba388fca20f7349996ebae26ccda7a6fda5c/LICENSE-MIT",
+      "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1"
+    },
+    {
+      "id": "ndk-Apache",
+      "file": "licenses/supplemental/ndk-Apache.txt",
+      "source": "https://raw.githubusercontent.com/rust-windowing/android-ndk-rs/10f2ba388fca20f7349996ebae26ccda7a6fda5c/LICENSE-APACHE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "id": "winapi-i686-MIT",
+      "file": "licenses/supplemental/winapi-i686-MIT.txt",
+      "source": "https://raw.githubusercontent.com/retep998/winapi-rs/796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/i686/LICENSE-MIT",
+      "sha256": "ce7bc3499fee93d5022ef430d5e4201e79a6d9154f3974e42f41349f0569e09b"
+    },
+    {
+      "id": "winapi-i686-Apache",
+      "file": "licenses/supplemental/winapi-i686-Apache.txt",
+      "source": "https://raw.githubusercontent.com/retep998/winapi-rs/796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/i686/LICENSE-APACHE",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "id": "winapi-x86_64-MIT",
+      "file": "licenses/supplemental/winapi-x86_64-MIT.txt",
+      "source": "https://raw.githubusercontent.com/retep998/winapi-rs/796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/x86_64/LICENSE-MIT",
+      "sha256": "ce7bc3499fee93d5022ef430d5e4201e79a6d9154f3974e42f41349f0569e09b"
+    },
+    {
+      "id": "winapi-x86_64-Apache",
+      "file": "licenses/supplemental/winapi-x86_64-Apache.txt",
+      "source": "https://raw.githubusercontent.com/retep998/winapi-rs/796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/x86_64/LICENSE-APACHE",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    }
+  ],
+  "packages": [
+    {
+      "name": "block",
+      "version": "0.1.6",
+      "vendorDirectory": "block",
+      "registryChecksum": "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a",
+      "manifestSha256": "24df2f33b48c9e756a4f864f882c1ab07a159b6c2b790f45af2e8162499b6719",
+      "declaredLicense": "MIT",
+      "declaredAuthors": [
+        "Steven Sheldon"
+      ],
+      "textIds": [
+        "standard-MIT"
+      ],
+      "licenseTextOrigin": "canonical MIT template for published declaration; not original copyright",
+      "upstreamEvidenceCommit": "47178790cfc9d4a8b092051d8b413b78bd31254a"
+    },
+    {
+      "name": "malloc_buf",
+      "version": "0.0.6",
+      "vendorDirectory": "malloc_buf",
+      "registryChecksum": "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb",
+      "manifestSha256": "d87624d9d117489bd49dbaeb70077a0721e00ac2a76eb371faec818a92da5661",
+      "declaredLicense": "MIT",
+      "declaredAuthors": [
+        "Steven Sheldon"
+      ],
+      "textIds": [
+        "standard-MIT"
+      ],
+      "licenseTextOrigin": "canonical MIT template for published declaration; not original copyright",
+      "upstreamEvidenceCommit": "a7811e5f4c6f9685dd57ad9bfe34e9bf6b0ba4f9"
+    },
+    {
+      "name": "objc_id",
+      "version": "0.1.1",
+      "vendorDirectory": "objc_id",
+      "registryChecksum": "c92d4ddb4bd7b50d730c215ff871754d0da6b2178849f8a2a2ab69712d0c073b",
+      "manifestSha256": "7d444ee847aa9b34cbe6cddeaf4001b28be86b28c2855e09c2e7fbfa797a66dd",
+      "declaredLicense": "MIT",
+      "declaredAuthors": [
+        "Steven Sheldon"
+      ],
+      "textIds": [
+        "standard-MIT"
+      ],
+      "licenseTextOrigin": "canonical MIT template for published declaration; not original copyright",
+      "upstreamEvidenceCommit": "6527cdf28fef2b155c67c1681f548ecfd794003c"
+    },
+    {
+      "name": "objc-foundation",
+      "version": "0.1.1",
+      "vendorDirectory": "objc-foundation",
+      "registryChecksum": "1add1b659e36c9607c7aab864a76c7a4c2760cd0cd2e120f3fb8b952c7e22bf9",
+      "manifestSha256": "27c851b122617cfbf263603bcf05d637aaddbc87c12c2e78f8f91675739928a8",
+      "declaredLicense": "MIT",
+      "declaredAuthors": [
+        "Steven Sheldon"
+      ],
+      "textIds": [
+        "standard-MIT"
+      ],
+      "licenseTextOrigin": "canonical MIT template for published declaration; not original copyright",
+      "upstreamEvidenceCommit": "0c157a59b7931430ed5ac7839381470b0c516d3c"
+    },
+    {
+      "name": "jni-sys-macros",
+      "version": "0.4.1",
+      "vendorDirectory": "jni-sys-macros",
+      "registryChecksum": "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264",
+      "manifestSha256": "b5a9f66e6501e17d0e790fecffa657df060b1bc41ac4d5f8cb5d7388098326a4",
+      "declaredLicense": "MIT OR Apache-2.0",
+      "declaredAuthors": [
+        "Robert Bragg <robert@sixbynine.org>"
+      ],
+      "textIds": [
+        "jni-MIT",
+        "jni-Apache"
+      ],
+      "licenseTextOrigin": "published VCS commit upstream root license texts",
+      "upstreamEvidenceCommit": "64d77b7a5f119d7b55b4e2c169a4668067ff59e6"
+    },
+    {
+      "name": "ndk-context",
+      "version": "0.1.1",
+      "vendorDirectory": "ndk-context",
+      "registryChecksum": "27b02d87554356db9e9a873add8782d4ea6e3e58ea071a9adb9a2e8ddb884a8b",
+      "manifestSha256": "caed75f8ae352e5f07b1cf5b34cfb1e47cc4d76485dbaf12fe6cd033075bc67a",
+      "declaredLicense": "MIT OR Apache-2.0",
+      "declaredAuthors": [
+        "The Rust Windowing contributors"
+      ],
+      "textIds": [
+        "ndk-MIT",
+        "ndk-Apache"
+      ],
+      "licenseTextOrigin": "published VCS commit upstream root license texts",
+      "upstreamEvidenceCommit": "10f2ba388fca20f7349996ebae26ccda7a6fda5c"
+    },
+    {
+      "name": "winapi-i686-pc-windows-gnu",
+      "version": "0.4.0",
+      "vendorDirectory": "winapi-i686-pc-windows-gnu",
+      "registryChecksum": "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6",
+      "manifestSha256": "9652222664ffc7e2a26fdcdebdce0917a455b39d8fbcbf451bf0b011a3067bf7",
+      "declaredLicense": "MIT/Apache-2.0",
+      "declaredAuthors": [
+        "Peter Atashian <retep998@gmail.com>"
+      ],
+      "textIds": [
+        "winapi-i686-MIT",
+        "winapi-i686-Apache"
+      ],
+      "licenseTextOrigin": "matching upstream package version license texts; not crate commit provenance",
+      "upstreamEvidenceCommit": "796a8e6c2971dc2ff1bcff166e6671284f9b5b6b"
+    },
+    {
+      "name": "winapi-x86_64-pc-windows-gnu",
+      "version": "0.4.0",
+      "vendorDirectory": "winapi-x86_64-pc-windows-gnu",
+      "registryChecksum": "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f",
+      "manifestSha256": "a88605a11db5def9b6cf73398e83b3edb72228cb43ea935729fac5cd33cec22c",
+      "declaredLicense": "MIT/Apache-2.0",
+      "declaredAuthors": [
+        "Peter Atashian <retep998@gmail.com>"
+      ],
+      "textIds": [
+        "winapi-x86_64-MIT",
+        "winapi-x86_64-Apache"
+      ],
+      "licenseTextOrigin": "matching upstream package version license texts; not crate commit provenance",
+      "upstreamEvidenceCommit": "796a8e6c2971dc2ff1bcff166e6671284f9b5b6b"
+    }
+  ]
+}

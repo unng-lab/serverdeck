@@ -1,0 +1,16 @@
+{
+  "family": "Noto Sans SC",
+  "purpose": "Offline fallback for glyphs absent from the preserved brandbook Noto Sans and Noto Sans Mono faces.",
+  "coverage": "Upstream Noto Sans Simplified Chinese coverage; this does not promise all Unicode glyphs.",
+  "repository": "https://github.com/google/fonts",
+  "commit": "e7db6ca603fd4862010383ff17ffd6cc4ffac1c0",
+  "fontUrl": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+  "licenseUrl": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/notosanssc/OFL.txt",
+  "metadataUrl": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/notosanssc/METADATA.pb",
+  "fontSHA256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+  "fontBytes": 17772300,
+  "license": "SIL Open Font License 1.1",
+  "licenseSHA256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
+  "modifications": "None; the complete upstream variable font and matching license are bundled unchanged.",
+  "weightAxis": { "min": 100, "default": 100, "max": 900 }
+}
