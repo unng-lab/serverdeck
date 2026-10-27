@@ -16,9 +16,11 @@
 ### Current Unit/Widget Stage
 
 - The user explicitly approved this stage on 2026-10-27 for both local checks
-  and automatic GitHub CI. It applies to PR #3 and the source-only
-  `0.2.0-preview.1+9` preview, in accordance with constitution VII (4.0.0).
-  Required checks use unit/widget tests and static analysis only.
+  and automatic GitHub CI, in accordance with constitution VII (4.0.0).
+  It continues for the ordinary MIT source-only `0.2.0` release
+  (Flutter version `0.2.0+10`), following the completed PR #3 / preview9.
+  Required checks use unit/widget tests and static analysis only. The ordinary
+  release label does not establish platform or whole-product acceptance.
 - Use the pinned Flutter 3.47.7 / Dart 3.13.5 SDK via
   `tools/foundation-sdk.ps1`; SDK preparation resolves locked tooling and
   verifies identity. It does not authorize native build or fixture scripts.
@@ -55,7 +57,7 @@
   without a separate user instruction.
 - Record deferred checks as not run; skipped CI jobs and earlier partial or
   failed runs do not become native passes. This stage gates the current
-  source-preview merge/release only and does not establish full native,
+  source-only merge/release, including ordinary `0.2.0`, and does not establish full native,
   runtime, signing, distribution, or product acceptance. Authorized private
   build/package/install actions retain separate delivery evidence and do
   not authorize integration tests.

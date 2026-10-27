@@ -1,5 +1,34 @@
 # Evidence: дизайн003
 
+## Завершение preview9 (2026-10-27)
+
+Прежний source `46959af0b5c06687f6922a69152ae834ede57dfc` прошёл оба exact-source
+unit/static runs: [push](https://github.com/unng-lab/serverdeck/actions/runs/40548098336)
+и [PR](https://github.com/unng-lab/serverdeck/actions/runs/40548108907).
+В каждом: format643/0changed, анализ без ошибок, Flutter7505passed +1expected
+opt-in skip, protocol165passed, pure queue21passed. Шесть native jobs skipped,
+это не native passes. Fresh policy/spec/workflow и installed-artifact reviews
+завершены без замечаний; прежние failed/interrupted попытки сохранены.
+
+[PR3](https://github.com/unng-lab/serverdeck/pull/3) merged в
+`1cb0ef09d97257bf907bd957f859438dba189fa2`, tree совпадает с проверенным source.
+[Preview9](https://github.com/unng-lab/serverdeck/releases/tag/v0.2.0-preview.1%2B9)
+опубликован: только ZIP исходников и checksum; SHA256 ZIP
+`760b87c690d048c98b4606fbfbf6eeea7b5fe761684c40a8173bfbd7f26e59ca`.
+Оба скачанных public asset совпали с проверенными оригиналами.
+
+Private installation+9 завершена из того же source: bundle29+receipt30,
+core5/PE/shortcut проверены; workspace4 и прежние9директорий/660файлов/7root
+backups сохранены, приложение при установке не запускалось. Фактические
+local receipts: `.local/release/published-build9-verification.json`,
+`build9-installed-artifact-review-completed.json`, `build9-prepare/install.stdout.json`.
+T118(003) и T213(021) закрываются только в этих выполненных scopes;
+original T207/full native acceptance остаются открыты.
+
+Ни этот результат, ни прежние unit passes не являются результатом будущего
+обычного `0.2.0`. Его новый source commit/CI/tag/publication учитываются отдельно
+по [плану](plan.md#обычный-выпуск-020-2026-10-27).
+
 ## Current unit-widget evidence (2026-10-27)
 
 Это фактический checkpoint до нового commit/release. Действует

@@ -1,5 +1,21 @@
 # Локальная передача дизайна ServerDeck
 
+## Обычный source release 0.2.0
+
+Текущий scope — обычный MIT source-only `0.2.0` с Flutter metadata `0.2.0+10`,
+по явному решению пользователя. Меняется номер выпуска и запись результатов;
+продуктовый код, API/schema и текущий unit/widget/static stage не меняются.
+Новые exact-source CI, merge/tag/archive/publication gates описаны в
+[плане](plan.md#обычный-выпуск-020-2026-10-27); их будущий успех пока не заявлен.
+Windows binary, новая private installation и native/signing qualification
+не входят в этот source-only выпуск.
+
+Предыдущие PR3 / preview9 опубликованы и private+9 установлена;
+фактический scoped результат записан в
+[evidence](evidence.md#завершение-preview9-2026-10-27).
+T118 и T213 завершены только для прежнего scope. Разделы ниже сохраняются
+как исторические checkpoints; production/full001/021/005 acceptance не заявлена.
+
 ## Current stage handoff (2026-10-27)
 
 Для PR3/source-only MIT preview `0.2.0-preview.1+9` действует

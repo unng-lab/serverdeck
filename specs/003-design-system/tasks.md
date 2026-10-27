@@ -374,10 +374,18 @@ Combined frozen5 readiness завершён0findings; final Dart6 и PS2 реа�
 
 ## Current unit-widget stage (2026-10-27)
 
-- [ ] T118 Внедрить принятый пользователем [unit/widget и static stage](plan.md#unit-widget-stage-2026-10-27) локально и в автоматическом push/PR CI для source-only MIT preview `0.2.0-preview.1+9`: согласовать Constitution4.0.0/VII, AGENTS, `mcp.yml`, current003/021 docs и scoped exact-source inspector; сохранить все117completed task lines и original native/full-product acceptance. Выполнить текущие [unit/static commands](quickstart.md#current-unit-widget-commands), fresh strict links/diff и completed independent policy/spec/workflow review/fix loop с frozen inputs. Затем отдельно подтвердить реальный exact-source push и PR `unit-widget-checks=success`, native jobs=not-selected/skipped, identity/source/base/parents/attempt/freshness и обязательный procedural inspector gate до merge без создания branch protection. Записать actual receipts без будущих pass claims; задача остаётся unchecked до своего полного scope, а её закрытие не доказывает native qualification, source publication или private installation.
+- [x] T118 Внедрить принятый пользователем [unit/widget и static stage](plan.md#unit-widget-stage-2026-10-27) локально и в автоматическом push/PR CI для source-only MIT preview `0.2.0-preview.1+9`: согласовать Constitution4.0.0/VII, AGENTS, `mcp.yml`, current003/021 docs и scoped exact-source inspector; сохранить все117completed task lines и original native/full-product acceptance. Выполнить текущие [unit/static commands](quickstart.md#current-unit-widget-commands), fresh strict links/diff и completed independent policy/spec/workflow review/fix loop с frozen inputs. Затем отдельно подтвердить реальный exact-source push и PR `unit-widget-checks=success`, native jobs=not-selected/skipped, identity/source/base/parents/attempt/freshness и обязательный procedural inspector gate до merge без создания branch protection. Записать actual receipts без будущих pass claims; задача остаётся unchecked до своего полного scope, а её закрытие не доказывает native qualification, source publication или private installation.
 
 T118 продолжает историю, не переоценивает завершённые T001–T117 и не подменяет
 original T207(021) full-native acceptance. Source implementation и текущий
 unit scope T204–T212 учитываются новой
 [T213](../021-mcp-control/tasks.md#current-unit-widget-stage-2026-10-27);
 новые CI/install/release результаты добавляются только после выполнения.
+
+## Обычный source release 0.2.0
+
+T118 выполнена на прежнем source46959af; actual CI/merge/publication/private
+installation и ограничения записаны в [evidence](evidence.md#завершение-preview9-2026-10-27).
+Это не закрывает full-native T207 и не переносит результаты на новый commit.
+
+- [ ] T119 Подготовить и выпустить обычный MIT source-only `0.2.0` по [плану](plan.md#обычный-выпуск-020-2026-10-27): установить pubspec `0.2.0+10`, сохранить текущие unit/widget/static gates и историю preview9, проверить links и пройти fresh independent metadata/spec/helper review. Для нового exact source получить successful push и PR unit CI, проверить source/base/parents/tree/workflow/attempt, слить PR с совпадающим tree, создать `v0.2.0` на проверенном commit и GitHub release `prerelease=false` с ровно source ZIP и `SHA256SUMS.txt`. Проверить remote tag/assets/digests и downloaded bytes; записывать только фактические результаты. Windows build/install/public binary и native/signing/full-service acceptance в эту задачу не входят.
