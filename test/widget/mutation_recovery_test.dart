@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/app.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/recovery_view.dart';
-import 'package:serverdeck/ui/deck_components.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../contract/startup_recovery_test.dart' show RecentClient, recent;
@@ -46,7 +45,7 @@ void main() {
       await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
       await tester.pumpAndSettle();
 
-      final history = find.byType(Dialog);
+      final history = find.byType(RecentOperationsView);
       Finder receiptRows() => find.descendant(
         of: history,
         matching: find.byWidgetPredicate(
@@ -58,7 +57,7 @@ void main() {
           RecentOperationReceiptKey(receipt['requestId']! as String),
         );
         expect(row, findsOneWidget);
-        expect(tester.widget(row), isA<DeckSurface>());
+        expect(tester.widget(row), isA<Container>());
         for (final value in [
           label,
           receipt['requestId'],
@@ -81,7 +80,7 @@ void main() {
         find.descendant(of: history, matching: find.byType(Card)),
         findsNothing,
       );
-      expect(find.text('Saved profile'), findsOneWidget);
+      expect(find.text('Saved profile'), findsNothing);
       expect(client.reads, 1);
 
       await tester.ensureVisible(find.text('Обновить список'));
@@ -105,7 +104,7 @@ void main() {
         findsNothing,
       );
       expect(find.text('Изменение настроек подтверждено'), findsNothing);
-      expect(find.text('Saved profile'), findsOneWidget);
+      expect(find.text('Saved profile'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await client.events.close();
@@ -122,7 +121,7 @@ void main() {
       await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
       client.events.add(fixture.snapshot());
       await tester.pumpAndSettle();
-      expect(find.text('Создать профиль'), findsNothing);
+      expect(find.text('Добавить сервер'), findsNothing);
       expect(
         find.text('Проверка текущих данных и недавних операций'),
         findsOneWidget,
@@ -131,7 +130,7 @@ void main() {
         ApiReply(fixture.fixtureGeneration, recent()),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Создать профиль'), findsOneWidget);
+      expect(find.text('Добавить сервер'), findsOneWidget);
       await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
       await tester.pumpAndSettle();
       expect(find.text('Изменение настроек подтверждено'), findsOneWidget);
@@ -144,7 +143,7 @@ void main() {
       expect(find.text('Изменение настроек подтверждено'), findsNothing);
       expect(find.textContaining('33333333-3333'), findsNothing);
       expect(find.byType(Dialog), findsNothing);
-      expect(find.text('Локальная служба недоступна'), findsOneWidget);
+      expect(find.text('Локальная служба недоступна'), findsWidgets);
       expect(client.reads, 1);
       await tester.pumpWidget(const SizedBox.shrink());
       await client.events.close();

@@ -103,10 +103,8 @@ void main() {
     (tester) async {
       await tester.runAsync(() async {
         for (final entry in {
-          BrandAssets.uiFont: [
-            BrandAssets.regularFont,
-            BrandAssets.semiboldFont,
-          ],
+          BrandAssets.uiFont: [BrandAssets.regularFont],
+          BrandAssets.semiboldFamily: [BrandAssets.semiboldFont],
           BrandAssets.monoFont: [BrandAssets.monoRegularFont],
           BrandAssets.unicodeFont: [BrandAssets.unicodeVariableFont],
         }.entries) {

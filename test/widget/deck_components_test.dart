@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/ui/deck_icon.dart';
 
 Widget host(
   Widget child, {
@@ -244,16 +245,31 @@ void main() {
         focus.requestFocus();
         await tester.pumpAndSettle();
         expect(find.text('Validation error'), findsOneWidget);
+        expect(
+          tester
+              .widget<InputDecorator>(find.byType(InputDecorator))
+              .decoration
+              .fillColor,
+          c['bg'],
+        );
         final row = await pixels(tester, key, [
           for (double x = 0; x < 9; x++) Offset(x, 24),
         ]);
         expect(row.take(5).toList(), [
           c['error'],
-          c['surface'],
-          c['surface'],
+          c['bg'],
+          c['bg'],
           c['focus'],
           c['focus'],
         ]);
+        for (final role in ['focus', 'error']) {
+          final foreground = c[role].computeLuminance();
+          final background = c['bg'].computeLuminance();
+          final contrast = foreground > background
+              ? (foreground + .05) / (background + .05)
+              : (background + .05) / (foreground + .05);
+          expect(contrast, greaterThanOrEqualTo(3), reason: '$role on bg');
+        }
         await tester.pumpWidget(const SizedBox.shrink());
         focus.dispose();
       },
@@ -298,7 +314,12 @@ void main() {
       host(const DeckStatus(label: 'Ожидание результата', pending: true)),
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.byIcon(Icons.timelapse), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is DeckIcon && widget.name == 'clock',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Ожидание результата'), findsOneWidget);
     expect(tester.binding.transientCallbackCount, 0);
     await tester.pumpWidget(
@@ -312,7 +333,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('each status has a distinct symbol and supplied text', (
+  testWidgets('each status has its canonical symbol and supplied text', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -328,10 +349,19 @@ void main() {
     for (final tone in DeckTone.values)
       expect(find.text(tone.name), findsOneWidget);
     final icons = tester
-        .widgetList<Icon>(find.byType(Icon))
-        .map((widget) => widget.icon)
-        .toSet();
-    expect(icons.length, DeckTone.values.length);
+        .widgetList<DeckIcon>(find.byType(DeckIcon))
+        .map((widget) => widget.name)
+        .toList();
+    expect(icons, [
+      'info',
+      'check',
+      'close',
+      'info',
+      'warning',
+      'warning',
+      'clock',
+      'check',
+    ]);
   });
 
   testWidgets('content surfaces do not insert extra keyboard stops', (

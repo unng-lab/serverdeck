@@ -3,6 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
+import 'package:serverdeck/automation/automation_panel.dart'
+    show AutomationPageFrame, automationPageActions, automationPageDescription;
+import 'package:serverdeck/servers/server_compositions.dart'
+    show ServerPageFrame, serverPageHeaderActions, serverOverviewActions;
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/profiles/mutation_controller.dart';
@@ -144,6 +148,8 @@ class DesignScenarioHarness {
     ],
   );
   final filter = TextEditingController();
+  final serverLogsKey = GlobalKey<ServerLogsSectionState>();
+  final recipesKey = GlobalKey<AutomationRecipesSectionState>();
   final name = TextEditingController();
   final description = TextEditingController();
   final body = TextEditingController();
@@ -291,7 +297,7 @@ class DesignScenarioHarness {
 
   /// Only composition wrappers surround the same production sections used by
   /// ServerPanel/AutomationPanel. No layout is reimplemented in test support.
-  Widget buildOrigin(String id) => switch (id) {
+  Widget buildOrigin(String id, {bool asPage = false}) => switch (id) {
     '01-startup' => ReadinessView(
       state: options.readiness ?? ReadinessState.starting,
       onRetry: counters.callback('retry'),
@@ -317,15 +323,7 @@ class DesignScenarioHarness {
       model: profiles,
       initial: initialProfile,
     ),
-    '10-host-trust' => ServerTrustConfirmation(
-      challenge: trustChallenge,
-      profile: trustProfile,
-      changes: profiles,
-      currentProfile: () => trustProfile,
-      currentChallenge: () => trustChallenge,
-      onCancel: counters.callback('cancelTrust'),
-      onConfirm: counters.callback('confirmTrust'),
-    ),
+    '10-host-trust' => trustDialog(),
     '13-mutation-conflict' => ListenableBuilder(
       listenable: mutation,
       builder: (_, _) => MutationStatus(
@@ -341,8 +339,12 @@ class DesignScenarioHarness {
       ],
     ),
     '17-recipe-detail' => recipes(),
-    '18-install-preflight' => plan(blocked: options.planBlocked),
+    '18-install-preflight' => plan(
+      blocked: options.planBlocked,
+      showPreflight: true,
+    ),
     '19-plan-approval' => AutomationPlanDecisionDialog(
+      asPage: asPage,
       now: DesignAutomationFixtures.presentationNow,
       plan: DesignAutomationFixtures.plan(),
       serverProfiles: [automationServerProfile],
@@ -350,34 +352,22 @@ class DesignScenarioHarness {
       approve: true,
       onBack: counters.callback('decisionBack'),
       onConfirm: counters.callback('approve'),
+      onAlternate: counters.callback('alternateDecision'),
     ),
-    '22-server-logs' => ServerLogsSection(
-      logs: options.loaded
-          ? DesignServerFixtures.logs(
-              quality: options.quality,
-              records: options.empty ? [] : null,
-            )
-          : null,
-      filterController: filter,
-      busy: options.busy,
-      onLoad: counters.callback('readLogs'),
-      onPrevious: counters.callback('previousLogs'),
-      onOpenRecord: counters.change('openRecord'),
-    ),
-    '23-log-record' => ServerLogRecordDialog(
-      recordContext: ServerLogRecordContext.capture(trustProfile, recordLogs),
-      record: (recordLogs['records'] as List).single as Map<String, Object?>,
-      onClose: counters.callback('closeRecord'),
-    ),
+    '22-server-logs' => serverLogs(),
+    '23-log-record' => logRecordDialog(),
     '27-job-list' => jobs(detail: false),
     '28-job-detail' => jobs(),
     '29-job-unknown' => jobs(state: 'unknown'),
-    '30-job-cancel' => jobs(),
+    '30-job-cancel' => jobs(state: 'cancel-requested'),
     '31-recent-operations' => RecoveryView(
       recovery: recovery,
       child: RecentOperationsButton(recovery: recovery),
     ),
     '32-automation-profiles' => AutomationProfilesSection(
+      onSelectVersion: options.empty
+          ? null
+          : counters.callback('selectVersion'),
       profiles: options.empty ? [] : [DesignAutomationFixtures.profile()],
       loaded: options.loaded,
       hasMore: false,
@@ -386,6 +376,7 @@ class DesignScenarioHarness {
       onMore: counters.callback('moreProfiles'),
     ),
     '33-profile-authoring' => AutomationProfileEditorDialog(
+      asPage: asPage,
       name: name,
       description: description,
       body: body,
@@ -401,6 +392,7 @@ class DesignScenarioHarness {
     '35-plan-parameters' => jsonEditor(
       'Параметры плана',
       const {'greeting': 'Привет'},
+      asPage: asPage,
       purpose: 'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
       target: 'Ansible-профиль: Приветствие сервера · версия 2.',
       contextDetails: {
@@ -419,6 +411,7 @@ class DesignScenarioHarness {
         'serverIds': [DesignAutomationFixtures.serverId],
         'lifetimeSeconds': 28800,
       },
+      asPage: asPage,
       purpose: 'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.',
     ),
     '38-mcp-client-config' => grants(configuration: true),
@@ -433,6 +426,7 @@ class DesignScenarioHarness {
           },
         },
       },
+      asPage: asPage,
       purpose: 'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
       target:
           'Ansible-профиль: Приветствие сервера · версия 2. Доступ клиента до: ${DesignAutomationFixtures.grant()['expiresAt']} (UTC).',
@@ -444,18 +438,10 @@ class DesignScenarioHarness {
         'grantId': DesignAutomationFixtures.grantId,
       },
     ),
-    '40-executor-binding' => ServerExecutorConfirmation(
-      inspection: executorInspection,
-      profile: trustProfile,
-      changes: profiles,
-      currentProfile: () => trustProfile,
-      currentInspection: () => executorInspection,
-      onCancel: counters.callback('cancelExecutor'),
-      onConfirm: counters.callback('confirmExecutor'),
-    ),
+    '40-executor-binding' => executorDialog(),
     '84-settings' => settings.SettingsView(controller: profiles),
     '85-settings-form' => SettingsForm(model: profiles),
-    '94-plan-invalidated' => plan(blocked: true),
+    '94-plan-invalidated' => plan(invalidated: true),
     _ => throw ArgumentError.value(
       id,
       'id',
@@ -463,14 +449,374 @@ class DesignScenarioHarness {
     ),
   };
 
-  Widget serverOverview() => ServerOverviewSection(
+  /// Current003.4 page bindings share actual production presentation widgets.
+  Widget buildCurrentOrigin(String id) => switch (id) {
+    '10-host-trust' => trustDialog(asPage: true),
+    '23-log-record' => logRecordDialog(asPage: true),
+    '40-executor-binding' => executorDialog(asPage: true),
+    '04-empty-workspace' || '05-server-list' => ProfileList(
+      controller: profiles,
+      onAiAccess: counters.callback('openAiAccess'),
+      onOpenProfile: counters.change('openProfile'),
+    ),
+    '07-profile-create' => ProfileForm(
+      model: profiles,
+      asPage: true,
+      onClose: counters.callback('closeProfile'),
+    ),
+    '08-profile-edit' => ProfileForm(
+      model: profiles,
+      initial: initialProfile,
+      asPage: true,
+      onClose: counters.callback('closeProfile'),
+    ),
+    '09-profile-delete' => ProfileDelete(
+      model: profiles,
+      initial: initialProfile,
+      asPage: true,
+      onClose: counters.callback('closeProfile'),
+    ),
+    '12-credential-input' => ProfileForm(
+      model: profiles,
+      initial: initialProfile,
+      credentialOnly: true,
+      asPage: true,
+      onClose: counters.callback('closeProfile'),
+    ),
+    '13-mutation-conflict' => ListenableBuilder(
+      listenable: mutation,
+      builder: (_, _) => MutationReviewPage(
+        controller: mutation,
+        settings: true,
+        onReload: counters.callback('reload'),
+        onClose: counters.callback('closeSettings'),
+      ),
+    ),
+    '11-host-key-changed' => currentServerPage(
+      serverOverview(error: 'TRUST_CHANGED'),
+      changedKey: true,
+    ),
+    '31-recent-operations' => RecentOperationsView(
+      recovery: recovery,
+      asPage: true,
+      onClose: counters.callback('closeHistory'),
+    ),
+    '84-settings' => settings.SettingsView(
+      controller: profiles,
+      onAiAccess: counters.callback('openAiAccess'),
+    ),
+    '85-settings-form' => SettingsForm(
+      model: profiles,
+      asPage: true,
+      onClose: counters.callback('closeSettings'),
+    ),
+    '06-server-overview' => currentServerPage(serverOverview()),
+    '22-server-logs' => currentServerPage(
+      serverLogs(headerActions: false),
+      logs: true,
+    ),
+    '16-install-catalog' => currentAutomationPage(
+      id,
+      'catalog',
+      recipes(),
+      catalog: true,
+    ),
+    '17-recipe-detail' => currentAutomationPage(
+      id,
+      'catalog',
+      recipes(),
+      title: 'Рецепт установки',
+      catalog: true,
+    ),
+    '18-install-preflight' => currentAutomationPage(
+      id,
+      'plans',
+      plan(showPreflight: true),
+      title: 'Проверка готовности к установке',
+      catalog: true,
+    ),
+    '27-job-list' => currentAutomationPage(
+      id,
+      'jobs',
+      jobs(detail: false, showHeaderActions: false),
+    ),
+    '28-job-detail' => currentAutomationPage(
+      id,
+      'jobs',
+      jobs(showHeaderActions: false),
+      title: 'Ход задания',
+    ),
+    '29-job-unknown' => currentAutomationPage(
+      id,
+      'jobs',
+      jobs(state: 'unknown', showHeaderActions: false),
+      title: 'Неизвестный исход задания',
+    ),
+    '30-job-cancel' => currentAutomationPage(
+      id,
+      'jobs',
+      jobs(cancelRequested: true, showHeaderActions: false),
+      title: 'Остановка задания',
+    ),
+    '32-automation-profiles' => currentAutomationPage(
+      id,
+      'profiles',
+      buildOrigin(id, asPage: true),
+    ),
+    '34-profile-revisions' => currentAutomationPage(
+      id,
+      'profiles',
+      revision(),
+      title: 'Версии и сравнение профиля',
+    ),
+    '35-plan-parameters' => jsonEditor(
+      'Параметры плана',
+      const {'greeting': 'Привет'},
+      asPage: true,
+      purpose: 'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
+      target: 'Ansible-профиль: Приветствие сервера · версия 2.',
+      parameterDefinitions:
+          (DesignAutomationFixtures.revision()['body']
+                  as Map<String, Object?>)['parameters']
+              as Map<String, Object?>,
+      contextDetails: {
+        'profileId': DesignAutomationFixtures.profileId,
+        'revision': 2,
+        'bodyDigest': DesignAutomationFixtures.revision()['digest'],
+        'serverId': DesignAutomationFixtures.serverId,
+      },
+    ),
+    '36-ai-grants' => currentAutomationPage(
+      id,
+      'grants',
+      grants(showHeaderActions: false),
+    ),
+    '37-ai-grant-form' => jsonEditor(
+      'Выдать доступ ИИ',
+      {
+        'label': 'Synthetic client',
+        'scopes': ['read', 'logs', 'author', 'plan'],
+        'serverIds': [DesignAutomationFixtures.serverId],
+        'lifetimeSeconds': 28800,
+      },
+      asPage: true,
+      purpose: 'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.',
+    ),
+    '38-mcp-client-config' => currentAutomationPage(
+      id,
+      'grants',
+      grants(configuration: true, showHeaderActions: false),
+    ),
+    '39-delegations' => jsonEditor(
+      'Делегирование версии',
+      {
+        'lifetimeSeconds': 3600,
+        'predicates': <String, Object?>{
+          'greeting': {
+            'type': 'enum',
+            'values': ['Привет'],
+          },
+        },
+      },
+      asPage: true,
+      clientLabel: DesignAutomationFixtures.grant()['label'] as String,
+      purpose: 'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
+      target:
+          'Ansible-профиль: Приветствие сервера · версия 2. Доступ клиента до: ${DesignAutomationFixtures.grant()['expiresAt']} (UTC).',
+      contextDetails: {
+        'profileId': DesignAutomationFixtures.profileId,
+        'revision': 2,
+        'bodyDigest': DesignAutomationFixtures.revision()['digest'],
+        'serverId': DesignAutomationFixtures.serverId,
+        'grantId': DesignAutomationFixtures.grantId,
+      },
+    ),
+    '93-protected-effect-blocked' => currentAutomationPage(
+      id,
+      'plans',
+      plan(blocked: true),
+      title: 'План заблокирован',
+    ),
+    '94-plan-invalidated' => currentAutomationPage(
+      id,
+      'plans',
+      plan(invalidated: true),
+      title: 'План требует новой проверки',
+    ),
+    _ => buildOrigin(id, asPage: true),
+  };
+
+  Widget trustDialog({bool asPage = false}) => ServerTrustConfirmation(
+    asPage: asPage,
+    challenge: trustChallenge,
+    profile: trustProfile,
+    changes: profiles,
+    currentProfile: () => trustProfile,
+    currentChallenge: () => trustChallenge,
+    onCancel: counters.callback('cancelTrust'),
+    onConfirm: counters.callback('confirmTrust'),
+  );
+
+  Widget logRecordDialog({bool asPage = false}) => ServerLogRecordDialog(
+    asPage: asPage,
+    recordContext: ServerLogRecordContext.capture(trustProfile, recordLogs),
+    record: (recordLogs['records'] as List).single as Map<String, Object?>,
+    onClose: counters.callback('closeRecord'),
+  );
+
+  Widget executorDialog({bool asPage = false}) => ServerExecutorConfirmation(
+    asPage: asPage,
+    inspection: executorInspection,
+    profile: trustProfile,
+    changes: profiles,
+    currentProfile: () => trustProfile,
+    currentInspection: () => executorInspection,
+    onCancel: counters.callback('cancelExecutor'),
+    onConfirm: counters.callback('confirmExecutor'),
+  );
+
+  Widget currentServerPage(
+    Widget child, {
+    bool logs = false,
+    bool changedKey = false,
+  }) => ServerPageFrame(
+    profile: trustProfile,
+    title: changedKey
+        ? 'SSH-ключ изменился'
+        : logs
+        ? 'Журнал сервера'
+        : 'Обзор сервера',
+    description: changedKey
+        ? 'Сведения, наблюдения и доступные действия'
+        : logs
+        ? 'События выбранного сервера в хронологическом порядке'
+        : 'Система, ресурсы и программное обеспечение ${trustProfile.name}',
+    eyebrow: logs
+        ? 'Журналы / Рабочее пространство'
+        : 'Серверы / Рабочее пространство',
+    showServerTabs: !logs && !changedKey,
+    showIdentity: !logs && !changedKey,
+    identityStatus: ServerConnectionBadge(
+      connection: DesignServerFixtures.connection(
+        state: options.connectionState,
+      ),
+    ),
+    onTabSelected: counters.change('serverTab'),
+    actions: serverPageHeaderActions(
+      busy: options.busy,
+      connected: options.connectionState == 'connected',
+      changedKey: changedKey,
+      logs: logs,
+      onConnect: counters.callback('connect'),
+      onDisconnect: counters.callback('disconnect'),
+      onRefresh: counters.callback('readState'),
+      onSearch: () => serverLogsKey.currentState?.focusSearch(),
+      onFilters: () => serverLogsKey.currentState?.toggleFilters(),
+    ),
+    contentActions: logs || changedKey
+        ? const []
+        : serverOverviewActions(
+            onSoftware: counters.callback('openSoftware'),
+            onLogs: counters.callback('openLogs'),
+          ),
+    child: child,
+  );
+
+  Widget currentAutomationPage(
+    String screenId,
+    String section,
+    Widget child, {
+    String? title,
+    bool catalog = false,
+  }) => AutomationPageFrame(
+    screenId: screenId,
+    title:
+        title ??
+        (screenId == '38-mcp-client-config'
+            ? 'Подключение MCP-клиента'
+            : null) ??
+        switch (section) {
+          'catalog' => 'Каталог установки',
+          'jobs' => 'Задания',
+          'grants' => 'Доступ ИИ',
+          'plans' => 'Планы',
+          _ => 'Ansible-профили',
+        },
+    description: automationPageDescription(screenId),
+    catalog: catalog,
+    section: section,
+    onSelected: counters.change('automationSection'),
+    actions: automationPageActions(
+      section: section,
+      availability: actions,
+      onRefresh: counters.callback(
+        section == 'grants'
+            ? 'refreshGrants'
+            : section == 'jobs'
+            ? 'refreshJobs'
+            : 'refreshProfiles',
+      ),
+      onCreate: counters.callback(
+        section == 'grants' ? 'createGrant' : 'createProfile',
+      ),
+      onLoadRecipes: counters.callback('loadRecipes'),
+      onSelectRecipe: options.empty
+          ? null
+          : () => recipesKey.currentState?.selectFirst(),
+      onEdit: options.empty
+          ? null
+          : () => counters.change<Map<String, Object?>>('editGrant')(
+              DesignAutomationFixtures.grant(),
+            ),
+      onOpenJob: counters.callback('selectJob'),
+      detail:
+          screenId == '38-mcp-client-config' ||
+          title != null && ['catalog', 'jobs', 'profiles'].contains(section),
+    ),
+    contextBar: catalog
+        ? SoftwareServerSelector(
+            profiles: [automationServerProfile],
+            selectedId: automationServerProfile.id,
+            environment:
+                DesignAutomationFixtures.catalog()['environment'] as String?,
+            onChoose: counters.callback('chooseServer'),
+          )
+        : null,
+    child: child,
+  );
+
+  Widget serverLogs({bool headerActions = true}) => ServerLogsSection(
+    key: serverLogsKey,
+    targetSelector: ServerLogTargetSelector(
+      profiles: [trustProfile],
+      selectedId: trustProfile.id,
+      onSelected: counters.change<String>('selectLogTarget'),
+    ),
+    showHeaderActions: headerActions,
+    profile: trustProfile,
+    logs: options.loaded
+        ? DesignServerFixtures.logs(
+            quality: options.quality,
+            records: options.empty ? [] : null,
+          )
+        : null,
+    filterController: filter,
+    busy: options.busy,
+    onLoad: counters.callback('readLogs'),
+    onPrevious: counters.callback('previousLogs'),
+    onOpenRecord: counters.change('openRecord'),
+  );
+
+  Widget serverOverview({String? error}) => ServerOverviewSection(
+    profile: trustProfile,
+    onCloseChangedKey: counters.callback('closeChangedKey'),
     connection: ServerConnectionSection(
       connection: DesignServerFixtures.connection(
         state: options.connectionState,
       ),
       trust: DesignServerFixtures.trust(),
       busy: options.busy,
-      error: options.error,
+      error: error ?? options.error,
       hasTrustChallenge: false,
       onRefresh: counters.callback('refreshConnection'),
       onProbeTrust: counters.callback('probeTrust'),
@@ -492,19 +838,33 @@ class DesignScenarioHarness {
   MetricsHistory graph(List<Object?> points) => MetricsHistory(points: points);
 
   AutomationRecipesSection recipes() => AutomationRecipesSection(
+    key: recipesKey,
+    serverId: DesignAutomationFixtures.serverId,
+    serverProfiles: [automationServerProfile],
     catalog: DesignAutomationFixtures.catalog(),
     canMutate: !options.busy,
     onCreatePlan: counters.change('createRecipePlan'),
   );
 
-  AutomationPlanSection plan({bool blocked = false}) => AutomationPlanSection(
+  AutomationPlanSection plan({
+    bool blocked = false,
+    bool invalidated = false,
+    bool showPreflight = false,
+  }) => AutomationPlanSection(
+    sourceRevision: DesignAutomationFixtures.revision(),
+    onClose: counters.callback('closePlan'),
+    onEditSource: counters.callback('editPlanSource'),
     serverProfiles: [automationServerProfile],
     automationProfile: DesignAutomationFixtures.profile(),
     plan: DesignAutomationFixtures.plan(
       blocked: blocked,
       expired: options.planExpired,
     ),
-    runnable: !blocked && !options.planExpired,
+    showPreflight: showPreflight,
+    invalidReason: invalidated
+        ? 'План больше не действует: изменились условия выбранной цели.'
+        : null,
+    runnable: !blocked && !invalidated && !options.planExpired,
     expired: options.planExpired,
     actions: actions,
     onApprove: counters.callback('approve'),
@@ -513,10 +873,19 @@ class DesignScenarioHarness {
     onRefresh: counters.callback('refreshPlan'),
   );
 
-  AutomationJobsSection jobs({bool detail = true, String? state}) {
-    final job = DesignAutomationFixtures.job(state: state ?? options.jobState);
+  AutomationJobsSection jobs({
+    bool detail = true,
+    String? state,
+    bool cancelRequested = false,
+    bool showHeaderActions = true,
+  }) {
+    final job = DesignAutomationFixtures.job(
+      state: cancelRequested ? 'cancel-requested' : state ?? options.jobState,
+    );
     return AutomationJobsSection(
       serverId: DesignAutomationFixtures.serverId,
+      serverProfiles: [automationServerProfile],
+      showHeaderActions: showHeaderActions,
       jobs: options.empty
           ? []
           : [
@@ -555,45 +924,61 @@ class DesignScenarioHarness {
     onArchive: counters.callback('archive'),
   );
 
-  AutomationGrantsSection grants({bool configuration = false}) =>
-      AutomationGrantsSection(
-        serverProfiles: [automationServerProfile],
-        grants: options.empty
-            ? []
-            : [
-                AutomationGrantPresentation(
-                  value: DesignAutomationFixtures.grant(),
-                  current: true,
-                ),
-              ],
-        loaded: options.loaded,
-        actions: actions,
-        launchConfiguration: configuration
-            ? DesignAutomationFixtures.launchConfiguration()
-            : null,
-        onRefresh: counters.callback('refreshGrants'),
-        onCreate: counters.callback('createGrant'),
-        onConfigure: counters.change('configureGrant'),
-        onEdit: counters.change('editGrant'),
-        onRevoke: counters.change('revokeGrant'),
-        onCopyConfiguration: counters.callback('copyConfiguration'),
-      );
+  AutomationGrantsSection grants({
+    bool configuration = false,
+    bool showHeaderActions = true,
+  }) => AutomationGrantsSection(
+    showHeaderActions: showHeaderActions,
+    serverProfiles: [automationServerProfile],
+    grants: options.empty
+        ? []
+        : [
+            AutomationGrantPresentation(
+              value: DesignAutomationFixtures.grant(),
+              current: true,
+            ),
+          ],
+    loaded: options.loaded,
+    actions: actions,
+    launchConfiguration: configuration
+        ? DesignAutomationFixtures.launchConfiguration()
+        : null,
+    onRefresh: counters.callback('refreshGrants'),
+    onCreate: counters.callback('createGrant'),
+    onConfigure: counters.change('configureGrant'),
+    onEdit: counters.change('editGrant'),
+    onRevoke: counters.change('revokeGrant'),
+    onCopyConfiguration: counters.callback('copyConfiguration'),
+  );
 
   AutomationJsonEditorDialog jsonEditor(
     String title,
     Map<String, Object?> input, {
+    bool asPage = false,
     String? purpose,
     String? target,
+    String? clientLabel,
+    Map<String, Object?> parameterDefinitions = const {},
     Map<String, Object?> contextDetails = const {},
   }) {
     if (jsonInput.text.isEmpty)
       jsonInput.text = const JsonEncoder.withIndent('  ').convert(input);
     return AutomationJsonEditorDialog(
+      asPage: asPage,
+      submitLabel: title == 'Параметры плана'
+          ? 'Создать план'
+          : input.containsKey('scopes')
+          ? 'Выдать доступ'
+          : input.containsKey('predicates')
+          ? 'Делегировать версию'
+          : 'Продолжить',
       title: title,
       input: jsonInput,
       preview: input,
       purpose: purpose,
       target: target,
+      clientLabel: clientLabel,
+      parameterDefinitions: parameterDefinitions,
       serverProfiles: [automationServerProfile],
       targetServerIds: [
         if (contextDetails['serverId'] is String)

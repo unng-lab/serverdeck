@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../shell/private_session.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_icon.dart';
+import 'brand_theme.dart';
 
 /// Reduce large transitions; keep feedback, focus, text input and timers live.
 abstract final class Motion {
@@ -43,6 +45,7 @@ Future<T?> showMotionDialog<T>({
   required WidgetBuilder builder,
   bool barrierDismissible = false,
   bool privateContent = true,
+  Color? barrierColor,
 }) async {
   final launcher = FocusManager.instance.primaryFocus;
   final launchScope = FocusScope.of(context, createDependency: false);
@@ -57,6 +60,7 @@ Future<T?> showMotionDialog<T>({
               PrivateDialogGate(launchEpoch: launchEpoch, builder: builder)
         : builder,
     barrierDismissible: barrierDismissible,
+    barrierColor: barrierColor,
     animationStyle: Motion.reduced(context) ? AnimationStyle.noAnimation : null,
   );
   // Flutter restores a surviving launcher. If it was removed while the modal
@@ -100,11 +104,43 @@ class MotionDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fieldDecoration = decoration.copyWith(
+      isDense: decoration.isDense ?? true,
+      contentPadding:
+          decoration.contentPadding ??
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
     if (!Motion.reduced(context))
       return DropdownButtonFormField<T>(
         initialValue: initialValue,
         isDense: false,
+        iconSize: 16,
+        icon: const DeckIcon('chevron', size: 16),
+        iconEnabledColor: Theme.of(context).extension<BrandColors>()!['text'],
+        iconDisabledColor: Theme.of(context)
+            .extension<BrandColors>()!['disabled'],
+        style: BrandTypography.body.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
         itemHeight: null,
+        // Popup options retain their normal touch targets. The closed field
+        // uses the original child directly so multiline values determine its
+        // height instead of a dense button's single-line fixed height.
+        selectedItemBuilder: (context) {
+          final field = context.findAncestorStateOfType<FormFieldState<T>>();
+          final current = field == null ? initialValue : field.value;
+          return [
+            for (final item in items)
+              if (item.value == current)
+                Align(
+                  alignment: item.alignment,
+                  heightFactor: 1,
+                  child: item.child,
+                )
+              else
+                const SizedBox.shrink(),
+          ];
+        },
         items: [
           for (final item in items)
             DropdownMenuItem<T>(
@@ -116,15 +152,17 @@ class MotionDropdown<T> extends StatelessWidget {
               child: DeckFocusLabel(child: item.child),
             ),
         ],
-        decoration: decoration,
+        decoration: fieldDecoration,
         onChanged: onChanged,
         isExpanded: isExpanded,
       );
     final selected = items
         .where((item) => item.value == initialValue)
         .firstOrNull;
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+    return _StaticSelectField(
+      decoration: fieldDecoration,
+      isExpanded: isExpanded,
+      value: selected?.child,
       onPressed: onChanged == null
           ? null
           : () async {
@@ -144,12 +182,13 @@ class MotionDropdown<T> extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                decoration.labelText ?? '',
-                                style: Theme.of(dialogContext)
-                                    .textTheme
-                                    .titleLarge,
-                              ),
+                              if (decoration.labelText?.isNotEmpty ?? false)
+                                Text(
+                                  decoration.labelText ?? '',
+                                  style: Theme.of(dialogContext)
+                                      .textTheme
+                                      .titleLarge,
+                                ),
                               if (!(available?.call() ?? true))
                                 const Text(
                                   'Выбор недоступен: локальная служба не готова',
@@ -159,13 +198,18 @@ class MotionDropdown<T> extends StatelessWidget {
                                       ? items
                                       : <DropdownMenuItem<T>>[])
                                 OutlinedButton(
+                                  clipBehavior: Clip.none,
                                   style: OutlinedButton.styleFrom(
                                     minimumSize: const Size(48, 48),
                                   ),
                                   onPressed: item.enabled
-                                      ? () =>
-                                            Navigator.of(dialogContext)
-                                                .pop(item.value)
+                                      ? () {
+                                          if (!(available?.call() ?? true))
+                                            return;
+                                          item.onTap?.call();
+                                          Navigator.of(dialogContext)
+                                              .pop(item.value);
+                                        }
                                       : null,
                                   child: Semantics(
                                     selected: item.value == initialValue,
@@ -173,6 +217,7 @@ class MotionDropdown<T> extends StatelessWidget {
                                   ),
                                 ),
                               TextButton(
+                                clipBehavior: Clip.none,
                                 onPressed: () =>
                                     Navigator.of(dialogContext).pop(),
                                 child: const Text('Отмена'),
@@ -190,12 +235,80 @@ class MotionDropdown<T> extends StatelessWidget {
                   (available?.call() ?? true))
                 onChanged?.call(value);
             },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(decoration.labelText ?? ''),
-          if (selected != null) selected.child,
-        ],
+    );
+  }
+}
+
+/// Reduced motion changes the popup route, not the closed select composition.
+class _StaticSelectField extends StatefulWidget {
+  const _StaticSelectField({
+    required this.decoration,
+    required this.isExpanded,
+    required this.value,
+    required this.onPressed,
+  });
+  final InputDecoration decoration;
+  final bool isExpanded;
+  final Widget? value;
+  final VoidCallback? onPressed;
+  @override
+  State<_StaticSelectField> createState() => _StaticSelectFieldState();
+}
+
+class _StaticSelectFieldState extends State<_StaticSelectField> {
+  bool _focused = false;
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final colors = Theme.of(context).extension<BrandColors>()!;
+    final value = widget.value ?? const SizedBox.shrink();
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: widget.onPressed,
+          onFocusChange: (value) => setState(() => _focused = value),
+          borderRadius: BorderRadius.circular(8),
+          child: InputDecorator(
+            isFocused: _focused,
+            isEmpty: widget.value == null,
+            decoration: widget.decoration
+                .applyDefaults(InputDecorationTheme.of(context))
+                .copyWith(
+                  enabled: enabled,
+                  suffixIconConstraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 16,
+                  ),
+                  suffixIcon: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 12),
+                    child: DeckIcon(
+                      'chevron',
+                      size: 16,
+                      color: colors[enabled ? 'text' : 'disabled'],
+                    ),
+                  ),
+                ),
+            child: DefaultTextStyle(
+              style: BrandTypography.body.copyWith(
+                color: colors[enabled ? 'text' : 'disabled'],
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.textScalerOf(context).scale(20),
+                ),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  heightFactor: 1,
+                  widthFactor: widget.isExpanded ? null : 1,
+                  child: value,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

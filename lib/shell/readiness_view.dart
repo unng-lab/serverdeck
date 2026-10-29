@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode, ReadinessState;
 
-import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_page.dart';
+import '../servers/server_compositions.dart';
 
-class ReadinessView extends StatelessWidget {
+class ReadinessView extends StatefulWidget {
   const ReadinessView({
     super.key,
     required this.state,
@@ -12,147 +13,179 @@ class ReadinessView extends StatelessWidget {
     this.onRetry,
     this.retryInProgress = false,
   });
-
   final ReadinessState state;
   final ErrorCode? reason;
   final VoidCallback? onRetry;
   final bool retryInProgress;
+  @override
+  State<ReadinessView> createState() => _ReadinessViewState();
+}
+
+class _ReadinessViewState extends State<ReadinessView> {
+  bool _details = false;
+  @override
+  void didUpdateWidget(covariant ReadinessView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state) _details = false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (state == ReadinessState.ready) {
+    final state = widget.state;
+    if (state == ReadinessState.ready)
       throw StateError('Ready requires the workspace shell');
-    }
+    final pending = {
+      ReadinessState.starting,
+      ReadinessState.recovering,
+      ReadinessState.stopping,
+    }.contains(state);
     final title = switch (state) {
-      ReadinessState.starting => 'Запуск локальной службы',
+      ReadinessState.starting => 'Запуск рабочего пространства',
       ReadinessState.recovering => 'Восстановление локального пространства',
-      ReadinessState.storageBlocked => 'Локальное хранилище заблокировано',
-      ReadinessState.incompatible => 'Несовместимая версия локальной службы',
       ReadinessState.stopping => 'Завершение работы локальной службы',
-      ReadinessState.unavailable => 'Локальная служба недоступна',
-      ReadinessState.ready => throw StateError(
-        'Ready requires the workspace shell',
-      ),
+      ReadinessState.storageBlocked => 'Доступ к хранилищу заблокирован',
+      ReadinessState.incompatible => 'Несовместимая версия локальной службы',
+      _ => 'Локальная служба недоступна',
     };
-    final retryAvailable =
-        onRetry != null &&
-        switch (state) {
-          ReadinessState.storageBlocked ||
-          ReadinessState.incompatible ||
-          ReadinessState.unavailable => true,
-          _ => false,
-        };
-    final pending =
-        retryInProgress ||
-        {
-          ReadinessState.starting,
-          ReadinessState.recovering,
-          ReadinessState.stopping,
-        }.contains(state);
+    final stage = widget.retryInProgress
+        ? 'Ожидаем результат текущей попытки.'
+        : switch (state) {
+            ReadinessState.starting => 'Запуск локальной службы',
+            ReadinessState.recovering =>
+              'Восстановление локального пространства',
+            ReadinessState.stopping => 'Завершение работы локальной службы',
+            ReadinessState.storageBlocked =>
+              'Локальное хранилище заблокировано',
+            ReadinessState.incompatible =>
+              'Версии клиента и локальной службы несовместимы',
+            _ => 'Служба недоступна',
+          };
+    final next = switch (state) {
+      ReadinessState.starting => 'Ожидаем результат запуска.',
+      ReadinessState.recovering =>
+        'Дождитесь завершения восстановления локального пространства.',
+      ReadinessState.stopping => 'Ожидаем завершения работы службы.',
+      ReadinessState.incompatible => 'Используйте совместимые версии клиента и локальной службы, затем повторите запуск.',
+      ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
+      _ => 'Проверьте доступность локальной службы и повторите запуск.',
+    };
     final tone = switch (state) {
       ReadinessState.storageBlocked => DeckTone.error,
       ReadinessState.incompatible => DeckTone.warning,
       ReadinessState.unavailable => DeckTone.unavailable,
       _ => DeckTone.running,
     };
-    final stage = retryInProgress
-        ? 'Ожидаем результат текущей попытки.'
-        : switch (state) {
-            ReadinessState.starting ||
-            ReadinessState.recovering => 'Ожидаем результат запуска.',
-            ReadinessState.stopping => 'Ожидаем завершения работы службы.',
-            ReadinessState.unavailable => 'Локальное пространство недоступно.',
-            ReadinessState.incompatible => 'Требуется совместимая версия.',
-            ReadinessState.storageBlocked => 'Доступ к хранилищу заблокирован.',
-            ReadinessState.ready => throw StateError(
-              'Ready requires the workspace shell',
-            ),
-          };
-    final nextStep = switch (state) {
-      ReadinessState.starting => 'Дождитесь готовности локального пространства. Данные появятся после проверки доступа.',
-      ReadinessState.recovering =>
-        'Дождитесь завершения восстановления локального пространства.',
-      ReadinessState.stopping =>
-        'Дождитесь завершения текущей службы перед новым запуском.',
-      ReadinessState.unavailable =>
-        'Проверьте доступность локальной службы и повторите запуск.',
-      ReadinessState.incompatible => 'Используйте совместимые версии клиента и локальной службы, затем повторите запуск.',
-      ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
-      ReadinessState.ready => throw StateError(
-        'Ready requires the workspace shell',
-      ),
+    final facts = <String, String>{
+      'Состояние': stage,
+      if (pending) ...{
+        'Этап': next,
+        'Доступ': 'Локальные данные появятся после проверки',
+      },
+      if (!pending && state != ReadinessState.storageBlocked) ...{
+        'Причина': widget.reason == null
+            ? 'Дополнительная причина не предоставлена'
+            : _reasonMessage(widget.reason!),
+        'Данные': 'Рабочее пространство сохранено',
+        'Область отказа':
+            'Локальная служба; это не SSH offline выбранного сервера',
+      },
+      if (state == ReadinessState.storageBlocked) ...{
+        'Следующий шаг': next,
+        'Сохранность': 'Исходные данные сохраняются',
+        'Ограничение': 'Нет сброса данных и открытого запасного хранения',
+      },
     };
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.hasBoundedHeight
-                  ? constraints.maxHeight
-                  : 0,
-            ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(BrandSpacing.space24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: Semantics(
-                    liveRegion: true,
-                    child: DeckSurface(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Semantics(
-                            header: true,
-                            child: Text(
-                              title,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          const SizedBox(height: BrandSpacing.space16),
-                          DeckStatus(
-                            label: stage,
-                            tone: tone,
-                            pending: pending,
-                          ),
-                          if (reason != null) ...[
-                            const SizedBox(height: BrandSpacing.space16),
-                            Text(_reasonMessage(reason!)),
-                          ],
-                          const SizedBox(height: BrandSpacing.space16),
-                          Text(
-                            retryInProgress
-                                ? 'Текущая попытка уже выполняется. Дождитесь результата.'
-                                : nextStep,
-                          ),
-                          if (retryAvailable) ...[
-                            const SizedBox(height: BrandSpacing.space24),
-                            DeckActions(
-                              children: [
-                                FilledButton(
-                                  onPressed: retryInProgress ? null : onRetry,
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                  ),
-                                  child: const Text(
-                                    'Повторить запуск',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+    if ((pending || state == ReadinessState.storageBlocked) &&
+        widget.reason != null)
+      facts['Причина'] = _reasonMessage(widget.reason!);
+    final tabs = pending
+        ? const {
+            ReadinessState.starting: 'Запуск',
+            ReadinessState.recovering: 'Восстановление',
+            ReadinessState.stopping: 'Завершение',
+          }
+        : const {
+            ReadinessState.unavailable: 'Недоступна',
+            ReadinessState.incompatible: 'Несовместимая версия',
+          };
+    return DeckPage(
+      title: title,
+      eyebrow: 'Серверы / Рабочее пространство',
+      description: 'Состояние и следующие доступные действия',
+      child: Semantics(
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (state != ReadinessState.storageBlocked) ...[
+              Tooltip(
+                message: 'Состояние определяет локальная служба',
+                child: DeckTabs(
+                  labels: tabs.values.toList(),
+                  selected: tabs.keys
+                      .toList()
+                      .indexOf(state)
+                      .clamp(0, tabs.length - 1),
+                  onSelected: null,
                 ),
               ),
+              const DeckTabsGap(),
+            ],
+            ServerStatusBody(
+              title: title,
+              facts: facts,
+              tone: tone,
+              icon: pending ? 'clock' : 'close',
+              emblemRole: pending ? 'running' : 'error',
+              details: _details
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(next),
+                          if (widget.reason != null &&
+                              state == ReadinessState.storageBlocked)
+                            Text(_reasonMessage(widget.reason!)),
+                          if (widget.retryInProgress)
+                            const Text(
+                              'Текущая попытка уже выполняется. Дождитесь результата.',
+                            ),
+                        ],
+                      ),
+                    )
+                  : null,
+              actions: [
+                if (!pending && widget.onRetry != null)
+                  FilledButton(
+                    clipBehavior: Clip.none,
+                    onPressed: widget.retryInProgress ? null : widget.onRetry,
+                    child: const Text('Повторить запуск'),
+                  ),
+                if (pending)
+                  const Tooltip(
+                    message: 'Дождитесь перехода локальной службы. Повторный запуск не создаётся.',
+                    child: FilledButton(
+                      clipBehavior: Clip.none,
+                      onPressed: null,
+                      child: Text('Дождаться запуска'),
+                    ),
+                  ),
+                if (!pending)
+                  OutlinedButton(
+                    clipBehavior: Clip.none,
+                    onPressed: () => setState(() => _details = !_details),
+                    child: Text(
+                      state == ReadinessState.storageBlocked
+                          ? 'Показать сведения'
+                          : 'Открыть сведения',
+                    ),
+                  ),
+              ],
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

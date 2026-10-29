@@ -43,8 +43,8 @@ void main() {
         final previousCredential = tester.state<CredentialInputState>(
           find.byType(CredentialInput),
         );
-        final previousTile = tester.state(
-          find.byType(ExpansionTile, skipOffstage: false),
+        final previousList = tester.state(
+          find.byType(ProfileList, skipOffstage: false),
         );
         final route = ModalRoute.of(tester.element(find.byType(ProfileForm)))!;
         final originalEpoch = _session(tester).epoch;
@@ -94,10 +94,14 @@ void main() {
         _expectRetired(tester);
         expect(previousForm.mounted, isFalse);
         expect(previousCredential.mounted, isFalse);
-        expect(previousTile.mounted, isFalse);
+        expect(previousList.mounted, isFalse);
         expect(_session(tester).epoch, greaterThan(originalEpoch));
         await tester.pumpAndSettle();
-        expect(route.isActive, isFalse);
+        expect(
+          route.isActive,
+          isTrue,
+          reason: 'The public base route survives while its private page State is retired.',
+        );
 
         delayedRead.complete();
         await refresh;
@@ -144,15 +148,18 @@ void main() {
         expect(find.byType(ProfileForm, skipOffstage: false), findsNothing);
         expect(find.byType(CredentialInput, skipOffstage: false), findsNothing);
         expect(
-          tester.state(find.byType(ExpansionTile)),
-          isNot(same(previousTile)),
+          tester.state(find.byType(ProfileList)),
+          isNot(same(previousList)),
         );
         expect(find.text('Редактировать профиль'), findsNothing);
         _expectRetired(tester);
 
         // Inspect the newly opened production form: consent and secret buffers
         // are fresh, while persisted fixture data was never cleared by the UI.
-        await tester.tap(find.text(_currentTarget).last);
+        await tester.ensureVisible(
+          find.byTooltip('Действия профиля $_currentTarget'),
+        );
+        await tester.tap(find.byTooltip('Действия профиля $_currentTarget'));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Редактировать профиль'));
         await tester.tap(find.text('Редактировать профиль'));
@@ -190,7 +197,7 @@ void main() {
   }
 
   testWidgets(
-    'theme and resize preserve the real edit route, State and secret',
+    'theme and resize preserve the inline edit page, State and secret',
     (tester) async {
       final harness = await _Harness.open(tester);
       try {
@@ -199,8 +206,8 @@ void main() {
         final credential = tester.state<CredentialInputState>(
           find.byType(CredentialInput),
         );
-        final tile = tester.state(
-          find.byType(ExpansionTile, skipOffstage: false),
+        final profileList = tester.state(
+          find.byType(ProfileList, skipOffstage: false),
         );
         final route = ModalRoute.of(tester.element(find.byType(ProfileForm)))!;
         final epoch = _session(tester).epoch;
@@ -212,8 +219,8 @@ void main() {
         expect(tester.state(find.byType(ProfileForm)), same(form));
         expect(tester.state(find.byType(CredentialInput)), same(credential));
         expect(
-          tester.state(find.byType(ExpansionTile, skipOffstage: false)),
-          same(tile),
+          tester.state(find.byType(ProfileList, skipOffstage: false)),
+          same(profileList),
         );
         expect(
           ModalRoute.of(tester.element(find.byType(ProfileForm))),
@@ -385,7 +392,8 @@ class _Harness {
   }
 
   Future<void> openEdit() async {
-    await tester.tap(find.text(_oldTarget).last);
+    await tester.ensureVisible(find.byTooltip('Действия профиля $_oldTarget'));
+    await tester.tap(find.byTooltip('Действия профиля $_oldTarget'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Редактировать профиль'));
     await tester.tap(find.text('Редактировать профиль'));

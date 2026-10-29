@@ -237,7 +237,10 @@ void main() {
                 final start = plain.indexOf(version);
                 expect(start, greaterThanOrEqualTo(0));
                 if (site == 'plan-effect') {
-                  expect(plain, 'Установить PostgreSQL 16 · версия $version');
+                  expect(
+                    plain,
+                    'Установить ПО по точному рецепту · версия $version',
+                  );
                 } else if (site == 'configuration-recipe') {
                   expect(plain, 'Рецепт: postgresql16 $version');
                   expect(find.text('Желаемая версия: 7'), findsOneWidget);
@@ -301,7 +304,14 @@ void main() {
                 expect(style.height! * style.fontSize!, closeTo(20, .001));
                 if (start > 0) {
                   final human = _styleAt(text, 0);
-                  expect(human.fontFamily, BrandAssets.uiFont);
+                  expect(
+                    human.fontFamily,
+                    site == 'recipe-header'
+                        ? BrandAssets.semiboldFamily
+                        : BrandAssets.uiFont,
+                  );
+                  if (site == 'recipe-header')
+                    expect(human.fontWeight, BrandTypography.semiboldWeight);
                   expect(human.fontSize, 14);
                 }
 
@@ -333,7 +343,7 @@ void main() {
                   );
                   expect(
                     _styleAt(package.text, 0).fontFamily,
-                    BrandAssets.uiFont,
+                    BrandAssets.semiboldFamily,
                   );
                 }
                 if (site == 'configuration-recipe') {
@@ -358,14 +368,26 @@ void main() {
                 }
                 final raster = await StockPaintRaster.capture(tester, boundary);
                 final foreground = style.color!;
+                // A single thin13px glyph can contain only antialiased pixels
+                // at a fractional x offset. Sample the same real leading run
+                // whose individual advances were checked against the bundled
+                // Mono font above, without including a label or another row.
+                final paintedRun = boxes(
+                  TextSelection(
+                    baseOffset: start,
+                    extentOffset: start + math.min(8, version.length),
+                  ),
+                ).first;
                 final glyphRect = Rect.fromLTRB(
-                  first.left,
-                  first.top,
-                  last.right > first.left && last.top == first.top
-                      ? last.right
-                      : first.right,
-                  first.bottom,
+                  paintedRun.left,
+                  paintedRun.top,
+                  paintedRun.right,
+                  paintedRun.bottom,
                 ).shift(render.localToGlobal(Offset.zero));
+                expect(glyphRect.left, greaterThanOrEqualTo(0));
+                expect(glyphRect.right, lessThanOrEqualTo(frame.width));
+                expect(glyphRect.top, greaterThanOrEqualTo(0));
+                expect(glyphRect.bottom, lessThanOrEqualTo(frame.height));
                 final glyphPixels =
                     raster.histogram(glyphRect)[foreground] ?? 0;
                 expect(glyphPixels, greaterThan(0));
@@ -445,10 +467,17 @@ void main() {
                   tester.state<EditableTextState>(value).hideToolbar();
                   editor.focusNode.unfocus();
                 }
+                if (site == 'recipe-header') {
+                  final select = find.text('PostgreSQL 16');
+                  await _show(tester, select);
+                  await tester.tap(select);
+                  await tester.pumpAndSettle();
+                  expect(calls, isEmpty);
+                }
                 final action = switch (site) {
-                  'recipe-header' => 'План установки PostgreSQL 16',
+                  'recipe-header' => 'Создать план',
                   'plan-effect' => 'Подтвердить план',
-                  'executor-runtime' => 'Привязать',
+                  'executor-runtime' => 'Привязать исполнитель',
                   _ => null,
                 };
                 if (action != null) {

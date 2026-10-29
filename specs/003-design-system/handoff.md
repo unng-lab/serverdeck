@@ -1,5 +1,118 @@
-# Локальная передача дизайна ServerDeck
+## Промежуточная установленная 0.3.0-preview.1+12 — 2026-10-29
 
+По текущему решению пользователя завершается только пакет003 (37 базовых сценариев);004–020 не реализуются в этой задаче. Порядок: закончить implementation batch → промежуточная сборка/установка → полный static/unit/widget gate; адресные прогоны только при падении полного.
+
+Normal Release build (`tools/run-foundation.ps1 -BuildOnly -Configuration Release`) завершён exit0, журнал `.local/unit-widget/private-build-003-preview1.log`. Установленная копия: `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.3.0-preview.1+12-design003/`, FileVersion `0.3.0-preview.1+12`. Проверены все пять ролей штатного manifest; format3/testOnly=false/API1.1/schema3. Прежние установки и копия default workspace `.local/release/workspace-before-003-preview1/` сохранены. Обновлён обычный shortcut; предыдущий сохранён как `ServerDeck 0.2.1 base design t213-216.lnk`.
+
+После повторного открытия по просьбе пользователя exact installed process PID18968/Respondingtrue/MainWindowHandle12062324. Пользователь прислал screenshot установленного окна: виден экран «Первый запуск», тёмная тема, пять sidebar разделов, workspace/breadcrumb, действия «Добавить сервер»/«Настроить ИИ-доступ» и welcome panel. Это фактическое подтверждение данного экрана, не всех37 маршрутов, viewport boundaries, scales или поведения. Computer Use/desktop automation не применялись. Screenshot предоставлен пользователем, не снят агентом.
+
+На этом candidate format692/0 и root analyze NoIssues выполнены успешно; links1982total/1981OK/1excluded/0errors. Полный root unit/widget прогон после установки завершён: 9037PASS/1expected capture SKIP,8:07,exit0; session62567 terminal, журнал `.local/unit-widget/preview1-final-full.log`. Очищены capture environment variables, SERVERDECK_NATIVE_CONTROL_RED=0; capture defines не передавались. Формат/анализ: `.local/unit-widget/preview1-final-format.log` и `preview1-final-analyze.log`; ссылки: `preview1-final-links.log`. Адресные прогоны после успешного полного не запускались. T214/T217 реализованы, финальное независимое review ещё впереди. Никакие дополнительные task markers этой записью не закрываются.
+
+Source candidate ещё незакоммичен: manifest buildId от прежнегоHEAD+locks не устанавливает точную Git identity UI изменений. Нового commit/push/CI/tag/GitHub release нет; public Windows binary не публиковался. Ниже — сохранённая история предыдущих checkpoints, её pending утверждения относятся к соответствующим версиям.
+
+Fresh independent readonly `base003_preview1_final_review` завершён: замечаний не найдено; пакет003 готов к реализации, рассмотренный source candidate готов к финальному коммиту в текущем static/unit/widget stage. Проверен full-source003 и связанные contracts; отдельно native readonly lifecycle/guards, fleet layout/actions, private epoch/navigation/target owners. T214/T217 отмечены[X] только по выполненной реализации/check/review. Review не устанавливает полную FA09/FA10 visual/installed приёмку всех37, окончательную source identity или будущий CI. T191/T192 остаются открытыми.
+
+
+
+## Актуальная private сборка T213/T215/T216 — 2026-10-29
+
+T213/T215/T216 закрыты после8981PASS/1expectedSKIP, format690/0, analyzeNoIssues и clean fresh `t213_216_code_review_r2`. Normal private build завершёнexit0, установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t213-216/`; обычный Shell launch PID44300/окно5376928/Respondingtrue. Прежние installations, workspace copy и shortcutT193 сохранены. Это source check/review и progress delivery, не полная visual/installed приёмка37/98; содержимое окна не осматривалось. [Evidence](evidence.md) содержит проверенные результаты и ограничения.
+
+Следующая implementation: T214 (сводка/title/glyphs05, readiness готова) и T217 (остальные readonly form controls и общий source separator2px; fresh readonly `t213_217_delivery_record_review` подтвердил готовность без замечаний). T191/T192 и цель98 открыты; новые commit/push/CI/publication/native/integration/CU не выполнялись. Финальный source identity незакоммиченного UI не установлен. Записи ниже — история предыдущих checkpoints.
+
+## Текущая работа T213/T215/T216 — 2026-10-29
+
+Выбор исходного SemiBold, сброс inherited semibold axis для regular roles и native readonly поле85 реализованы. Последний scoped focused gate686PASS; актуальные format690/0 и analyze NoIssues прошли. Полный `t213-216-full-5.log` завершён8981PASS/1expectedSKIP/8:21/exit0, exec session19541 терминален. Далее обязательны fresh independent review текущего кода/спек/записей, normal build и сохранная private установка/обычный запуск. T213/T215/T216 пока[ ]; T214 готова по readiness, но не реализована; новая T217 описывает остальные readonly inputs и ждёт readiness; T191/T192/37/98 открыты.
+
+Подробные RED/GREEN, найденный review P2 и границы evidence — в начале [evidence](evidence.md). Исторический8961PASS относится к версии до T215/T216. Установлена прежняя T193/T198; подготовленный private build T213 устарел и не установлен. Новых commit/push/CI/publication, Computer Use или native/integration qualification нет. Все98 требований и старые установки/данные сохранены.
+
+## Установлена progress-сборка T193/T198, 2026-10-29
+
+После root8953PASS/1expectedSKIP и чистого code review собран normal private Release и установлен в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t193-198/` (FileVersion0.2.1+11). Пять manifest roles проверены; старые версии, shortcutT188 и копия default workspace сохранены. Обычный Shell launch: PID35768/окно8523378/Respondingtrue; пользователь подтвердил «Список серверов или первый запуск». Первая неудачная попытка и точные ограничения — в [evidence](evidence.md).
+
+Это промежуточная установленная рабочая копия, не завершение003/37/98. T193/T198/T200–T204 source scope закрыт; T191 полная visual сверка и T192 итоговая привязка source revision/installed приёмка остаются открытыми. Самостоятельного осмотра native окна не было; theme/frame/scale/точный screen04vs05 и остальные routes пользователь не сообщил. Backend/future61 design+functionality остаются в программе всех98. Новых публичных релизов, CI dispatch, native/integration tests или Computer Use не было.
+
+## Текущий source checkpoint T193/T198, 2026-10-29
+
+T193/T198/T200–T204 закрыты после root8953PASS/1expectedSKIP, format689/0, analyze NoIssues, выбранных package checks и clean readonly `t193_198_code_review_r2`. Подробности и ограничения — в [evidence](evidence.md). Исправлены controls/search/pager, shared header/tab origins, settings hint и canonical glyph/label gap7. T190 history сохранена вместе с новой correctionT201.
+
+Следующий этап — T191: полная прямая сверка37базовых сценариев/областей/состояний в обеих темах и frames/scales. T192 final installed acceptance остаётся открытым; программа всех98/61futurefunctional screens также открыта. До этого source checkpoint установлен только прежний private T188; теперь разрешён отдельный progress build/install/show после чистого code review, с сохранением данных/версий. Его нельзя считать final visual/installed приёмкой или native qualification. Новый публичный релиз и native/integration/Computer Use не выполняются.
+
+## Текущий срез после T190, 2026-10-29
+
+T190/T195/T196/T197/T199 закрыты после фактического root gate8903PASS/1expectedSKIP, format/analyze и clean independent `t190_code_review_r3`. Исправлены credential-only footer12, required string semantics, compact flex521–760 и реальная painted form border42; прежние controllers/JSON/guards сохранены. Подробные ограничения и failed/RED/GREEN checkpoints — в [evidence](evidence.md). Это завершение форм, не всего003/37/98.
+
+Следующая очередь: открытые T193 (search/action/pager) и T198 (shared header origins/post-tabs margins; clean readiness review уже завершён), затем полная прямая сверка T191 и установленная поставка T192. T198 ещё не реализован. Все98 экранов сохраняются:37base здесь,61design+functionality в собственных пакетах. Установлен прежний private T188 (`0.2.1+11`); текущие правки туда не доставлены, фактическое содержимое окна не осматривалось. Новых build/install/launch/commit/push/CI/publication, native/integration и Computer Use не было. Цель активна; final visual/installed acceptance не заявляется.
+
+# Локальная передача дизайна ServerDeck
+## T189 закрыт в scoped code/check/review; T190 продолжается — 2026-10-29
+
+T189 получил clean fresh `t189_code_review_r3` после двух реальных RED/fix циклов clipping и first-frame resize focus. Последний относящийся к нему полный root gate:685/0format,0analysis issues,8856PASS/1expected capture SKIP8:06 exit0; ссылки на обычные журналы и границы проверки сохранены в evidence. Три файла T189 не менялись после этого gate/review. Это не visual/installed acceptance37/98.
+
+T190 остаётся[ ]: footer/helper частично перенесены, purpose при скрытии aside сохранён. Дополнительный test33cases выявил20native-fringe FAIL и после исправления DeckFormActions проходит; новый полный gate/review этой правки ещё впереди. Далее — external captions/required marks по реальному codec, textarea и остальная геометрия полей. Установленная версия по-прежнему T188, новые build/install/CI/publication не выполнялись. T191/T192 и цель98 не завершены; новые reference/installer frameworks и native/integration/CU не вводятся.
+## Phase9 готова к реализации после исправления readiness — 2026-10-29
+
+Converge добавил5задач T189–T193, не объявляя003/37/98 завершёнными. После двух responsive corrections и fresh clean `phase9_readiness_r2` закрыт только metadata T194. Очередь: tabs/focus и формы/общие controls → полная визуальная сверка37 → итоговая installed acceptance. Установленная копия остаётся T188; code Phase9 ещё не менялся. [Evidence](evidence.md) отделяет первое failed-readiness от итоговой готовности. Native/integration/CU и новые provider defaults не разрешены.
+## Обновление T188 — 2026-10-29
+
+Toolbar/search/filter страницы «Серверы» и privacy/reduced lifecycle двух native menu hosts прошли final8792PASS/1expectedSKIP, format/analyze и independent code review без замечаний. Private0.2.1+11 установлена отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t188`, запущена PID41772; shortcut обновлён, прежняя копия сохранена. Реальные predicates/counts/owners и функции сохранены. Содержимое установленного окна и полный37/98 не приняты; подробности и validation scope — в [evidence](evidence.md). Следующая работа — оставшиеся общие/action/feature compositions по открытым задачам, без восстановления reference engine.
+## Обновление T187 — 2026-10-29
+
+Табличные строки/phone cards прошли финальный8752PASS/1expectedSKIP, format/analyze и независимые readiness/code reviews без замечаний. Private0.2.1+11 установлена отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t187` и запущена PID35848; shortcut обновлён, прежний сохранён. Содержимое окна не инспектировалось; полные37/98 не приняты. [Evidence](evidence.md) содержит точные scopes. Следующая видимая корректировка05 — toolbar/search/filter по T188; существующие handlers и данные сохраняются.
+## Обновление T185/T186 — 2026-10-29
+
+Общие панели поиска/фильтров и visible/hit action geometry прошли финальный ordinary gate8726PASS/1expectedSKIP, format/analyze и fresh readonly review без замечаний. Новая private0.2.1+11 установлена отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t185` и запущена обычным способом, PID35528. Основной shortcut обновлён, предыдущий сохранён. Полные факты/ограничения — в начале [evidence](evidence.md). Содержимое окна и installed visual acceptance не проверены; полные37/98 и открытые задачи не закрыты. Следующий остаток общей таблицы — отступы строк/ячеек и phone cards, уточнённый T187. Header13/20/600 сохраняется по явному приоритету FA04; прежнее предположение о его дефекте исправлено. T129/T133 сохраняют полный объём таблиц и pager.
+
+## Актуальная запущенная private копия — 2026-10-29, T183/T184
+
+T183/T184 завершены локально: format678/0, analyze0issues,8700unit/widget PASS/1expectedskip; два fresh независимых reviews без замечаний в core UI и application scopes. Штатная сборка завершилась exit0, установлена отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t183-184`. Обычный ярлык указывает сюда; прежний t182 сохранён как `ServerDeck base design t182.lnk`. Старые установки и workspace сохранены.
+
+Новая копия запущена обычным способом: PID27112, MainWindowHandle26739918, Responding=True. Прежние35156/40552 остаются открыты. Содержимое окна/readiness не проверялось через автоматизацию; пользователю задан вопрос о фактически видимом экране. Подробные ограничения — в начале [evidence](evidence.md). Native/integration/CU не выполнялись; полный visual37/98 и T139/T147/T152 остаются открытыми. Следующий подтверждённый общий UI gap — toolbar/search metrics и selected filter-chip role, плюс прежние открытые compositions/функции. Source остаётся незакоммиченным, нового public release нет. Все записи ниже — история прежних checkpoints.
+
+## Актуальная запущенная private копия — 2026-10-29, T182
+
+T182 закрыта после полного gate (format676/0, analyze0issues,8634unit/widget PASS/1expectedskip) и fresh независимого code/spec review без замечаний. Штатная сборка завершилась exit0, установлена отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t182`; обычный ярлык указывает сюда, прежний r2 сохранён отдельным ярлыком. Версии и workspace сохранены.
+
+Новая установленная копия запущена обычным способом: PID35156, MainWindowHandle66323690, Responding=True. Прежний40552 остаётся открыт; закрытие для отдельного запуска больше не требуется. CU/desktop automation не применялись, содержимое окна не проверялось. Подробные evidence/ограничения — в начале [evidence](evidence.md). Полная прямая визуальная приёмка37, остальные61 и цель98 остаются открытыми. Далее — прежние задачи T129–T147, включая phone actions и проверку остальных compositions; T182 не меняла padding другой table-context панели SoftwarePanel. Ни native/integration проверки, ни public release не выполнялись. Все последующие записи — история предыдущих checkpoints.
+
+## Последняя private копия — 2026-10-29
+
+T179–T181 реализованы: mandatory root format/analyze чистые,8601unit/widget PASS/1expectedskip, fresh independent review после Jobs correction — без замечаний. Повторная штатная сборка завершилась exit0. Новая копия0.2.1+11 установлена в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-r2`; обычный ярлык указывает на неё. Прежний ярлык сохранён как `ServerDeck 0.2.1 previous.lnk`; старые установки и данные сохранены.
+
+Новая копия пока не запущена: прежний процесс40552 остаётся открыт, пользователю предложено обычное закрытие. После закрытия запустить именно новую установленную копию, без CU/desktop automation. Подробная запись — в начале [evidence](evidence.md). Source незакоммичен, manifest buildId содержит базовый HEAD. Приёмка37 и последующая программа61/общая цель98 остаются открытыми. Следующие уже подтверждённые UI gaps — table-context отступы/разделители и ширина phone actions на36, в рамках T129/T133/T143/T147. Native/integration проверки не запускались. Предыдущие записи ниже сохранены как история.
+
+## Текущая private установка 0.2.1+11 — 2026-10-28
+
+Штатная Release-сборка завершилась exit0 и установлена рядом с0.2.0 в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11`. Обычный ярлык переключён на неё, прежний сохранён отдельным ярлыком; версии и данные сохранены. Установленный exe имеет FileVersion0.2.1+11, запущен обычным способом; подтверждены живой процесс40552, окно и Responding=True.
+
+Подробности и ограничения — в начале [evidence](evidence.md). Это private build текущей незакоммиченной рабочей копии, без нового source commit/public release и без native/integration tests. Содержимое окна и визуальное соответствие не инспектировались; полный installed acceptance и37/98 не объявляются завершёнными. Следующий шаг — прямая сверка канонических макетов с обычным Flutter UI в разрешённых unit/widget проверках и доступный пользователю осмотр установленного приложения, без восстановления reference-движка или Computer Use.
+
+## Текущая работа 2026-10-28 — 003.4
+
+Пользователь вернул003 в работу после сравнения установленного приложения с
+макетами. Первыми выполняются точный дизайн37 существующих базовых экранов/
+состояний и интеграция их функций. Остальные61экран сохраняются в своих
+функционально-визуальных пакетах; все98 остаются в [программе](../design-delivery.md).
+
+Последнее прямое указание пользователя удаляет самостоятельный reference-движок,
+его язык bindings, corpus/schema bundles, двойную валидацию и receipt graphs.
+Отменённые ID перечислены в [tasks](tasks.md). Обычные production widgets,
+owners/callbacks, unit/widget tests, protective guards и канонический дизайн
+сохраняются; отдельная HTML/gallery-копия не является приложением.
+
+Текущая очередь — shared/feature compositions и сохранённые продуктовые fixes,
+ordinary static/unit/widget gate, fresh independent review, прямая визуальная
+сверка с HTML/брендбуком/исходными PNG и новая private build/install/show.
+Конкретные фактические результаты, версия и ещё не проверенные области
+фиксируются в [evidence](evidence.md); эта редакция новых passes не заявляет.
+Старые sections ниже являются историей своего source/scope.
+
+При поставке сохраняются текущие данные, предыдущая версия и shortcut.
+Показывается обычный рабочий UI с настоящими переходами. Native/integration/
+реальные SSH/container qualification tests не запускаются. Computer Use и
+автоматизация рабочего стола не применяются вопреки указанию пользователя;
+ограничения доступа к исходному просмотру не обходятся. Установка и показ сами
+по себе не подтверждают всю визуальную матрицу или функциональность будущих61.
 ## Обычный source release 0.2.0
 
 Текущий scope — обычный MIT source-only `0.2.0` с Flutter metadata `0.2.0+10`,

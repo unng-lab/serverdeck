@@ -298,8 +298,11 @@ void main() {
                   expect(tester.takeException(), isNull);
                   expect(
                     tester
-                        .widget<FilledButton>(
-                          find.widgetWithText(FilledButton, 'Сохранить версию'),
+                        .widget<OutlinedButton>(
+                          find.widgetWithText(
+                            OutlinedButton,
+                            'Сохранить версию',
+                          ),
                         )
                         .onPressed,
                     isNull,
@@ -308,9 +311,9 @@ void main() {
                   // capability; saving excludes it. Neither is invoked here.
                   expect(
                     tester
-                            .widget<OutlinedButton>(
+                            .widget<FilledButton>(
                               find.widgetWithText(
-                                OutlinedButton,
+                                FilledButton,
                                 'Проверить без сохранения',
                               ),
                             )
@@ -319,6 +322,22 @@ void main() {
                     saving,
                   );
                   for (final entry in controllers.entries) {
+                    if (entry.key == 'body') {
+                      final parameters = find.widgetWithText(
+                        TextButton,
+                        'Параметры',
+                      );
+                      await tester.ensureVisible(parameters);
+                      await tester.tap(parameters);
+                      await tester.pumpAndSettle();
+                      final details = find.text(
+                        'Шаги и параметры профиля (JSON)',
+                      );
+                      await tester.ensureVisible(details);
+                      await tester.pumpAndSettle();
+                      await tester.tap(details);
+                      await tester.pumpAndSettle();
+                    }
                     final field = find.byWidgetPredicate(
                       (widget) =>
                           widget is TextField &&
@@ -333,7 +352,15 @@ void main() {
                       values[entry.key]!,
                       typography: entry.key == 'body'
                           ? BrandTypography.log
-                          : BrandTypography.body,
+                          : (entry.key == 'description'
+                                    ? BrandTypography.log
+                                    : BrandTypography.body)
+                                .copyWith(
+                                  fontSize: 14,
+                                  height: frame.width <= 520
+                                      ? 22 / 14
+                                      : 20 / 14,
+                                ),
                     );
                     final editor = tester.widget<EditableText>(
                       find.descendant(
@@ -417,6 +444,11 @@ void main() {
                       ),
                     ),
                   );
+                  await tester.pumpAndSettle();
+                  final details = find.text('JSON · дополнительные сведения');
+                  await tester.ensureVisible(details);
+                  await tester.pumpAndSettle();
+                  await tester.tap(details);
                   await tester.pumpAndSettle();
                   final field = find.byWidgetPredicate(
                     (widget) =>

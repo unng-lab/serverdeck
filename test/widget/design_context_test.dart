@@ -13,6 +13,7 @@ import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/profile_form.dart';
 import 'package:serverdeck/profiles/profile_list.dart';
 import 'package:serverdeck/servers/server_sections.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/settings/settings_form.dart';
 import 'package:serverdeck/settings/settings_view.dart' as settings;
 import 'package:serverdeck/shell/foundation_shell.dart';
@@ -73,6 +74,53 @@ void _view(WidgetTester tester, Size size) {
 Finder _field(String name) => find.byKey(ValueKey('profile-$name'));
 Finder _editable(Finder owner) =>
     find.descendant(of: owner, matching: find.byType(EditableText));
+
+Future<void> _expectRecordSemantics(
+  WidgetTester tester,
+  Finder finder,
+  String text,
+) async {
+  expect(finder, findsOneWidget);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  final widget = tester.widget(finder);
+  final data = tester.getSemantics(finder).getSemanticsData();
+  if (widget is EditableText) {
+    expect(widget.readOnly, isTrue);
+    expect(data.value, text);
+    final row = find
+        .ancestor(
+          of: finder,
+          matching: find.byWidgetPredicate(
+            (widget) => widget.key is ServerFactRowKey,
+          ),
+        )
+        .first;
+    final label = find.descendant(
+      of: row,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            const [
+              'Сервер',
+              'Адрес',
+              'Время',
+              'Источник',
+              'Наблюдение',
+              'Служба',
+              'Приоритет',
+            ].contains(widget.data),
+      ),
+    );
+    expect(label, findsOneWidget);
+    expect(
+      tester.getSemantics(label).getSemanticsData().label,
+      contains(tester.widget<Text>(label).data!),
+    );
+  } else {
+    expect(data.label, contains(text));
+  }
+}
 
 ProfileView _logTarget({
   String id = DesignServerFixtures.serverId,
@@ -288,17 +336,14 @@ void main() {
         for (final text in [
           'Цель записи: ${profile.id}',
           'Параметры цели записи не подтверждены текущими сведениями',
-          'Источник: journald',
-          'Время записи: 2026-10-24T07:08:09.000Z UTC',
-          'Наблюдение: ${DesignServerFixtures.observedAt} UTC',
+          'journald',
+          '2026-10-24T07:08:09.000Z UTC',
+          '${DesignServerFixtures.observedAt} UTC',
         ]) {
           final label = find.descendant(of: dialog, matching: find.text(text));
           await tester.ensureVisible(label);
           await tester.pumpAndSettle();
-          expect(
-            find.bySemanticsLabel(RegExp(RegExp.escape(text))),
-            findsWidgets,
-          );
+          await _expectRecordSemantics(tester, label, text);
         }
         final pending = Completer<void>();
         client.refreshGate = pending;
@@ -413,7 +458,13 @@ void main() {
       await mount();
       profile = profileB;
       await mount();
-      final launcher = find.byType(ListTile);
+      final launcher = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Semantics &&
+                (widget.properties.label ?? '').startsWith('Полная запись '),
+          )
+          .first;
       await tester.ensureVisible(launcher);
       await tester.tap(launcher);
       await tester.pumpAndSettle();
@@ -445,18 +496,15 @@ void main() {
         'Цель записи: ${logsA['serverId']}',
         'Параметры цели записи не подтверждены текущими сведениями',
         'Закройте окно и получите журнал для текущих параметров.',
-        'Источник: ${logsA['source']}',
-        'Время записи: ${recordA['timestamp']} UTC',
-        'Наблюдение: ${logsA['observedAt']} UTC',
+        '${logsA['source']}',
+        '${recordA['timestamp']} UTC',
+        '${logsA['observedAt']} UTC',
       ]) {
         final label = find.descendant(of: dialog, matching: find.text(text));
         expect(label, findsOneWidget);
         await tester.ensureVisible(label);
         await tester.pumpAndSettle();
-        expect(
-          find.bySemanticsLabel(RegExp(RegExp.escape(text))),
-          findsWidgets,
-        );
+        await _expectRecordSemantics(tester, label, text);
       }
       logs = {
         ...logsA,
@@ -498,9 +546,9 @@ void main() {
       for (final text in [
         'Цель B',
         'endpoint-b.example:22',
-        'Источник: journal-B',
-        'Наблюдение: 2026-10-26T12:00:00.000Z UTC',
-        'Время записи: 2026-10-26T11:00:00.000Z UTC',
+        'journal-B',
+        '2026-10-26T12:00:00.000Z UTC',
+        '2026-10-26T11:00:00.000Z UTC',
       ]) {
         expect(
           find.descendant(of: dialog, matching: find.text(text)),
@@ -518,7 +566,7 @@ void main() {
   );
 
   testWidgets(
-    'actual profile owner and modal retain draft target expansion scroll and identity across all layouts',
+    'actual profile page retains draft target scroll owner and identity across all layouts',
     (tester) async {
       _view(tester, const Size(1100, 760));
       addTearDown(tester.view.resetPhysicalSize);
@@ -531,27 +579,34 @@ void main() {
       await tester.pumpAndSettle();
       final owner = tester.widget<ProfileList>(find.byType(ProfileList));
       final model = owner.controller;
-      await tester.tap(find.text('Saved profile'));
+      final listOwner = tester.state(find.byType(ProfileList));
+      final initial = model.profiles.single;
+      final baseRoute = ModalRoute.of(tester.element(find.byType(ProfileList)));
+      final edit = find.widgetWithText(OutlinedButton, 'Изменить');
+      await tester.ensureVisible(edit);
       await tester.pumpAndSettle();
-      final expansion = tester.state(find.byType(ExpansionTile));
-      final listScroll = tester.state<ScrollableState>(
-        find
-            .descendant(
-              of: find.byType(ProfileList),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.ensureVisible(find.text('Редактировать профиль'));
-      await tester.pumpAndSettle();
-      final launcher = Focus.of(
-        tester.element(find.text('Редактировать профиль')),
-      );
+      final launcher = Focus.of(tester.element(find.text('Изменить')));
       launcher.requestFocus();
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       final form = tester.state(find.byType(ProfileForm));
+      expect(
+        tester.widget<ProfileForm>(find.byType(ProfileForm)).asPage,
+        isTrue,
+      );
+      expect(
+        ModalRoute.of(tester.element(find.byType(ProfileForm))),
+        same(baseRoute),
+      );
+      final formScroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(ProfileForm),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.enterText(_field('name'), 'Черновик сервера 日本語');
       final editableState = tester.state(_editable(_field('name')));
       final editor = tester.widget<EditableText>(_editable(_field('name')));
@@ -577,13 +632,36 @@ void main() {
           same(editor.controller),
         );
         expect(editor.controller.text, 'Черновик сервера 日本語');
-        expect(tester.state(find.byType(ExpansionTile)), same(expansion));
+        expect(tester.state(find.byType(ProfileList)), same(listOwner));
+        expect(
+          tester.state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(ProfileForm),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          ),
+          same(formScroll),
+        );
+        expect(formScroll.position.pixels, greaterThanOrEqualTo(0));
+        final currentForm = tester.widget<ProfileForm>(
+          find.byType(ProfileForm),
+        );
+        expect(currentForm.initial, same(initial));
+        expect(currentForm.initial!.id, fixture.profileId);
+        expect(currentForm.initial!.revision, initial.revision);
+        expect(currentForm.initial!.address, initial.address);
+        expect(
+          tester.widget<EditableText>(_editable(_field('name'))).focusNode,
+          same(editor.focusNode),
+        );
         expect(model.selected!.id, fixture.profileId);
         expect(
           tester.widget<ProfileList>(find.byType(ProfileList)).controller,
           same(model),
         );
-        expect(listScroll.mounted, isTrue);
+        expect(formScroll.mounted, isTrue);
         expect(find.text('Редактирование профиля'), findsOneWidget);
         expect(find.textContaining('192.0.2.1:22'), findsWidgets);
         expect(client.reads, reads);
@@ -597,9 +675,16 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byType(ProfileForm), findsNothing);
-      expect(launcher.hasFocus, isTrue);
-      expect(find.text('Редактировать профиль'), findsOneWidget);
-      expect(tester.state(find.byType(ExpansionTile)), same(expansion));
+      expect(launcher.context?.mounted, isNot(true));
+      expect(tester.state(find.byType(ProfileList)), same(listOwner));
+      final search = tester.widget<TextField>(
+        find.descendant(
+          of: find.byType(ProfileList),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(search.focusNode!.hasFocus, isTrue);
+      expect(find.widgetWithText(OutlinedButton, 'Изменить'), findsOneWidget);
       expect(client.writes, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
       await client.events.close();
@@ -607,70 +692,78 @@ void main() {
     },
   );
 
-  testWidgets('actual settings route retains unsaved checkbox and owner', (
-    tester,
-  ) async {
-    _view(tester, const Size(1100, 760));
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final client = _CountingClient();
-    final bootstrap = fixture.ModelBootstrap(client)
-      ..show(ReadinessState.ready);
-    await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
-    client.publish(ThemePreference.dark, 1);
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Настройки'));
-    await tester.pumpAndSettle();
-    final owner = tester
-        .widget<settings.SettingsView>(find.byType(settings.SettingsView))
-        .controller;
-    await tester.tap(find.text('Изменить настройки'));
-    await tester.pumpAndSettle();
-    final form = tester.state(find.byType(SettingsForm));
-    await tester.ensureVisible(find.byType(CheckboxListTile));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(CheckboxListTile));
-    await tester.pumpAndSettle();
-    expect(
-      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
-      isFalse,
-    );
-    final reads = List<ApiMethod>.of(client.reads);
-    final refreshes = client.refreshes;
-    var revision = 1;
-    for (final size in const [
-      Size(800, 600),
-      Size(390, 800),
-      Size(1100, 760),
-    ]) {
-      _view(tester, size);
-      client.publish(ThemePreference.light, ++revision);
+  testWidgets(
+    'actual settings page retains unsaved motion dropdown and owner',
+    (tester) async {
+      _view(tester, const Size(1100, 760));
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final client = _CountingClient();
+      final bootstrap = fixture.ModelBootstrap(client)
+        ..show(ReadinessState.ready);
+      await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
+      client.publish(ThemePreference.dark, 1);
       await tester.pumpAndSettle();
-      expect(tester.state(find.byType(SettingsForm)), same(form));
-      expect(
-        tester.widget<SettingsForm>(find.byType(SettingsForm)).model,
-        same(owner),
+      await tester.tap(
+        find.byKey(const ValueKey('foundation-navigation-settings')),
       );
+      await tester.pumpAndSettle();
+      final owner = tester
+          .widget<settings.SettingsView>(find.byType(settings.SettingsView))
+          .controller;
+      await tester.tap(find.text('Изменить настройки'));
+      await tester.pumpAndSettle();
+      final form = tester.state(find.byType(SettingsForm));
       expect(
-        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
-        isFalse,
+        tester.widget<SettingsForm>(find.byType(SettingsForm)).asPage,
+        isTrue,
       );
-      expect(owner.selected!.id, fixture.profileId);
-      expect(client.reads, reads);
-      expect(client.refreshes, refreshes);
-      expect(client.connections, 0);
+      final motion = find.byType(MotionDropdown<bool>);
+      await tester.ensureVisible(motion);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Включено'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Выключено'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<MotionDropdown<bool>>(motion).initialValue, isFalse);
+      final reads = List<ApiMethod>.of(client.reads);
+      final refreshes = client.refreshes;
+      var revision = 1;
+      for (final size in const [
+        Size(800, 600),
+        Size(390, 800),
+        Size(1100, 760),
+      ]) {
+        _view(tester, size);
+        client.publish(ThemePreference.light, ++revision);
+        await tester.pumpAndSettle();
+        expect(tester.state(find.byType(SettingsForm)), same(form));
+        expect(
+          tester.widget<SettingsForm>(find.byType(SettingsForm)).model,
+          same(owner),
+        );
+        expect(
+          tester.widget<MotionDropdown<bool>>(motion).initialValue,
+          isFalse,
+        );
+        expect(owner.settings!.reduceMotion, isTrue);
+        expect(owner.selected!.id, fixture.profileId);
+        expect(client.reads, reads);
+        expect(client.refreshes, refreshes);
+        expect(client.connections, 0);
+        expect(client.writes, isEmpty);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsForm), findsNothing);
+      expect(find.text('Изменить настройки'), findsOneWidget);
       expect(client.writes, isEmpty);
-      expect(tester.takeException(), isNull);
-    }
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-    expect(find.byType(SettingsForm), findsNothing);
-    expect(find.text('Изменить настройки'), findsOneWidget);
-    expect(client.writes, isEmpty);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await client.events.close();
-    await client.readErrors.close();
-  });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await client.events.close();
+      await client.readErrors.close();
+    },
+  );
 
   testWidgets('production logs retain filter inner scroll and record modal', (
     tester,
@@ -711,7 +804,12 @@ void main() {
             state: ReadinessState.ready,
             targetName: displayProfile.name,
             targetAddress: '${displayProfile.address}:${displayProfile.port}',
-            servers: SingleChildScrollView(
+            servers: ServerPageFrame(
+              profile: displayProfile,
+              title: 'Журнал сервера',
+              eyebrow: 'Журналы / Рабочее пространство',
+              showServerTabs: false,
+              onTabSelected: (_) {},
               child: ServerLogsSection(
                 logs: displayLogs,
                 filterController: filter,
@@ -772,9 +870,21 @@ void main() {
       expect(find.textContaining('Целевой сервер'), findsWidgets);
       expect(tester.takeException(), isNull);
     }
-    // Current logs expose a text filter and bounded pages, and have no pause.
-    expect(find.textContaining('Пауза'), findsNothing);
-    final record = find.byType(ListTile).first;
+    // Pause remains an honest disabled future affordance; no read follows.
+    expect(
+      tester
+          .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Пауза'))
+          .onPressed,
+      isNull,
+    );
+    expect(reads, 0);
+    final record = find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              (widget.properties.label ?? '').startsWith('Полная запись '),
+        )
+        .first;
     await tester.ensureVisible(record);
     await tester.pumpAndSettle();
     await tester.tap(record);
@@ -785,16 +895,20 @@ void main() {
     final contextText = [
       'Целевой сервер',
       '192.0.2.1:22',
-      'Источник: journald captured result',
-      'Время записи: ${selected!['timestamp']} UTC',
-      'Наблюдение: 2026-10-26T09:15:00.000Z UTC',
+      'journald captured result',
+      '${selected!['timestamp']} UTC',
+      '2026-10-26T09:15:00.000Z UTC',
     ];
     for (final text in contextText) {
       expect(
         find.descendant(of: dialog, matching: find.text(text)),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel(text), findsOneWidget);
+      await _expectRecordSemantics(
+        tester,
+        find.descendant(of: dialog, matching: find.text(text)),
+        text,
+      );
     }
     final captured = tester.widget<ServerLogRecordDialog>(dialog);
     expect(captured.recordContext.profile, same(profile));
@@ -820,7 +934,7 @@ void main() {
       await tester.ensureVisible(label);
       await tester.pumpAndSettle();
       expect(label, findsOneWidget);
-      expect(find.bySemanticsLabel(text), findsOneWidget);
+      await _expectRecordSemantics(tester, label, text);
     }
     for (final text in [
       'Поздняя другая цель',
@@ -915,7 +1029,7 @@ void main() {
           'Источник не указан',
           missingRecordTime
               ? 'Время записи: не указано'
-              : 'Время записи: 2026-10-24T07:08:09.000Z UTC',
+              : '2026-10-24T07:08:09.000Z UTC',
           'Наблюдение: время не указано',
         ]) {
           expect(
@@ -925,7 +1039,14 @@ void main() {
             ),
             findsOneWidget,
           );
-          expect(find.bySemanticsLabel(text), findsOneWidget);
+          await _expectRecordSemantics(
+            tester,
+            find.descendant(
+              of: find.byType(ServerLogRecordDialog),
+              matching: find.text(text),
+            ),
+            text,
+          );
         }
         expect(find.textContaining('null'), findsNothing);
         expect(find.textContaining('journald'), findsNothing);
@@ -953,7 +1074,8 @@ void main() {
       await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
       client.publish(ThemePreference.dark, 1);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Создать профиль'));
+      await tester.ensureVisible(find.text('Добавить сервер'));
+      await tester.tap(find.text('Добавить сервер'));
       await tester.pumpAndSettle();
       final retired = tester.state(find.byType(ProfileForm));
       await tester.enterText(_field('name'), 'Retired private draft');
@@ -993,20 +1115,20 @@ void main() {
       await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
       client.publish(ThemePreference.dark, 1);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Saved profile'));
+      final listOwner = tester.state(find.byType(ProfileList));
+      await tester.ensureVisible(find.text('Изменить'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Редактировать профиль'));
-      await tester.pumpAndSettle();
-      final launcher = Focus.of(
-        tester.element(find.text('Редактировать профиль')),
-      );
+      final launcher = Focus.of(tester.element(find.text('Изменить')));
       launcher.requestFocus();
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      final retiredRoute = ModalRoute.of(
+      final baseRoute = ModalRoute.of(
         tester.element(find.byType(ProfileForm)),
       )!;
+      final closeEditor = tester
+          .widget<ProfileForm>(find.byType(ProfileForm))
+          .onClose!;
       final navigator = Navigator.of(tester.element(find.byType(ProfileForm)));
       _removeProfiles(client);
       await tester.pumpAndSettle();
@@ -1024,14 +1146,24 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(coveringFocus.hasFocus, isTrue);
-      navigator.removeRoute(retiredRoute);
+      // The editor is inline. Closing its retired launcher must not remove the
+      // public route or move focus out of the route currently covering it.
+      closeEditor();
       await tester.pumpAndSettle();
       expect(coveringFocus.hasFocus, isTrue);
       expect(find.byType(ProfileForm, skipOffstage: false), findsNothing);
+      expect(baseRoute.isActive, isTrue);
+      expect(baseRoute.isCurrent, isFalse);
+      expect(
+        tester.state(find.byType(ProfileList, skipOffstage: false)),
+        same(listOwner),
+      );
       expect(client.writes, isEmpty);
       navigator.pop();
       await tester.pumpAndSettle();
       await covering;
+      expect(baseRoute.isCurrent, isTrue);
+      expect(find.text('Все серверы.\nОдин центр управления.'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       coveringFocus.dispose();
       await client.events.close();
@@ -1051,12 +1183,10 @@ void main() {
       await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
       client.publish(ThemePreference.dark, 1);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Saved profile'));
+      final listOwner = tester.state(find.byType(ProfileList));
+      await tester.ensureVisible(find.text('Изменить'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Редактировать профиль'));
-      await tester.pumpAndSettle();
-      Focus.of(tester.element(find.text('Редактировать профиль')))
-          .requestFocus();
+      Focus.of(tester.element(find.text('Изменить'))).requestFocus();
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
@@ -1076,10 +1206,24 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Редактировать профиль'), findsNothing);
+      expect(find.text('Изменить'), findsNothing);
+      expect(
+        tester.widget<ProfileForm>(find.byType(ProfileForm)).initial!.id,
+        fixture.profileId,
+      );
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byType(ProfileForm), findsNothing);
+      expect(tester.state(find.byType(ProfileList)), same(listOwner));
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Добавить сервер'),
+            )
+            .focusNode!
+            .hasFocus,
+        isTrue,
+      );
       final focus = FocusManager.instance.primaryFocus!;
       expect(focus.context, isNotNull);
       final element = focus.context! as Element;
@@ -1126,7 +1270,9 @@ void main() {
         await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
         client.publish(dark ? ThemePreference.dark : ThemePreference.light, 1);
         await tester.pumpAndSettle();
-        final launch = find.text('Создать профиль');
+        final launch = find.text('Добавить сервер');
+        await tester.ensureVisible(launch);
+        await tester.pumpAndSettle();
         final launcher = Focus.of(tester.element(launch));
         launcher.requestFocus();
         await tester.pump();
@@ -1170,7 +1316,10 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
         expect(client.writes, isEmpty);
-        final save = find.widgetWithText(FilledButton, 'Сохранить');
+        final save = find.widgetWithText(
+          FilledButton,
+          'Сохранить без подключения',
+        );
         await tester.ensureVisible(save);
         await tester.pumpAndSettle();
         expect(save.hitTestable(), findsOneWidget);
@@ -1182,7 +1331,14 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
         expect(find.byType(ProfileForm), findsNothing);
-        expect(launcher.hasFocus, isTrue);
+        expect(launcher.hasFocus, isFalse);
+        final search = tester.widget<TextField>(
+          find.descendant(
+            of: find.byType(ProfileList),
+            matching: find.byType(TextField),
+          ),
+        );
+        expect(search.focusNode!.hasFocus, isTrue);
         expect(client.writes, isEmpty);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

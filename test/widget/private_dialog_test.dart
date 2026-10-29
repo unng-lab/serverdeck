@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/app.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/shell/foundation_shell.dart';
+import 'package:serverdeck/profiles/profile_list.dart';
+import 'package:serverdeck/profiles/profile_form.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck_protocol/models.dart';
 
@@ -27,11 +29,13 @@ void main() {
         await tester.pumpWidget(FoundationApp(bootstrap: bootstrap));
         client.events.add(fixture.snapshot());
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Saved profile'));
+        await tester.tap(find.byTooltip('Действия профиля Saved profile'));
         await tester.pumpAndSettle();
-        final tiles = find.byType(ExpansionTile);
+        await tester.tap(find.text('Редактировать профиль'));
+        await tester.pumpAndSettle();
+        final tiles = find.byType(ProfileList);
         final previous = tester.state(tiles);
-        expect(find.text('Редактировать профиль'), findsOneWidget);
+        expect(find.byType(ProfileForm), findsOneWidget);
         final snapshot = fixture.snapshot();
         if (rapidRetirement) {
           client.readErrors.add(ErrorCode.unauthorized);
@@ -58,17 +62,17 @@ void main() {
         if (rapidRetirement) {
           expect(current, isNot(same(previous)));
           expect(previous.mounted, isFalse);
-          expect(find.text('Редактировать профиль'), findsNothing);
+          expect(find.byType(ProfileForm), findsNothing);
           // A subsequent response can update the current snapshot; it cannot
           // reattach the retired owner, its expansion, or descendant buffers.
           client.events.add(fixture.snapshot(revision: '2'));
           await tester.pumpAndSettle();
           expect(previous.mounted, isFalse);
           expect(tester.state(tiles), same(current));
-          expect(find.text('Редактировать профиль'), findsNothing);
+          expect(find.byType(ProfileForm), findsNothing);
         } else {
           expect(current, same(previous));
-          expect(find.text('Редактировать профиль'), findsOneWidget);
+          expect(find.byType(ProfileForm), findsOneWidget);
         }
         await tester.pumpWidget(const SizedBox.shrink());
         await bootstrap.close();

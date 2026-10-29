@@ -23,7 +23,7 @@ abstract final class BrandGeometry {
   static const double rowDefault = 44;
   static const double logoMinWidth = 140;
   static const double markMinSize = 24;
-  static const double railWidth = 72;
+  static const double railWidth = 68;
   static const double sidebarWidth = 210;
   static const double phoneBreakpoint = 520;
   static const double compactBreakpoint = 1060;

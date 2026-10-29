@@ -14,10 +14,12 @@ import 'package:serverdeck/profiles/recovery_view.dart';
 import 'package:serverdeck/settings/settings_form.dart';
 import 'package:serverdeck/settings/settings_view.dart' as settings;
 import 'package:serverdeck/shell/error_view.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/shell/readiness_view.dart' as readiness;
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/ui/deck_page.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../contract/profile_controller_test.dart' as model_fixture;
@@ -69,7 +71,7 @@ class _StateHostState extends State<_StateHost> {
 
 enum _Form {
   profileEdit('08-profile-edit', 'Сохранить'),
-  profileDelete('09-profile-delete', 'Подтвердить удаление'),
+  profileDelete('09-profile-delete', 'Удалить профиль'),
   settings('85-settings-form', 'Сохранить настройки');
 
   const _Form(this.origin, this.submit);
@@ -88,8 +90,18 @@ class _Frame {
   String get suffix => '${size.width.toInt()}-${(scale * 100).toInt()}';
 }
 
-Finder _dialogText(String text) =>
-    find.descendant(of: find.byType(Dialog), matching: find.text(text));
+Finder _dialogText(String text) {
+  final exact = find.descendant(
+    of: find.byType(Dialog),
+    matching: find.text(text),
+  );
+  if (text == 'Сохранить' && exact.evaluate().isEmpty)
+    return find.descendant(
+      of: find.byType(Dialog),
+      matching: find.text('Сохранить без подключения'),
+    );
+  return exact;
+}
 
 Finder _dialogButton(String text) => find
     .ancestor(
@@ -203,6 +215,10 @@ Future<void> _openForm(
     await tester.ensureVisible(find.byType(CheckboxListTile));
     await tester.tap(find.byType(CheckboxListTile));
     await tester.pumpAndSettle();
+  } else if (form == _Form.profileDelete) {
+    await tester.ensureVisible(find.byType(CheckboxListTile));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pump();
   }
 }
 
@@ -234,21 +250,20 @@ Finder _typedNotice(ErrorCode code) => find.descendant(
   of: find.byType(Dialog),
   matching: find.byWidgetPredicate(
     (widget) =>
-        widget is DeckNotice &&
-        (widget.title == ReadErrorView.category(code) ||
-            widget.message == ReadErrorView.category(code)),
+        widget is ServerStatusBody &&
+        widget.title == ReadErrorView.category(code),
   ),
 );
 
 void _expectTypedError(WidgetTester tester, ErrorCode code) {
   expect(
     _dialogText(ReadErrorView.category(code)),
-    findsOneWidget,
+    findsWidgets,
     reason: 'The actual open dialog must explain the guarded read error, not only disable its submit',
   );
   expect(_typedNotice(code), findsOneWidget);
   expect(
-    tester.widget<DeckNotice>(_typedNotice(code)).tone,
+    tester.widget<ServerStatusBody>(_typedNotice(code)).tone,
     code == ErrorCode.timeout ? DeckTone.unavailable : DeckTone.warning,
   );
   if (code == ErrorCode.timeout) {
@@ -434,7 +449,7 @@ void registerDesignFoundationStateCases({bool fullAdaptive = false}) {
                 tester
                     .widget<ButtonStyleButton>(_dialogButton(form.submit))
                     .onPressed,
-                isNotNull,
+                form == _Form.profileDelete ? isNull : isNotNull,
               );
               expect(harness.client.mutations, hasLength(1));
               expect(harness.client.statusRequests, isEmpty);
@@ -668,14 +683,17 @@ void registerDesignFoundationStateCases({bool fullAdaptive = false}) {
                 state == 'loading'
                     ? 'Загрузка локальных профилей'
                     : state == 'empty'
-                    ? 'Добро пожаловать в ServerDeck'
+                    ? 'Все серверы.\nОдин центр управления.'
                     : 'Saved profile',
               ),
               findsOneWidget,
             );
             if (state == 'loading') {
               expect(harness.profiles.loaded, isFalse);
-              expect(find.text('Добро пожаловать в ServerDeck'), findsNothing);
+              expect(
+                find.text('Все серверы.\nОдин центр управления.'),
+                findsNothing,
+              );
             } else {
               expect(harness.profiles.loaded, isTrue);
               expect(
@@ -730,11 +748,27 @@ void registerDesignFoundationStateCases({bool fullAdaptive = false}) {
               _dialogText('Сохранено; ожидается чтение актуального состояния'),
               findsOneWidget,
             );
-            expect(_dialogText('Сохранено'), findsNothing);
+            expect(
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    widget.key == const ValueKey('mutation-current-status') &&
+                    widget.data == 'Сохранено',
+              ),
+              findsNothing,
+            );
             _expectDraft(tester, _Form.profileEdit);
             _publishCurrent(harness);
             await tester.pumpAndSettle();
-            expect(_dialogText('Сохранено'), findsOneWidget);
+            expect(
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    widget.key == const ValueKey('mutation-current-status') &&
+                    widget.data == 'Сохранено',
+              ),
+              findsOneWidget,
+            );
             _expectDraft(tester, _Form.profileEdit);
             expect(harness.client.mutations, hasLength(2));
             expect(harness.client.statusRequests, hasLength(1));
@@ -950,6 +984,41 @@ void _registerRegistryCases(bool fullAdaptive) {
   }
 }
 
+void _expectReadinessTabs(WidgetTester tester, ReadinessState state) {
+  final tabs = find.byType(DeckTabs);
+  if (state == ReadinessState.storageBlocked) {
+    expect(tabs, findsNothing);
+    return;
+  }
+  final stages = const {
+    ReadinessState.starting: 'Запуск',
+    ReadinessState.recovering: 'Восстановление',
+    ReadinessState.stopping: 'Завершение',
+  };
+  final labels = stages.containsKey(state)
+      ? stages
+      : const {
+          ReadinessState.unavailable: 'Недоступна',
+          ReadinessState.incompatible: 'Несовместимая версия',
+        };
+  final presentation = tester.widget<DeckTabs>(tabs);
+  expect(presentation.labels, labels.values.toList());
+  expect(presentation.selected, labels.keys.toList().indexOf(state));
+  expect(
+    presentation.onSelected,
+    isNull,
+    reason: 'The local service owns readiness; variant labels cannot synthesize a transition',
+  );
+  final controls = find.descendant(
+    of: tabs,
+    matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+  );
+  expect(controls, findsNWidgets(labels.length));
+  for (final element in controls.evaluate()) {
+    expect((element.widget as ButtonStyleButton).onPressed, isNull);
+  }
+}
+
 Future<void> _registryReadiness(
   WidgetTester tester,
   DesignStateCase scenario,
@@ -993,11 +1062,21 @@ Future<void> _registryReadiness(
         frame,
         dark,
       );
-      expect(find.textContaining('Ожидаем'), findsOneWidget);
+      final presentation = tester.widget<readiness.ReadinessView>(
+        find.byType(readiness.ReadinessView),
+      );
+      expect(presentation.state, state);
+      _expectReadinessTabs(tester, state);
       expect(
-        tester.widget<DeckStatus>(find.byType(DeckStatus)).pending,
+        presentation.retryInProgress ||
+            const {
+              ReadinessState.starting,
+              ReadinessState.recovering,
+              ReadinessState.stopping,
+            }.contains(presentation.state),
         isTrue,
       );
+      expect(find.text('Состояние и следующие шаги'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
       final retry = find.widgetWithText(FilledButton, 'Повторить запуск');
       if (retry.evaluate().isNotEmpty)
@@ -1048,18 +1127,14 @@ Future<void> _registryReadiness(
         ErrorCode.incompatible:
             'Версии клиента и локальной службы несовместимы.',
       }[reason]!;
-      expect(find.text(expected), findsOneWidget);
-      final status = tester.widget<DeckStatus>(find.byType(DeckStatus));
-      expect(
-        status.tone,
-        state == ReadinessState.storageBlocked
-            ? DeckTone.error
-            : state == ReadinessState.incompatible
-            ? DeckTone.warning
-            : state == ReadinessState.unavailable
-            ? DeckTone.unavailable
-            : DeckTone.running,
+      expect(find.text(expected), findsWidgets);
+      final presentation = tester.widget<readiness.ReadinessView>(
+        find.byType(readiness.ReadinessView),
       );
+      expect(presentation.state, state);
+      expect(presentation.reason, reason);
+      _expectReadinessTabs(tester, state);
+      expect(find.text('Состояние и следующие шаги'), findsOneWidget);
       expect(find.byType(ProfileForm), findsNothing);
       expect(find.textContaining('plaintext'), findsNothing);
       final before = retries;
@@ -1140,7 +1215,7 @@ Future<void> _registrySnapshot(
         ),
         findsOneWidget,
       );
-      expect(find.text('Локальных профилей пока нет'), findsNothing);
+      expect(find.text('Все серверы.\nОдин центр управления.'), findsNothing);
       await _passiveRebuilds(tester, frame, dark, () => _counts(harness));
       await _checkpoint(
         tester,
@@ -1158,11 +1233,14 @@ Future<void> _registrySnapshot(
       expect(harness.profiles.loaded, isTrue);
       if (empty) {
         expect(harness.profiles.profiles, isEmpty);
-        expect(find.text('Локальных профилей пока нет'), findsOneWidget);
+        expect(
+          find.text('Все серверы.\nОдин центр управления.'),
+          findsOneWidget,
+        );
         expect(
           tester
               .widget<FilledButton>(
-                find.widgetWithText(FilledButton, 'Создать профиль'),
+                find.widgetWithText(FilledButton, 'Добавить сервер'),
               )
               .onPressed,
           isNotNull,
@@ -1171,7 +1249,7 @@ Future<void> _registrySnapshot(
         expect(find.textContaining('Saved profile'), findsOneWidget);
         expect(find.textContaining('192.0.2.1:22'), findsOneWidget);
         if (scenario.originId == '84-settings') {
-          expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
+          expect(find.text('Включено'), findsOneWidget);
         } else {
           final surface = find
               .ancestor(
@@ -1179,7 +1257,12 @@ Future<void> _registrySnapshot(
                 matching: find.byType(DeckSurface),
               )
               .first;
-          expect(tester.widget<DeckSurface>(surface).selected, isTrue);
+          expect(harness.profiles.selected?.id, harness.initialProfile.id);
+          expect(
+            tester.widget<DeckSurface>(surface).selected,
+            isFalse,
+            reason: 'A selected local profile does not prove an observed SSH connection',
+          );
         }
       }
       await _passiveRebuilds(tester, frame, dark, () => _counts(harness));
@@ -1209,13 +1292,13 @@ Future<void> _registrySnapshot(
       for (final code in codes) {
         harness.showReadError(code);
         await tester.pumpAndSettle();
-        expect(find.text(ReadErrorView.category(code)), findsOneWidget);
+        expect(find.text(ReadErrorView.category(code)), findsWidgets);
         expect(
           tester.widget<ReadErrorView>(find.byType(ReadErrorView)).code,
           code,
         );
         expect(harness.profiles.loaded, isFalse);
-        expect(find.text('Локальных профилей пока нет'), findsNothing);
+        expect(find.text('Все серверы.\nОдин центр управления.'), findsNothing);
         expect(find.text('Повторить чтение'), findsNothing);
         expect(
           find.text('Повторить проверку службы'),
@@ -1315,7 +1398,7 @@ void _publishFormCurrent(
 }
 
 Future<void> _reveal(WidgetTester tester, Finder finder) async {
-  await tester.ensureVisible(finder);
+  await tester.ensureVisible(finder.first);
   await tester.pumpAndSettle();
 }
 
@@ -1392,11 +1475,27 @@ Future<void> _registryForm(
         );
         await tester.pumpAndSettle();
         expect(_activeMutation(tester).state, MutationPresentation.committed);
-        expect(_dialogText('Сохранено'), findsNothing);
+        expect(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.key == const ValueKey('mutation-current-status') &&
+                widget.data == 'Сохранено',
+          ),
+          findsNothing,
+        );
         _publishFormCurrent(harness, form, id, creating);
         await tester.pumpAndSettle();
         expect(_activeMutation(tester).state, MutationPresentation.succeeded);
-        expect(_dialogText('Сохранено'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.key == const ValueKey('mutation-current-status') &&
+                widget.data == 'Сохранено',
+          ),
+          findsOneWidget,
+        );
       }
       await _checkpoint(
         tester,
@@ -1478,7 +1577,7 @@ Future<void> _registryForm(
       expect(_activeMutation(tester).state, MutationPresentation.failed);
       expect(
         _dialogText(ReadErrorView.category(ErrorCode.validation)),
-        findsOneWidget,
+        findsWidgets,
       );
       _expectDraft(tester, form);
       await _checkpoint(
@@ -1530,7 +1629,7 @@ Future<void> _registryForm(
           tester
               .widget<ButtonStyleButton>(_dialogButton(form.submit))
               .onPressed,
-          isNotNull,
+          form == _Form.profileDelete ? isNull : isNotNull,
         );
         expect(harness.client.mutations, hasLength(2));
       }
@@ -1543,7 +1642,7 @@ Future<void> _registryForm(
       await _click(tester, form.submit);
       expect(harness.client.mutations, hasLength(1));
       expect(_activeMutation(tester).state, MutationPresentation.failed);
-      expect(_dialogText(ReadErrorView.category(code)), findsOneWidget);
+      expect(_dialogText(ReadErrorView.category(code)), findsWidgets);
       expect(_dialogText('Проверить результат'), findsNothing);
       expect(_dialogText('Повторить тот же запрос'), findsNothing);
       _expectDraft(tester, form);
@@ -1573,7 +1672,7 @@ Future<void> _registryForm(
           : code;
       harness.showReadError(readCode);
       await tester.pumpAndSettle();
-      expect(_dialogText(ReadErrorView.category(readCode)), findsOneWidget);
+      expect(_dialogText(ReadErrorView.category(readCode)), findsWidgets);
       _expectDisabledSubmit(tester, form);
       _expectDraft(tester, form);
       expect(harness.client.mutations, hasLength(1));
@@ -1777,7 +1876,15 @@ Future<void> _registryUnknown(
     await tester.pumpAndSettle();
     expect(_activeMutation(tester).state, MutationPresentation.committed);
     final success = form == _Form.profileDelete ? 'Удалено' : 'Сохранено';
-    expect(_dialogText(success), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.key == const ValueKey('mutation-current-status') &&
+            widget.data == success,
+      ),
+      findsNothing,
+    );
     _expectDraft(tester, form);
     await _checkpoint(
       tester,
@@ -1844,7 +1951,15 @@ Future<void> _registryUnknown(
     _publishFormCurrent(harness, form, id, creating);
     await tester.pumpAndSettle();
     expect(_activeMutation(tester).state, MutationPresentation.succeeded);
-    expect(_dialogText(success), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.key == const ValueKey('mutation-current-status') &&
+            widget.data == success,
+      ),
+      findsOneWidget,
+    );
     _expectDraft(tester, form);
     expect(harness.client.mutations, hasLength(2));
     expect(harness.client.statusRequests, hasLength(3));
@@ -1912,7 +2027,7 @@ Future<void> _registryHistory(
         expect(harness.client.reads.length, initialReads + 1);
         harness.client.recentGate!.completeError(LocalApiException(code));
         await tester.pumpAndSettle();
-        expect(_dialogText(ReadErrorView.category(code)), findsOneWidget);
+        expect(_dialogText(ReadErrorView.category(code)), findsWidgets);
         expect(harness.recovery.loaded, isFalse);
         expect(harness.recovery.error, code);
         expect(
@@ -1967,7 +2082,12 @@ Future<void> _registryHistory(
         _dialogText('Проверка текущих данных и недавних операций'),
         findsOneWidget,
       );
-      expect(_dialogText('Обновить список'), findsNothing);
+      expect(
+        tester
+            .widget<ButtonStyleButton>(_dialogButton('Обновить список'))
+            .onPressed,
+        isNull,
+      );
       expect(_dialogText('Подтверждённых записей в выборке нет'), findsNothing);
       await _passiveRebuilds(tester, frame, dark, () => _counts(harness));
       expect(harness.client.reads.length, beforeReads + 1);
@@ -2034,7 +2154,7 @@ Future<void> _registryHistory(
       await tester.pumpAndSettle();
       expect(
         _dialogText(ReadErrorView.category(ErrorCode.timeout)),
-        findsOneWidget,
+        findsWidgets,
       );
       harness.client.refreshGate = Completer<void>();
       harness.client.recentGate = null;

@@ -49,8 +49,14 @@ void main() {
   String save(_Form form) => switch (form) {
     _Form.profile => 'Сохранить',
     _Form.settings => 'Сохранить настройки',
-    _Form.delete => 'Подтвердить удаление',
+    _Form.delete => 'Удалить профиль',
   };
+  Finder currentStatus(String label) => find.byWidgetPredicate(
+    (widget) =>
+        widget is Text &&
+        widget.key == const ValueKey('mutation-current-status') &&
+        widget.data == label,
+  );
   Map<String, Object?> receipt(_Form form) => {
     'entityId': form == _Form.settings ? null : fixture.profileId,
     'entityRevision': form == _Form.delete
@@ -112,6 +118,10 @@ void main() {
       );
     } else if (form == _Form.settings) {
       await click(tester, 'Уменьшение анимации');
+    } else if (form == _Form.delete) {
+      await tester.ensureVisible(find.byType(CheckboxListTile));
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pump();
     }
   }
 
@@ -218,22 +228,22 @@ void main() {
         });
         await click(tester, 'Проверить результат');
         final success = form == _Form.delete ? 'Удалено' : 'Сохранено';
-        expect(find.text(success), findsNothing);
+        expect(currentStatus(success), findsNothing);
         expect(find.text('Перечитать состояние'), findsOneWidget);
         client.events.add(baseline());
         await tester.pumpAndSettle();
-        expect(find.text(success), findsNothing);
+        expect(currentStatus(success), findsNothing);
         client.readErrors.add(ErrorCode.timeout);
         await tester.pumpAndSettle();
         final before = client.refreshes;
         await click(tester, 'Перечитать состояние');
         expect(client.refreshes, before + 1);
         expect(client.sent, hasLength(1));
-        expect(find.text(success), findsNothing);
+        expect(currentStatus(success), findsNothing);
         expect(find.text('Повторить тот же запрос'), findsNothing);
         current(form, externalUpdate: true);
         await tester.pumpAndSettle();
-        expect(find.text(success), findsOneWidget);
+        expect(currentStatus(success), findsOneWidget);
         draft(tester, form);
         expect(client.sent.single, same(original));
         await click(tester, 'Закрыть');
@@ -276,13 +286,13 @@ void main() {
         pending.complete(ApiReply(fixture.fixtureGeneration, receipt(form)));
         await tester.pumpAndSettle();
         expect(
-          find.text(form == _Form.delete ? 'Удалено' : 'Сохранено'),
+          currentStatus(form == _Form.delete ? 'Удалено' : 'Сохранено'),
           findsNothing,
         );
         current(form);
         await tester.pumpAndSettle();
         expect(
-          find.text(form == _Form.delete ? 'Удалено' : 'Сохранено'),
+          currentStatus(form == _Form.delete ? 'Удалено' : 'Сохранено'),
           findsOneWidget,
         );
         expect(client.sent, hasLength(2));
@@ -317,7 +327,7 @@ void main() {
         expect(find.text('Повторить тот же запрос'), findsNothing);
         expect(find.text('Retained draft'), findsNothing);
         expect(client.sent, hasLength(1));
-        await click(tester, 'Отмена');
+        await click(tester, form == _Form.delete ? 'Назад' : 'Отмена');
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
@@ -406,7 +416,15 @@ void main() {
                   : CredentialKind.password,
             );
             await tester.pumpAndSettle();
-            expect(find.text('Сохранено'), findsOneWidget);
+            expect(
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    widget.key == const ValueKey('mutation-current-status') &&
+                    widget.data == 'Сохранено',
+              ),
+              findsOneWidget,
+            );
             expect(secret.text, isEmpty);
             expect(credential.passphrase.text, isEmpty);
             expect(find.byType(ProfileForm), findsOneWidget);

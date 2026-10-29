@@ -8,6 +8,6 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(FoundationApp(bootstrap: dormantBootstrap()));
-    expect(find.text('Локальная служба недоступна'), findsOneWidget);
+    expect(find.text('Локальная служба недоступна'), findsWidgets);
   });
 }

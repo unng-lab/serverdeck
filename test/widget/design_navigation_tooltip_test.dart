@@ -30,10 +30,7 @@ void _expectLabels(FoundationSection? current) {
 
 FoundationSection? _current(WidgetTester tester) {
   for (final section in FoundationSection.values) {
-    if (tester
-        .widget<OutlinedButton>(_item(section))
-        .focusNode!
-        .hasPrimaryFocus) {
+    if (tester.widget<TextButton>(_item(section)).focusNode!.hasPrimaryFocus) {
       return section;
     }
   }
@@ -130,26 +127,9 @@ void main() {
               expect(_current(tester), section);
               _expectLabels(section);
             }
-            await _tabToElement(tester, find.byType(EditableText));
+            final feature = find.widgetWithText(TextButton, 'Действие feature');
+            await _tabToElement(tester, feature);
             expect(_current(tester), isNull);
-            _expectLabels(null);
-            // The new bounded header is the next actual Tab target; feature is
-            // next, and neither can retain navigation overlays.
-            expect(
-              tester
-                  .widget<EditableText>(find.byType(EditableText))
-                  .focusNode
-                  .hasPrimaryFocus,
-              isTrue,
-            );
-            await _tabToElement(tester, find.byType(TextButton));
-            expect(_current(tester), isNull);
-            _expectLabels(null);
-            await _tabToElement(
-              tester,
-              find.byType(EditableText),
-              reverse: true,
-            );
             _expectLabels(null);
             for (final section in FoundationSection.values.reversed) {
               await _tabToSection(tester, section, reverse: true);

@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
+import 'deck_icon.dart';
+import 'deck_action_flow.dart';
+import 'deck_control_target.dart';
 
 /// Presentation meaning supplied by the owner of the operation/observation.
 enum DeckTone {
@@ -21,15 +24,12 @@ BrandColors _colors(BuildContext context) =>
 
 String _role(DeckTone tone) => tone == DeckTone.neutral ? 'muted' : tone.name;
 
-IconData _symbol(DeckTone tone) => switch (tone) {
-  DeckTone.neutral => Icons.info_outline,
-  DeckTone.available => Icons.circle_outlined,
-  DeckTone.unavailable => Icons.close,
-  DeckTone.unknown => Icons.help_outline,
-  DeckTone.warning => Icons.warning_amber_rounded,
-  DeckTone.error => Icons.report_outlined,
-  DeckTone.running => Icons.timelapse,
-  DeckTone.success => Icons.check,
+String _symbol(DeckTone tone) => switch (tone) {
+  DeckTone.neutral || DeckTone.unknown => 'info',
+  DeckTone.available || DeckTone.success => 'check',
+  DeckTone.unavailable => 'close',
+  DeckTone.warning || DeckTone.error => 'warning',
+  DeckTone.running => 'clock',
 };
 
 /// A surface is focusable only when it has an enabled action.
@@ -101,7 +101,7 @@ class _DeckSurfaceState extends State<DeckSurface> {
           style: BrandTypography.body.copyWith(
             color: colors[widget.enabled ? 'text' : 'disabled'],
           ),
-          child: widget.child,
+          child: DeckHitOverflow(child: widget.child),
         ),
       ),
     );
@@ -380,7 +380,7 @@ class DeckStatus extends StatelessWidget {
               height: BrandGeometry.iconSize,
               child: pending && !MediaQuery.disableAnimationsOf(context)
                   ? CircularProgressIndicator(strokeWidth: 2, color: color)
-                  : Icon(
+                  : DeckIcon(
                       _symbol(effective),
                       color: color,
                       size: BrandGeometry.iconSize,
@@ -490,16 +490,45 @@ class DeckActions extends StatelessWidget {
     super.key,
     required this.children,
     this.alignment = WrapAlignment.start,
+    this.phoneBasis,
   });
   final List<Widget> children;
   final WrapAlignment alignment;
+  final double? phoneBasis;
   @override
-  Widget build(BuildContext context) => Wrap(
+  Widget build(BuildContext context) => DeckActionFlow(
+    expand: phoneBasis != null && MediaQuery.sizeOf(context).width <= 520,
+    controlInset: MediaQuery.sizeOf(context).width <= 520 ? 0 : 4,
+    basis: phoneBasis,
     alignment: alignment,
-    spacing: BrandSpacing.space8,
-    runSpacing: BrandSpacing.space8,
-    crossAxisAlignment: WrapCrossAlignment.center,
     children: children,
+  );
+}
+
+/// Source form footers keep one full-width action per row on phones.
+/// The same render ancestry preserves each native button across breakpoints.
+class DeckFormActions extends StatelessWidget {
+  const DeckFormActions({super.key, required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => DeckHitOverflow(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final phone = MediaQuery.sizeOf(context).width <= 520;
+        return DeckActionFlow(
+          expand: MediaQuery.sizeOf(context).width <= 760,
+          basis: phone
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width <= 760
+              ? 0
+              : null,
+          spacing: phone ? 10 : 8,
+          controlInset: phone ? 0 : 4,
+          alignment: WrapAlignment.end,
+          children: children,
+        );
+      },
+    ),
   );
 }
 

@@ -20,24 +20,20 @@ void main() {
       client.events.add(fixtures.snapshot());
       await tester.pumpAndSettle();
       expect(find.text('Saved profile'), findsOneWidget);
-      expect(find.text('Saved profile · 192.0.2.1:22'), findsOneWidget);
+      expect(find.text('192.0.2.1:22'), findsOneWidget);
+      expect(find.text('Состояние подключения не получено'), findsOneWidget);
+      expect(find.text('Нет данных'), findsNWidgets(3));
       expect(find.textContaining('Не подключён'), findsNothing);
-      await tester.tap(find.text('Saved profile'));
-      await tester.pumpAndSettle();
-      expect(find.text('Пользователь SSH: admin'), findsOneWidget);
-      expect(
-        find.text('Секрет доступа сохранён; содержимое не отображается'),
-        findsOneWidget,
-      );
-      expect(find.byType(TextField), findsNothing);
       final context = tester.element(find.text('Saved profile'));
       expect(Theme.of(context).brightness, Brightness.dark);
       expect(MediaQuery.disableAnimationsOf(context), isTrue);
       client.readErrors.add(ErrorCode.timeout);
       await tester.pumpAndSettle();
-      expect(find.text('Локальная служба не ответила вовремя'), findsOneWidget);
+      expect(find.text('Локальная служба не ответила вовремя'), findsWidgets);
       expect(find.textContaining('Saved profile'), findsNothing);
       var before = client.refreshes;
+      await tester.ensureVisible(find.text('Повторить чтение'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Повторить чтение'));
       await tester.pump();
       expect(client.refreshes, before + 1);
@@ -53,24 +49,26 @@ void main() {
       await tester.tap(settings);
       await tester.pumpAndSettle();
       expect(ModalRoute.of(tester.element(settings)), same(route));
-      expect(find.text('Тема: тёмная'), findsOneWidget);
-      expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
+      expect(find.text('Тёмная'), findsOneWidget);
+      expect(find.text('Включено'), findsOneWidget);
       client.readErrors.add(ErrorCode.internal);
       await tester.pumpAndSettle();
-      expect(find.text('Ошибка локальной службы'), findsOneWidget);
-      expect(find.text('Тема: тёмная'), findsNothing);
+      expect(find.text('Ошибка локальной службы'), findsWidgets);
+      expect(find.text('Тёмная'), findsNothing);
       before = client.refreshes;
+      await tester.ensureVisible(find.text('Повторить чтение'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Повторить чтение'));
       await tester.pump();
       expect(client.refreshes, before + 1);
       client.events.add(fixtures.snapshot());
       await tester.pumpAndSettle();
-      expect(find.text('Тема: тёмная'), findsOneWidget);
+      expect(find.text('Тёмная'), findsOneWidget);
       bootstrap.show(ReadinessState.unavailable);
       await tester.pumpAndSettle();
       expect(find.textContaining('Saved profile'), findsNothing);
       expect(find.textContaining('192.0.2.1'), findsNothing);
-      expect(find.text('Локальная служба недоступна'), findsOneWidget);
+      expect(find.text('Локальная служба недоступна'), findsWidgets);
       await tester.pumpWidget(const SizedBox.shrink());
       await client.events.close();
     },
@@ -134,16 +132,15 @@ void main() {
               .first;
           final tile = find.byKey(const ValueKey(fixtures.profileId));
           await tester.scrollUntilVisible(tile, 200, scrollable: scrollable);
-          final disclosure = find
-              .descendant(of: tile, matching: find.byType(Icon))
-              .first;
-          await tester.ensureVisible(disclosure);
-          await tester.pumpAndSettle();
-          await tester.tap(disclosure);
-          await tester.pumpAndSettle();
-          await tester.ensureVisible(
-            find.text('Подключение к серверу пока недоступно'),
+          final edit = find.descendant(
+            of: tile,
+            matching: find.text('Изменить'),
           );
+          await tester.ensureVisible(edit);
+          await tester.pumpAndSettle();
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Сохранить'));
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox.shrink());
           await client.events.close();

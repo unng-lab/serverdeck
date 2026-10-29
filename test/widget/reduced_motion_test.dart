@@ -5,6 +5,7 @@ import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
+import 'package:serverdeck/profiles/profile_list.dart';
 
 import '../contract/profile_controller_test.dart' as fixture;
 
@@ -36,7 +37,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Выбор'));
+      await tester.tap(find.byType(MotionDropdown<String>));
       await tester.pump();
       final route = ModalRoute.of(
         tester.element(find.text('Private B')),
@@ -45,7 +46,7 @@ void main() {
       await tester.tap(find.text('Private B'));
       await tester.pump();
       expect(selected, 'b');
-      await tester.tap(find.text('Выбор'));
+      await tester.tap(find.byType(MotionDropdown<String>));
       await tester.pump();
       changes.value = false;
       await tester.pump();
@@ -64,7 +65,7 @@ void main() {
   );
 
   testWidgets(
-    'reduced profile dialog has zero transition and adaptive navigation retains its route',
+    'reduced profile page and adaptive navigation retain the existing route',
     (tester) async {
       final client = fixture.ModelClient();
       final bootstrap = fixture.ModelBootstrap(client)
@@ -77,13 +78,13 @@ void main() {
       );
       final baseRoute =
           ModalRoute.of(tester.element(settings)) as TransitionRoute;
-      await tester.tap(find.text('Создать профиль'));
+      await tester.tap(find.text('Добавить сервер'));
       await tester.pump();
       final profileRoute = ModalRoute.of(
-        tester.element(find.text('Сохранить')),
+        tester.element(find.text('Сохранить без подключения')),
       ) as TransitionRoute;
-      expect(profileRoute, isNot(same(baseRoute)));
-      expect(profileRoute.transitionDuration, Duration.zero);
+      expect(profileRoute, same(baseRoute));
+      // Canonical profile authoring is an inline page and keeps the base route.
       await tester.ensureVisible(find.text('Отмена'));
       await tester.tap(find.text('Отмена'));
       await tester.pump();
@@ -101,7 +102,7 @@ void main() {
       expect(baseRoute.animation!.status, AnimationStatus.completed);
       expect(baseRoute.animation!.value, 1);
       expect(Navigator.of(tester.element(settings)).canPop(), isFalse);
-      expect(find.text('Тема: тёмная'), findsOneWidget);
+      expect(find.text('Тёмная'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await client.events.close();
       await client.readErrors.close();
@@ -141,7 +142,7 @@ void main() {
             app.themeAnimationStyle,
             os || saved ? AnimationStyle.noAnimation : isNull,
           );
-          final context = tester.element(find.byType(ExpansionTile));
+          final context = tester.element(find.byType(ProfileList));
           expect(MediaQuery.disableAnimationsOf(context), os || saved);
           expect(
             Theme.of(context).expansionTileTheme.expansionAnimationStyle,

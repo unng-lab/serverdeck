@@ -4,6 +4,12 @@
 
 Документ фиксирует решения Phase 0 для визуального внедрения в существующий Flutter-клиент. Исследование кода и SDK не является приёмкой реализации. Фактические проверки приложения и независимое ревью фиксируются отдельно после изменений.
 
+Актуальное уточнение2026-10-28: отдельная reference-инфраструктура отменена
+прямым указанием пользователя. Действуют обычная Flutter-реализация,
+static/unit/widget checks, прямая визуальная сверка и сохранная поставка.
+R01–R14 сохраняют исследование прежних этапов; его инструменты/числа не являются
+новыми обязательствами или доказательством текущей приёмки.
+
 ## R01 — Среда и зависимости
 
 **Decision**: использовать закреплённый Flutter 3.47.7 / bundled Dart 3.13.5, framework revision `abaf9c523780a608bd46686fd5e53740a07077f8`. Первая runtime-платформа остаётся Windows; phone обозначает узкую композицию того же клиента, а не новую заявленную поддержку Android/iOS. Изменение не требует нового UI-пакета, backend, внешнего сервиса, загрузки шрифтов или миграции хранилища.
@@ -147,3 +153,76 @@ Global Logs/Jobs получают точное объяснение отсутс
 **Evidence/rationale**: supplemental preflight3 подтвердил, что lifetimeSeconds:0 проходит JSON/type слой, service возвращает VALIDATION, но _jsonEditor уже закрыл route и disposed input. Private pending closure доступна только для exact retry/dismiss, не для редактирования draft. Profile-specific T094/T097 не закрывают общий контракт. Select-version/compare являются reads, поэтому blanket pending lock или write-success semantics к ним неприменимы.
 
 **Boundaries**: ошибки сохраняют текст до explicit close/P10 retirement; pending fields непрозрачны и не редактируются. Own successful callback может закрыть ещё действующий dialog, включая обновление DTO собственным readback; stale context не разрешает новую операцию. Не добавляются grant UI, новый CAS/rebase, API/schema/validator/dependency/timer/cache или изменение authority. Existing shared flow сначала можно извлечь с прежним поведением для meaningful runtime red; такой red не заменяет native proof. Затем current production flow и caller wiring проверяются вместе с delayed VALIDATION, duplicate/late/current-context, read-with-unrelated-write, retry/dismiss и own-success completion.
+
+## R15 — Актуальное разделение базового дизайна и новых функций (2026-10-28)
+
+**Decision**: первым реализуется003 для37 базовых screen IDs:35 historical origins и реальные existing security states11/93. Остальные61 сценарий сохраняются в своих существующих004–020 вместе с дизайном и функциями;003 не создаёт недостающие сервисы ради возможности открыть98 mockups. Точный текущий состав и future owners задаёт [screen-map](screen-map.md), актуальную композицию — [контракт003.4](contracts/full-application.md), порядок реализации — новый верхний раздел [plan](plan.md). Эти решения имеют приоритет над прежними выводами о достаточности старого UI и ограничении оформления одной палитрой.
+
+**Rationale**: пользователь последовательно подтвердил полное обязательство дизайна/функций, затем прямо разделил его по функциональным пакетам и выбрал003 первым для уже работающей базы. Это изменение последовательности и владельцев, а не технически выведенное разрешение отказаться от61 экрана. `implemented` остаётся provenance;11/93 входят в003 по существующим trust/protected-plan behaviors, несмотря на false в исходном manifest.
+
+**Alternatives considered**: универсальная Flutter-галерея98 макетов, canned service data, `_Unavailable` вместо действующих handlers и реализация всех21 пакетов одним MR не выполняют последнее решение. Ранее исследованный bundle Docker/libvirt/restic/Ubuntu Core/прочих providers не принят и не является архитектурой003. Внешний admin-configured OIDC принят только для будущего020;003 не требует cloud login/backend.
+
+## R16 — Существующие владельцы и конечные presentation interfaces
+
+**Decision**: FoundationApp сохраняет BootstrapController/ProfileController/StartupRecovery и trusted bootstrap, а UI разделяется на navigation, активный feature-host и чистые views. Планируемые `lib/shell/deck_navigation.dart` содержит DeckLocation/DeckNavigationController; `base_workspace.dart` — BaseWorkspace. Shared widgets остаются в `lib/ui/deck_components.dart`, page и table/card primitives выделяются в `deck_page.dart`/`deck_data_table.dart`. Конечные base views относятся только к37 сценариям и их реальным состояниям, не к98-screen runtime catalogue.
+
+DeckLocation содержит section, baseView и необязательные serverId/entityId; не содержит credentials, draft payload, challenge secret или permission. EntityID проверяется существующим owner/result context перед использованием; правильный UUID сам по себе не является authority. NavigationController изменяет только RAM location/back state. ProfileForm/SettingsController остаются единственным явным путём записи профиля/настроек. Target selection в навигации не изменяет сохранённый selectedProfileId.
+
+**Evidence/rationale**: production [LocalApiClient](../../lib/bootstrap/local_api_client.dart) предоставляет verified TrustedApiClient; [ProfileController](../../lib/profiles/profile_controller.dart) проверяет generation/store revision и очищает private projections. `ModelClient` находится в [contract test](../../test/contract/profile_controller_test.dart), DesignModelClient — в test support; это не installed runtime. Имеющихся controllers достаточно для базового переноса без новой БД, transport, wire schema или packages navigation.
+
+**Alternatives considered**: новый universal model client с production demo payload, UI→SSH и перенос control authority в shell нарушили бы существующие границы. Общий widget с request-building logic затруднил бы проверку того, что новый дизайн вызывает прежний handler ровно один раз.
+
+## R17 — Настоящие глобальные Журналы/Задания без второго владельца
+
+**Decision**: FoundationShell отображает actual Logs/Jobs views, подключённые через BaseWorkspace к ServerPanel/AutomationPanel hosts. Используются текущая явная route target либо существующий selectedProfileId; при отсутствии действительной цели показывается реальный selector, без автоматического выбора первого сервера. Navigation не connections/probes/applies. ServerPanel сохраняет один ServerController на active client/target/epoch и выбираемые overview/logs/trust/executor/config views. AutomationPanel сохраняет один AutomationController на свой context и выбираемые catalogue/profiles/revision/plan/jobs/grants/delegation views. View change не пересоздаёт model и не вызывает повторный initialize.
+
+**Evidence/rationale**: [ServerPanel](../../lib/servers/server_panel.dart) уже содержит loadLogs text/cursor, detail dialog и проверенные trust/executor review guards. [ServerController](../../lib/servers/server_controller.dart) поддерживает unit/text/cursor и общие operation status/cancel. [AutomationPanel](../../lib/automation/automation_panel.dart) и [AutomationController](../../lib/automation/automation_controller.dart) уже имеют refreshJobs/selectJob/events/cancel/reconcile и plan/grants/profile callbacks; их прятание за сообщением о полном отсутствии функции не соответствует фактическому коду. Jobs list имеет serverId; глобальный пункт навигации не обещает fleet aggregation, которой этот owner не предоставляет.
+
+При смене настоящего target/owner/private epoch прежний owner закрывается по existing lifecycle; dispose/cancel-interest не называется отменой durable job. Не вводится IndexedStack скрытых feature widgets и не удерживаются секретные формы ради back navigation. Переход внутри живого host, theme/resize/textScale сохраняют controllers, pending identity и разрешённый draft. Root readiness/private epoch и [PrivateDialogGate](../../lib/shell/private_session.dart) имеют приоритет над этим сохранением.
+
+**Alternatives considered**: отдельный ServerController для глобального журнала и ещё один внутри overview дали бы новые подписки/polling и разные target states. `_SectionGuide` с единственным переходом обратно к серверам оставил бы canonical разделы не реализованными. Подмена jobs текущего сервера общим списком всех серверов была бы ложной областью данных.
+
+## R18 — Обязательные tabs/search/filter списка серверов
+
+**Decision**:05 получает canonical composition, включая tabs «Все серверы», «Подключены», «Требуют внимания», локальный поиск по name/address/tags, локальные фильтры доступных tags/observed status, summaries и table→cards. Presentation controller принадлежит route, меняет только проекцию текущих ProfileView и переданных existing matching observations; не создаёт fleet polling, persistent indexes или service methods. Unknown исключён из connected и не становится сам по себе attention/error: он показывается в All и отдельном summary. Attention имеет конкретное существующее failure/mismatch/stale/incomplete/error основание.
+
+**Rationale**: current ProfileView уже предоставляет metadata, а действующий owner — connection/quality при наличии. Локальная фильтрация не является новым функциональным сервисом008. Нельзя снова исключить tabs ради того, что весь расширенный fleet inventory ещё не реализован. При этом отсутствие observation не разрешает скрыто connect/probe для заполнения карточки.
+
+**Alternatives considered**: одинаковый универсальный unknown для всех полей, demo counts/metrics и классификация непроверенного профиля как offline не достоверны. Summary `0 подключены` без отдельного контекста непроверенных данных мог бы ошибочно выглядеть завершённым fleet check; область имеющихся observations должна быть видима.
+
+## R19 — Данные метрик, software recipes и защитных состояний
+
+**Decision**: existing typed state/connection/trust/catalog projections заполняют соответствующие canonical regions. Каждое observation сопоставляется с profileID и revisions; missing не равен нулю, mismatched/old context не становится current. Сохраняются source/time/quality/gaps и прежние120-point/10-minute history semantics. В11 old fingerprint берётся только из matching trust record, new — из реально предоставленного matching challenge; отсутствие нового значения обозначается явно. В93 показываются настоящие protected reasons текущего plan/owner, без фиктивного apply результата.
+
+**Evidence/rationale**: [remote read contract](../../packages/serverdeck_protocol/lib/remote_reads.dart) уже ограничивает state.system/metrics/packages/units/history; packages дают name/version/type/state, units — systemd name/load/active/sub/description. Эти observations не являются регистрацией приложения или произвольным discovery engine. [host-trust contract](../../packages/serverdeck_protocol/lib/host_trust.dart) содержит PublicHostTrustRecord.key и HostTrustChallenge.key; UI не должен выдумывать отсутствующий observed key.
+
+Существующий [SoftwarePanel](../../lib/software/software_panel.dart) — каталог установки по выбранному серверу, с явным connect-and-open-recipes handler и exact recipe digest. Он не называется поиском всего ПО/инвентарём: будущие008/007/014 получают свои дизайн и services отдельно. Base shell может показывать ссылки на них с их точной областью, но нельзя заменить будущий software search двумя DB installation recipes или объявить его уже выполненным.
+
+**Alternatives considered**: изменение provider matrix либо добавление Ubuntu Core внутри003 не следует из переноса дизайна. Выдуманные hardware/rates/fleet associations для совпадения demo rows и отключение реальных метрик там, где DTO их уже предоставляет, одинаково нарушают достоверность.
+
+## R20 — Визуальный источник и разрешённая проверка
+
+**Decision**: состав37 базовых экранов проверяется на четырёх frames, в обеих
+темах и при100/200% текста по [контракту](contracts/full-application.md).
+Прямая сверка использует закреплённый HTML, брендбук и исходные PNG. Текущий
+Flutter не становится собственным эталоном. Матрица592 сочетаний задаёт покрытие,
+но не требует отдельного renderer,592 файлов, binding DSL или общего JSON corpus.
+
+Обычные unit/widget tests используют настоящие production widgets/callbacks
+с fake внешними зависимостями. Они проверяют полные данные, копирование, scroll,
+keyboard/focus/semantics, counters/target/request identity и privacy. Реальный
+контекст приложения не подменяется демонстрационным ради совпадения данных макета.
+Computed/pixel соответствие не выводится из свойств темы или одного unit pass.
+
+Полные mandatory static/unit/widget checks и specification links выполняются
+по [AGENTS](../../AGENTS.md)/[quickstart](quickstart.md), затем fresh independent
+review/fix loop. Недоступный визуальный просмотр остаётся непроверенным;
+browser policy и запрет Computer Use не обходятся. Native/SSH/container/service
+fixtures текущим этапом не разрешены. Это исследование новых проверок не запускало.
+## R21 — Готовность текущего этапа и установленный результат
+
+**Decision**: readiness текущего003 устанавливается после согласования актуальных spec/map/contract/model/plan/tasks, strict links/consistency и completed independent readiness review. Код начинается только после этого gate; затем applicable checks и fresh independent code/spec review. Поставка включает разрешённые пользователем normal build/package/install/show с сохранением собственных данных и фактической записью source/version/package и результата установки/показа. Показ идёт по настоящим production routes без fixture flags/gallery/HTML.
+
+Исторические full-native release указания в старом плане сохраняются только в своём scope; текущий stage их не dispatch. Native/FFI/Isar/DPAPI/real service/process/pipe/SSH/container/systemd/Ansible/integration/cold qualification фиксируются not-run. Build/install не переименовываются в эти тесты. Прежняя установка либо passed unit suite не доказывает новую установленную композицию или future61 acceptance.
+
+**Rationale**: пользователь явно разрешил только static/unit/widget проверки и отдельно поручил показать результат в установленном приложении. Готовность базового003 не зависит от непринятого provider bundle/020 и не объявляет функциональную готовность остальных пакетов. Зависимость004 от003 разрешается принятой shared foundation/base stage, без ожидания всех новых004–020 функций и без потери их обязательств.

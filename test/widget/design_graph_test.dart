@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/servers/metrics_history.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
+import 'package:serverdeck/ui/deck_page.dart';
 import 'package:serverdeck/servers/server_sections.dart';
 import 'package:serverdeck/shell/foundation_shell.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
@@ -23,18 +25,18 @@ void main() {
         final scenario =
             '${frame.width}x${frame.height} '
             '${theme.brightness.name} ${scale * 100}%';
-        testWidgets('production overview geometry and strokes $scenario', (
+        testWidgets('retained history geometry and strokes $scenario', (
           tester,
         ) async {
           _setFrame(tester, frame);
           var calls = 0;
           for (final stale in [false, true]) {
-            await _pumpOverview(
+            await _pumpHistory(
               tester,
               theme,
               scale: scale,
               stale: stale,
-              onAction: () => calls++,
+              quality: 'known',
             );
             await tester.ensureVisible(
               find.byKey(const ValueKey('metrics-history-plots')),
@@ -43,12 +45,6 @@ void main() {
             final history = find.byType(MetricsHistory);
             final plots = tester.getRect(
               find.byKey(const ValueKey('metrics-history-plots')),
-            );
-            final actions = tester.getRect(
-              find.byKey(const ValueKey('server-overview-actions')),
-            );
-            final error = tester.getRect(
-              find.byKey(const ValueKey('server-overview-error')),
             );
             final available = tester.getSize(history).width;
             final expectedWidth = frame.width > 1060 ? 300.0 : 270.0;
@@ -59,19 +55,8 @@ void main() {
                 .01,
               ),
             );
-            expect(error.bottom, lessThan(plots.top));
-            expect(error.bottom, lessThan(actions.top));
-            expect(actions.overlaps(plots), isFalse);
             final historyBounds = tester.getRect(history);
             expect(plots.right, closeTo(historyBounds.right, .01));
-            if (frame.width <= 520) {
-              expect(plots.bottom, lessThan(actions.top));
-            } else if (available >= plots.width + 24 + 280 * scale) {
-              expect(actions.bottom, closeTo(plots.bottom, .01));
-              expect(actions.right, lessThan(plots.left));
-            } else {
-              expect(actions.bottom, lessThan(plots.top));
-            }
             final palette = theme.extension<BrandColors>()!;
             for (final series in _seriesExpectations) {
               final plot = find.byKey(
@@ -199,7 +184,7 @@ void main() {
           for (
             var tabs = 0;
             !Focus.of(tester.element(find.text('Значения истории'))).hasFocus &&
-                tabs < 40;
+                tabs < 160;
             tabs++
           ) {
             await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -888,7 +873,7 @@ void main() {
 
   for (final width in [1100.0, 800.0, 390.0, 360.0]) {
     testWidgets(
-      'overview action and graph placement follows the ${width}px frame',
+      'overview cards and details/CPU panels follow the ${width}px frame',
       (tester) async {
         tester.view.physicalSize = Size(width, 800);
         tester.view.devicePixelRatio = 1;
@@ -907,7 +892,7 @@ void main() {
                     connection: DesignServerFixtures.connection(),
                     trust: DesignServerFixtures.trust(),
                     busy: false,
-                    error: 'TRUST_CHANGED',
+                    error: 'FORBIDDEN',
                     hasTrustChallenge: true,
                     onRefresh: action,
                     onProbeTrust: action,
@@ -922,22 +907,26 @@ void main() {
             ),
           ),
         );
-        final plots = tester.getRect(
-          find.byKey(const ValueKey('metrics-history-plots')),
+        final cards = tester.getRect(find.byType(ServerResourceCards));
+        final details = tester.getRect(
+          find.widgetWithText(DeckPanel, 'Сведения о сервере'),
         );
-        final actions = tester.getRect(
-          find.byKey(const ValueKey('server-overview-actions')),
+        final chart = tester.getRect(
+          find.widgetWithText(DeckPanel, 'Процессор'),
         );
         final error = tester.getRect(
           find.byKey(const ValueKey('server-overview-error')),
         );
-        expect(error.bottom, lessThan(plots.top));
-        expect(error.bottom, lessThan(actions.top));
-        if (width > 520) {
-          expect(actions.bottom, closeTo(plots.bottom, 0.01));
-          expect(actions.right, lessThan(plots.left));
+        expect(error.bottom, lessThan(cards.top));
+        expect(cards.bottom, lessThan(details.top));
+        expect(details.overlaps(chart), isFalse);
+        if (width > 600) {
+          expect(chart.left, greaterThan(details.right));
         } else {
-          expect(plots.bottom, lessThan(actions.top));
+          expect(chart.top, greaterThan(details.bottom));
+        }
+        for (final label in ['100', '75', '50', '25', '0', 'CPU, % · UTC']) {
+          expect(find.text(label), findsWidgets);
         }
         expect(calls, 0);
         expect(tester.takeException(), isNull);
@@ -952,6 +941,7 @@ Future<void> _pumpHistory(
   List<Object?>? points,
   bool stale = false,
   double scale = 1,
+  String? quality,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: theme,
@@ -965,6 +955,7 @@ Future<void> _pumpHistory(
         child: MetricsHistory(
           points: points ?? DesignServerFixtures.history(),
           stale: stale,
+          quality: quality,
         ),
       ),
     ),
@@ -1022,14 +1013,18 @@ Future<void> _pumpOverview(
     ),
     home: FoundationShell(
       state: ReadinessState.ready,
-      servers: SingleChildScrollView(
+      servers: ServerPageFrame(
+        profile: DesignServerFixtures.profile(),
+        title: 'Обзор сервера',
+        onTabSelected: (_) {},
         child: ServerOverviewSection(
+          profile: DesignServerFixtures.profile(),
           state: DesignServerFixtures.state(stale: stale, points: points),
           connection: ServerConnectionSection(
             connection: DesignServerFixtures.connection(),
             trust: DesignServerFixtures.trust(),
             busy: false,
-            error: 'TRUST_CHANGED',
+            error: 'FORBIDDEN',
             hasTrustChallenge: true,
             onRefresh: onAction,
             onProbeTrust: onAction,

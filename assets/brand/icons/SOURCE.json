@@ -1,0 +1,7 @@
+{
+  "source": "docs/design/ServerDeck-design.html",
+  "sourceSha256": "7ceda8e4e79f736c48bd6ff24b572f75b5e05f2aa2e3d25dca95cbbecbe1b75d",
+  "license": "MIT; repository LICENSE",
+  "count": 36,
+  "conversion": "Original viewBox and ordered SVG elements retained. Source CSS stroke/fill/linecap/linejoin become root attributes. currentColor is black at asset time and receives the semantic color through SvgPicture.colorFilter. No path simplification or expansion."
+}

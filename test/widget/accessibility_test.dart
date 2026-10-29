@@ -167,13 +167,26 @@ void main() {
                   );
               }
 
+              if (form == _Form.delete) {
+                await tester.ensureVisible(find.byType(CheckboxListTile));
+                await tester.tap(find.byType(CheckboxListTile));
+                await tester.pump();
+              }
               await action(switch (form) {
                 _Form.profile => 'Сохранить',
                 _Form.settings => 'Сохранить настройки',
-                _Form.delete => 'Подтвердить удаление',
+                _Form.delete => 'Удалить профиль',
               });
               expect(client.sent, hasLength(1));
-              expect(find.text('Сохранено'), findsNothing);
+              expect(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Text &&
+                      widget.key == const ValueKey('mutation-current-status') &&
+                      widget.data == 'Сохранено',
+                ),
+                findsNothing,
+              );
               expect(find.text('Удалено'), findsNothing);
               expectDraft();
               final external = fixture.snapshot(revision: '2');

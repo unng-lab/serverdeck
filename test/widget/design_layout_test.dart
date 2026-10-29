@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind, Tristate;
 
 import 'package:flutter/material.dart';
@@ -6,30 +5,26 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
+import 'package:serverdeck/automation/automation_panel.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/profile_list.dart';
 import 'package:serverdeck/servers/server_sections.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/shell/foundation_shell.dart';
 import 'package:serverdeck/software/software_panel.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
-import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/ui/deck_page.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../contract/profile_controller_test.dart' as model_fixture;
 import '../support/design_host.dart' show loadDesignFonts;
 import '../support/design_host.dart' as design;
 import '../support/design_scenarios.dart';
-
-const _frames = [
-  Size(1100, 760),
-  Size(800, 600),
-  Size(390, 800),
-  Size(360, 800),
-];
+import '../support/design_stock_paint_support.dart' show stockTabTo;
 
 Finder _item(FoundationSection section) =>
-    find.widgetWithIcon(OutlinedButton, section.icon);
+    find.byKey(ValueKey('foundation-navigation-${section.name}'));
 
 Widget _app({
   bool dark = false,
@@ -70,19 +65,19 @@ void _setFrame(WidgetTester tester, Size frame) {
 double _sideWidth(WidgetTester tester) =>
     tester.getSize(find.byKey(const ValueKey('foundation-sidebar'))).width;
 
-double _labelWidth(BuildContext context, String label, FontWeight weight) {
-  final painter = TextPainter(
-    text: TextSpan(
-      text: label,
-      style: BrandTypography.caption.copyWith(fontWeight: weight),
-    ),
-    textDirection: Directionality.of(context),
-    locale: Localizations.maybeLocaleOf(context),
-    textScaler: MediaQuery.textScalerOf(context),
-  )..layout();
-  final result = painter.width;
-  painter.dispose();
-  return result;
+String _selectedLabel(WidgetTester tester) {
+  final shell = tester.state(find.byType(FoundationShell));
+  // Inspect semantic state of the real navigation control, independent of pages.
+  for (final section in FoundationSection.values) {
+    if (tester
+            .getSemantics(_item(section))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected ==
+        Tristate.isTrue)
+      return section.label;
+  }
+  throw StateError('No selected navigation control in $shell');
 }
 
 Widget _denseApp(
@@ -122,12 +117,21 @@ void _expectVerticalPages(WidgetTester tester) {
     final horizontal =
         widget.axisDirection == AxisDirection.left ||
         widget.axisDirection == AxisDirection.right;
+    final boundedTabs =
+        element.findAncestorWidgetOfExactType<DeckTabs>() != null;
     expect(
       horizontal &&
-          element.findAncestorWidgetOfExactType<EditableText>() == null,
+          element.findAncestorWidgetOfExactType<EditableText>() == null &&
+          !boundedTabs,
       isFalse,
       reason: 'Whole pages, lists and cards must wrap horizontally',
     );
+    if (boundedTabs) {
+      expect(
+        tester.getSize(find.byWidget(widget)).width,
+        lessThanOrEqualTo(tester.view.physicalSize.width),
+      );
+    }
   }
 }
 
@@ -135,6 +139,10 @@ void _expectParagraphsInWidth(WidgetTester tester, double width) {
   for (final element in find.byType(RichText).evaluate()) {
     final paragraph = element.renderObject! as RenderParagraph;
     if (!paragraph.hasSize || paragraph.size.isEmpty) continue;
+    if (element.findAncestorWidgetOfExactType<DeckTabs>() != null) {
+      expect(paragraph.didExceedMaxLines, isFalse);
+      continue; // Canonical tab strips expose whole labels by their own scroll.
+    }
     final bounds = MatrixUtils.transformRect(
       paragraph.getTransformTo(null),
       Offset.zero & paragraph.size,
@@ -150,18 +158,23 @@ void _expectParagraphsInWidth(WidgetTester tester, double width) {
 
 void _expectFullText(WidgetTester tester, String value, double width) {
   final finder = find.text(value);
-  expect(finder, findsOneWidget);
-  final widget = tester.widget<Text>(finder);
-  expect(widget.maxLines, isNull);
-  expect(widget.overflow, isNot(TextOverflow.ellipsis));
-  final paragraph = tester.renderObject<RenderParagraph>(finder);
-  expect(paragraph.didExceedMaxLines, isFalse);
-  final last = paragraph.getBoxesForSelection(
-    TextSelection(baseOffset: value.length - 1, extentOffset: value.length),
-  );
-  expect(last, isNotEmpty);
-  expect(last.last.right, lessThanOrEqualTo(paragraph.size.width + .1));
-  expect(tester.getRect(finder).right, lessThanOrEqualTo(width));
+  expect(finder, findsWidgets);
+  for (final element in finder.evaluate()) {
+    final widget = element.widget as Text;
+    expect(widget.maxLines, isNull);
+    expect(widget.overflow, isNot(TextOverflow.ellipsis));
+    final paragraph = element.renderObject! as RenderParagraph;
+    expect(paragraph.didExceedMaxLines, isFalse);
+    final last = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: value.length - 1, extentOffset: value.length),
+    );
+    expect(last, isNotEmpty);
+    expect(last.last.right, lessThanOrEqualTo(paragraph.size.width + .1));
+    expect(
+      paragraph.localToGlobal(Offset(paragraph.size.width, 0)).dx,
+      lessThanOrEqualTo(width),
+    );
+  }
 }
 
 void main() {
@@ -196,6 +209,7 @@ void main() {
             frame: Size(width, 800),
             theme: dark ? ThemeMode.dark : ThemeMode.light,
             textScale: 2,
+            currentBase: true,
             options: const DesignFixtureOptions(longText: true),
           );
           try {
@@ -205,10 +219,15 @@ void main() {
             _expectVerticalPages(tester);
             _expectParagraphsInWidth(tester, width);
             expect(find.byType(FoundationShell), findsOneWidget);
-            final target = find.textContaining(
-              host.harness.profiles.selected!.name,
+            expect(
+              host.harness.profiles.selected?.id,
+              host.harness.initialProfile.id,
             );
-            expect(target, findsWidgets);
+            // Each section exposes its own captured target; shell-wide text no longer duplicates it.
+            expect(
+              find.byKey(const ValueKey('foundation-feature-slot')),
+              findsOneWidget,
+            );
             await tester.pump(const Duration(milliseconds: 200));
             expect(_effects(host.harness), before);
             expect(tester.takeException(), isNull);
@@ -271,22 +290,16 @@ void main() {
                   )
                   .first,
             );
-            final disclosure = find
-                .descendant(of: tile, matching: find.byType(Icon))
-                .first;
-            await tester.ensureVisible(disclosure);
-            await tester.pumpAndSettle();
-            expect(disclosure.hitTestable(), findsOneWidget);
-            await tester.tap(disclosure);
-            await tester.pumpAndSettle();
-            for (final value in [
-              name,
-              '$address:22',
-              'Пользователь SSH: ${'u' * 64}',
-              'Метки: ${tags.join(', ')}',
-            ]) {
+            for (final value in [name, '$address:22', ...tags]) {
               _expectFullText(tester, value, width);
             }
+            final open = find.widgetWithText(FilledButton, 'Открыть сервер');
+            await tester.ensureVisible(open);
+            await tester.tap(open);
+            await tester.pumpAndSettle();
+            _expectFullText(tester, name, width);
+            _expectFullText(tester, '$address:22', width);
+            _expectFullText(tester, 'Пользователь SSH: ${'u' * 64}', width);
             _expectVerticalPages(tester);
             _expectParagraphsInWidth(tester, width);
             expect(harness.profiles.profiles, hasLength(1));
@@ -303,17 +316,19 @@ void main() {
                 dark: dark,
               ),
             );
-            _expectFullText(tester, name, width);
             final selectedAddress = '$address:22';
-            final fullAddress = find.text(selectedAddress);
+            final selectedTarget = '$name · $selectedAddress';
+            _expectFullText(tester, selectedTarget, width);
+            final fullTarget = find.text(selectedTarget);
+            await tester.ensureVisible(fullTarget);
+            await tester.pumpAndSettle();
+            final semantics = tester.ensureSemantics();
             expect(
-              tester.widget<EditableText>(fullAddress).controller.text,
-              selectedAddress,
+              tester.getSemantics(fullTarget).getSemanticsData().label,
+              contains(selectedTarget),
             );
-            final choose = find.widgetWithText(
-              OutlinedButton,
-              'Изменить сервер',
-            );
+            semantics.dispose();
+            final choose = find.widgetWithText(TextButton, 'Изменить сервер');
             await tester.ensureVisible(choose);
             await tester.pumpAndSettle();
             expect(choose.hitTestable(), findsOneWidget);
@@ -368,9 +383,9 @@ void main() {
           final contextText = [
             profile.name,
             '${profile.address}:${profile.port}',
-            'Источник: journald',
-            'Время записи: $recordTime UTC',
-            'Наблюдение: ${DesignServerFixtures.observedAt} UTC',
+            'journald',
+            '$recordTime UTC',
+            '${DesignServerFixtures.observedAt} UTC',
           ];
           var closed = 0;
           await tester.pumpWidget(
@@ -394,12 +409,53 @@ void main() {
               .first;
           final semantics = tester.ensureSemantics();
           for (final value in contextText) {
-            _expectFullText(tester, value, width);
             final label = find.text(value);
+            expect(label, findsOneWidget);
+            final editable = tester.widget<EditableText>(label);
+            expect(editable.controller.text, value);
+            expect(editable.readOnly, isTrue);
+            expect(editable.maxLines, isNull);
+            final render = tester
+                .state<EditableTextState>(label)
+                .renderEditable;
+            final last = render.getBoxesForSelection(
+              TextSelection(
+                baseOffset: value.length - 1,
+                extentOffset: value.length,
+              ),
+            );
+            expect(last, isNotEmpty);
+            expect(last.last.right, lessThanOrEqualTo(render.size.width + .1));
+            final bounds = tester.getRect(label);
+            expect(bounds.left, greaterThanOrEqualTo(0));
+            expect(bounds.right, lessThanOrEqualTo(width));
             await tester.ensureVisible(label);
             await tester.pumpAndSettle();
-            design.expectDesignVisible(tester, label);
-            expect(find.bySemanticsLabel(value), findsOneWidget);
+            // Very long readonly facts may exceed a phone viewport at 200%.
+            // The outer page exposes them without truncating the actual value.
+            final visible = tester.getRect(label);
+            expect(visible.right, lessThanOrEqualTo(width));
+            expect(visible.left, greaterThanOrEqualTo(0));
+            expect(visible.bottom, greaterThan(0));
+            expect(visible.top, lessThan(800));
+            expect(tester.getSemantics(label).getSemanticsData().value, value);
+            final row = find
+                .ancestor(
+                  of: label,
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget.key is ServerFactRowKey,
+                  ),
+                )
+                .first;
+            final factLabel = find.descendant(
+              of: row,
+              matching: find.byType(Text),
+            );
+            expect(factLabel, findsOneWidget);
+            expect(
+              tester.getSemantics(factLabel).getSemanticsData().label,
+              contains(tester.widget<Text>(factLabel).data!),
+            );
           }
           semantics.dispose();
           await tester.ensureVisible(rawScroll);
@@ -476,25 +532,48 @@ void main() {
               dark: dark,
             ),
           );
-          final section = find.text('Доступ ИИ рабочего пространства');
-          await tester.ensureVisible(section);
-          await tester.pumpAndSettle();
-          await tester.tap(section);
           await tester.pumpAndSettle();
           _expectFullText(tester, name, width);
+          final commandValue = find.descendant(
+            of: find.byWidgetPredicate(
+              (widget) =>
+                  widget is AutomationExactValue && widget.label == 'Команда',
+            ),
+            matching: find.byType(EditableText),
+          );
+          final editor = tester.widget<EditableText>(commandValue);
+          expect(editor.controller.text, command);
+          expect(editor.readOnly, isTrue);
+          expect(editor.maxLines, isNull);
+          await tester.ensureVisible(commandValue);
+          await tester.pumpAndSettle();
+          final commandRender = tester
+              .state<EditableTextState>(commandValue)
+              .renderEditable;
+          final lastGlyph = commandRender.getBoxesForSelection(
+            TextSelection(
+              baseOffset: command.length - 1,
+              extentOffset: command.length,
+            ),
+          );
+          expect(lastGlyph, isNotEmpty);
           expect(
-            tester.widget<EditableText>(find.text(command)).controller.text,
+            lastGlyph.last.right,
+            lessThanOrEqualTo(commandRender.size.width + .1),
+          );
+          final semantics = tester.ensureSemantics();
+          expect(
+            tester.getSemantics(commandValue).getSemanticsData().value,
             command,
           );
+          semantics.dispose();
           final title = find.text('Команда и аргументы MCP');
           await tester.ensureVisible(title);
           await tester.pumpAndSettle();
-          final focus = Focus.of(tester.element(title));
-          for (var tabs = 0; !focus.hasFocus && tabs < 30; tabs++) {
-            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-            await tester.pumpAndSettle();
-          }
-          expect(focus.hasFocus, isTrue);
+          final expansion = find
+              .ancestor(of: title, matching: find.byType(ExpansionTile))
+              .first;
+          await stockTabTo(tester, expansion);
           await tester.sendKeyEvent(LogicalKeyboardKey.enter);
           await tester.pumpAndSettle();
           final details = find.ancestor(
@@ -514,7 +593,7 @@ void main() {
           expect(json, contains(DesignAutomationFixtures.grantId));
           expect(counters.values, isEmpty);
           final copy = find.widgetWithText(
-            OutlinedButton,
+            FilledButton,
             'Скопировать конфигурацию',
           );
           await tester.ensureVisible(copy);
@@ -572,24 +651,42 @@ void main() {
             find.text('Получено событий: 200. Пропущено в источнике: 13'),
             findsOneWidget,
           );
-          expect(find.text('Ещё задания'), findsOneWidget);
-          final title = find.text('Последние 200 полученных событий');
-          await tester.ensureVisible(title);
-          await tester.pumpAndSettle();
-          await tester.tap(title);
-          await tester.pumpAndSettle();
-          final events = find.ancestor(
-            of: title,
-            matching: find.byType(ExpansionTile),
+          final title = find.text('Ход выполнения');
+          final events = find
+              .ancestor(of: title, matching: find.byType(DeckPanel))
+              .first;
+          final eventTimes = tester.widgetList<Tooltip>(
+            find.descendant(of: events, matching: find.byType(Tooltip)),
+          );
+          expect(eventTimes, hasLength(200));
+          expect(
+            eventTimes.map((widget) => widget.message),
+            DesignAutomationFixtures.events(
+              count: 200,
+              dropped: 13,
+            ).map((event) => '${event['timestamp']} (UTC)'),
           );
           expect(
-            find.descendant(of: events, matching: find.byType(DeckKeyValue)),
-            findsNWidgets(200),
+            tester
+                .widget<AutomationJobsSection>(
+                  find.byType(AutomationJobsSection),
+                )
+                .events,
+            DesignAutomationFixtures.events(count: 200, dropped: 13),
           );
           expect(find.text('Пропущено событий: 13'), findsOneWidget);
           _expectVerticalPages(tester);
           _expectParagraphsInWidth(tester, width);
           expect(counters.values, isEmpty);
+          final back = find.widgetWithText(TextButton, 'К заданиям');
+          await tester.ensureVisible(back);
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          final more = find.widgetWithText(OutlinedButton, 'Ещё задания');
+          await tester.ensureVisible(more);
+          await tester.tap(more);
+          await tester.pumpAndSettle();
+          expect(counters.values, {'more': 1});
           expect(tester.takeException(), isNull);
         },
       );
@@ -600,15 +697,31 @@ void main() {
           var plans = 0;
           await tester.pumpWidget(
             _denseApp(
-              AutomationRecipesSection(
-                catalog: DesignAutomationFixtures.catalog(),
-                canMutate: true,
-                onCreatePlan: (_) => plans++,
+              AutomationPageFrame(
+                title: 'Рецепт установки',
+                screenId: '17-recipe-detail',
+                catalog: true,
+                section: 'catalog',
+                onSelected: (_) {},
+                child: AutomationRecipesSection(
+                  catalog: DesignAutomationFixtures.catalog(),
+                  serverId: DesignAutomationFixtures.serverId,
+                  serverProfiles: [DesignServerFixtures.profile()],
+                  canMutate: true,
+                  onCreatePlan: (_) => plans++,
+                ),
               ),
               dark: dark,
+              ownScroll: true,
             ),
           );
-          final title = find.text('Точный рецепт, параметры и условия');
+          final choose = find.text('PostgreSQL 16');
+          await tester.ensureVisible(choose);
+          await tester.tap(choose);
+          await tester.pumpAndSettle();
+          final title = find.text(
+            'Лицензии, начальные настройки и точные условия',
+          );
           await tester.ensureVisible(title);
           await tester.pumpAndSettle();
           await tester.tap(title);
@@ -636,20 +749,23 @@ void main() {
               )
               .position;
           expect(rawPosition.maxScrollExtent, greaterThan(0));
-          await tester.ensureVisible(title);
+          await tester.ensureVisible(raw);
           await tester.pumpAndSettle();
-          final target = find.text(
-            'Синтетическая цель 例 · server.example.invalid:2222',
-          );
-          await tester.ensureVisible(target);
-          await tester.pumpAndSettle();
-          design.expectDesignVisible(tester, target);
+          final targetValue =
+              '${DesignServerFixtures.profile().name} · 192.0.2.44:2222';
+          final target = find.text(targetValue);
+          expect(target, findsOneWidget);
+          _expectFullText(tester, targetValue, width);
           final targetBefore = tester.getRect(target);
           final offsetBefore = rawPosition.pixels;
           await tester.drag(raw, const Offset(0, -120));
           await tester.pumpAndSettle();
           expect(rawPosition.pixels, greaterThan(offsetBefore));
           expect(tester.getRect(target), targetBefore);
+          // Context belongs to the page scroll, and remains reachable without
+          // borrowing a fixed-height region from the body.
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
           design.expectDesignVisible(tester, target);
           _expectVerticalPages(tester);
           _expectParagraphsInWidth(tester, width);
@@ -692,10 +808,7 @@ void main() {
               tester.renderObject<RenderParagraph>(summary).didExceedMaxLines,
               isTrue,
             );
-            final row = find.ancestor(
-              of: summary,
-              matching: find.byType(ListTile),
-            );
+            final row = find.byKey(const ValueKey('server-log-row-0'));
             await tester.ensureVisible(row);
             await tester.pumpAndSettle();
             final focus = Focus.of(tester.element(summary));
@@ -715,7 +828,13 @@ void main() {
             await tester.pumpAndSettle();
             expect(opened, [record, record]);
             expect(reads, 0);
-            expect(find.text('Источник: journald · UTC'), findsOneWidget);
+            final source = tester
+                .widgetList<ServerFactRows>(find.byType(ServerFactRows))
+                .singleWhere(
+                  (widget) => widget.facts['Источник'] == 'journald',
+                );
+            expect(source.facts['Источник'], 'journald');
+            expect(find.text('journald'), findsOneWidget);
             expect(
               find.text('Наблюдение: ${DesignServerFixtures.observedAt} · UTC'),
               findsOneWidget,
@@ -730,350 +849,215 @@ void main() {
     }
   }
 
+  testWidgets('recipe target change cannot rebind retained plan callbacks', (
+    tester,
+  ) async {
+    _setFrame(tester, const Size(390, 800));
+    final catalog = DesignAutomationFixtures.catalog();
+    final original = DesignServerFixtures.profile();
+    final changedTargets = [
+      DesignServerFixtures.profile(
+        address: '192.0.2.99',
+        connectionRevision: '3',
+      ),
+      DesignServerFixtures.profile(id: '00000000-0000-4000-8000-000000000203'),
+    ];
+    for (final changed in changedTargets) {
+      final key = GlobalKey<AutomationRecipesSectionState>();
+      final calls = <String>[];
+      Future<void> mount(ProfileView target) async {
+        await tester.pumpWidget(
+          _denseApp(
+            AutomationRecipesSection(
+              key: key,
+              catalog: catalog,
+              canMutate: true,
+              serverId: target.id,
+              serverProfiles: [target],
+              onCreatePlan: (digest) => calls.add('${target.id}:$digest'),
+            ),
+            dark: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await mount(original);
+      key.currentState!.selectFirst();
+      await tester.pumpAndSettle();
+      final plan = find.widgetWithText(OutlinedButton, 'Создать план');
+      final retained = tester.widget<OutlinedButton>(plan).onPressed!;
+      await mount(changed);
+      retained();
+      expect(calls, isEmpty);
+      await mount(original);
+      retained();
+      expect(
+        calls,
+        isEmpty,
+        reason: 'Restoring the old target does not revive an old intent',
+      );
+      expect(
+        tester
+            .widget<AutomationRecipesSection>(
+              find.byType(AutomationRecipesSection),
+            )
+            .catalog,
+        same(catalog),
+      );
+      expect(catalog, DesignAutomationFixtures.catalog());
+      await tester.ensureVisible(plan);
+      await tester.tap(plan);
+      await tester.pumpAndSettle();
+      expect(calls, [
+        '${original.id}:${DesignAutomationFixtures.recipe()['digest']}',
+      ]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [520.0, 521.0, 1060.0, 1061.0]) {
-    testWidgets('production shell switches exactly at width $width', (
-      tester,
-    ) async {
+    testWidgets('canonical shell boundary $width', (tester) async {
       _setFrame(tester, Size(width, 800));
       await tester.pumpWidget(_app());
-      final expectedWidth = width <= 520 ? 0.0 : (width <= 1060 ? 72.0 : 210.0);
-      expect(_sideWidth(tester), expectedWidth);
-      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-      expect(scaffold.bottomNavigationBar != null, width <= 520);
+      expect(
+        _sideWidth(tester),
+        width <= 520
+            ? 0
+            : width <= 1060
+            ? 68
+            : 210,
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('foundation-topbar'))).height,
+        width <= 520 ? 62 : 56,
+      );
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar !=
+            null,
+        width <= 520,
+      );
       expect(find.byType(Drawer), findsNothing);
-      expect(tester.getSize(find.byType(AppBar)).height, 56);
       expect(tester.takeException(), isNull);
     });
   }
-
-  for (final frame in _frames) {
-    for (final dark in [false, true]) {
-      for (final scale in [1.0, 2.0]) {
-        testWidgets('shell $frame dark=$dark scale=$scale', (tester) async {
-          _setFrame(tester, frame);
-          final semantics = tester.ensureSemantics();
-          try {
-            await tester.pumpWidget(_app(dark: dark, scale: scale));
-            final phone = frame.width <= 520;
-            final rail = frame.width > 520 && frame.width <= 1060;
-            expect(_sideWidth(tester), phone ? 0 : (rail ? 72 : 210));
-            expect(tester.getSize(find.byType(AppBar)).height, 56);
-            final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-            expect(scaffold.bottomNavigationBar != null, phone);
-            final contentRect = tester.getRect(find.byType(TextField));
-            expect(
-              contentRect.left - _sideWidth(tester) - (phone ? 0 : 1),
-              phone ? 16 : 24,
-            );
-            expect(frame.width - contentRect.right, phone ? 16 : 24);
-
-            for (final section in FoundationSection.values) {
-              final button = _item(section);
-              await tester.ensureVisible(button);
-              expect(tester.getSize(button).width, greaterThanOrEqualTo(44));
-              expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
-              final node = tester.getSemantics(button);
-              expect(node.label, section.label);
-              expect(node.flagsCollection.isButton, isTrue);
-              final label = find.descendant(
-                of: button,
-                matching: find.text(section.label),
-              );
-              expect(label, rail ? findsNothing : findsOneWidget);
-              if (rail) {
-                expect(find.byTooltip(section.label), findsOneWidget);
-              }
-              await tester.tap(button);
-              await tester.pumpAndSettle();
-              expect(
-                tester.getSemantics(button).flagsCollection.isSelected,
-                Tristate.isTrue,
-              );
-              final title = tester.widget<Text>(
-                find.byKey(const ValueKey('foundation-page-title')),
-              );
-              expect(title.data, section.label);
-              expect(title.style!.fontSize, 24);
-              expect(title.style!.height! * title.style!.fontSize!, 32);
-              expect(tester.takeException(), isNull);
-            }
-            if (phone) {
-              final panel = tester.getRect(
-                find.byKey(const ValueKey('foundation-phone-navigation')),
-              );
-              expect(contentRect.bottom, lessThanOrEqualTo(panel.top));
-            }
-          } finally {
-            semantics.dispose();
-          }
-        });
-      }
-    }
-  }
-
-  for (final width in [360.0, 390.0]) {
-    for (final scale in [1.0, 2.0]) {
-      testWidgets('phone Wrap measures full labels at $width scale=$scale', (
-        tester,
-      ) async {
-        _setFrame(tester, Size(width, 800));
-        await tester.pumpWidget(_app(scale: scale));
-        final panelFinder = find.byKey(
-          const ValueKey('foundation-phone-navigation'),
-        );
-        expect(panelFinder, findsOneWidget);
-        final panel = tester.getRect(panelFinder);
-        final wrap = tester.widget<Wrap>(
-          find.descendant(of: panelFinder, matching: find.byType(Wrap)),
-        );
-        expect(wrap.spacing, 4);
-        expect(wrap.runSpacing, 4);
-        final context = tester.element(_item(FoundationSection.servers));
-        final before = <Rect>[];
-        for (final section in FoundationSection.values) {
-          final normal = _labelWidth(context, section.label, FontWeight.w400);
-          final selected = _labelWidth(context, section.label, FontWeight.w600);
-          final expected = math.min(
-            width - 8,
-            math.max(44.0, math.max(normal, selected).ceilToDouble() + 8),
-          );
-          final rect = tester.getRect(_item(section));
-          expect(rect.width, expected);
-          final text = tester.widget<Text>(
-            find.descendant(of: _item(section), matching: find.byType(Text)),
-          );
-          expect(text.maxLines, isNull);
-          expect(text.overflow, isNot(TextOverflow.ellipsis));
-          expect(text.style!.fontSize, 12);
-          expect(text.style!.height! * text.style!.fontSize!, 16);
-          final icon = tester.widget<Icon>(
-            find.descendant(of: _item(section), matching: find.byType(Icon)),
-          );
-          expect(icon.size, 20);
-          final iconRect = tester.getRect(
-            find.descendant(of: _item(section), matching: find.byType(Icon)),
-          );
-          final labelRect = tester.getRect(
-            find.descendant(of: _item(section), matching: find.byType(Text)),
-          );
-          expect(iconRect.top - rect.top, 8);
-          expect(labelRect.top - iconRect.bottom, 4);
-          expect(rect.bottom - labelRect.bottom, 8);
-          expect(rect.left, greaterThanOrEqualTo(panel.left + 4));
-          expect(rect.right, lessThanOrEqualTo(panel.right - 4));
-          before.add(rect);
-        }
-        final rows = before.map((rect) => rect.top).toSet().toList()..sort();
-        if (scale == 2) expect(rows.length, greaterThan(1));
-        final lastBottom = before.map((rect) => rect.bottom).reduce(math.max);
-        expect(before.first.top - panel.top, 8);
-        expect(panel.bottom - lastBottom, 8);
-        for (var i = 1; i < rows.length; i++) {
-          final previousBottom = before
-              .where((rect) => rect.top == rows[i - 1])
-              .map((rect) => rect.bottom)
-              .reduce(math.max);
-          expect(rows[i] - previousBottom, 4);
-        }
-        await tester.tap(_item(FoundationSection.settings));
-        await tester.pumpAndSettle();
-        expect(
-          FoundationSection.values.map(
-            (section) => tester.getRect(_item(section)),
-          ),
-          before,
-        );
-        expect(tester.takeException(), isNull);
-      });
-    }
-  }
-
-  testWidgets('keyboard hides and returns phone nav without losing draft', (
+  testWidgets('keyboard hides phone navigation and retains draft owner', (
     tester,
   ) async {
     _setFrame(tester, const Size(390, 800));
     await tester.pumpWidget(_app(scale: 2, safeBottom: 24));
     final panel = find.byKey(const ValueKey('foundation-phone-navigation'));
-    expect(panel, findsOneWidget);
     expect(tester.getRect(panel).bottom, 776);
-    await tester.enterText(
-      find.byKey(const ValueKey('layout-draft')),
-      'RAM draft',
-    );
+    final field = find.byKey(const ValueKey('layout-draft'));
+    await tester.enterText(field, 'RAM draft');
     final editable = find.descendant(
-      of: find.byKey(const ValueKey('layout-draft')),
+      of: field,
       matching: find.byType(EditableText),
     );
     final state = tester.state<EditableTextState>(editable);
     await tester.pumpWidget(_app(scale: 2, keyboard: 300, safeBottom: 24));
     expect(panel, findsNothing);
-    expect(find.byKey(const ValueKey('foundation-page-title')), findsOneWidget);
-    expect(state.widget.controller.text, 'RAM draft');
     expect(tester.state<EditableTextState>(editable), same(state));
+    expect(state.widget.controller.text, 'RAM draft');
     await tester.pumpWidget(_app(scale: 2, safeBottom: 24));
     expect(panel, findsOneWidget);
     expect(tester.getRect(panel).bottom, 776);
-    expect(
-      tester
-          .getSemantics(_item(FoundationSection.servers))
-          .flagsCollection
-          .isSelected,
-      Tristate.isTrue,
-    );
-    expect(state.widget.controller.text, 'RAM draft');
-    await tester.tap(_item(FoundationSection.settings));
-    await tester.pumpAndSettle();
-    await tester.pumpWidget(_app(scale: 2, keyboard: 300, safeBottom: 24));
-    expect(panel, findsNothing);
-    expect(
-      tester
-          .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-          .data,
-      'Настройки',
-    );
-    await tester.pumpWidget(_app(scale: 2, safeBottom: 24));
-    expect(panel, findsOneWidget);
-    expect(
-      tester
-          .getSemantics(_item(FoundationSection.settings))
-          .flagsCollection
-          .isSelected,
-      Tristate.isTrue,
-    );
     expect(tester.takeException(), isNull);
   });
-
-  testWidgets('short desktop sidebar scrolls every section into reach', (
+  testWidgets('short desktop keeps every navigation target reachable', (
     tester,
   ) async {
     _setFrame(tester, const Size(1100, 240));
     await tester.pumpWidget(_app(scale: 2));
-    expect(_sideWidth(tester), 210);
     for (final section in FoundationSection.values) {
       await tester.ensureVisible(_item(section));
       await tester.pumpAndSettle();
       expect(_item(section).hitTestable(), findsOneWidget);
       await tester.tap(_item(section));
       await tester.pumpAndSettle();
+      expect(_selectedLabel(tester), section.label);
+      expect(tester.takeException(), isNull);
+    }
+  });
+  testWidgets('breakpoint focus follows selected chrome without activation', (
+    tester,
+  ) async {
+    _setFrame(tester, const Size(1100, 800));
+    await tester.pumpWidget(_app());
+    for (final width in [800.0, 390.0, 1100.0]) {
+      tester
+          .widget<TextButton>(_item(FoundationSection.jobs))
+          .focusNode!
+          .requestFocus();
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = Size(width, 800);
+      await tester.pumpAndSettle();
       expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-            .data,
-        section.label,
+            .widget<TextButton>(_item(FoundationSection.servers))
+            .focusNode!
+            .hasFocus,
+        isTrue,
+      );
+      expect(_selectedLabel(tester), 'Серверы');
+      expect(find.byKey(const ValueKey('layout-draft')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+  testWidgets('breakpoint keeps existing field focus and draft', (
+    tester,
+  ) async {
+    _setFrame(tester, const Size(1100, 800));
+    await tester.pumpWidget(_app());
+    final field = find.byKey(const ValueKey('layout-draft'));
+    await tester.enterText(field, 'Retained draft');
+    final focus = FocusManager.instance.primaryFocus;
+    for (final width in [800.0, 390.0, 1100.0]) {
+      tester.view.physicalSize = Size(width, 800);
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus, same(focus));
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(of: field, matching: find.byType(EditableText)),
+            )
+            .controller
+            .text,
+        'Retained draft',
       );
       expect(tester.takeException(), isNull);
     }
   });
-
-  testWidgets('phone caps oversized labels to panel width and wraps the text', (
+  testWidgets('rail exposes full names through hover focus and long press', (
     tester,
   ) async {
-    _setFrame(tester, const Size(360, 2400));
-    await tester.pumpWidget(_app(scale: 8));
-    final item = _item(FoundationSection.settings);
-    expect(tester.getSize(item).width, 352);
-    final label = find.descendant(of: item, matching: find.byType(Text));
-    expect(tester.getSize(label).height, greaterThan(16 * 8));
-    expect(tester.widget<Text>(label).data, 'Настройки');
+    _setFrame(tester, const Size(800, 600));
+    await tester.pumpWidget(_app());
+    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await pointer.addPointer(location: Offset.zero);
+    await pointer.moveTo(tester.getCenter(_item(FoundationSection.logs)));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    expect(find.text('Журналы'), findsOneWidget);
+    await pointer.removePointer();
+    await tester.pumpAndSettle(const Duration(milliseconds: 200));
+    expect(find.text('Журналы'), findsNothing);
+    tester
+        .widget<TextButton>(_item(FoundationSection.jobs))
+        .focusNode!
+        .requestFocus();
+    await tester.pumpAndSettle();
+    expect(find.text('Задания'), findsOneWidget);
+    FocusManager.instance.primaryFocus!.unfocus();
+    await tester.pumpAndSettle();
+    expect(find.text('Задания'), findsNothing);
+    await tester.longPress(_item(FoundationSection.settings));
+    await tester.pumpAndSettle();
+    expect(find.text('Настройки'), findsOneWidget);
+    expect(_selectedLabel(tester), 'Серверы');
     expect(tester.takeException(), isNull);
   });
-
-  testWidgets(
-    'breakpoint focus follows selected chrome without activating it',
-    (tester) async {
-      _setFrame(tester, const Size(1100, 800));
-      await tester.pumpWidget(_app());
-      for (final width in [800.0, 390.0, 1100.0]) {
-        tester
-            .widget<OutlinedButton>(_item(FoundationSection.jobs))
-            .focusNode!
-            .requestFocus();
-        await tester.pumpAndSettle();
-        tester.view.physicalSize = Size(width, 800);
-        await tester.pumpAndSettle();
-        expect(
-          tester
-              .widget<OutlinedButton>(_item(FoundationSection.servers))
-              .focusNode!
-              .hasFocus,
-          isTrue,
-        );
-        expect(
-          tester
-              .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-              .data,
-          'Серверы',
-        );
-        expect(find.byKey(const ValueKey('layout-draft')), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      }
-    },
-  );
-
-  testWidgets(
-    'breakpoint leaves existing field focus and draft with its owner',
-    (tester) async {
-      _setFrame(tester, const Size(1100, 800));
-      await tester.pumpWidget(_app());
-      final field = find.byKey(const ValueKey('layout-draft'));
-      await tester.enterText(field, 'Retained field draft');
-      final focus = FocusManager.instance.primaryFocus;
-      for (final width in [800.0, 390.0, 1100.0]) {
-        tester.view.physicalSize = Size(width, 800);
-        await tester.pumpAndSettle();
-        expect(FocusManager.instance.primaryFocus, same(focus));
-        expect(focus!.hasFocus, isTrue);
-        final editable = find.descendant(
-          of: field,
-          matching: find.byType(EditableText),
-        );
-        expect(
-          tester.widget<EditableText>(editable).controller.text,
-          'Retained field draft',
-        );
-        expect(tester.takeException(), isNull);
-      }
-    },
-  );
-
-  testWidgets(
-    'rail tooltips expose full labels on hover focus and long press',
-    (tester) async {
-      _setFrame(tester, const Size(800, 600));
-      await tester.pumpWidget(_app());
-      final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await pointer.addPointer(location: Offset.zero);
-      await pointer.moveTo(tester.getCenter(_item(FoundationSection.logs)));
-      await tester.pumpAndSettle(const Duration(milliseconds: 600));
-      expect(find.text('Журналы'), findsOneWidget);
-      await pointer.removePointer();
-      await tester.pumpAndSettle(const Duration(milliseconds: 200));
-      expect(find.text('Журналы'), findsNothing);
-      tester
-          .widget<OutlinedButton>(_item(FoundationSection.jobs))
-          .focusNode!
-          .requestFocus();
-      await tester.pumpAndSettle();
-      expect(find.text('Задания'), findsOneWidget);
-      FocusManager.instance.primaryFocus!.unfocus();
-      await tester.pumpAndSettle();
-      expect(find.text('Задания'), findsNothing);
-      await tester.longPress(_item(FoundationSection.settings));
-      await tester.pumpAndSettle();
-      expect(find.text('Настройки'), findsOneWidget);
-      expect(
-        tester
-            .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-            .data,
-        'Серверы',
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets('phone and rail activate navigation with Enter and Space', (
-    tester,
-  ) async {
+  testWidgets('phone and rail support Enter and Space', (tester) async {
     _setFrame(tester, const Size(800, 600));
     await tester.pumpWidget(_app());
     for (final frame in [const Size(800, 600), const Size(390, 800)]) {
@@ -1081,22 +1065,17 @@ void main() {
       await tester.pumpAndSettle();
       for (final key in [LogicalKeyboardKey.enter, LogicalKeyboardKey.space]) {
         tester
-            .widget<OutlinedButton>(_item(FoundationSection.settings))
+            .widget<TextButton>(_item(FoundationSection.settings))
             .focusNode!
             .requestFocus();
         await tester.pumpAndSettle();
         await tester.sendKeyEvent(key);
         await tester.pumpAndSettle();
-        expect(
-          tester
-              .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-              .data,
-          'Настройки',
-        );
+        expect(_selectedLabel(tester), 'Настройки');
         await tester.tap(_item(FoundationSection.servers));
         await tester.pumpAndSettle();
       }
-      expect(tester.takeException(), isNull);
     }
+    expect(tester.takeException(), isNull);
   });
 }

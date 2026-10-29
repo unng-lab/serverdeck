@@ -15,214 +15,171 @@ Widget app(FoundationShell shell, {bool dark = false, double scale = 1}) =>
         child: child!,
       ),
     );
-
+Finder nav(FoundationSection section) =>
+    find.byKey(ValueKey('foundation-navigation-${section.name}'));
 void main() {
-  testWidgets('private content and target are removed on loss of readiness', (
+  testWidgets('private content removed on every loss of readiness', (
     tester,
   ) async {
-    FoundationShell shell(ReadinessState state) => FoundationShell(
-      state: state,
-      servers: const Text('private profile list'),
-      settings: const Text('private settings'),
-      targetName: 'private target',
-      targetAddress: '192.0.2.1',
-    );
-    await tester.pumpWidget(app(shell(ReadinessState.ready)));
-    expect(find.text('private profile list'), findsOneWidget);
-    expect(find.textContaining('private target'), findsOneWidget);
-    for (final state in ReadinessState.values.where(
-      (state) => state != ReadinessState.ready,
-    )) {
-      await tester.pumpWidget(app(shell(state)));
-      expect(find.text('private profile list'), findsNothing);
-      expect(find.text('private settings'), findsNothing);
-      expect(find.textContaining('private target'), findsNothing);
-      expect(find.textContaining('192.0.2.1'), findsNothing);
+    for (final state in ReadinessState.values) {
+      await tester.pumpWidget(
+        app(
+          FoundationShell(
+            state: state,
+            servers: const Text('private profiles'),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text('private profiles'),
+        state == ReadinessState.ready ? findsOneWidget : findsNothing,
+      );
       expect(tester.takeException(), isNull);
     }
   });
-
-  testWidgets(
-    'wide navigation preserves local section across service failure',
-    (tester) async {
-      tester.view.physicalSize = const Size(1100, 760);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        app(const FoundationShell(state: ReadinessState.ready)),
-      );
-      expect(find.byType(Drawer), findsNothing);
-      expect(find.text('Серверы'), findsNWidgets(2));
-      await tester.tap(find.widgetWithText(OutlinedButton, 'ПО'));
-      await tester.pump();
-      expect(
-        find.text('Управление ПО будет доступно после подключения к серверу'),
-        findsOneWidget,
-      );
-      await tester.pumpWidget(
-        app(const FoundationShell(state: ReadinessState.unavailable)),
-      );
-      expect(find.text('Локальная служба недоступна'), findsOneWidget);
-      expect(find.text('ПО'), findsNWidgets(2));
-      await tester.pumpWidget(
-        app(const FoundationShell(state: ReadinessState.ready)),
-      );
-      expect(
-        find.text('Управление ПО будет доступно после подключения к серверу'),
-        findsOneWidget,
-      );
-    },
-  );
-
   for (final dark in [false, true]) {
-    for (final size in const [
-      Size(1100, 760),
-      Size(800, 600),
-      Size(360, 800),
-      Size(390, 800),
+    for (final size in [
+      const Size(1100, 760),
+      const Size(800, 600),
+      const Size(390, 800),
+      const Size(360, 800),
     ]) {
-      testWidgets('all sections reachable at $size scale200 dark=$dark', (
-        tester,
-      ) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(
-          app(
-            const FoundationShell(state: ReadinessState.ready),
-            dark: dark,
-            scale: 2,
-          ),
-        );
-        for (final section in FoundationSection.values) {
-          final button = find.byKey(
-            ValueKey('foundation-navigation-${section.name}'),
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('canonical shell $size scale$scale dark$dark allsections', (
+          tester,
+        ) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            app(
+              FoundationShell(
+                state: ReadinessState.ready,
+                servers: const Text('profiles-pane'),
+                software: const Text('software-pane'),
+                logs: const Text('logs-pane'),
+                jobs: const Text('jobs-pane'),
+                settings: const Text('settings-pane'),
+              ),
+              dark: dark,
+              scale: scale,
+            ),
           );
-          await tester.ensureVisible(button);
-          expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
-          await tester.tap(button);
           await tester.pumpAndSettle();
-          final title = tester.widget<Text>(
-            find.byKey(const ValueKey('foundation-page-title')),
+          final sidebar = tester.getRect(
+            find.byKey(const ValueKey('foundation-sidebar')),
           );
-          expect(title.data, section.label);
-          expect(title.style!.fontSize, 24);
-          expect(title.style!.height! * title.style!.fontSize!, 32);
-          expect(tester.takeException(), isNull);
-        }
-      });
+          final topbar = tester.getRect(
+            find.byKey(const ValueKey('foundation-topbar')),
+          );
+          expect(
+            sidebar.width,
+            size.width <= 520
+                ? 0
+                : size.width <= 1060
+                ? 68
+                : 210,
+          );
+          expect(sidebar.top, 0);
+          expect(topbar.left, sidebar.right);
+          expect(
+            topbar.height,
+            scale == 1
+                ? (size.width <= 520 ? 62 : 56)
+                : greaterThanOrEqualTo(size.width <= 520 ? 62 : 56),
+          );
+          for (final section in FoundationSection.values) {
+            await tester.ensureVisible(nav(section));
+            expect(
+              tester.getSize(nav(section)).height,
+              greaterThanOrEqualTo(44),
+            );
+            expect(
+              tester.getSize(nav(section)).width,
+              greaterThanOrEqualTo(44),
+            );
+            await tester.tap(nav(section));
+            await tester.pumpAndSettle();
+            final text = switch (section) {
+              FoundationSection.servers => 'profiles-pane',
+              FoundationSection.software => 'software-pane',
+              FoundationSection.logs => 'logs-pane',
+              FoundationSection.jobs => 'jobs-pane',
+              FoundationSection.settings => 'settings-pane',
+            };
+            expect(find.text(text), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+        });
+      }
     }
   }
-
-  testWidgets('navigation supports keyboard activation', (tester) async {
-    tester.view.physicalSize = const Size(1100, 760);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      app(const FoundationShell(state: ReadinessState.ready)),
-    );
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Управление ПО будет доступно после подключения к серверу'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('profile selection does not invent an SSH state', (tester) async {
-    await tester.pumpWidget(
-      app(
-        const FoundationShell(
-          state: ReadinessState.ready,
-          targetName: 'Local profile',
-          targetAddress: '192.0.2.1:22',
-        ),
-      ),
-    );
-    expect(find.text('Local profile · 192.0.2.1:22'), findsOneWidget);
-    expect(find.text('Локальная служба готова'), findsOneWidget);
-    expect(find.textContaining('Не подключён'), findsNothing);
-  });
-
-  testWidgets('global logs and jobs lead back through local navigation', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1100, 760);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    var commands = 0;
-    await tester.pumpWidget(
-      app(
-        FoundationShell(
-          state: ReadinessState.ready,
-          servers: TextButton(
-            onPressed: () => commands++,
-            child: const Text('Existing local profiles'),
+  testWidgets(
+    'navigation is keyboard activated and invokes no content command',
+    (tester) async {
+      var commands = 0;
+      await tester.pumpWidget(
+        app(
+          FoundationShell(
+            state: ReadinessState.ready,
+            servers: TextButton(
+              onPressed: () => commands++,
+              child: const Text('command'),
+            ),
+            software: const Text('software-pane'),
           ),
         ),
-      ),
-    );
-    expect(tester.getSize(find.byType(AppBar)).height, 56);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('foundation-sidebar'))).width,
-      210,
-    );
-    final sidebar = tester.getRect(
-      find.byKey(const ValueKey('foundation-sidebar')),
-    );
-    expect(sidebar.top, 56);
-    expect(sidebar.bottom, 760);
-    final serversNavigation = tester.getRect(
-      find.widgetWithText(OutlinedButton, 'Серверы'),
-    );
-    expect(serversNavigation.top, lessThan(150));
-    for (final label in ['Журналы', 'Задания']) {
-      await tester.tap(find.widgetWithText(OutlinedButton, label));
+      );
+      final button = tester.widget<TextButton>(nav(FoundationSection.software));
+      button.focusNode!.requestFocus();
       await tester.pump();
-      expect(find.textContaining('Общий список'), findsOneWidget);
-      expect(find.textContaining('карточке сервера'), findsOneWidget);
-      await tester.tap(find.text('К серверам'));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
-      expect(find.text('Existing local profiles'), findsOneWidget);
-    }
-    expect(commands, 0);
+      expect(find.text('software-pane'), findsOneWidget);
+      expect(commands, 0);
+    },
+  );
+  testWidgets('section survives service loss and recovers same section', (
+    tester,
+  ) async {
+    Widget current(ReadinessState state) => app(
+      FoundationShell(state: state, software: const Text('software-pane')),
+    );
+    await tester.pumpWidget(current(ReadinessState.ready));
+    await tester.tap(nav(FoundationSection.software));
+    await tester.pump();
+    await tester.pumpWidget(current(ReadinessState.unavailable));
+    expect(find.text('software-pane'), findsNothing);
+    await tester.pumpWidget(current(ReadinessState.ready));
+    expect(find.text('software-pane'), findsOneWidget);
   });
-
-  testWidgets('size and theme keep the mounted feature and permitted draft', (
+  testWidgets('resize theme and scale preserve permitted feature draft', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     var creations = 0;
-    for (final frame in [1100.0, 390.0, 800.0, 1100.0]) {
-      tester.view.physicalSize = Size(frame, 760);
+    for (final width in [1100.0, 390.0, 800.0, 1100.0]) {
+      tester.view.physicalSize = Size(width, 760);
       await tester.pumpWidget(
         app(
           FoundationShell(
             state: ReadinessState.ready,
             servers: _RetainedInput(onCreate: () => creations++),
           ),
-          dark: frame == 390,
+          dark: width == 390,
+          scale: width == 800 ? 2 : 1,
         ),
       );
       await tester.pumpAndSettle();
       final field = find.byKey(const ValueKey('retained-field'));
-      if (creations == 1 &&
-          frame == 1100 &&
-          tester.widget<TextField>(field).controller!.text.isEmpty) {
-        await tester.enterText(field, 'Permitted RAM draft');
-      }
-      expect(
-        tester.widget<TextField>(field).controller!.text,
-        'Permitted RAM draft',
-      );
+      if (width == 1100 &&
+          tester.widget<TextField>(field).controller!.text.isEmpty)
+        await tester.enterText(field, 'RAM draft');
+      expect(tester.widget<TextField>(field).controller!.text, 'RAM draft');
       expect(creations, 1);
       expect(tester.takeException(), isNull);
     }

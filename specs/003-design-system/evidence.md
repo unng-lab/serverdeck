@@ -1,4 +1,364 @@
+## Промежуточная установленная 0.3.0-preview.1+12 — 2026-10-29
+
+По текущему решению пользователя завершается только пакет003 (37 базовых сценариев);004–020 не реализуются в этой задаче. Порядок: закончить implementation batch → промежуточная сборка/установка → полный static/unit/widget gate; адресные прогоны только при падении полного.
+
+Normal Release build (`tools/run-foundation.ps1 -BuildOnly -Configuration Release`) завершён exit0, журнал `.local/unit-widget/private-build-003-preview1.log`. Установленная копия: `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.3.0-preview.1+12-design003/`, FileVersion `0.3.0-preview.1+12`. Проверены все пять ролей штатного manifest; format3/testOnly=false/API1.1/schema3. Прежние установки и копия default workspace `.local/release/workspace-before-003-preview1/` сохранены. Обновлён обычный shortcut; предыдущий сохранён как `ServerDeck 0.2.1 base design t213-216.lnk`.
+
+После повторного открытия по просьбе пользователя exact installed process PID18968/Respondingtrue/MainWindowHandle12062324. Пользователь прислал screenshot установленного окна: виден экран «Первый запуск», тёмная тема, пять sidebar разделов, workspace/breadcrumb, действия «Добавить сервер»/«Настроить ИИ-доступ» и welcome panel. Это фактическое подтверждение данного экрана, не всех37 маршрутов, viewport boundaries, scales или поведения. Computer Use/desktop automation не применялись. Screenshot предоставлен пользователем, не снят агентом.
+
+На этом candidate format692/0 и root analyze NoIssues выполнены успешно; links1982total/1981OK/1excluded/0errors. Полный root unit/widget прогон после установки завершён: 9037PASS/1expected capture SKIP,8:07,exit0; session62567 terminal, журнал `.local/unit-widget/preview1-final-full.log`. Очищены capture environment variables, SERVERDECK_NATIVE_CONTROL_RED=0; capture defines не передавались. Формат/анализ: `.local/unit-widget/preview1-final-format.log` и `preview1-final-analyze.log`; ссылки: `preview1-final-links.log`. Адресные прогоны после успешного полного не запускались. T214/T217 реализованы, финальное независимое review ещё впереди. Никакие дополнительные task markers этой записью не закрываются.
+
+Source candidate ещё незакоммичен: manifest buildId от прежнегоHEAD+locks не устанавливает точную Git identity UI изменений. Нового commit/push/CI/tag/GitHub release нет; public Windows binary не публиковался. Ниже — сохранённая история предыдущих checkpoints, её pending утверждения относятся к соответствующим версиям.
+
+Fresh independent readonly `base003_preview1_final_review` завершён: замечаний не найдено; пакет003 готов к реализации, рассмотренный source candidate готов к финальному коммиту в текущем static/unit/widget stage. Проверен full-source003 и связанные contracts; отдельно native readonly lifecycle/guards, fleet layout/actions, private epoch/navigation/target owners. T214/T217 отмечены[X] только по выполненной реализации/check/review. Review не устанавливает полную FA09/FA10 visual/installed приёмку всех37, окончательную source identity или будущий CI. T191/T192 остаются открытыми.
+
+
+
+## T213/T215/T216 закрыты в scoped code/check/review; новая private поставка, 2026-10-29
+
+Fresh readonly `t213_217_delivery_record_review` завершён без замечаний: проверены closure/delivery records и readiness T217 вместе с последним separator уточнением. Готов только этот следующий scope; T214/T217 ещё не реализованы, T191/T192/37/98 не приняты. Это запись фактического результата законченного review; requirements после него не менялись.
+
+Fresh readonly `t213_216_code_review_r2` завершён без замечаний. Он проверил fixes T213/T215/T216, source gate8981PASS/1expectedSKIP/8:21/exit0, format690/0, analyzeNoIssues и records; подтвердил readiness T217 в описанном тогда scope. Маркеры T213/T215/T216 отмечены[X] только в этом scope. T214/T217/T191/T192 остаются[ ]; full37/98 не принят. Дополнительная pixel-сверка85 после review обнаружила соседние source form edges2px против current1px; это добавлено к открытойT217 для нового readiness review, не скрыто под markerT215. Высота readonly control42 восстановлена, общий separator ещё впереди.
+
+Normal `tools/run-foundation.ps1 -BuildOnly -Configuration Release` выполнен после финального code review; `private-build-t213-216.log`exit0. Без integration target/testBuild/capture defines и без test dispatch. Tracked packages/windows/original fonts после сборки не изменены. Normal format3/testOnly=false/API1.1/schema3 bundle установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t213-216/`, FileVersion0.2.1+11. Пять стандартных manifest roles проверены до/после копирования; в manifest копии изменён appRoot. Это штатный product manifest, нового receipt graph нет. Копия default workspace сохранена в ignored `.local/release/workspace-before-t213-216/`; installer не удалял и не перезаписывал исходные данные или старые installations. Shortcut ServerDeck обновлён, прежний сохранён как `ServerDeck base design t193-198.lnk`.
+
+Обычный Shell launch далPID44300; при первом чтении windowhandle был0, при повторном отдельном чтении точного installed executable — MainWindowHandle5376928/Respondingtrue. Содержимое окна агент не осматривал; human confirmation T193 не переносится на новую сборку. Computer Use/desktop screenshots/native или integration qualification не выполнялись. Source всё ещё незакоммичен; buildId прежнегоHEAD+locks не является identity всех UI правок, T192 требует отдельной финальной source identity/приёмки. Новых commit/push/CI/publication нет. Все98 требований и прежние данные/версии сохранены.
+
+Ниже сохранён checkpoint до финального fresh review/поставки; его pending-формулировки относятся к тому времени.
+
+## T213/T215/T216 — итоговый gate пройден, fresh review впереди, 2026-10-29
+
+Прямая сверка T191 выявила выбор Regular вместо исходного SemiBold в смешанном Noto Sans family: font-face probe1 дал1PASS/1FAIL, ширины362.232/377.256. Отдельный family выбирает правильные исходные outlines, но normal weight request необходим для исключения fake bold: `t213-ink-probe-2.log` показал одинаковую ширину377.256 и alpha657438/879009 для400/600. Текущие semibold roles используют отдельный family исходного неизменённого файла, normal engine request и wght600 для variable Unicode fallback. Это эффективное исходное600, не замена его обычными glyphs. Изменения TTF/нового renderer/DSL/schema/receipt graph нет.
+
+Первый full source gate T213 действительно завершился: `t213-format-4.log`690files/0changes, `t213-analyze-4.log`NoIssues, `t213-full-4.log`8961PASS/1expectedoptcaptureSKIP/8:05/exit0. Readonly `t213_font_code_review` нашёл P2: inherited wght600 утекал в explicit regular Body/Mono child первого cell. Это воспроизведено четырьмя actual table-cell CJK raster regressions (`t216-cjk-red.log`,4FAIL), исправлено явными пустыми variations regular roles; `t216-cjk-green.log`49PASS. Поэтому8961PASS не является итоговым gate нынешних правок. Review подтвердил готовность T214/T215, но не завершение T213. Предыдущие readiness T213/r2 завершены без замечаний только в своих исторических scope.
+
+T215 реализован после readiness: readonly поле «Выбор профиля» в SettingsForm теперь native TextFormField с неизменяемым значением, selection/focus, single-line при100% и полным wrap при scale>1. Нет onChanged/remote dispatch. `t215-readonly-red.log`16FAIL (отсутствовал требуемый native readonly control); после исправления `t215-216-green-1.log`686PASS, включая прежний canonical adoption matrix, settings lifecycle, Unicode/raster и16новых responsive/readonly проверок. `t215-settings-capture.log`16PASS; кадры `.local/design-003/003.4/direct-t215-settings-01/`. Непосредственно просмотрен85desktopdark100; это не полная приёмка37/98 или installed showing. Прежние37desktop PNG `.local/design-003/003.4/direct-t213-desktop-dark-02/` получены до T215/T216;85 в них устарел. Новая T214 фиксирует оставшиеся summary/title/button glyph gaps05 и ещё не реализована.
+
+Актуальный полный root gate после T215/T216 завершён: `t213-216-format-5.log`690/0, `t213-216-analyze-5.log`NoIssues, `t213-216-full-5.log`8981PASS/1expected optcaptureSKIP/8:21/exit0; exec session19541 терминален. Теперь нужен fresh readonly independent code/spec/record review T213/T215/T216, затем normal private build/install/launch. Markers T213/T215/T216 пока[ ]; T214/T191/T192 также[ ]. Links `t213-216-links-5.log`1979OK/0errors/1excluded. `t213-full-1/2` прерваны; analyzer3 завершился unnecessary-import finding, full3 не запускался; это не passes. Probe2 font-face не запускал tests из-за encodingerror; позднее probe3 диагностика выполнена. История не стирается.
+
+Normal `private-build-t213.log` завершён exit0 ДО T215/T216 и НЕ УСТАНОВЛЕН из-за finding review; эта сборка устарела. Последняя установленная копия по-прежнему T193/T198, пользователь подтвердил лишь стартовый экран. Все старые installs/workspace сохранены; новых install/launch/commit/push/CI/publication нет. Package code/dependencies и original fonts не изменены; предыдущие selected package checks остаются только своим evidence. Computer Use и native/integration qualification не выполнялись. Цель98 и полная visual/installed acceptance остаются открытыми.
+
+## Private progress delivery T193/T198, 2026-10-29
+
+После чистого code review выполнена обычная `tools/run-foundation.ps1 -BuildOnly -Configuration Release`, без integration target/test-build/capture defines. `private-build-t193-198.log` завершён exit0; tracked `packages/` и `windows/` не изменились. Установлен normal format3/testOnly=false bundle с API1.1/workspaceSchema3 и FileVersion0.2.1+11 в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t193-198/`. Пять ролей (serverdeck/locald/mcp/libisar/executor-release) совпали с production manifest до/после копирования; изменён только appRoot копии manifest. Старые установки не удалялись; T188 executable сохранён. Копия текущего default workspace лежит в ignored `.local/release/workspace-before-t193-198/`; исходные данные installer не удалял и не перезаписывал. Стандартный Start Menu shortcut указывает на новую сборку; прежний сохранён как `ServerDeck base design t188.lnk`.
+
+Первый Start-Process далPID45956 без окна, затем процесс исчез; причина не установлена, этот запуск не принят как показ. Последующий обычный Windows Shell launch устойчиво далPID35768, MainWindowHandle8523378 и Responding=true; точный установленный executable path повторно проверен отдельной командой. Пользователь подтвердил текстом категорию видимого экрана: «Список серверов или первый запуск». Это подтверждение установленного запуска/стартового UI, не точного screen04/05, theme/frame/scale, всех routes или визуального соответствия37/98. Computer Use/скриншоты desktop не использовались; содержимое окна агент не осматривал.
+
+Это промежуточная поставка незакоммиченной рабочей копии. Manifest buildId включает прежний HEAD и locks; он не является identity всех текущих незакоммиченных UI правок. Публичный релиз/push/CI и native/integration qualification не выполнялись. T191 полная visual matrix и T192 итоговая source-revision/installed acceptance остаются открытыми; все98 требований (37base/61future) сохранены. Следующая работа — полная прямая сверка base screens, не подмена её этим launch или widget captures.
+
+## T193/T198 — controls и origins: scoped review завершён, 2026-10-29
+
+T193/T198/T200–T204 реализованы и отмечены[X]: shared search22/31 сохраняет native key/controller/focus/maxLength256/guarded submit/local filtering; source body bars используют36desktop/native44; pager сохраняет loaded-page owner/callbacks, current read-only selected marker30desktop/44phone и рост текста; footer native fringe исправлен. DeckPage учитывает device700 и пустой action-row gap12/14;11callers используют post-tabs16phone/20desktop. Дополнительная сверка исправила settings hint20phone/18desktop (пропуск прежнего T190), presence refresh glyphs27/32/text-only22 и jobs gap18. Новый обычный DeckButtonLabel сохраняет native buttons/handlers и fixed gap7 вместо SDK8→4; SVG16/18 и standard20 разделены. Новых DTO/guards/providers/dependencies и reference/DSL/schema/receipt machinery нет.
+
+Актуальный gate: `.local/unit-widget/t193-198-format-3.log`689files/0changes, `t193-198-analyze-3.log`NoIssues, `t193-198-full-3.log`8953PASS/1expected optcaptureSKIP/7:46/exit0. Пять locked restores `t193-*-restore.log` успешны; protocol/windows/locald analysis без замечаний; выбранные protocol165 и fake scheduler21PASS. Package code/dependencies не менялись после этих package checks. Links `t193-198-links-3.log`1977OK/0errors/1excluded. Fresh readonly `t193_198_code_review_r2` завершён без замечаний, готов только указанный scope. Предыдущее review нашло P2 native icon gap; `t204-gap-red-1.log`4FAIL→`t204-gap-green-1.log`93PASS, затем текущий полный gate. `t193-198-full-1.log` остановлен, не pass; full2=8949PASS — checkpoint до T204. `t202-203-red-1.log` — shell error/no tests, не RED; red2=6FAIL→green1=70PASS. T198 origin red1=12FAIL/17PASS→29PASS; pager fringe2FAIL→8PASS; settings hint1FAIL/1PASS→2PASS. Итоговый focused3=184PASS до T204. История сохранена.
+
+Десять top PNG `direct-t193-198-02` получены обычным widget capture для22/27/31/33/85 на1100/390 dark100, до T204; это предварительные кандидаты, не полная visual matrix или installed showing. T191 и T192 остаются открытыми; сохраняются все98 (37base/61future design+functionality). На checkpoint source-review установлен прежний T188, новых build/install/launch/commit/push/CI/publication не было. Следующая отдельная delivery action — авторизованная normal private build, без integration target/capture defines/native tests. Она не закрывает T191/T192 и не доказывает содержимое окна. Native/integration/Computer Use не выполнялись.
+
+## T190 — формы: завершён scoped code review, 2026-10-29
+
+Перенесены внешние подписи/обязательность по действующим codec, form42desktop/44phone с native44, типографика и многострочный ввод, helper960/165:100/badge36, footer desktop/compact521–760/phone и сохранение прежних owners/controllers/JSON/guards. Независимые review выявили и привели к исправлению credential-only footer12 (T195), required strings (T196) и compact flex521–760 (T197). Дополнительная прямая сверка нашла painted input40 вместо42: T199 обеспечивает native minimum внутри dense InputDecorator без изменения multiline padding. Старую гипотезу о visual density опроверг failed green1; история сохранена. Ни один из этих passes не означает full37/98 acceptance.
+
+Текущий source gate: `.local/unit-widget/t190-format-5.log` —687files/0changes; `t190-analyze-5.log` —NoIssues; `t190-full-5.log` —8903PASS/1expected optcaptureSKIP/8:09/exit0. Все пять lockfile restores выполнены ранее в этом цикле; package code/dependencies не менялись. RED/GREEN: `t190-review-red-2.log`3FAIL→green1 3PASS; `t190-compact-red-1.log`12FAIL→compact-green2 47PASS; `t190-border-paint-red-1.log`1FAIL/1PASS→border-paint-green2 222PASS. `t190-review-red-1.log` не запустил тесты из-за literal filter и не является RED; full4 остановлен перед T199, не pass. Links после новых задач: `t190-review-links-3.log`1976OK/0errors/1excluded. Fresh readonly `t190_code_review_r3` завершён без замечаний; готовность и отсутствие препятствий к закрытию установлены только для T190/T195/T196/T197/T199. Эти пять задач отмечены[X].
+
+Предварительно непосредственно просмотрены пары top PNG для33 desktop/phone,85 desktop/phone,12phone и07desktop из `direct-t190-forms-01`; восемь PNG в run не означают восемь принятых сравнений. После T199 отдельный `direct-t190-border-01/85-settings-form-1100x760-dark-100.png` подтверждает совпадение первой рамки y300–341 с original. Это обычные widget fixtures, не установленное приложение и не вся визуальная сверка. Найденные shared origins/post-tabs gaps записаны в открытую T198; readonly `t198_readiness_review` завершён без замечаний, готов только этот корректирующий scope. T193/T198 → T191 → T192 остаются работой впереди. Установленный T188 (`0.2.1+11`) сохранён; новых build/install/launch/commit/push/CI/publication в этом цикле нет. Native/integration/Computer Use не выполнялись. Общая цель98 остаётся открытой.
+
+## T189 — вкладки: завершённый scoped review, 2026-10-29
+
+T189 реализован в обычных DeckTabs/DeckControlTarget: source42desktop/44phone, padding0/8 и gap20, короткая «ПО» с native hit/semantics44, рост/перенос текста, native keyboard callbacks и сохранение State. Содержимое ограничивает scroll viewport; отдельный foreground painter рисует только focus2/gap2 и читает фактический ScrollController offset во время paint, включая первый кадр resize390→800→1100. Новых domain owners и reference/DSL/renderer pipelines нет.
+
+Два последовательных независимых review обнаружили реальные дефекты: утечку normal content через расширенный clip и старую координату focus после layout correction. Оба воспроизведены до исправления: `t189-clip-red.log`1FAIL и `t189-resize-red-2.log`4FAIL. Первый settled-frame `t189-resize-red.log`4PASS не был RED. После исправлений `t189-focused-14.log`31PASS; последний root gate перед следующей правкой T190: `t189-190-format-1.log`685files/0changes, `t189-190-analyze-1.log`0issues, `t189-190-full-1.log`8856PASS/1expected capture SKIP/8:06/exit0. Fresh readonly `t189_code_review_r3` завершён без замечаний; scope — три файла T189, не весь T190/003. T189 отмечен[X]. Более ранние full/full2 остановлены перед новыми правками; full4 остановился на analysis warning; они не passes.
+
+T190 остаётся открытым. Частично перенесены form footer/helper: phone full-width actions/gap10/padding14; desktop source geometry, helper breakpoint960/ratio165:100 и badge36/icon20, source typography; реальный purpose при скрытом aside сохраняется в форме. После этого root gate дополнительный native-fringe тест воспроизвёл20 отказов (`t190-form-fringe-red.log`); исправление в DeckFormActions даёт33PASS (`t190-form-fringe-green.log`). Для этой последней правки T190 новый полный gate и independent review ещё не завершены. До неё focused `t190-form-focused-3.log`698PASS, затем33PASS/state+focus cases; старый failed focused2 сохраняется. Поля/подписи/textarea и остальные обязательства T190 ещё не доведены. Установлен T188; новые build/install/CI/publication, native/integration и Computer Use не выполнялись. T191/T192 и вся37/98 приёмка остаются открытыми.
 # Evidence: дизайн003
+## Phase9 Converge — readiness исправлен, реализация ещё не начата (2026-10-29)
+
+Converge после T188 рассмотрел20FR/6SC/9AC,7групп актуальных решений плана,8принципов Constitution в пределах UI003 и173существующих task IDs как текущие обязательства/результирующее поведение с учётом истории;15CANCELLED reference tasks не восстановлены. Registry содержит98unique IDs и98строк распределения; текущаяbase37/future61 последовательность пользователя сохранена. Выявлены5оставшихся блоков: tabs/focus, формы, общие controls, полная визуальная сверка и итоговая установленная поставка. Добавлены T189–T193 в Phase9, old task text был сохранён целиком как prefix. Результат tasks_appended, не converged; T140 и общая цель не закрыты.
+
+Первое независимое `phase9_converge_readiness` вернуло «не готов»: T189 ошибочно требовал убрать phone horizontal8, T193 не указал phone button icon18. По final CSS `.tabs .tab`≤520 сохраняются horizontal8/min-width44; `.button .icon`16desktop/compact и18phone. Исправлены только ещё не исполненные новые требования, добавлен T194 с причиной/историей. Fresh `phase9_readiness_r2` завершён без замечаний, готовность установлена только для этой очереди. T194 отмечен[X]; T189–T193 остаются[ ]. До/после correction links соответственно `converge-phase9-links.log` и `phase9-readiness-r2-links.log`:1975OK/0errors/1excluded; post-command diff check0. App/test code в этом цикле не менялся, прежние8792PASS/1SKIP относятся к T188 и не доказывают исполнение Phase9. Native/integration/CU не запускались, установлено по-прежнему T188.
+
+Порядок дальнейшей работы194→189/190/193→191→192. Источники и существующие DTO/owners/guards сохраняются; новые reference/installer frameworks и новые default providers не вводятся. Review допускает выбор обычных UI implementation details внутри зафиксированных требований, не разрешает сокращение экранов/функций.
+## T188 — toolbar «Серверы» и lifecycle menus завершены (2026-10-29)
+
+Финальные `.local/unit-widget/t188-format-2.log`, `t188-analyze-2.log`, `t188-full-2.log` завершились exit0:683files/0changes,0issues,8792PASS/1expectedoptincaptureSKIP за8:06. RED0,4capture variables очищены, обычный test/ без capture defines; native/integration не запускались. До code был clean `t187_record_t188_readiness`, после — readonly `t188_code_review` без замечаний в T188. T188 отмечен[X]; T129/T131, полный37/98 и прочие открытые задачи не закрыты.
+
+Focused `t188-focused-8.log`80PASS и `t188-focused-9.log`89PASS. Новый profile_toolbar_test содержит40тестов: geometry на6widths×2themes×100/200 с height1400, реальные fringe taps/semantics, intersections/reset/sort/stale tag, max64tag200%, keyboard normal/reduced,12menu privacy/epoch cases и queued late result. Эта height1400 matrix сама не доказывает4canonical frames; отдельные существующие tests/captures покрывают их геометрию/scroll. Старые ProfileList/native filter cases сохранены и перенесены на реальные открытые PopupMenuItem options; добавлен stale connecting status. MotionDropdown форм не менялся. Early RED `t188-red-2.log`24fail воспроизвёл48вместо44; первый RED был остановлен из-за async teardown после того же failed assertion, затем cleanup перенесён в body finally. Первый mandatory attempt остановился на unused import до Flutter tests и не является pass. Эти результаты не превращаются в native acceptance.
+
+`t188-profile-captures.log`16PASS/16PNG в `direct-t188-profiles-01`. Прямо просмотрены05phone390dark100 иdesktop1100dark100; panel controls получили source40/44 search, selected chip chrome и phone expanded actions. Данные synthetic widget boundary, не installed screenshot; полная визуальная матрица не принята. Отличия реальных counts/statuses от source demo сохраняются честно.
+
+Normal Release `private-build-t188.log` exit0. Полный format3 bundle установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t188`, FileVersion0.2.1+11;5product hashes проверены, copy manifest изменён только appRoot. Исходники незакоммичены, buildId=base HEAD, нет push/CI/public release. Сохранены предыдущие версии и workspace; основной shortcut обновлён, предыдущий сохранён как `ServerDeck base design t187.lnk`. Normal Start-Process запустил PID41772; последующее process metadata чтение подтвердило exact installed path, ненулевой MainWindowHandle и Responding=True. Содержимое окна не инспектировалось, CU/desktop automation не применялись. Installed visual acceptance и T139/T147/T152 остаются открытыми.
+## T187 — строки/phone cards завершены, private копия установлена (2026-10-29)
+
+Финальные `t187-format-3.log`, `t187-analyze-3.log`, `t187-full-3.log` в `.local/unit-widget/` завершились exit0:682files/0changes,0issues,8752PASS/1expectedoptincaptureSKIP за8:00. RED0,4capture vars очищены; native/integration не запускались. Before-code `t187_spec_readiness` и after-code `t187_code_review` завершены без замечаний в T187 scope. Links `t187-readiness-links.log`:1973OK/0errors/1excluded. Только T187 отмечен[X]; T129/T131/T133, другие общие задачи и приёмка37/98 остаются открытыми.
+
+`t187-red.log` воспроизвёл default14 вместоtable13 внутри Material. `t187-empty-red.log` воспроизвёл лишнюю1px линию пустой таблицы; после исправления `t187-focused-7.log`65PASS, включая filter/paging/keyboard regressions. Предыдущий `t187-full-2.log`8751PASS относится к source до empty fix, не final. Первый full прерван после старого ожидания phone one-column при200%; этот run не pass. Заголовок13/20/600 сохранён по FA04, ошибочное предположение о его дефекте исправлено.
+
+Обычные widget capture runs `t187-table-captures.log`48PASS и `t187-base-survey.log`74PASS. Из `direct-t187-tables-01` прямо просмотрены36phone390dark100/desktop1100dark100 и27phone390dark200. Из `direct-t187-base-survey-01` прямо сопоставлены с исходными PNG01/05/07/84/06desktop1100dark100 и05phone390dark100. Survey не является full visual acceptance; он выявил оставшийся прежний toolbar поиска/фильтров05, уточняемый T188. Различия реальных данных и demo values не подменяются. Полный набор сочетаний не объявляется просмотренным, installed UI screenshots не получены.
+
+Normal Release `private-build-t187.log` exit0. Целый format3 bundle установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t187`, FileVersion0.2.1+11,5product hashes verified, copy manifest отличается только appRoot. Source незакоммичен; buildId содержит base HEAD, нет push/CI/public release. Прежние версии и workspace сохранены; основной shortcut указывает на новую копию, прежний сохранён как `ServerDeck base design t185.lnk`. Normal Start-Process запустил PID35848; process metadata подтвердили exact path, MainWindowHandle260441982 и Responding=True. Содержимое окна и installed visual acceptance не инспектировались. CU/desktop automation и native/integration qualification не применялись. T139/T147/T152 и общая цель остаются открытыми.
+## T185/T186 — общие панели, клавиатура и private установка (2026-10-29)
+
+Финальный gate `.local/unit-widget/t185-186-format.log`, `t185-186-analyze.log`, `t185-186-full.log` завершился exit0: 681 файл/0 изменений, анализ0issues, ordinary Flutter8726PASS/1expected opt-in captureSKIP за8:08. RED=0, capture variables очищены, native/integration не запускались. Links `t185-186-links.log`:1972OK/0errors/1excluded. Первый review `t185_code_review` выявил отсутствие проверки keyboard popup navigation; исправление записано отдельным T186 без удаления истории. Fresh readonly `t185_186_code_review_r2` завершён без замечаний в scope этих двух задач. Только T185/T186 отмечены[X]; широкие задачи и вся приёмка37/98 остаются открытыми.
+
+Search/filter chrome и desktop visible/hit размеры action groups исправлены через обычные app widgets. Focused `t185-focused-14.log`105PASS; `t185-focus-15.log`26PASS; окончательный keyboard `t185-keyboard-17.log`1PASS включён в полный gate. Прежний полный `t185-full.log` остановлен после2устаревших geometry expectations и не является pass; второй `t185-full-2.log`8726PASS предшествовал добавлению keyboard сценария. В `direct-t185-tables-01` получены32PNG реальных production widget compositions с fake внешними зависимостями; directly просмотрены36-ai-grants390dark100 и1100dark100 рядом с исходными source PNG. Положения search/filter/table top совпадают в этих двух кадрах; различия данных/строк и ещё открытая геометрия строк/карточек таблицы не означают полной приёмки. Это не снимки установленного приложения.
+
+Normal private Release build `private-build-t185.log` завершён exit0; production code после сборки не менялся, исправлялся тест. Bundle format3 установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t185`, FileVersion0.2.1+11;5product hashes совпали, manifest в копии изменён только по appRoot. Source незакоммичен, buildId содержит базовый HEAD; публикация/CI/merge не выполнялись. Прежние версии и workspace сохранены; предыдущий shortcut сохранён как `ServerDeck base design t183-184.lnk`, основной ServerDeck.lnk указывает на новую копию. Обычный Start-Process WindowStyle Normal запустил PID35528. Последующее чтение process metadata подтвердило точный installed path, ненулевой MainWindowHandle и Responding=True. Содержимое окна/readiness не инспектировались; Computer Use/desktop automation не применялись. Installed visual acceptance, T139/T147/T152 и вся цель остаются открытыми.
+
+## T183/T184 завершены локально; новая private копия установлена и запущена — 2026-10-29
+
+Полный объединённый повторный gate `.local/unit-widget/t183-184-mandatory-2/` завершился exit0: format678/0changes, analyze0issues, Flutter8700PASS/1expectedcaptureSKIP за8:04. Fresh readonly reviews `t184_layout_code_review` (core layout/theme/identity) и `t183_184_application_review` (navigation/integration/callers/tests) завершены без замечаний в своих scopes. T183/T184 отмечены[X]; остальные открытые задачи003/37/98 сохранены. Cumulative diff старше этих изменений, отдельного baseline нет; отсутствие иных изменений во всём diff независимо не установлено. Предыдущий interrupted run не считается pass.
+
+Штатная private Release-сборка `.local/unit-widget/private-build-t183-184.log` завершилась exit0. Полный format3 bundle установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t183-184`; FileVersion0.2.1+11, manifest в копии отличается только appRoot, все5product component hashes проверены. Обычный shortcut переключён сюда; прежний t182 сохранён как `ServerDeck base design t182.lnk`. Предыдущие версии и каталог workspace сохранены. Source незакоммичен, manifest buildId содержит базовый HEAD; commit/push/CI/public release не выполнялись.
+
+Обычный Start-Process WindowStyle Normal запустил установленную новую копию PID27112; повторное чтение подтвердило точный путь, MainWindowHandle26739918 и Responding=True. Прежние35156/40552 также оставались открыты. CU/desktop automation не применялись; содержимое окна и readiness не инспектировались. Пользователю задан вопрос о том, что фактически видно в новом окне; ответа пока нет. Запуск не доказывает trusted runtime, native/integration qualification или installed visual acceptance. T139/T147/T152 и вся приёмка37/98 остаются открытыми. Прямые widget-сверки ограничены четырьмя записанными сочетаниями27/36; toolbar/search/selected-chip и другие gaps остаются T129/T133/T143. Следующие checkpoints ниже являются историей своих source/scope.
+
+## T183/T184: навигация и адаптивные действия, проверки продолжаются — 2026-10-29
+
+Оба дополнения прошли отдельные fresh readonly readiness reviews без замечаний до implementation. T183 исправляет реальный вход Jobs→Ansible-профили и null-client fallback: target/typed section/key/client сохранены, вместо требования выбрать сервер показана причина неподтверждённого локального подключения. Existing recent-operations caller и grant entry сохраняются. Meaningful `.local/unit-widget/t183-red.log` воспроизвёл отсутствие entry; `t183-green.log`66PASS, `t183-focused.log`82PASS, включая32actual BaseWorkspace cases с/без профилей во всех frames/themes/scales. Нативный trusted controller не создавался; non-null constructor/initialSection остаётся предметом независимого чтения.
+
+T184 исправляет phone visible44/focus2gap2, flex header auto и table-actionbar130. Это обычный physical Flutter layout `lib/ui/deck_action_flow.dart`, не reference renderer. У137существующих кнопок в22libfiles установлен публичный Clip.none; handlers и data payload не менялись. Default/explicit padding, IconButton и desktop roles проверяются непосредственно. Первый `t184-red.log` имел только compile error пропущенного test callback и не считается meaningful RED. Повторный `t184-red-2.log` дал16реальных phone geometry failures при16desktop passes. Первый GREEN имел compile error abstract ParentData; исправлен собственным обычным render parent data. `t184-green-5.log` завершился34PASS: pixels видимых fills/внешнего focus/пустого gap, hit≥44, disabled0effects, unequal header grow,130px bars, все4Jobs actions, сохранение фокуса через theme/scale/desktop↔phone. Перед последним4px gap correction расширенный `t183-184-focused.log` завершился1334PASS. Дополнительный meaningful `t184-panel-gap-red.log` подтвердил20вместоsource16; после исправления27/36 весь новый набор снова прошёл.
+
+Финальные captures27/36 (`t184-final-capture-27-job-list.log`, `t184-final-capture-36-ai-grants.log`) завершились по16PASS/16PNG. Прямо просмотрены из `direct-t184-*-02`:36phone390dark100/200,36desktop1100dark100 и27phone390dark100. Phone header/body actions теперь заполняют source ширину и имеют44px visible height; gap после panel16. Остальные сочетания не объявляются сверенными; desktop/source paint offsets и toolbar input/spacing/selected-count role остаются в T129/T133/T143/T147. Form footer full-stack не исправлялся этим scope. Full37/98 не принят.
+
+Полный объединённый mandatory gate и fresh independent code review ещё необходимы; T183/T184 остаются[ ]. Текущая установленная/запущенная private t182 не содержит этих правок. Публикация, CI, native/integration/CU не выполнялись.
+
+Первый объединённый mandatory: format678/0changes и analyze0issues прошли; widget run остановлен после3658PASS/4FAIL/1expectedskip, terminal exit1. Четыре прежних stock-focus profile cases искали phone focus внутри hit area, тогда как final CSS/T184 требует внешний outline2/offset2. В `design_stock_focus_test.dart` изменены только позиции4pixel samples для profile TextButton; log-row reserve и credential/settings branches сохранены, как и hit≥44, keyboard traversal, visibility, contrast≥3 и проверка точных2px/2px. После корректировки `.local/unit-widget/t183-184-focused-2.log` завершился124PASS/exit0. Новый полный gate — `.local/unit-widget/t183-184-mandatory-2/`, пока без итогового результата.
+
+## T182 завершён локально; новая private копия установлена и запущена — 2026-10-29
+
+Полный повторный gate `.local/unit-widget/t182-mandatory-2/` завершился exit0: format676/0changes, analyze0issues, ordinary Flutter8634PASS/1expectedcaptureSKIP за7:58. Fresh readonly code/spec review `t182_code_review` завершён без замечаний в scope T182; подтверждено соответствие helper и MCP ожиданий окончательному CSS, сохранение glyph/selection/copy assertions. Ограничение review: отдельного baseline T182 нет, поэтому сохранность всего cumulative diff независимо не установлена. T182 отмечена[X] только для этой presentation-коррекции. Остальные37/98 и открытые задачи не закрыты.
+
+Штатная private Release-сборка `.local/unit-widget/private-build-t182.log` завершилась exit0. Полный format3 bundle установлен в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-t182`; FileVersion0.2.1+11, manifest отличается от build-копии только appRoot, проверены все5product component hashes. Обычный `ServerDeck.lnk` переключён сюда; прежний r2 shortcut сохранён как `ServerDeck base design r2.lnk`. Старые каталоги установок и каталог workspace сохранены. Source остаётся незакоммиченным, manifest buildId содержит базовый HEAD; нового commit/push/CI/release нет.
+
+Новая копия запущена обычным Start-Process с WindowStyle Normal, без остановки прежней. Подтверждены PID35156, точный установленный путь, MainWindowHandle66323690, Responding=True; прежний40552 также продолжил работать. Ранее запрошенное закрытие старого окна оказалось не обязательным для отдельного запуска. Содержимое окна не инспектировалось, CU/desktop automation не применялись. Native/integration квалификация, реальные операции и installed visual acceptance этим не доказываются. Прямая сверка остаётся ограничена двумя записанными widget PNG36. T139/T147/T152 сохраняются открытыми в полном объёме. Следующие строки этого документа — исторические checkpoints своих source/scope.
+
+## T182: исправление строк сведений, проверки продолжаются — 2026-10-29
+
+Дополнение T182/plan прошло fresh readonly readiness review `t182_spec_readiness` без замечаний. Новые обычные widget-тесты сначала дали33meaningful failures на прежних font roles/min110/geometry; `.local/unit-widget/t182-red.log`. Исправлен AutomationFacts: фактические роли12/20 Mono/UI, phone13/22, отдельные borders/gap12, padding9 и source phone spacing, min110 table-context, без desktop stack при200%; body padding12vertical ограничен callers27/36. Explicit styles и все values сохранены. Первый GREEN attempt имел compile error неверного имени готовой typography-константы; после замены на существующую BrandTypography.log повторный `.local/unit-widget/t182-green-2.log` завершился33PASS.
+
+Focused production tests и вся primary matrix завершились674PASS/exit0: `.local/unit-widget/t182-focused.log`. В existing matrix27/36 добавлены проверки фактических inner/outer rects body padding во всех16условиях. Отдельный обычный capture36 завершился16PASS/16PNG, `.local/unit-widget/t182-capture-36.log`; прямо просмотрены только desktop1100 dark100 и phone390 dark100 в `.local/design-003/003.4/direct-t182-36-ai-grants-01/`. Panel теперь совпадает с source по просмотренным верхней/нижней границам188–344desktop и263–501phone, разделитель имеет исходный gap. Остальные сочетания не объявляются визуально проверенными. Width phone actions остаётся открытой.
+
+Полный mandatory gate и fresh code review T182 ещё необходимы; task остаётся[ ]. Установленная r2 соответствует предыдущему завершённому T179–T181 source и не содержит T182. Старая запущенная копия не подменялась; native/integration/CU не выполнялись.
+
+Первый T182 mandatory run: format676/0changes и analyze0issues прошли, но24MCP typography tests выявили устаревшее ожидание UI13/20 для значения description-list. Окончательный source exactFields выдаёт обычный dd (Mono12/20, phone13/22); отдельные exact command/args и captions сохраняют прежние роли. Уже failed прогон остановлен после5465PASS/24FAIL/1skip, process exit1; это неполный failed run, не successful full gate. В `design_mcp_typography_test.dart` изменены только три ожидания human value на source role; actual glyph advances, Mono13/20 command/args, UI captions, selection/full text, exact copy/callback counts и immutability сохранены. Повторный focused `.local/unit-widget/t182-focused-2.log` завершился651PASS/exit0. Новый полный gate находится в `.local/unit-widget/t182-mandatory-2/`; его итог пока не установлен.
+
+## T179–T181: завершённые проверки и private установка — 2026-10-29
+
+После Jobs correction полный gate `.local/unit-widget/t179-181-mandatory-3/` завершился exit0: format675/0changes, analyze0issues, ordinary Flutter8601PASS/1expectedcaptureSKIP за7:52. Fresh readonly review `t179_181_code_review_r2` завершён без замечаний в scope этих трёх задач. Non-null TrustedApiClient wiring проверен чтением; native/runtime/integration не выполнялись. T179–T181 отмечены[X], остальные открытые задачи и отменённые ID сохранены. Промежуточные записи ниже являются историей, не текущим статусом.
+
+Штатная повторная Release-сборка после Jobs fix завершилась exit0: `.local/unit-widget/private-build-t179-181-r2.log`. Полный normal format3 bundle установлен отдельно в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029-r2`, FileVersion0.2.1+11. В копии manifest изменён только appRoot, проверены все5product component hashes. Обычный `ServerDeck.lnk` переключён сюда; прежний сохранён как `ServerDeck 0.2.1 previous.lnk`. Старые установки, подготовленная r1 и каталог данных сохранены. Source незакоммичен; buildId с базовым HEAD не идентифицирует новый source commit. Commit/push/CI/public release не выполнялись.
+
+Новая копия не запускалась: прежний процесс40552 продолжал работать из папки0.2.1+11. Пользователю предложено обычное закрытие; принудительное завершение и CU не применялись. Actual showing новой копии и installed visual acceptance остаются открытыми T139/T147/T152. Прямо просмотренные сочетания32/36 перечислены ниже; остальные условия, отличия36 и вся программа37/98 не объявляются принятыми.
+
+## Текущие T179–T181 и повторное ревью — 2026-10-29
+
+Первый полный прогон последних правок завершился успешно: format675/0changes, analyze0issues, ordinary Flutter8601PASS/1expectedcaptureSKIP за7:54; `.local/unit-widget/t179-181-mandatory-2/`. Ранее failed analysis attempt из-за лишнего import не считается pass. Независимый readonly review затем нашёл один подтверждённый пропуск: обязательный по FA06 переход из Jobs к доступу ИИ отсутствовал. Поэтому T179–T181 пока не закрыты.
+
+Для этого пропуска расширен настоящий BaseWorkspace widget scenario: до исправления один desktop case завершился meaningful failure на отсутствии кнопки, `.local/unit-widget/t180-jobs-entry-red.log`. После передачи локального callback через существующие page actions все33теста `base_page_actions_test.dart` прошли, включая16Jobs transitions: `.local/unit-widget/t180-jobs-entry-green.log`. Новый полный gate `.local/unit-widget/t179-181-mandatory-3/` запущен; его итог и fresh independent review пока не установлены этой записью. Non-null TrustedApiClient wiring проверяется чтением, native runtime не запускался.
+
+До последнего Jobs correction штатная private Release-сборка завершилась exit0: `.local/unit-widget/private-build-t179-181.log`. Полный bundle с FileVersion0.2.1+11 скопирован в отдельную папку `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11-base-design-20261029`; изменён только appRoot копии manifest, проверены все5component hashes. Предыдущая0.2.1+11 и данные сохранены. Эта подготовленная копия не включает последнюю коррекцию Jobs, не запущена, обычный ярлык не переключён. Прежний процесс40552 оставался запущен; пользователю предложено закрыть его обычным способом. Нужна пересборка после clean повторного gate/review. Public release/CI/native/integration проверки не выполнялись.
+
+Прямо просмотрены original desktop dark36 и current widget PNG `direct-t179-181-36-ai-grants-02/36-ai-grants-1100x760-dark-100.png`, затем original/current phone390 dark100. Подтверждены Settings selected, нейтральные header actions и малый search glyph. Остаются отличия table-context отступов/разделителей и phone ширины actions; весь T147/37/98 этим не принят. Это просмотр widget PNG, не содержимого установленного окна.
+
+## Private 0.2.1+11: сборка, установка и запуск 2026-10-28
+
+Штатный `tools/run-serverdeck.ps1 -Configuration Release -BuildOnly` с pinned SDK завершился exit0; журнал `.local/unit-widget/private-build-0.2.1.log`. IntegrationTarget/capture/qualification flags не передавались. Это доставка, не native/integration qualification.
+
+Полный normal format3 bundle скопирован в `C:/Users/user/AppData/Local/Programs/ServerDeckNext/0.2.1+11`; FileVersion установленного serverdeck.exe — `0.2.1+11`. В копии изменён только product manifest appRoot, все пять component hashes проверены по этому manifest. Прежняя0.2.0 и каталог данных не изменялись. До переключения процессов serverdeck/locald/mcp не было. Прежний ярлык сохранён как `ServerDeck 0.2.0.lnk`, обычный `ServerDeck.lnk` указывает на новую версию.
+
+Обычный запуск установленного exe создал PID40552; повторное чтение процесса подтвердило правильный путь, MainWindowHandle2557532 и Responding=True. Содержимое окна не инспектировалось: Computer Use/desktop automation не применялись. Pixel correspondence, все реальные переходы и полный runtime T174 этим не подтверждены; T139/T147/T152 остаются открытыми в своём полном scope.
+
+Сборка выполнена из незакоммиченной рабочей копии после cleanup и clean scoped reviews. BuildId штатного manifest содержит базовый HEAD; он не является идентификатором отдельного нового source commit. Публикация/CI/merge/release не выполнялись. До сборки mandatory root gate: format672/0, analyze0issues,8516PASS/1expectedcaptureSKIP; логи `.local/unit-widget/cleanup-checks-5/`. Spec links после cleanup:1968OK/0errors/1excluded. Эти результаты не устанавливают готовность37/98.
+
+## 003.4 — Исправление базового переноса 2026-10-28
+
+### Текущий статус после прямого указания пользователя
+
+Самостоятельная reference-инфраструктура и связанные corpus/schema/binding/
+validator/receipt требования отменены и удаляются. Отменённые task IDs сохранены
+в [tasks](tasks.md), без ложной отметки выполнения. Они не являются условием
+приёмки приложения. В работе остаются точный дизайн37 базовых сценариев,
+существующие функции/guards, обычные static/unit/widget checks, прямая визуальная
+сверка и поставка установленного приложения с сохранением данных. Остальные61
+экрана сохраняются в функционально-визуальных пакетах программы98.
+
+Эта редакция документа не запускала tests, link check или review. После очистки
+нужны фактические проверки текущего source и свежее независимое ревью по AGENTS.
+Результаты удалённого инструментария не доказывают приёмку UI и не заменяют
+прямую сверку канонического HTML/брендбука/PNG с настоящим приложением.
+
+Сохранённые реальные checkpoints предыдущего source:
+
+- После T160/T161 gate06 завершился exit0: пять locked restores, root format/
+  analyze, protocol/windows/locald analyze,165 protocol pure units,21 locald
+  fake scheduler units,8473 ordinary root unit/widget PASS и1 expected opt-in
+  capture skip. Native/integration не запускались. Это результат прежнего
+  source, не текущий pass после новых правок.
+- Focused T160/T161:604 PASS, включая320 сохранённых journeys и16 zero-TTL
+  pre-admission cases. Guards остаются обязательными.
+- Independent R4 выявил недостающую текстовую альтернативу saved mini charts.
+  T163 добавил существующий text-only MetricsHistory: meaningful defect RED,
+  focused GREEN118/118 и scoped format/analyze. Эти результаты не закрывают
+  общую визуальную сверку или последующую проверку текущей версии.
+
+Прямое визуальное соответствие всех заявленных сочетаний и окончательная
+установка0.2.1+11 ещё не приняты этим документом. Прежний WIP и старые captures
+не становятся новым эталоном; непросмотренные состояния остаются непроверенными.
+Показ установленной сборки и сохранность данных учитываются отдельно от unit
+и от невыполненной native/integration qualification.
+### Сохранённые промежуточные факты до первого общего gate
+
+После clean prerequisite review начат перенос37base. В рабочем дереве
+подключены36canonicalSVG, общие страницы/panels/tabs, оболочка210/68/phone,
+реальные разделы workspace, профили/credentials/recovery, сервер/журналы/trust,
+automation/software и настройки. RAM `DeckView`/`DeckLocation` используются
+обычной навигацией; история возвращает в захваченный caller. Контроллеры,
+Local API, полномочия и native transport этим переносом не заменены.
+
+Фактически выполнены промежуточные проверки, receipts под
+`.local/design-003/003.4/`:
+
+| Проверка | Наблюдаемый результат | Ограничение |
+| --- | --- | --- |
+| Root format | `checks/format.log`:658files,0changes,exit0 | После последующих исправлений повторяется |
+| Root `flutter analyze` | `checks/flutter-analyze.log`:0issues,exit0 | Общий test gate ещё не пройден |
+| Package analysis | protocol/windows/locald, каждый exit0 | Product-native проверки не запускались |
+| Selected package units | protocol165/165; locald fake scheduler21/21,exit0 | Не full locald/windows/MCP test suites |
+| Профили/credentials/settings/privacy overview |123/123 fresh focused passed | Не полная privacy/state matrix |
+| Серверные crosscutting widgets | `output/server-crosscutting-focused-final.log`:174/174,exit0 | Не весь root и не visual acceptance |
+| Основные35adoption origins |560/560 combinations внутри `root-focused-3` | Сам batch завершился exit1:678passed/53failed; остальные failures не скрыты |
+| Accessibility/MCP/RED-contract повтор | `root-short-4.log`:10/10,exit0 | Узкий повтор после исправления fixtures/helpers |
+
+Meaningful RED проверен на неизменённом архиве commit `c6a08d7`, с копированием
+только нового `test/widget/base_visual_contract_red_test.dart`: прежний rail72
+провалил canonical68 assertion, обычное пустое приложение не содержало welcome04.
+Оба — framework UI assertion failures, exit1; compile/tooling/fixture errors нет.
+Все1259архивных tracked files остались побайтно исходными. Тот же тест на текущем
+коде прошёл2/2 внутри `root-short-4`. Это доказательство различения старого UI,
+а не принятие всех37экранов. Receipts: `red-before-c6/.red-evidence/`.
+
+Source-only reference generator проверил296исходных100%PNG и зафиксировал592
+рецепта текущего scope. После исправления неоднозначного report checksum новая
+`reference-final-v2` отдельно фиксирует canonical JSON hash и реальный file SHA;
+UTF-8/LF serializer,21Python unit checks и strict regeneration прошли. V1 сохранён,
+все592recipe objects/IDs/markup побайтно канонически эквивалентны;
+это не растры послеFA04 и не измеренная переразметкаFA05. Разрешённая browser
+surface повторно отказала в доступе к уже открытой `file://` вкладке канонического
+атласа (`Blocked browser navigation by Browser Use URL policy`). Ограничение не
+обходилось скрытым браузером или переносом файла наHTTP. Исправленные100% и
+производные200%references/полная визуальная сверка остаются неполученными.
+
+По просьбе пользователя отдельно собран и показан обычный WIP Windows UI:
+`progress-preview-20261028-01/build-receipt.json`, build exit0, sourceClean=false;
+копия bundle запущена, фактическое окно наблюдалось на переднем плане. Это
+промежуточная поставка из рабочего дерева, не новая установленная принятая версия.
+Stable0.2.0+10, данные, прежние версии и shortcut сохранены.
+
+Первый primary candidate run (`candidate-20261028-01`) дал594/594layout passes
+и592PNG, но просмотр выявил отсутствующий brand logo. Он не принят как визуальное
+доказательство: четыре SVG, на которые перешла оболочка, не были перечислены в
+Flutter assets. Это реальный bundle defect, ранее скрытый тем, что capture host
+ждал старыеPNG. Исправлены pubspec assets и ожидание actual SVG loaders/decodes;
+обычный asset regression проверяет rootBundle, capture дополнительно требует
+видимые brand ink pixels. `svg-readiness-pilot-01` сохранил настоящий asset-load
+RED; `svg-readiness-pilot-02` прошёл2/2 со снятыми desktop/phone200 изображениями.
+Последующее изменение возврата фокуса после удаления последнего профиля также
+не переносится автоматически на прежний source digest. Новый candidate02 и общий
+gate выполняются отдельно; прежние файлы сохранены.
+
+T129–T140 ещё открыты. Свежая592matrix/candidates, весь root unit/widget gate,
+независимые code/visual reviews и окончательная private установка ещё не приняты.
+Product-native/integration suites и manual CI native profiles не запускались;
+публичный релиз и61futureфункции не объявляются выполненными.
+
+Последующая полная цепочка для private metadata0.2.1+11 завершилась фактически:
+`candidate-20261028-03`594/594passed и592PNG с decoded brand ink assertion;
+strict format658files/0changes/exit0; `flutter analyze`0issues/exit0;
+обычный root `flutter test --reporter expanded` **6246passed/1878failed/1expected
+opt-in skip,process1**. `checks/final-exits.json` подтверждает неизменность
+lib/test/assets/pubspec/AGENTS inputs между началом и концом. Это не clean gate.
+Крупнейшие группы — privacy/readiness overflow и server-state expectations,
+также exit/disposed listener и keyboard/focus cases. Ни skipped test, ни прежний
+focused pass не изменяют failure результата. Native/integration не запускались.
+
+Три read-only visual preflight выделили настоящие composition defects и
+неполные capture bindings. Они не объявлены финальным независимым review:
+profiles/settings —9PV findings после21original/35candidate frames;
+automation/software —9V-A findings после18desktop originals/candidates и
+выбранныхphone кадров; server preflight не завершился из-за provider capacity,
+но сохранил конкретные tab/phone-facts и capture-header observations.
+Подтверждённые исправления записаны append-only T142–T147. Состав37/61,
+FA01–FA10, API и stage не сужаются; metadata0.2.1+11 ещё не собрана/установлена
+как итоговый результат.
+
+### Итоговый prerequisite gate перед Implement 003.4
+
+Первый readiness и Analyze не были чистыми; их замечания и отчёты сохранены.
+Второй reviewer признал обязательные решения текущей базы достаточными,
+одобрил28пунктов качества и подтвердил26/26plannedFR/SCcoverage, но оставилP3:
+выдача grant ошибочно классифицирована как navigation.
+
+Исправлена только классификация `action/37-ai-grant-form/01` на `write`.
+R3fix receipt подтверждает34прочих frozenfiles без изменений; обратно заменённый
+JSON в памяти совпадает с R2checksum. Новые actual links:
+1971total /311unique /1970OK /0errors /1excluded,exit0;
+`git diff --check` exit0. Первые147477bytesисторииtasksсохранены.
+
+Итоговый независимый R3отчёт и его scopedverdict сохранены в
+`.local/design-003/003.4/review-r3/completed-report.md` и `completed-report.json`.
+MarkersT120–T128/T141и28CHKпереносятся только после завершённогоcleanR3,
+достаточности текущих37base решений и проверки неизменности reviewedсодержимого.
+Фактический вердикт определяется этим отчётом, не наличиемгалочки.
+
+Код приложения на prerequisitecheckpointещё не изменён;T129–T140,
+widget/visual592cases,новаясборка/установка/показне выполнены.
+Future61пакетыиnative/integrationqualificationне объявляются принятыми.
+
+
+### Readiness / Analyze, раунд1 и исправления
+
+Оба независимых read-only отчёта завершены, каждый с одним обязательным замечанием:
+readiness — отсутствовал достоверный binding93; Spec Kit Analyze — отсутствовал
+полный поэлементный affordance registry. Оба вывода **не готов** сохранены в
+`.local/design-003/003.4/review-r1/`; ни один не объявляется чистым.
+
+Исправления закреплены append-only T141 до Implement: FA07.1 определяет
+93blocked-unspecified только по валидному matching blocked plan, без вывода
+NetBird/protected cause из generic qualification/runtime отказа. Идентичность
+эффекта остаётся неизвестной, соответствующее действие disabled с объяснением;
+просмотр причины/исходного шага и exact-source edit не дают исполнения.
+
+Исторический T141 дополнительно проверял машинный registry действий. По последнему
+прямому указанию пользователя этот generated JSON удалён; его прежние результаты
+не являются текущей UI-приёмкой. Читаемая [таблица действий](contracts/base-affordances.md),
+настоящие callbacks, защитные ограничения и обычные widget assertions сохраняются.
+Далее обязательны новые links/diff и fresh Analyze/readiness для исправленного
+frozen package. До их результата T120–T141 остаются без заявления о готовности;
+application code и installed0.2.0 этим исправлением не изменялись.
+
+Пользователь изменил порядок после сравнения установленной0.2.0 с макетами:
+сначала003 переносит точный дизайн реализованной базы, последующие функциональные
+пакеты принимают свои функции и дизайн вместе. Прежняя приёмка003.1–003.3
+не доказывает новый результат. Текущий состав —37base (35origins плюс11/93)
+и61future в программе98; предложенный набор провайдеров/Ubuntu Core не принят.
+
+Подготовлены исправленные Spec/Clarify, Plan/research, модель, новый визуальный
+контракт, карта37, распределение98 и приложения к функциональным спекам.
+Новая очередьT120–T140 содержит21unchecked задачу. Старый147477-byte tasks prefix
+сохранён побайтно; task IDs/markers/полные строки прошлого не переписаны.
+Проверка `git diff --check` завершенаexit0.
+
+Реальная проверка ссылок `lychee "specs/**/*.md"` завершенаexit0:
+1965total /307unique /1964OK /0errors /1excluded. Sidecars:
+`.local/design-003/003.4/spec-links-exit.json`, `spec-links.log`, `spec-static.json`.
+Setup/Tasks и checklist prerequisites выполнены отдельными pwsh процессамиexit0;
+первоначальная проверка одного inline wrapper ошибочно прочитала старыйLASTEXITCODE,
+это не отказ Spec Kit. Фактические JSON/prerequisites сохранены отдельно.
+
+На этом checkpoint application code не менялся; новые Flutter/unit/widget,
+визуальные592проверки, readiness/code/visual reviews, сборка/установка/показ ещё
+не выполнены. Native/integration и реальные серверные workloads не запускались.
+Согласованный stage остаётсяstatic/unit/widget; old captures и публикация0.2.0
+не используются как доказательство переноса003.4.
 
 ## Завершение preview9 (2026-10-27)
 
@@ -1169,3 +1529,50 @@ Fresh final `t116_t117_dart_round2_review` завершён06:49:34Z/0findings: 
 Неудачная round2 серия сохранена: `T116-sourcecandidate-round2/result.json` —2passed, третийrun exit1 вsetUpAll/native artifact resolver доquota body,129775ms; source/normalprovider/Release preserved. `.local/release/candidate-selection-diagnosis/diagnosis-report.json` разграничивает этот локальный setup failure и actualCI7gateway failure. Corrected resolver-only3/3 exit0/{25763,25990,25287}ms подтверждает selection того жеc45 и restored context/provider, но не воспроизводит исходный сбой. Независимо установлен pwsh7.6.3/ucrtbase crash0xc0000409 того же временного окна; script-load PID44792 коррелирует сresolver dependencies, direct original command-line/child-PID/exit/stdout binding и underlying crash cause отсутствуют. Первый diagnostic harness64 сохранился отдельно и не является productfailure. Final round3 ten после restored scope не стирает эти failed evidence и не доказывает причины CI7.
 
 T116/T117 markers закрываются только в actual local implementation/checks/clean scoped review scope. Все117task IDs уникальны, прежние115completed lines byte-identical, полные T116/T117 line bodies сохранены и изменены только markers. Эта запись не заявляет fresh after-recording links/diff или clean recording review: до commit нужны их actual receipts, frozen13 и отдельный completed independent recording audit/fix loop. Workingmetadata `0.2.0-preview.1+8` остаётся без новых commit8/CI8/build8/install8/source8/tag/merge/publication receipts; current HEAD/source/privateinstall+7 `02ac9c88ba3e697f284af5598d37cb4b844a7ff1` сохраняются. ОбаWindowsCI7gateway-quotaexit1/4Linuxsuccess и unknowncause сохранены. Exact future terminalsuccessful fullcoldCI обязателен доmerge/tag/source-onlyMITrelease; publicassets толькоsourceZIP/SHA256SUMS.txt, privateunsigned/native/signing/distribution/full001/021/005 gates открыты, unactivatedc45/normalprivatef1/шестьoldversions/workspace сохранены.
+
+## Прямая сверка: первый текущий widget capture 2026-10-28
+
+Отдельный разрешённый widget invocation: pinned flutter test --no-pub test/widget/base_canonical_matrix_test.dart --reporter expanded с SERVERDECK_NATIVE_CONTROL_RED=0, очищенными DESIGN_CAPTURE_DIR/DESIGN_STATE_CAPTURE_DIR/DESIGN_STOCK_CAPTURE_DIR, BASE_DESIGN_CAPTURE_DIR=<workspace>/.local/design-003/003.4/direct-current-20261028-01, без dart-define flags. Terminal session27264 exit0:594tests passed,592viewport PNG записаны. Журнал .local/unit-widget/direct-current-capture.log. Это production widgets с fake внешними зависимостями, а не установленный runtime; наличие PNG не означает visually-verified.
+
+Непосредственно просмотрены исходный previews/dark/desktop/05-server-list.png из output/design-all-pages-2026-10-25 и текущий05-server-list-1100x760-dark-100.png. Исходный full-page PNG не уменьшался до viewport. Подтверждена лишняя строка вкладок между summary и search/filter в Flutter; создан T176 для её удаления с сохранением существующих функций фильтрации. Число/имена/наблюдения различаются из-за разных данных; они не объявлены geometry defects. Типографика исходных PNG требует учёта FA04, поэтому визуальное различие glyphs само по себе не принято как дефект. Остальная геометрия05 и другие591условие ещё не проверены; визуальная приёмка37/98 и установленного UI не заявлена.
+### Вторая непосредственно просмотренная пара:01desktopdark100%
+
+Просмотрены исходный previews/dark/desktop/01-startup.png и текущий direct-current-20261028-01/01-startup-1100x760-dark-100.png. Подтверждено сжатие строк блока «Состояние и следующие шаги» по содержимому вместо полной ширины и общих column boundaries. В ServerFactRows имеются outer Column с default center, Flex mainAxisSize.min и loose children; исходный .description-list задаёт grid minmax(0,1fr)/minmax(0,1.3fr), окончательный gap12. T177 описывает исправление constraints с сохранением phone stack и других фактических контекстов. Отклонения текста этапа являются данными; disabled action не объявлен дефектом, поскольку ожидание службы не даёт полномочий повторного запуска. Остальные590условий ещё не просмотрены; эта запись не подтверждает полную геометрию двух просмотренных страниц.
+## T176: реализация и текущая повторная сверка
+
+Из ProfileList удалены отдельный DeckTabs и _tab state; connected/attention перенесены в существующий dropdown с прежними identity-bound predicates, доступны при нулевой выборке. Canonical profile tests проверяют реальный dropdown, empty matches, несовпадающую identity, отсутствие connection и исчезновение/возвращение attention; PV01 сохраняет data/source/effect assertions с обновлённым перечнем options. Meaningful RED:2 исходных падения отсутствия строки в t176-red.log. Focused606PASS, затем финальные49PASS в t176-source-focused.log.
+
+Первый общий t176-mandatory остановлен после обнаруженного старого PV01 expectation; это не pass. После исправления полный t176-mandatory-2 завершился exit0:8516PASS/1expectedcaptureSKIP за11:37; format и analyze успешны. Независимый read-only reviewer t176_independent_code_review завершил проверку без замечаний только в scope T176. Пакетные исходники/locks не менялись; предыдущие выбранные package checks сохраняют свой исходный scope.
+
+Отдельный повторный capture existing base_canonical_matrix_test.dart с --no-pub --plain-name 'current base primary layout 05-server-list' --reporter expanded, RED0, очищенными тремя другими capture variables и BASE_DESIGN_CAPTURE_DIR=<workspace>/.local/design-003/003.4/direct-t176-05-20261028-01: exit0,16testsPASS/16PNG, журнал .local/unit-widget/t176-capture.log. Непосредственно просмотрен новый05-server-list-1100x760-dark-100.png: лишняя строка отсутствует, поиск/filters следуют после summary. Общая геометрия05 всё ещё не принята: остаются отличия вертикальных отступов и controls относительно канонического источника (T143/T147). Другие15PNG нового набора ещё не просмотрены. Установленная0.2.1+11 собрана доT176 и эту правку пока не содержит; новой установки/visual37/98acceptance не заявлено. T176 отмечен выполненным только для описанного локального исправления/checks/review; T177 и остальные открытые задачи сохранены.
+## Дополнительная прямая сверка во время frozen checks T177 — 2026-10-29
+
+Непосредственно просмотрены desktopdark100% пары06-server-overview,07-profile-create,22-server-logs,18-install-preflight из исходных previews и direct-current-20261028-01. В06 и22 виден уже известный дефект ширины ServerFactRows; исходный22 подтверждает отдельный table-context ratio .7fr/2fr, тогда как23-log-record (также просмотрен исходный PNG) использует обычный1fr/1.3fr. Это учтено в текущей реализацииT177 и её36geometry cases, но новый общий gate ещё идёт. В07 основные области формы присутствуют; разные данные/режим секрета и дополнительные защитные объяснения не объявлены автоматически дефектами. Принятия полной геометрии06/07/22 нет.
+
+В18 подтверждён дефект стиля пояснений hero: исходный status-hero p использует muted/max-width440, тогда как _AutomationHero выводит Text(state)/Text(contextLine) без соответствующих styles/constraints. Дополнительно исходные CSS и код подтверждают отличия icon/phone metrics/межстрочного gap; T178 фиксирует их проверяемую коррекцию. Source CSS извлечён чтением существующего HTML без исполнения/адаптера; production данные не подменялись. Прямой просмотр этих отдельных viewport не устанавливает visual37/98 или installed acceptance. Старые captures предшествуютT176/T177; их нельзя принимать за текущий source результат.
+## T177: завершение локального исправления таблиц 2026-10-29
+
+ServerFactRows теперь растягивает строки по доступной ширине, использует общую границу колонок1fr/1.3fr/gap12; только журнал22 включает tableContext с .7fr/2fr и минимумом110 для labels. Сохранены phone stack, facts, styles, keys, valueWidgets и SelectableText. Проверены фактические callers; helper-panel caller для этого компонента отсутствует. Новые36geometry tests покрывают default/table контексты во всех16условиях и четыре узких220px/tableminimum случая. Meaningful initial RED16 воспроизводил сжатие ширины; промежуточный TypeError в style getter теста исправлен до окончательного GREEN и не выдан за продуктовый дефект.
+
+Финальный focused85PASS: .local/unit-widget/t177-final-focused.log. Первый t177-mandatory остановлен для учёта найденного table-context варианта, не принят как pass. Финальный t177-mandatory-2: exact root format673/0, analyze0issues, full ordinary Flutter8552PASS/1expectedcaptureSKIP за12:40, terminal46754exit0. Capture variables очищены, RED0, без dart-define flags. Пакетные исходники/locks не менялись; прежние выбранные package checks сохраняют свой scope. Независимое code/spec review t177_independent_code_review завершилось без замечаний в scope T177.
+
+Отдельные capture runs existing base_canonical_matrix_test.dart с --no-pub --plain-name 'current base primary layout 01-startup' либо 'current base primary layout 22-server-logs' --reporter expanded, RED0, очищенными тремя другими capture variables, BASE_DESIGN_CAPTURE_DIR=<workspace>/.local/design-003/003.4/direct-t177-01-startup-01 либо direct-t177-22-server-logs-01: каждый exit0/16PASS/16PNG. Логи t177-capture-01-startup.log и t177-capture-22-server-logs.log. Непосредственно просмотрены только оба новых desktopdark100% изображения: обычные и log-context колонки выровнены согласно source. Другие30новых PNG не просмотрены; все остальные области страниц не приняты как exact geometry.
+
+T177 отмечена выполненной только для этого исправления, checks и clean scoped review. Установленная0.2.1+11 предшествуетT176/T177 и не обновлялась. Native/integration tests, новая сборка/установка и полная визуальная приёмка37/98 не выполнялись. T178 и оставшиеся задачи сохранены открытыми.
+## Прямая сверка32/36 и следующие коррекции 2026-10-29
+
+Просмотрены исходные и direct-current-20261028-01 desktopdark100%32-automation-profiles/36-ai-grants, а также исходный phone32. Подтверждено: «Выбрать версию»32 ошибочно растянута на desktop, но phone source действительно full-width; первые header actions32/36 имеют accent fill вместо source neutral. CSS .button normal background=surface; текущий _ButtonPainter normal outlined transparent. T179 сохраняет contrast border/hit targets FA04 и другие состояния, исправляет только установленные variants/width/fill, без утверждения полной геометрии.
+
+У36 source выделяет Settings и breadcrumb Settings, текущий capture — Jobs. Чтение screens.json подтверждает nav Settings у36/37/38, Jobs у32–35/39. Причина присутствует в production: DeckView.grants.section=Jobs; BaseWorkspace размещает AutomationPanel только в Jobs. T180 переносит section и реальный content, а не только fixture. Native TrustedApiClient unit-stage ограничение закреплено прямо; source wiring подлежит отдельному независимому чтению, runtime не заявляется проверенным. Непросмотренные условия этих страниц и визуальная приёмка37/98 остаются открытыми.
+## T178: завершение локального исправления hero 2026-10-29
+
+_AutomationHero получил canonical muted subtitles14/22desktop и14/24phone, общий maxWidth440, удалён лишний4px межстрочный gap; padding30/20desktop/28/16phone, emblem64/56, icon28, heading20/28desktop/22/30phone, gaps18/8. Существующие state/contextLine/tone и пять callers сохранены. ServerStatusBody изменён только в emblem gap20→18. Transparent emblem оставляет видимой surface родительской панели согласно renderer override, не ранний selected background.
+
+Новые16widget cases проверяют production preflight section с настоящими typed fake DTO, effective text styles, rects, полный длинный context, icon/tone,0implicit callbacks и ServerStatusBody gap. Начальные test compile/getter ошибки не являются product RED. Meaningful t178-red-3.log содержит16 actual color failures muted vs text; final focused58PASS t178-focused.log. Mandatory t178-mandatory: format674/0, analyze0issues, ordinary Flutter8568PASS/1expectedcaptureSKIP за8:18, terminal22177exit0. RED0/allcapture4clear/noflags; package sources/locks unchanged. Независимое t178_independent_code_review завершилось без замечаний только в этом scope.
+
+Два отдельных existing matrix capture runs --no-pub --plain-name 'current base primary layout 01-startup' либо 'current base primary layout 18-install-preflight' --reporter expanded с RED0/тремя другими capture vars clear и BASE_DESIGN_CAPTURE_DIR=<workspace>/.local/design-003/003.4/direct-t178-01-startup-01 либо direct-t178-18-install-preflight-01: каждый16PASS/16PNG/exit0. Логи t178-capture-01-startup.log и t178-capture-18-install-preflight.log. Непосредственно просмотрены новые18dark1100x760100% и18dark390x800100%: muted и responsive emblem/heading исправлены. Остальные30PNG не просмотрены; это не visual37/98acceptance.
+
+T178 отмечена выполненной в локальном implementation/check/review scope. T179/T180 и остальные открытые задачи сохранены. Новая build/install не выполнялась, установленная0.2.1+11 предшествуетT176–178; native/integration qualification не заявлена.
+### Подтверждённые glyphs панели списка — T181 (2026-10-29)
+
+После текущихT179/T180 непосредственно просмотрены новые32/36desktopdark100%: кнопка версии больше не занимает desktop ширину, neutral header variants и Settings breadcrumb/selection у36 исправлены. При этом source AutomationLoadedTable передаёт DeckIcon15 непосредственно в prefixIcon с minimum36×38; SvgPicture получает увеличенные constraints. Исходный CSS .search-field .icon задаёт15×15/muted. В chip «Теги» находится literal⌄, который на текущих снимках виден missing glyph. T181 сохраняет все поля/действия/guard и исправляет только bounded SVG и chevron; это не новая система иконок или источник данных. Прочие области/условия новых64captures пока не объявлены проверенными, установленный executable не обновлён.

@@ -2,11 +2,22 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
+import 'package:serverdeck_protocol/automation/models.dart' show AutomationBody;
 import 'package:serverdeck_protocol/models.dart';
 
+import '../theme/brand_assets.dart';
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
+import '../theme/motion.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_page.dart';
+import '../ui/deck_workspace_overlay.dart';
+import '../ui/deck_icon.dart';
+import '../ui/deck_control_target.dart';
+import '../ui/deck_table_controls.dart';
+import '../ui/deck_input_border.dart';
+import '../shell/private_session.dart';
+import 'automation_forms.dart';
 import 'automation_presentation.dart';
 
 /// Availability is calculated by the owner, including its pending request and
@@ -176,6 +187,25 @@ const _changedTargetMessage =
 String _pretty(Object? value) =>
     const JsonEncoder.withIndent('  ').convert(value);
 
+bool _jsonObject(String source) {
+  try {
+    return jsonDecode(source) is Map<String, Object?>;
+  } on FormatException {
+    return false;
+  }
+}
+
+bool _profileBodyValid(String source) {
+  try {
+    AutomationBody.fromJson(
+      (jsonDecode(source) as Map).cast<String, Object?>(),
+    );
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 Map<String, Object?> _object(Object? value) =>
     value is Map<String, Object?> ? value : const {};
 List<Map<String, Object?>> _rows(Object? value) =>
@@ -287,10 +317,904 @@ class _Section extends StatelessWidget {
   const _Section({required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: BrandSpacing.space8),
+  Widget build(BuildContext context) => child;
+}
+
+/// Canonical rows remain one table surface on wide layouts and become labelled
+/// cards on phones or large text. Only loaded owner records reach this widget.
+class AutomationRecordTable extends StatelessWidget {
+  const AutomationRecordTable({
+    super.key,
+    required this.columns,
+    required this.rows,
+    this.onSelect,
+    this.selected = -1,
+    this.footer,
+    this.caption,
+    this.showFooter = true,
+  });
+  final String? caption;
+  final bool showFooter;
+  final List<String> columns;
+  final List<List<Widget>> rows;
+  final ValueChanged<int>? onSelect;
+  final int selected;
+  final Widget? footer;
+  @override
+  Widget build(BuildContext context) {
+    final phone = MediaQuery.sizeOf(context).width <= 520;
+    final colors = deckColors(context);
+    Widget content(List<Widget> cells, {required bool header}) {
+      if (phone) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: colors['border'])),
+                ),
+                child: DefaultTextStyle.merge(
+                  style: BrandTypography.table.copyWith(
+                    fontSize: 15,
+                    height: 22 / 15,
+                    fontFamily: BrandAssets.semiboldFamily,
+                    fontWeight: BrandTypography.semiboldWeight,
+                    fontVariations: BrandTypography.semiboldVariations,
+                  ),
+                  child: cells.first,
+                ),
+              ),
+              if (cells.length > 1) ...[
+                const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, c) => Wrap(
+                    spacing: 12,
+                    runSpacing: 14,
+                    children: [
+                      for (var i = 1; i < cells.length; i++)
+                        SizedBox(
+                          width: (c.maxWidth - 12) / 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                columns[i],
+                                style: BrandTypography.caption.copyWith(
+                                  color: colors['muted'],
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              cells[i],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (var i = 0; i < cells.length; i++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: header ? 10 : 12,
+                ),
+                child: !header && i == 0
+                    ? DefaultTextStyle.merge(
+                        style: const TextStyle(
+                          fontFamily: BrandAssets.semiboldFamily,
+                          fontWeight: BrandTypography.semiboldWeight,
+                          fontVariations: BrandTypography.semiboldVariations,
+                        ),
+                        child: cells[i],
+                      )
+                    : cells[i],
+              ),
+            ),
+        ],
+      );
+    }
+
+    Widget line(List<Widget> cells, {bool header = false, int index = -1}) {
+      final selectedRow = !header && index == selected;
+      final radius = BorderRadius.circular(phone ? 10 : 0);
+      return Container(
+        decoration: BoxDecoration(
+          color:
+              colors[header
+                  ? 'raised'
+                  : selectedRow
+                  ? 'selected'
+                  : 'surface'],
+          borderRadius: phone ? radius : null,
+          border: phone
+              ? Border.all(color: colors['border'])
+              : (header ? rows.isNotEmpty : index < rows.length - 1)
+              ? Border(bottom: BorderSide(color: colors['border']))
+              : null,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: radius,
+            hoverColor: colors['hover'],
+            onTap: index < 0 || onSelect == null
+                ? null
+                : () => onSelect!(index),
+            child: DefaultTextStyle(
+              style: BrandTypography.table.copyWith(color: colors['text']),
+              child: content(cells, header: header),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final children = <Widget>[
+      if (caption != null) ...[
+        Container(
+          decoration: phone
+              ? BoxDecoration(
+                  color: colors['surface'],
+                  border: Border.all(color: colors['border']),
+                  borderRadius: BorderRadius.circular(9),
+                )
+              : null,
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            caption!,
+            style: BrandTypography.caption.copyWith(color: colors['muted']),
+          ),
+        ),
+        if (phone) const SizedBox(height: 10),
+      ],
+      if (!phone)
+        line(
+          columns
+              .map(
+                (label) => Text(
+                  label,
+                  style: BrandTypography.tableHeader.copyWith(
+                    color: colors['muted'],
+                  ),
+                ),
+              )
+              .toList(),
+          header: true,
+        ),
+      for (var i = 0; i < rows.length; i++) ...[
+        if (phone && i > 0) const SizedBox(height: 10),
+        Semantics(
+          selected: selected == i,
+          button: onSelect != null,
+          child: line(rows[i], index: i),
+        ),
+      ],
+      if (showFooter)
+        Container(
+          decoration: phone
+              ? null
+              : BoxDecoration(
+                  border: Border(top: BorderSide(color: colors['border'])),
+                ),
+          padding: phone
+              ? const EdgeInsets.only(top: 12)
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: DefaultTextStyle(
+            style: BrandTypography.caption.copyWith(color: colors['muted']),
+            child: DeckHitOverflow(
+              outset: 7,
+              child: footer ?? Text('Получено записей: ${rows.length}'),
+            ),
+          ),
+        ),
+    ];
+    final table = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+    return phone ? table : DeckPanel(padding: EdgeInsets.zero, child: table);
+  }
+}
+
+class AutomationLoadedTable extends StatefulWidget {
+  const AutomationLoadedTable({
+    super.key,
+    required this.columns,
+    required this.rows,
+    this.onSelect,
+    this.selected = -1,
+    this.footer,
+    this.hasMore = false,
+    this.onMore,
+  });
+  final List<String> columns;
+  final List<List<Widget>> rows;
+  final ValueChanged<int>? onSelect;
+  final int selected;
+  final Widget? footer;
+  final bool hasMore;
+  final VoidCallback? onMore;
+  @override
+  State<AutomationLoadedTable> createState() => _AutomationLoadedTableState();
+}
+
+class _AutomationLoadedTableState extends State<AutomationLoadedTable> {
+  final query = TextEditingController();
+  String? status;
+  int page = 0;
+  bool awaitingPage = false;
+  int? _statusMenuEpoch;
+  bool _filterSessionCurrent() {
+    if (!mounted) return false;
+    final session = PrivateSessionScope.maybeOf(context);
+    return session == null
+        ? _statusMenuEpoch == null
+        : session.authorized && session.epoch == _statusMenuEpoch;
+  }
+
+  String text(Widget value) => switch (value) {
+    Text() => value.data ?? '',
+    DeckStatus() => value.label,
+    _ => '',
+  };
+  @override
+  void dispose() {
+    query.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant AutomationLoadedTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (awaitingPage && widget.rows.length > oldWidget.rows.length) {
+      page++;
+      awaitingPage = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stateColumn = widget.columns.indexWhere(
+      (label) => label == 'Состояние' || label == 'Доступность',
+    );
+    final states = stateColumn < 0
+        ? <String>[]
+        : widget.rows.map((row) => text(row[stateColumn])).toSet().toList();
+    final indices = [
+      for (var i = 0; i < widget.rows.length; i++)
+        if (widget.rows[i]
+                .map(text)
+                .join(' ')
+                .toLowerCase()
+                .contains(query.text.toLowerCase()) &&
+            (status == null ||
+                stateColumn < 0 ||
+                text(widget.rows[i][stateColumn]) == status))
+          i,
+    ];
+    final last = indices.isEmpty ? 0 : (indices.length - 1) ~/ 20;
+    final current = page.clamp(0, last);
+    final visible = indices.skip(current * 20).take(20).toList();
+    return DeckHitOverflow(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DeckHitOverflow(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final phone = MediaQuery.sizeOf(context).width <= 520;
+                final filters = DeckHitOverflow(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DeckFilterChip(
+                        label: 'Все ${indices.length}',
+                        active: status == null,
+                        onPressed: () => setState(() {
+                          query.clear();
+                          status = null;
+                          page = 0;
+                          awaitingPage = false;
+                        }),
+                      ),
+                      if (stateColumn >= 0)
+                        DeckControlTarget(
+                          visibleHeight: DeckFilterChip.visibleHeight(context),
+                          child: PopupMenuButton<String>(
+                            tooltip: 'Состояние',
+                            initialValue: status ?? '',
+                            popUpAnimationStyle: Motion.reduced(context)
+                                ? AnimationStyle.noAnimation
+                                : null,
+                            onSelected: (next) {
+                              if (!_filterSessionCurrent()) return;
+                              setState(() {
+                                status = next == '' ? null : next;
+                                page = 0;
+                                awaitingPage = false;
+                              });
+                            },
+                            itemBuilder: (_) {
+                              final epoch = PrivateSessionScope.maybeOf(context)
+                                  ?.epoch;
+                              _statusMenuEpoch = epoch;
+                              return [
+                                PopupMenuItem(
+                                  value: '',
+                                  child: PrivateDialogGate(
+                                    launchEpoch: epoch,
+                                    builder: (_) => const Text('Все состояния'),
+                                  ),
+                                ),
+                                for (final state in states)
+                                  PopupMenuItem(
+                                    value: state,
+                                    child: PrivateDialogGate(
+                                      launchEpoch: epoch,
+                                      builder: (_) => Text(state),
+                                    ),
+                                  ),
+                              ];
+                            },
+                            style: DeckFilterChip.style(
+                              context,
+                              active: status != null,
+                            ),
+                            icon: Semantics(
+                              selected: status != null,
+                              child: DeckFilterChip.content(
+                                context,
+                                status ?? 'Состояние',
+                                active: status != null,
+                                icon: 'filter',
+                              ),
+                            ),
+                          ),
+                        ),
+                      const DeckFilterChip(
+                        label: 'Теги',
+                        trailing: 'chevron',
+                        tooltip: 'В данных этого списка нет меток; фильтр по меткам недоступен.',
+                      ),
+                    ],
+                  ),
+                );
+                return Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: phone ? 12 : 10,
+                  runSpacing: phone ? 12 : 10,
+                  children: [
+                    DeckHitOverflow(
+                      child: SizedBox(
+                        width: c.maxWidth.clamp(0.0, 360.0).toDouble(),
+                        child: DeckSearchField(
+                          controller: query,
+                          onChanged: (_) => setState(() {
+                            page = 0;
+                            awaitingPage = false;
+                          }),
+                        ),
+                      ),
+                    ),
+                    filters,
+                  ],
+                );
+              },
+            ),
+          ),
+          SizedBox(height: MediaQuery.sizeOf(context).width <= 520 ? 13 : 16),
+          AutomationRecordTable(
+            columns: widget.columns,
+            rows: [for (final i in visible) widget.rows[i]],
+            selected: visible.indexOf(widget.selected),
+            onSelect: widget.onSelect == null
+                ? null
+                : (i) => widget.onSelect!(visible[i]),
+            footer: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.footer != null) widget.footer!,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Получено записей: ${widget.rows.length} · показано: ${visible.length}',
+                      style: BrandTypography.caption,
+                    ),
+                    DeckHitOverflow(
+                      outset: 7,
+                      child: Wrap(
+                        spacing: MediaQuery.sizeOf(context).width <= 520
+                            ? 3
+                            : 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Tooltip(
+                            message: current > 0 ? 'Предыдущая страница' : 'Предыдущая страница · Нет другой загруженной страницы',
+                            child: DeckPagerButton(
+                              reverse: true,
+                              onPressed: current > 0
+                                  ? () => setState(() => page = current - 1)
+                                  : null,
+                            ),
+                          ),
+                          Tooltip(
+                            message: 'Это текущая загруженная страница; переход на произвольный номер не поддерживается.',
+                            child: DeckPagerButton(
+                              selected: true,
+                              page: current + 1,
+                            ),
+                          ),
+                          Tooltip(
+                            message: current < last || widget.hasMore
+                                ? 'Следующая страница'
+                                : 'Следующая страница · Нет другой загруженной страницы',
+                            child: DeckPagerButton(
+                              onPressed: current < last
+                                  ? () => setState(() => page = current + 1)
+                                  : widget.hasMore && widget.onMore != null
+                                  ? () {
+                                      awaitingPage = true;
+                                      widget.onMore!();
+                                    }
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TwoPanels extends StatelessWidget {
+  const _TwoPanels({
+    required this.left,
+    required this.right,
+    this.form = false,
+  });
+  final Widget left, right;
+  final bool form;
+  @override
+  Widget build(BuildContext context) {
+    if (form) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = MediaQuery.sizeOf(context).width > 960;
+          final available = constraints.maxWidth - (wide ? 20 : 0);
+          return Flex(
+            direction: wide ? Axis.horizontal : Axis.vertical,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: wide ? available * 165 / 265 : available,
+                child: left,
+              ),
+              if (wide) const SizedBox(width: 20),
+              if (wide) SizedBox(width: available * 100 / 265, child: right),
+            ],
+          );
+        },
+      );
+    }
+    return MediaQuery.sizeOf(context).width > 760 &&
+            MediaQuery.textScalerOf(context).scale(14) < 27
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: form ? 506 : 1, child: left),
+              const SizedBox(width: 20),
+              Expanded(flex: form ? 307 : 1, child: right),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [left, const SizedBox(height: 20), right],
+          );
+  }
+}
+
+/// The effective source description-list: ruled facts on wide pages, ordered
+/// labels and values on phones or at the FA05 large-text override.
+class AutomationFacts extends StatelessWidget {
+  const AutomationFacts({
+    super.key,
+    required this.values,
+    this.tableContext = false,
+    this.styles = const {},
+  });
+  final Map<String, String> values;
+  final bool tableContext;
+  final Map<String, TextStyle> styles;
+  @override
+  Widget build(BuildContext context) {
+    final colors = deckColors(context);
+    final stacked = MediaQuery.sizeOf(context).width <= 520;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < values.length; i++)
+          Builder(
+            builder: (context) {
+              final entry = values.entries.elementAt(i),
+                  last = i == values.length - 1;
+              final label = Text(
+                entry.key,
+                style: BrandTypography.caption.copyWith(
+                  color: colors['muted'],
+                  height: 20 / 12,
+                ),
+              );
+              final value = Text(
+                entry.value,
+                style:
+                    (tableContext ? BrandTypography.body : BrandTypography.log)
+                        .copyWith(
+                          fontSize: stacked ? 13 : 12,
+                          height: stacked ? 22 / 13 : 20 / 12,
+                          color: colors['text'],
+                        )
+                        .merge(styles[entry.key]),
+              );
+              if (stacked)
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+                      child: label,
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.only(top: 4, bottom: last ? 0 : 12),
+                      decoration: BoxDecoration(
+                        border: last
+                            ? null
+                            : Border(
+                                bottom: BorderSide(color: colors['border']),
+                              ),
+                      ),
+                      child: value,
+                    ),
+                  ],
+                );
+              Widget cell(Widget child) => Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  border: last
+                      ? null
+                      : Border(bottom: BorderSide(color: colors['border'])),
+                ),
+                child: child,
+              );
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final available = constraints.maxWidth - 12;
+                  final labelWidth = tableContext
+                      ? (available * 7 / 27)
+                            .clamp(110.0, double.infinity)
+                            .toDouble()
+                      : available / 2.3;
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: labelWidth, child: cell(label)),
+                        const SizedBox(width: 12),
+                        Expanded(child: cell(value)),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+/// The same page regions are used by the actual guarded transient route and
+/// by an already hosted workspace page. The overlay gets its real caller box.
+class AutomationWorkspaceOverlay extends StatelessWidget {
+  const AutomationWorkspaceOverlay({
+    super.key,
+    required this.child,
+    this.workspaceBounds,
+    this.pageInsets,
+  });
+  final Widget child;
+  final ValueGetter<Rect?>? workspaceBounds;
+  final ValueGetter<EdgeInsetsGeometry>? pageInsets;
+  @override
+  Widget build(BuildContext context) => DeckWorkspaceOverlay(
     child: child,
+    workspaceBounds: workspaceBounds,
+    pageInsets: pageInsets,
   );
+}
+
+class AutomationFormPageFrame extends StatelessWidget {
+  const AutomationFormPageFrame({
+    super.key,
+    required this.title,
+    required this.child,
+    this.tabs,
+    this.actions = const [],
+    this.description = 'Укажите параметры и проверьте их перед продолжением',
+    this.eyebrow = 'Задания / Рабочее пространство',
+    this.asPage = false,
+    this.workspaceBounds,
+    this.pageInsets,
+    this.helper = const _BeforeContinue(),
+  });
+  final String title, description, eyebrow;
+  final Widget child;
+  final Widget? tabs, helper;
+  final List<Widget> actions;
+  final bool asPage;
+  final ValueGetter<Rect?>? workspaceBounds;
+  final ValueGetter<EdgeInsetsGeometry>? pageInsets;
+  @override
+  Widget build(BuildContext context) {
+    final form = DeckPanel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            decoration: actions.isNotEmpty
+                ? BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: deckColors(context)['border']),
+                    ),
+                  )
+                : null,
+            padding: MediaQuery.sizeOf(context).width <= 520
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 18)
+                : const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Параметры',
+                  style: BrandTypography.body.copyWith(
+                    height: 22 / 14,
+                    fontFamily: BrandAssets.semiboldFamily,
+                    fontWeight: BrandTypography.semiboldWeight,
+                    fontVariations: BrandTypography.semiboldVariations,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Проверьте выбранную цель и значения полей.',
+                  style: BrandTypography.caption.copyWith(
+                    color: deckColors(context)['muted'],
+                    height: 20 / 12,
+                  ),
+                ),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).width <= 520 ? 20 : 18,
+                ),
+                child,
+              ],
+            ),
+          ),
+          if (actions.isNotEmpty)
+            Container(
+              padding: MediaQuery.sizeOf(context).width <= 520
+                  ? const EdgeInsets.all(14)
+                  : const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: deckColors(context)['raised'],
+                border: Border(
+                  top: BorderSide(color: deckColors(context)['border']),
+                ),
+              ),
+              child: DeckFormActions(children: actions),
+            ),
+        ],
+      ),
+    );
+    final page = DeckPage(
+      title: title,
+      description: description,
+      eyebrow: eyebrow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (tabs != null) ...[tabs!, const DeckTabsGap()],
+          if (helper != null)
+            _TwoPanels(left: form, right: helper!, form: true)
+          else
+            form,
+        ],
+      ),
+    );
+    return asPage
+        ? page
+        : AutomationWorkspaceOverlay(
+            workspaceBounds: workspaceBounds,
+            pageInsets: pageInsets,
+            child: page,
+          );
+  }
+}
+
+class _BeforeContinue extends StatelessWidget {
+  const _BeforeContinue({this.purpose});
+  final String? purpose;
+  @override
+  Widget build(BuildContext context) => DeckPanel(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: deckColors(context)['selected'],
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: DeckIcon(
+            'info',
+            size: 20,
+            color: deckColors(context)['accent'],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Перед продолжением',
+          style: BrandTypography.body.copyWith(
+            height: 22 / 14,
+            fontFamily: BrandAssets.semiboldFamily,
+            fontWeight: BrandTypography.semiboldWeight,
+            fontVariations: BrandTypography.semiboldVariations,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          purpose ?? 'Проверьте значения и выбранный объект. Изменения, требующие выполнения на сервере, проходят через просмотр плана.',
+          style: BrandTypography.caption.copyWith(
+            height: 20 / 12,
+            color: deckColors(context)['muted'],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Сохранение формы не заменяет подтверждение и отдельный запуск плана.',
+          style: BrandTypography.caption.copyWith(
+            height: 20 / 12,
+            color: deckColors(context)['muted'],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AutomationHero extends StatelessWidget {
+  const _AutomationHero({
+    super.key,
+    required this.title,
+    required this.state,
+    required this.tone,
+    this.contextLine,
+  });
+  final String title, state;
+  final String? contextLine;
+  final DeckTone tone;
+  @override
+  Widget build(BuildContext context) {
+    final phone = MediaQuery.sizeOf(context).width <= 520;
+    final subtitleStyle = BrandTypography.body.copyWith(
+      color: deckColors(context)['muted'],
+      height: (phone ? 24 : 22) / 14,
+    );
+    return DeckPanel(
+      padding: EdgeInsets.symmetric(
+        vertical: phone ? 28 : 30,
+        horizontal: phone ? 16 : 20,
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: phone ? 56 : 64,
+            height: phone ? 56 : 64,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color:
+                    deckColors(context)[tone == DeckTone.error
+                        ? 'error'
+                        : tone == DeckTone.warning
+                        ? 'warning'
+                        : tone == DeckTone.running
+                        ? 'running'
+                        : tone == DeckTone.available || tone == DeckTone.neutral
+                        ? 'accent'
+                        : 'unknown'],
+              ),
+            ),
+            child: Center(
+              child: DeckIcon(
+                tone == DeckTone.error
+                    ? 'close'
+                    : tone == DeckTone.warning
+                    ? 'warning'
+                    : tone == DeckTone.running
+                    ? 'clock'
+                    : 'info',
+                color:
+                    deckColors(context)[tone == DeckTone.error
+                        ? 'error'
+                        : tone == DeckTone.warning
+                        ? 'warning'
+                        : tone == DeckTone.running
+                        ? 'running'
+                        : tone == DeckTone.unknown
+                        ? 'unknown'
+                        : 'accent'],
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: BrandTypography.title.copyWith(
+              fontSize: phone ? 22 : 20,
+              height: phone ? 30 / 22 : 28 / 20,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(state, textAlign: TextAlign.center, style: subtitleStyle),
+                if (contextLine != null)
+                  Text(
+                    contextLine!,
+                    textAlign: TextAlign.center,
+                    style: subtitleStyle,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Values extends StatelessWidget {
@@ -311,123 +1235,125 @@ class _Values extends StatelessWidget {
   );
 }
 
-class _Program extends StatelessWidget {
-  const _Program({
+class AutomationPlanSteps extends StatelessWidget {
+  const AutomationPlanSteps({
+    super.key,
     required this.effects,
     required this.checks,
-    this.showChecks = true,
     this.recipes = const [],
   });
-  final List<Map<String, Object?>> effects, checks;
-  final List<Map<String, Object?>> recipes;
-  final bool showChecks;
+  final List<Map<String, Object?>> effects, checks, recipes;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const DeckSectionHeader(title: 'Действия'),
-      if (effects.isEmpty) const Text('Действия не запланированы'),
-      for (final effect in effects) ...[
-        const SizedBox(height: BrandSpacing.space8),
-        if (effect['kind'] == 'install_recipe')
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text:
-                      'Установить ${switch (recipes.where((recipe) => recipe['digest'] == effect['recipeDigest']).firstOrNull?['id']) {
-                        'postgresql16' => 'PostgreSQL 16',
-                        'clickhouse' => 'ClickHouse',
-                        _ => 'ПО по точному рецепту',
-                      }} · версия ',
-                ),
-                TextSpan(
-                  text: _value(effect['version']),
-                  style: BrandTypography.log,
-                ),
-              ],
-            ),
-          )
-        else
-          Text(switch (effect['kind']) {
-            'config_file' =>
-              'Изменить конфигурацию: ${_resource(effect['resourceId'])}',
-            'service' || 'service_state' =>
-              'Изменить состояние: ${_resource(effect['resourceId'])}',
-            'service_enabled' =>
-              'Изменить автозапуск: ${_resource(effect['resourceId'])}',
-            _ =>
-              '${_value(effect['kind'])}: ${_resource(effect['resourceId'])}',
-          }),
-        if (effect['values'] is Map) _Values(_object(effect['values'])),
-        if (effect['state'] != null)
-          DeckKeyValue(
-            label: 'Требуемое состояние',
-            value: _value(effect['state']),
+      if (effects.isEmpty) const Text('Разрешённые эффекты не предоставлены'),
+      for (var i = 0; i < effects.length; i++)
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            border: i == effects.length - 1
+                ? null
+                : Border(
+                    bottom: BorderSide(color: deckColors(context)['border']),
+                  ),
           ),
-        if (effect['enabled'] != null)
-          DeckKeyValue(label: 'Автозапуск', value: _value(effect['enabled'])),
-      ],
-      if (showChecks) ...[
-        const SizedBox(height: BrandSpacing.space16),
-        const DeckSectionHeader(title: 'Проверки после действий'),
-        if (checks.isEmpty) const Text('Проверки не запланированы'),
-        for (final check in checks)
-          DeckKeyValue(
-            label: _check(check['kind']),
-            value: _resource(check['resourceId']),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: deckColors(context)['raised'],
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  '${i + 1}'.padLeft(2, '0'),
+                  style: BrandTypography.log.copyWith(
+                    fontSize: 11,
+                    height: 18 / 11,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (effects[i]['kind'] == 'install_recipe')
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text:
+                                  'Установить ПО по точному рецепту · версия ',
+                            ),
+                            TextSpan(
+                              text: _value(effects[i]['version']),
+                              style: BrandTypography.log,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        switch (effects[i]['kind']) {
+                          'config_file' =>
+                            'Изменить конфигурацию: ${_resource(effects[i]['resourceId'])}',
+                          'service' || 'service_state' =>
+                            'Изменить состояние: ${_resource(effects[i]['resourceId'])}',
+                          _ =>
+                            '${_value(effects[i]['kind'])} · ${_resource(effects[i]['resourceId'])}',
+                        },
+                        style: BrandTypography.table.copyWith(
+                          fontFamily: BrandAssets.semiboldFamily,
+                          fontWeight: BrandTypography.semiboldWeight,
+                          fontVariations: BrandTypography.semiboldVariations,
+                        ),
+                      ),
+                    if (effects[i]['values'] is Map) ...[
+                      const SizedBox(height: 6),
+                      AutomationFacts(
+                        values: {
+                          for (final entry in _object(
+                            effects[i]['values'],
+                          ).entries)
+                            _field(entry.key): _value(entry.value),
+                        },
+                      ),
+                    ],
+                    for (final entry in effects[i].entries.where(
+                      (entry) => const {
+                        'state',
+                        'enabled',
+                        'arguments',
+                        'operation',
+                        'restart',
+                        'dataLoss',
+                        'downtime',
+                      }.contains(entry.key),
+                    ))
+                      AutomationFacts(values: {entry.key: _value(entry.value)}),
+                    for (final check in checks.where(
+                      (row) => row['effectId'] == effects[i]['id'],
+                    ))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _check(check['kind']),
+                          style: BrandTypography.table.copyWith(
+                            color: deckColors(context)['muted'],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-      ],
-    ],
-  );
-}
-
-class _PlanSummary extends StatelessWidget {
-  const _PlanSummary(
-    this.plan, {
-    this.serverProfiles = const [],
-    this.automationProfile,
-  });
-  final Map<String, Object?> plan;
-  final List<ProfileView> serverProfiles;
-  final AutomationProfileRecord? automationProfile;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      AutomationServerTargets(
-        serverIds: [if (plan['serverId'] is String) plan['serverId'] as String],
-        serverProfiles: serverProfiles,
-        expectedIdentities: {
-          if (plan['serverId'] is String)
-            plan['serverId'] as String: _planIdentity(plan),
-        },
-      ),
-      DeckKeyValue(
-        label: 'Ansible-профиль',
-        value:
-            _matchingProfile(plan, automationProfile)?.name ??
-            'Название профиля недоступно',
-      ),
-      DeckKeyValue(
-        label: 'Версия профиля',
-        value: _value(plan['profileRevision']),
-      ),
-      DeckKeyValue(
-        label: 'Хеш версии профиля',
-        value: _value(plan['profileDigest']),
-        selectable: true,
-      ),
-      DeckKeyValue(label: 'Действует до', value: _time(plan['expiresAt'])),
-      const SizedBox(height: BrandSpacing.space12),
-      const DeckSectionHeader(title: 'Точные параметры'),
-      _Values(_object(plan['exactParams'])),
-      const SizedBox(height: BrandSpacing.space16),
-      _Program(
-        effects: _rows(plan['effects']),
-        checks: _rows(plan['checks']),
-        recipes: _rows(_object(plan['preflight'])['recipes']),
-      ),
+        ),
+      if (effects.isEmpty && checks.isNotEmpty)
+        for (final check in checks) Text(_check(check['kind'])),
     ],
   );
 }
@@ -454,43 +1380,10 @@ class _Validation extends StatelessWidget {
   );
 }
 
-class _EditorPreview extends StatelessWidget {
-  const _EditorPreview(this.value, {this.serverProfiles = const []});
-  final Map<String, Object?> value;
-  final List<ProfileView> serverProfiles;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (value['label'] != null)
-        DeckKeyValue(label: 'Клиент ИИ', value: _value(value['label'])),
-      if (value['scopes'] is List)
-        DeckKeyValue(
-          label: 'Выдаваемые права',
-          value: (value['scopes'] as List).map(_scope).join(', '),
-        ),
-      if (value['serverIds'] is List)
-        AutomationServerTargets(
-          serverIds: _targetIds(value['serverIds']),
-          serverProfiles: serverProfiles,
-        ),
-      if (value['lifetimeSeconds'] != null)
-        DeckKeyValue(
-          label: 'Срок после выдачи',
-          value: '${_value(value['lifetimeSeconds'])} секунд',
-        ),
-      if (value['predicates'] is Map)
-        _ParameterConstraints(_object(value['predicates'])),
-      if (!value.containsKey('scopes') && !value.containsKey('predicates'))
-        _Values(value),
-    ],
-  );
-}
-
 class _ParameterConstraints extends StatelessWidget {
-  const _ParameterConstraints(this.values, {this.definitions = false});
+  const _ParameterConstraints(this.values);
   final Map<String, Object?> values;
-  final bool definitions;
+  final bool definitions = false;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -521,6 +1414,34 @@ class _ParameterConstraints extends StatelessWidget {
   );
 }
 
+class _AutomationExpansion extends StatelessWidget {
+  const _AutomationExpansion({
+    required this.title,
+    this.tilePadding,
+    this.childrenPadding,
+    this.expandedCrossAxisAlignment,
+    this.initiallyExpanded = false,
+    this.children = const [],
+  });
+  final Widget title;
+  final EdgeInsetsGeometry? tilePadding, childrenPadding;
+  final CrossAxisAlignment? expandedCrossAxisAlignment;
+  final bool initiallyExpanded;
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: ExpansionTile(
+      title: title,
+      tilePadding: tilePadding,
+      childrenPadding: childrenPadding,
+      expandedCrossAxisAlignment: expandedCrossAxisAlignment,
+      initiallyExpanded: initiallyExpanded,
+      children: children,
+    ),
+  );
+}
+
 class AutomationJsonView extends StatelessWidget {
   const AutomationJsonView({
     super.key,
@@ -532,12 +1453,24 @@ class AutomationJsonView extends StatelessWidget {
   final Object? value;
 
   @override
-  Widget build(BuildContext context) => ExpansionTile(
+  Widget build(BuildContext context) => _AutomationExpansion(
     title: DeckFocusLabel(child: Text(title)),
     tilePadding: EdgeInsets.zero,
     childrenPadding: const EdgeInsets.all(BrandSpacing.space12),
     expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [SelectableText(_pretty(value), style: BrandTypography.log)],
+    children: [
+      Semantics(
+        label: title,
+        child: SizedBox(
+          height: 240,
+          width: double.infinity,
+          child: DeckBoundedTextView(
+            text: _pretty(value),
+            style: BrandTypography.log,
+          ),
+        ),
+      ),
+    ],
   );
 }
 
@@ -548,8 +1481,11 @@ class _ActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) =>
-      OutlinedButton(onPressed: onPressed, child: Text(label));
+  Widget build(BuildContext context) => OutlinedButton(
+    clipBehavior: Clip.none,
+    onPressed: onPressed,
+    child: Text(label),
+  );
 }
 
 class AutomationStatusSection extends StatelessWidget {
@@ -657,6 +1593,7 @@ class AutomationStatusSection extends StatelessWidget {
                   canRetry ? onRetry : null,
                 ),
                 TextButton(
+                  clipBehavior: Clip.none,
                   onPressed: onDismiss,
                   child: const Text('Закрыть запрос'),
                 ),
@@ -671,6 +1608,7 @@ class AutomationStatusSection extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(
+            clipBehavior: Clip.none,
             onPressed: onStopWaiting,
             child: const Text('Перестать ждать ответ'),
           ),
@@ -680,135 +1618,196 @@ class AutomationStatusSection extends StatelessWidget {
   );
 }
 
-class AutomationProfileActions extends StatelessWidget {
-  const AutomationProfileActions({
-    super.key,
-    required this.actions,
-    required this.hasServer,
-    required this.installationCatalog,
-    required this.onRefresh,
-    required this.onCreate,
-    required this.onLoadRecipes,
-  });
-
-  final AutomationActionAvailability actions;
-  final bool hasServer, installationCatalog;
-  final VoidCallback onRefresh, onCreate, onLoadRecipes;
-
-  @override
-  Widget build(BuildContext context) => _Section(
-    child: DeckActions(
-      children: [
-        _ActionButton('Обновить профили', actions.read ? onRefresh : null),
-        _ActionButton('Новый профиль', actions.mutate ? onCreate : null),
-        if (hasServer)
-          _ActionButton(
-            installationCatalog
-                ? 'Подключиться и открыть рецепты'
-                : 'Рецепты установки',
-            actions.read ? onLoadRecipes : null,
-          ),
-      ],
-    ),
-  );
-}
-
-class AutomationRecipesSection extends StatelessWidget {
+class AutomationRecipesSection extends StatefulWidget {
   const AutomationRecipesSection({
     super.key,
     required this.catalog,
     required this.canMutate,
     required this.onCreatePlan,
+    this.onSelectionChanged,
+    this.serverId,
+    this.serverProfiles = const [],
   });
-
   final Map<String, Object?> catalog;
   final bool canMutate;
   final ValueChanged<String> onCreatePlan;
-
+  final ValueChanged<bool>? onSelectionChanged;
+  final String? serverId;
+  final List<ProfileView> serverProfiles;
   @override
-  Widget build(BuildContext context) => _Section(
-    child: DeckFormSection(
-      title: 'Каталог установки',
-      description: 'Точный рецепт сначала создаёт план. Установка запускается отдельным действием после проверки и согласия.',
-      children: [
-        const DeckNotice(
-          title: 'Только чистая установка',
-          message: 'Существующие данные и конфигурация блокируют установку; очистка не выполняется.',
-        ),
-        if (catalog['installEnabled'] != true)
-          const DeckNotice(
-            title: 'Установка недоступна',
-            message: 'Администратор должен подготовить совместимый executor и точные рецепты.',
-            tone: DeckTone.unavailable,
-          ),
-        for (final row in _rows(catalog['recipes']))
-          DeckSurface(
-            child: DeckFormSection(
-              title: row['id'] == 'postgresql16'
-                  ? 'PostgreSQL 16'
-                  : 'ClickHouse',
-              trailing: Text('${row['version']}', style: BrandTypography.log),
-              children: [
-                DeckKeyValue(
-                  label: 'Окружение',
-                  value: row['environment'] == 'ubuntu24.04-amd64-systemd'
-                      ? 'Ubuntu 24.04 · amd64 · systemd'
-                      : _value(row['environment']),
-                ),
-                if (row['initialSettings'] is Map)
-                  DeckFormSection(
-                    title: 'Начальные настройки',
-                    children: [_Values(_object(row['initialSettings']))],
-                  ),
-                DeckFormSection(
-                  title: 'Проверки перед установкой',
-                  children: [
-                    for (final check in row['prechecks'] as List)
-                      Text(_check(check)),
-                  ],
-                ),
-                DeckFormSection(
-                  title: 'Лицензии',
-                  children: [
-                    for (final notice in row['licenseNotices'] as List)
-                      Text(_value(notice)),
-                  ],
-                ),
-                AutomationJsonView(
-                  title: 'Точный рецепт, параметры и условия',
-                  value: row,
-                ),
-                if (catalog['installEnabled'] == true)
-                  DeckActions(
-                    children: [
-                      _ActionButton(
-                        'План установки ${row['id'] == 'postgresql16' ? 'PostgreSQL 16' : 'ClickHouse'}',
-                        canMutate
-                            ? () => onCreatePlan(row['digest'] as String)
-                            : null,
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        for (final row in _rows(catalog['unavailable']))
-          DeckNotice(
-            title:
-                '${row['id'] == 'postgresql16' ? 'PostgreSQL 16' : 'ClickHouse'}: рецепт недоступен',
-            message: _code(row['code']),
-            tone: DeckTone.unavailable,
-          ),
-        AutomationJsonView(
-          title: 'Каталог рецептов и доступность установки',
-          value: catalog,
-        ),
-      ],
-    ),
-  );
+  State<AutomationRecipesSection> createState() =>
+      AutomationRecipesSectionState();
 }
 
-class AutomationProfilesSection extends StatelessWidget {
+String automationRecipeTitle(Map<String, Object?> row) => switch (row['id']) {
+  'postgresql16' => 'PostgreSQL 16',
+  'clickhouse' => 'ClickHouse',
+  _ => _value(row['id']),
+};
+
+class AutomationRecipesSectionState extends State<AutomationRecipesSection> {
+  String? selectedDigest;
+  int _selectionEpoch = 0;
+
+  @override
+  void didUpdateWidget(covariant AutomationRecipesSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.serverId != widget.serverId ||
+        !automationTargetsUnchanged(
+          [if (oldWidget.serverId != null) oldWidget.serverId!],
+          oldWidget.serverProfiles,
+          widget.serverProfiles,
+        ) ||
+        _pretty(oldWidget.catalog) != _pretty(widget.catalog)) {
+      _selectionEpoch++;
+    }
+  }
+
+  String? get selectedRecipeTitle {
+    final row = _rows(widget.catalog['recipes'])
+        .where((row) => row['digest'] == selectedDigest)
+        .firstOrNull;
+    return row == null ? null : automationRecipeTitle(row);
+  }
+
+  void selectFirst() {
+    final first = _rows(widget.catalog['recipes']).firstOrNull;
+    if (first != null) selectRecipe(first['digest'] as String);
+  }
+
+  void selectRecipe(String digest) {
+    if (!_rows(widget.catalog['recipes']).any((row) => row['digest'] == digest))
+      return;
+    setState(() {
+      if (selectedDigest != digest) _selectionEpoch++;
+      selectedDigest = digest;
+    });
+    widget.onSelectionChanged?.call(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _rows(widget.catalog['recipes']);
+    final selected = rows
+        .where((row) => row['digest'] == selectedDigest)
+        .firstOrNull;
+    if (selected == null)
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AutomationLoadedTable(
+            columns: const ['Программа', 'Версия', 'Доступность', 'Назначение'],
+            rows: [
+              for (final row in rows)
+                [
+                  Text(automationRecipeTitle(row)),
+                  Text(_value(row['version']), style: BrandTypography.log),
+                  Text(
+                    widget.catalog['installEnabled'] == true
+                        ? 'Нужна проверка'
+                        : 'Установка недоступна',
+                  ),
+                  Text(_value(row['description'])),
+                ],
+            ],
+            onSelect: (index) => selectRecipe(rows[index]['digest'] as String),
+          ),
+          for (final row in _rows(widget.catalog['unavailable']))
+            DeckNotice(
+              title: '${automationRecipeTitle(row)}: рецепт недоступен',
+              message: _code(row['code']),
+              tone: DeckTone.unavailable,
+            ),
+          const AutomationFreshness(
+            source: 'Каталог точных рецептов · локальная служба',
+          ),
+        ],
+      );
+    final enabled =
+        widget.canMutate && widget.catalog['installEnabled'] == true;
+    final targetId = widget.serverId;
+    final targets = List<ProfileView>.unmodifiable(widget.serverProfiles);
+    final target = targetId == null
+        ? null
+        : AutomationServerTargets.resolve(targetId, targets);
+    final epoch = _selectionEpoch;
+    final catalogStamp = _pretty(widget.catalog);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DeckPanel(
+          title: 'Сведения',
+          child: AutomationFacts(
+            values: {
+              'Цель': targetId == null
+                  ? 'Сервер не выбран'
+                  : target == null
+                  ? 'Сведения о цели недоступны'
+                  : '${target.name} · ${AutomationServerTargets.address(target)}',
+              'Программа': automationRecipeTitle(selected),
+              'Версия': _value(selected['version']),
+              'Среда': selected['environment'] == 'ubuntu24.04-amd64-systemd'
+                  ? 'Ubuntu 24.04 · amd64 · systemd'
+                  : _value(selected['environment']),
+              'Подготовка': 'Требуются точный рецепт, доверенный репозиторий и исполнитель',
+              'Сеть': _value(_object(selected['initialSettings'])['listener']),
+              'Данные': 'Только чистая установка; существующие данные и конфигурация блокируют запуск',
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        DeckActions(
+          children: [
+            const Tooltip(
+              message: 'Отдельная проверка готовности реализуется в пакете установки ПО (006).',
+              child: FilledButton(
+                clipBehavior: Clip.none,
+                onPressed: null,
+                child: Text('Проверить готовность'),
+              ),
+            ),
+            _ActionButton(
+              'Создать план',
+              enabled
+                  ? () {
+                      if (!mounted ||
+                          epoch != _selectionEpoch ||
+                          widget.serverId != targetId ||
+                          !widget.canMutate ||
+                          widget.catalog['installEnabled'] != true ||
+                          _pretty(widget.catalog) != catalogStamp ||
+                          !automationTargetsUnchanged(
+                            [if (targetId != null) targetId],
+                            targets,
+                            widget.serverProfiles,
+                          ))
+                        return;
+                      widget.onCreatePlan(selected['digest'] as String);
+                    }
+                  : null,
+            ),
+            _ActionButton('Назад', () {
+              setState(() {
+                _selectionEpoch++;
+                selectedDigest = null;
+              });
+              widget.onSelectionChanged?.call(false);
+            }),
+          ],
+        ),
+        const Text(
+          'Отдельная проверка готовности появится в пакете установки ПО (006). «Создать план» сохраняет профиль и план; установка требует отдельного подтверждения и запуска.',
+        ),
+        AutomationJsonView(
+          title: 'Лицензии, начальные настройки и точные условия',
+          value: selected,
+        ),
+      ],
+    );
+  }
+}
+
+class AutomationProfilesSection extends StatefulWidget {
   const AutomationProfilesSection({
     super.key,
     required this.profiles,
@@ -819,8 +1818,8 @@ class AutomationProfilesSection extends StatelessWidget {
     required this.onMore,
     this.selectedId,
     this.beforeProfiles,
+    this.onSelectVersion,
   });
-
   final List<AutomationProfileRecord> profiles;
   final String? selectedId;
   final bool loaded, hasMore;
@@ -828,45 +1827,89 @@ class AutomationProfilesSection extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onMore;
   final Widget? beforeProfiles;
-
+  final VoidCallback? onSelectVersion;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (loaded && profiles.isEmpty)
-        const _Section(
-          child: DeckNotice(
-            message: 'Ansible-профилей пока нет',
-            tone: DeckTone.neutral,
-          ),
+  State<AutomationProfilesSection> createState() =>
+      _AutomationProfilesSectionState();
+}
+
+class _AutomationProfilesSectionState extends State<AutomationProfilesSection> {
+  int tab = 0;
+  String search = '';
+  @override
+  Widget build(BuildContext context) {
+    final rows = widget.profiles
+        .where(
+          (row) =>
+              row.archived == (tab == 1) &&
+              '${row.name} ${row.description}'.toLowerCase().contains(
+                search.toLowerCase(),
+              ),
+        )
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.beforeProfiles != null) widget.beforeProfiles!,
+        DeckTabs(
+          labels: const ['Активные', 'Архив'],
+          selected: tab,
+          onSelected: (next) => setState(() => tab = next),
         ),
-      if (beforeProfiles != null) beforeProfiles!,
-      if (profiles.isNotEmpty)
-        const _Section(child: DeckSectionHeader(title: 'Ansible-профили')),
-      for (final row in profiles)
-        _Section(
-          child: DeckSurface(
-            selected: selectedId == row.id,
-            enabled: actions.select,
-            onTap: () => onSelect(row.id),
-            semanticLabel:
-                '${row.name}, версия ${row.headRevision}${row.archived ? ', архив' : ''}',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DeckSectionHeader(title: row.name),
-                const SizedBox(height: BrandSpacing.space8),
-                Text(
-                  'Версия ${row.headRevision}${row.archived ? ' · архив' : ''}',
-                ),
-                if (row.description.isNotEmpty) Text(row.description),
-              ],
+        const DeckTabsGap(),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            width: MediaQuery.sizeOf(context).width <= 520
+                ? double.infinity
+                : null,
+            child: _ActionButton(
+              'Выбрать версию',
+              widget.actions.read ? widget.onSelectVersion : null,
             ),
           ),
         ),
-      if (hasMore) _ActionButton('Ещё профили', actions.read ? onMore : null),
-    ],
-  );
+        const SizedBox(height: 18),
+        if (!widget.loaded)
+          const DeckStatus(label: 'Профили ещё не прочитаны')
+        else if (rows.isEmpty)
+          const DeckEmptyState(
+            title: 'Ansible-профилей пока нет',
+            description: 'Создайте профиль или измените фильтр. Сохранение профиля не запускает действия на сервере.',
+            icon: 'terminal',
+          )
+        else
+          AutomationLoadedTable(
+            hasMore: widget.hasMore,
+            onMore: widget.actions.read ? widget.onMore : null,
+            columns: const ['Профиль', 'Назначение', 'Версия', 'Состояние'],
+            rows: [
+              for (final row in rows)
+                [
+                  Text(row.name),
+                  Text(row.description),
+                  Text(
+                    '${row.headRevision}',
+                    style: BrandTypography.log,
+                    textAlign: TextAlign.right,
+                  ),
+                  Text(row.archived ? 'Архив' : 'Активен'),
+                ],
+            ],
+            selected: rows.indexWhere((row) => row.id == widget.selectedId),
+            onSelect: widget.actions.select
+                ? (index) => widget.onSelect(rows[index].id)
+                : null,
+          ),
+        const AutomationFreshness(source: 'Ansible-профили · локальная служба'),
+        if (widget.hasMore)
+          _ActionButton(
+            'Ещё профили',
+            widget.actions.read ? widget.onMore : null,
+          ),
+      ],
+    );
+  }
 }
 
 class AutomationProfileDetailSection extends StatelessWidget {
@@ -897,122 +1940,257 @@ class AutomationProfileDetailSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = _object(revision['body']);
-    return _Section(
-      child: DeckSurface(
-        child: DeckFormSection(
-          title: '${profile.name} · версия ${revision['revision']}',
-          description: 'Версия неизменна. Новая версия требует отдельного разрешения на запуск.',
+    final changes = _rows(_object(comparison?['result'])['changes']);
+    final previousDigest = comparison?['fromDigest'];
+    final currentDigest = revision['digest'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DeckPanel(
+          title: 'Сведения',
+          child: AutomationFacts(
+            values: {
+              'Профиль': '${profile.name} · версия ${revision['revision']}',
+              'profileId': profile.id,
+              'Сравнение': comparison == null
+                  ? 'Версия для сравнения не выбрана'
+                  : 'Ревизия ${comparison!['fromRevision']} → ${comparison!['toRevision']}',
+              'bodyDigest исходной версии': _value(previousDigest),
+              'bodyDigest выбранной версии': _value(currentDigest),
+              'Автор': revision.containsKey('authorGrantId')
+                  ? (revision['authorGrantId'] == null
+                        ? 'Владелец'
+                        : 'ИИ · ${revision['authorGrantId']}')
+                  : 'Не предоставлено',
+              'Изменение': comparison == null
+                  ? 'Сравнение не получено'
+                  : changes.isEmpty
+                  ? 'В полученном сравнении изменений нет'
+                  : changes.map((row) => _value(row['path'])).join(', '),
+              'Разрешения': 'Для новой версии потребуется отдельное согласие',
+              'Совместимость полномочий': 'Даже одинаковое содержимое новой версии не наследует право исполнения',
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (comparison != null) ...[
+          AutomationRecordTable(
+            columns: const ['Параметр', 'Было', 'Стало'],
+            rows: [
+              for (final row in changes)
+                [
+                  Text(_value(row['path'])),
+                  Text(_value(row['before'])),
+                  Text(_value(row['after'])),
+                ],
+            ],
+            caption:
+                'Сравнение версий ${comparison!['fromRevision']} и ${comparison!['toRevision']}',
+            showFooter: false,
+          ),
+          if (_object(comparison!['result'])['truncated'] == true)
+            const DeckNotice(
+              message: 'Сравнение неполное: часть изменений не получена',
+              tone: DeckTone.warning,
+            ),
+          const SizedBox(height: 20),
+        ],
+        DeckPanel(
+          title: 'Точные значения',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AutomationExactValue(
+                label: 'bodyDigest исходной версии',
+                value: _value(previousDigest),
+              ),
+              const SizedBox(height: 16),
+              AutomationExactValue(
+                label: 'bodyDigest выбранной версии',
+                value: _value(currentDigest),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        DeckActions(
           children: [
-            if (profile.description.isNotEmpty) Text(profile.description),
-            DeckStatus(
-              label: profile.archived
-                  ? 'Профиль в архиве'
-                  : revision['revision'] == profile.headRevision
-                  ? 'Текущая версия профиля'
-                  : 'Выбрана предыдущая версия',
-              tone: profile.archived ? DeckTone.neutral : DeckTone.available,
+            FilledButton(
+              clipBehavior: Clip.none,
+              onPressed: actions.read ? onSelectVersion : null,
+              child: const Text('Выбрать версию'),
             ),
-            if (!hasServer)
-              const DeckNotice(
-                message: 'Создавать и проверять профиль можно без сервера. Для плана и запуска выберите сервер.',
-                tone: DeckTone.neutral,
+            _ActionButton('Проверить версию', actions.read ? onValidate : null),
+            if (hasServer && !profile.archived)
+              _ActionButton(
+                'Создать план',
+                actions.mutate ? onCreatePlan : null,
               ),
-            DeckFormSection(
-              title: 'Параметры профиля',
-              children: [
-                _ParameterConstraints(
-                  _object(body['parameters']),
-                  definitions: true,
+            _ActionButton('Сравнить версии', actions.read ? onCompare : null),
+            if (!profile.archived) ...[
+              _ActionButton('Изменить профиль', actions.mutate ? onEdit : null),
+              if (hasServer)
+                _ActionButton(
+                  'Делегировать версию',
+                  actions.mutate ? onDelegate : null,
                 ),
-              ],
-            ),
-            _Program(
-              effects: _rows(body['steps']),
-              checks: const [],
-              showChecks: false,
-            ),
-            if (validation != null) _Validation(validation!),
-            if (comparison != null)
-              DeckFormSection(
-                title:
-                    'Сравнение версий ${comparison!['fromRevision']} и ${comparison!['toRevision']}',
-                children: [
-                  if (_rows(_object(comparison!['result'])['changes']).isEmpty)
-                    const Text('Изменений в полученном сравнении нет'),
-                  for (final change in _rows(
-                    _object(comparison!['result'])['changes'],
-                  ))
-                    DeckKeyValue(
-                      label: _value(change['path']),
-                      value:
-                          'Было: ${_value(change['before'])}\nСтало: ${_value(change['after'])}',
-                      selectable: true,
-                    ),
-                  if (_object(comparison!['result'])['truncated'] == true)
-                    const DeckStatus(
-                      label: 'Сравнение неполное: часть изменений не получена',
-                      tone: DeckTone.warning,
-                    ),
-                  AutomationJsonView(
-                    title: 'Сравнение выбранных версий',
-                    value: comparison,
-                  ),
-                ],
+              _ActionButton('Архивировать', actions.mutate ? onArchive : null),
+            ],
+          ],
+        ),
+        if (!hasServer)
+          const DeckNotice(
+            message: 'Создавать и проверять профиль можно без сервера. Для плана и запуска выберите сервер.',
+            tone: DeckTone.neutral,
+          ),
+        if (validation != null) _Validation(validation!),
+        AutomationJsonView(title: 'Шаги и параметры', value: revision['body']),
+      ],
+    );
+  }
+}
+
+class AutomationExactValue extends StatelessWidget {
+  const AutomationExactValue({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(label, style: BrandTypography.button),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: deckColors(context)['bg'],
+          border: Border.all(color: deckColors(context)['border']),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: SelectableText(
+          value,
+          style: BrandTypography.log.copyWith(
+            color: deckColors(context)['accent'],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class AutomationFreshness extends StatelessWidget {
+  const AutomationFreshness({super.key, required this.source, this.observedAt});
+  final String source;
+  final String? observedAt;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DeckIcon('clock', size: 12, color: deckColors(context)['muted']),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                observedAt == null
+                    ? 'Время снимка не предоставлено'
+                    : 'Снимок данных · $observedAt',
+                style: BrandTypography.caption.copyWith(
+                  color: deckColors(context)['muted'],
+                ),
               ),
-            AutomationJsonView(
-              title: 'Идентификатор и хеш версии',
-              value: {
-                'profileId': profile.id,
-                'revision': revision['revision'],
-                'digest': revision['digest'],
-              },
-            ),
-            AutomationJsonView(title: 'Шаги и параметры', value: body),
-            DeckActions(
-              children: [
-                _ActionButton(
-                  'Выбрать версию',
-                  actions.read ? onSelectVersion : null,
-                ),
-                _ActionButton(
-                  'Проверить версию',
-                  actions.read ? onValidate : null,
-                ),
-                _ActionButton(
-                  'Сравнить версии',
-                  actions.read ? onCompare : null,
-                ),
-                if (!profile.archived) ...[
-                  _ActionButton(
-                    'Изменить профиль',
-                    actions.mutate ? onEdit : null,
-                  ),
-                  if (hasServer)
-                    _ActionButton(
-                      'Создать план',
-                      actions.mutate ? onCreatePlan : null,
-                    ),
-                  if (hasServer)
-                    _ActionButton(
-                      'Делегировать версию',
-                      actions.mutate ? onDelegate : null,
-                    ),
-                  _ActionButton(
-                    'Архивировать',
-                    actions.mutate ? onArchive : null,
-                  ),
-                ],
-              ],
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        Text(
+          source,
+          style: BrandTypography.caption.copyWith(
+            color: deckColors(context)['muted'],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Readonly projection of an owner's validated blocked record. A reason is
+/// never interpreted as evidence of a particular protected client or effect.
+@immutable
+class BlockedPlanDisplay {
+  const BlockedPlanDisplay._({
+    required this.plan,
+    required this.reasons,
+    required this.sourceSteps,
+  });
+  final Map<String, Object?> plan;
+  final List<Map<String, Object?>> reasons, sourceSteps;
+  static BlockedPlanDisplay? tryCreate(
+    Map<String, Object?> plan, {
+    required bool targetMatches,
+    required bool expired,
+    required bool invalidated,
+  }) {
+    if (!targetMatches ||
+        expired ||
+        invalidated ||
+        plan['status'] != 'blocked' ||
+        plan['id'] is! String ||
+        plan['serverId'] is! String ||
+        plan['profileId'] is! String ||
+        plan['profileRevision'] is! int ||
+        plan['profileDigest'] is! String ||
+        plan['createdAt'] is! String ||
+        plan['expiresAt'] is! String)
+      return null;
+    if (plan['reasons'] is! List ||
+        plan['effects'] is! List ||
+        plan['checks'] is! List ||
+        (plan['effects'] as List).isNotEmpty ||
+        (plan['checks'] as List).isNotEmpty)
+      return null;
+    final reasons = _rows(plan['reasons']);
+    if (reasons.isEmpty ||
+        reasons.length != (plan['reasons'] as List).length ||
+        reasons.any(
+          (reason) =>
+              reason['code'] is! String ||
+              reason['field'] is! String ||
+              reason['stepId'] != null && reason['stepId'] is! String,
+        ))
+      return null;
+    final snapshot = _readonlyPlanValue(plan) as Map<String, Object?>;
+    final ids = reasons.map((row) => row['stepId']).whereType<String>().toSet();
+    return BlockedPlanDisplay._(
+      plan: Map.unmodifiable(snapshot),
+      reasons: List.unmodifiable(
+        _rows(snapshot['reasons'])
+            .map((row) => Map<String, Object?>.unmodifiable(row)),
+      ),
+      sourceSteps: List.unmodifiable(
+        _rows(snapshot['desired'])
+            .where((step) => ids.contains(step['id']))
+            .map((row) => Map<String, Object?>.unmodifiable(row)),
       ),
     );
   }
 }
 
-class AutomationPlanSection extends StatelessWidget {
+Object? _readonlyPlanValue(Object? value) => switch (value) {
+  Map() => Map<String, Object?>.unmodifiable(
+    value.map((key, child) => MapEntry('$key', _readonlyPlanValue(child))),
+  ),
+  List() => List<Object?>.unmodifiable(value.map(_readonlyPlanValue)),
+  _ => value,
+};
+
+class AutomationPlanSection extends StatefulWidget {
   const AutomationPlanSection({
     super.key,
     required this.plan,
@@ -1027,92 +2205,576 @@ class AutomationPlanSection extends StatelessWidget {
     this.invalidReason,
     this.serverProfiles = const [],
     this.automationProfile,
+    this.sourceRevision,
+    this.onEditSource,
+    this.onClose,
+    this.currentServerId,
+    this.historical = false,
+    this.showPreflight = false,
+    this.onViewPlan,
+    this.onShowAuthorities,
+    this.allowApply = true,
+    this.showRefresh = true,
   });
-
   final Map<String, Object?> plan;
-  final bool runnable, expired;
+  final bool runnable,
+      expired,
+      historical,
+      showPreflight,
+      allowApply,
+      showRefresh;
   final AutomationActionAvailability actions;
   final Key? planAnchor;
-  final String? invalidReason;
+  final String? invalidReason, currentServerId;
   final List<ProfileView> serverProfiles;
   final AutomationProfileRecord? automationProfile;
+  final Map<String, Object?>? sourceRevision;
   final VoidCallback onApprove, onDeny, onApply, onRefresh;
-
+  final VoidCallback? onEditSource, onClose, onViewPlan, onShowAuthorities;
   @override
-  Widget build(BuildContext context) => _Section(
-    child: DeckSurface(
-      child: DeckFormSection(
-        title: 'План',
-        children: [
-          DeckStatus(
-            key: planAnchor,
-            label: expired
-                ? 'Срок плана истёк'
-                : invalidReason != null
-                ? 'План больше не действует'
-                : runnable
-                ? 'План готов к подтверждению'
-                : 'План заблокирован',
-            tone: expired || invalidReason != null || !runnable
-                ? DeckTone.warning
-                : DeckTone.available,
-          ),
-          if (expired)
-            const Text('Создайте новый план. Прежний план нельзя запустить.'),
-          if (invalidReason != null) Text(invalidReason!),
-          for (final reason in _rows(plan['reasons']))
-            Text(_code(reason['code'])),
-          _PlanSummary(
-            plan,
-            serverProfiles: serverProfiles,
-            automationProfile: automationProfile,
-          ),
-          const Text(
-            'Подтверждение сохраняет согласие на этот точный план. Запуск задания выполняется отдельно.',
-          ),
-          AutomationJsonView(
-            title: 'Неизменный план и технические детали',
-            value: plan,
-          ),
-          if (!automationPlanTargetAvailable(plan, serverProfiles) ||
-              _matchingProfile(plan, automationProfile) == null)
-            const DeckNotice(
-              message: 'Не удалось проверить цель и профиль плана',
-              nextStep: 'Обновите локальные профили и план перед подтверждением или запуском.',
-              tone: DeckTone.warning,
-            ),
-          DeckActions(
-            children: [
-              if (runnable && !expired && invalidReason == null) ...[
-                _ActionButton(
-                  'Подтвердить план',
-                  actions.mutate &&
-                          automationPlanTargetAvailable(plan, serverProfiles) &&
-                          _matchingProfile(plan, automationProfile) != null
-                      ? onApprove
-                      : null,
-                ),
-                _ActionButton('Отклонить план', actions.mutate ? onDeny : null),
-                FilledButton(
-                  onPressed:
-                      actions.mutate &&
-                          automationPlanTargetAvailable(plan, serverProfiles) &&
-                          _matchingProfile(plan, automationProfile) != null
-                      ? onApply
-                      : null,
-                  child: const Text('Запустить'),
-                ),
-              ],
-              _ActionButton('Обновить план', actions.read ? onRefresh : null),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
+  State<AutomationPlanSection> createState() => _AutomationPlanSectionState();
 }
 
-class AutomationJobsSection extends StatelessWidget {
+class _AutomationPlanSectionState extends State<AutomationPlanSection> {
+  bool showReasons = false,
+      showSource = false,
+      showPrevious = false,
+      viewedPlan = false;
+  int tab = 0;
+  @override
+  void didUpdateWidget(covariant AutomationPlanSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.plan['id'] != widget.plan['id']) {
+      showReasons = showSource = showPrevious = false;
+      viewedPlan = false;
+      tab = 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.plan;
+    final targetMatches =
+        automationPlanTargetAvailable(p, widget.serverProfiles) &&
+        (widget.currentServerId == null ||
+            widget.currentServerId == p['serverId']);
+    final blocked = BlockedPlanDisplay.tryCreate(
+      p,
+      targetMatches: targetMatches,
+      expired: widget.expired,
+      invalidated: widget.invalidReason != null,
+    );
+    final invalid = widget.expired || widget.invalidReason != null;
+    final source = widget.sourceRevision;
+    final exactSource =
+        source != null &&
+        source['profileId'] == p['profileId'] &&
+        source['revision'] == p['profileRevision'] &&
+        source['digest'] == p['profileDigest'];
+    final sourceMatches =
+        targetMatches &&
+        exactSource &&
+        _matchingProfile(p, widget.automationProfile) != null &&
+        widget.automationProfile?.archived == false;
+    final title = invalid
+        ? 'План требует новой проверки'
+        : blocked != null
+        ? 'План заблокирован'
+        : 'Подтверждение плана';
+    final target = AutomationServerTargets.resolve(
+      '${p['serverId']}',
+      widget.serverProfiles,
+      expectedIdentity: _planIdentity(p),
+    );
+    final state = invalid
+        ? (widget.expired ? 'Срок плана истёк' : 'План больше не действует')
+        : blocked != null
+        ? 'Исполнение не разрешено'
+        : widget.runnable
+        ? 'План готов к подтверждению'
+        : 'План недоступен для исполнения';
+    if (invalid) {
+      final targetLabel = target == null
+          ? 'Сведения о цели недоступны'
+          : '${target.name} · ${AutomationServerTargets.address(target)}';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _AutomationHero(
+            key: widget.planAnchor,
+            title: title,
+            state: 'Состояние: $state',
+            tone: DeckTone.warning,
+            contextLine: 'Цель: $targetLabel',
+          ),
+          const SizedBox(height: 20),
+          const DeckNotice(
+            title: 'Следующий шаг',
+            message: 'Создать новый план и просмотреть актуальные эффекты',
+            tone: DeckTone.warning,
+          ),
+          const SizedBox(height: 20),
+          DeckPanel(
+            title: 'Параметры и условия',
+            child: AutomationFacts(
+              values: {
+                'Цель': targetLabel,
+                'План':
+                    _matchingProfile(p, widget.automationProfile)?.name ??
+                    _value(p['id']),
+                'Состояние': state,
+                'Причина': widget.invalidReason ?? 'Срок плана истёк',
+                'Ранее выданное согласие': 'Не действует для новой проверки',
+                'Следующий шаг':
+                    'Создать новый план и просмотреть актуальные эффекты',
+                'planId': _value(p['id']),
+                'Digest плана': _value(p['digest']),
+                'Исходная версия': _value(p['profileRevision']),
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          const DeckPanel(
+            title: 'Последствия',
+            child: AutomationFacts(
+              values: {
+                'Следующий шаг':
+                    'Создать новый план и просмотреть актуальные эффекты',
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          DeckActions(
+            children: [
+              FilledButton(
+                clipBehavior: Clip.none,
+                onPressed: sourceMatches && widget.actions.mutate
+                    ? widget.onEditSource
+                    : null,
+                child: const Text('Создать новый план'),
+              ),
+              _ActionButton(
+                'Просмотреть прежний план',
+                () => setState(() => showPrevious = !showPrevious),
+              ),
+              _ActionButton('Закрыть', widget.onClose),
+            ],
+          ),
+          if (showPrevious) ...[
+            AutomationJsonView(
+              title: 'Неизменный план и технические детали',
+              value: p,
+            ),
+            _ActionButton(
+              'Обновить план',
+              widget.actions.read ? widget.onRefresh : null,
+            ),
+          ],
+        ],
+      );
+    }
+    if (widget.showPreflight &&
+        !viewedPlan &&
+        !invalid &&
+        blocked == null &&
+        p['preflight'] is Map) {
+      final preflight = _object(p['preflight']);
+      return _Section(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _AutomationHero(
+              key: widget.planAnchor,
+              title: 'Проверка готовности к установке',
+              state: state,
+              tone: widget.runnable ? DeckTone.available : DeckTone.warning,
+              contextLine: target == null
+                  ? 'Цель: сведения недоступны'
+                  : 'Цель: ${target.name} · ${AutomationServerTargets.address(target)}',
+            ),
+            const SizedBox(height: 20),
+            _TwoPanels(
+              left: DeckPanel(
+                title: 'Состав плана и проверки',
+                padding: EdgeInsets.zero,
+                child: AutomationPlanSteps(
+                  effects: _rows(p['effects']),
+                  checks: _rows(p['checks']),
+                  recipes: _rows(preflight['recipes']),
+                ),
+              ),
+              right: DeckPanel(
+                title: 'Параметры плана',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AutomationFacts(
+                      values: {
+                        'Цель': target == null
+                            ? 'Сведения о цели недоступны'
+                            : '${target.name} · ${AutomationServerTargets.address(target)}',
+                        'Итог': state,
+                        'Среда': _value(preflight['environment']),
+                        'Исполнитель': _value(preflight['runtimeVersion']),
+                        'planId': _value(p['id']),
+                        'Digest плана': _value(p['digest']),
+                        'Наблюдение': _value(p['createdAt']),
+                        'Срок': _time(p['expiresAt']),
+                        for (final entry in _object(p['exactParams']).entries)
+                          entry.key: _value(entry.value),
+                      },
+                    ),
+                    const Text(
+                      'Полученный план содержит разрешённые эффекты и будущие проверки результата. Нового чтения сервера при просмотре не выполняется.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            DeckActions(
+              children: [
+                FilledButton(
+                  clipBehavior: Clip.none,
+                  onPressed: () {
+                    setState(() => viewedPlan = true);
+                    widget.onViewPlan?.call();
+                  },
+                  child: const Text('Просмотреть план'),
+                ),
+                const Tooltip(
+                  message: 'Отдельная проверка и обновление готовности реализуется в пакете установки ПО (006).',
+                  child: OutlinedButton(
+                    clipBehavior: Clip.none,
+                    onPressed: null,
+                    child: Text('Обновить проверку'),
+                  ),
+                ),
+              ],
+            ),
+            const Text(
+              'Отдельная проверка и обновление готовности реализуется в пакете установки ПО (006).',
+            ),
+            AutomationJsonView(
+              title: 'Полученный результат проверки и план',
+              value: p,
+            ),
+          ],
+        ),
+      );
+    }
+    return _Section(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!invalid && blocked == null) ...[
+            DeckTabs(
+              labels: const [
+                'План',
+                'Запросы владельцу',
+                'Устарел / истёк срок',
+              ],
+              selected: tab,
+              onSelected: (next) {
+                setState(() => tab = next);
+                if (next == 1) widget.onShowAuthorities?.call();
+              },
+            ),
+            const DeckTabsGap(),
+          ],
+          if (blocked != null)
+            _AutomationHero(
+              key: widget.planAnchor,
+              title: title,
+              state: state,
+              tone: DeckTone.error,
+              contextLine: target == null
+                  ? 'Цель: сведения недоступны'
+                  : 'Цель: ${target.name} · ${AutomationServerTargets.address(target)}',
+            ),
+          if (blocked != null) const SizedBox(height: 20),
+          if (widget.historical)
+            const DeckNotice(
+              message: 'Исторический план: запись не является результатом сегодняшней проверки.',
+              tone: DeckTone.warning,
+            ),
+          if (invalid) ...[
+            DeckNotice(
+              title: 'Нужна новая проверка',
+              message:
+                  widget.invalidReason ??
+                  'Создайте новый план. Прежний план нельзя запустить.',
+              nextStep:
+                  'Ранее выданное согласие не действует для нового плана.',
+              tone: DeckTone.warning,
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (blocked != null) ...[
+            const DeckNotice(
+              title: 'Причина',
+              message: 'План заблокирован по причинам, полученным от сервиса. Сведения о конкретном защищённом эффекте не предоставлены.',
+              tone: DeckTone.error,
+            ),
+            const SizedBox(height: 20),
+            _TwoPanels(
+              left: DeckPanel(
+                title: 'Состав плана и проверки',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Сервис не предоставил разрешённые эффекты и проверки для заблокированного плана.',
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      clipBehavior: Clip.none,
+                      onPressed: () =>
+                          setState(() => showReasons = !showReasons),
+                      child: const Text('Просмотреть причины'),
+                    ),
+                    if (showReasons)
+                      for (final reason in blocked.reasons) ...[
+                        const Divider(height: 24),
+                        DeckKeyValue(
+                          label: 'Код',
+                          value: _value(reason['code']),
+                          selectable: true,
+                        ),
+                        Text(_code(reason['code'])),
+                        DeckKeyValue(
+                          label: 'Поле',
+                          value: _value(reason['field']),
+                        ),
+                        DeckKeyValue(
+                          label: 'Исходный шаг',
+                          value: _value(reason['stepId']),
+                        ),
+                      ],
+                    if (blocked.sourceSteps.isNotEmpty) ...[
+                      OutlinedButton(
+                        clipBehavior: Clip.none,
+                        onPressed: () =>
+                            setState(() => showSource = !showSource),
+                        child: const Text('Открыть исходный шаг'),
+                      ),
+                      if (showSource) ...[
+                        const Text(
+                          'Исходный запрос; это не доказанный и не разрешённый эффект.',
+                        ),
+                        for (final step in blocked.sourceSteps) _Values(step),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              right: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DeckPanel(
+                    title: 'Параметры плана',
+                    child: AutomationFacts(
+                      values: {
+                        'Цель': target == null
+                            ? 'Сведения о цели недоступны'
+                            : '${target.name} · ${AutomationServerTargets.address(target)}',
+                        'Состояние плана': state,
+                        'planId': _value(p['id']),
+                        'Причины': _pretty(blocked.reasons),
+                        'Создан': _value(p['createdAt']),
+                        'Источник': exactSource
+                            ? _value(source['digest'])
+                            : 'Точная исходная версия недоступна',
+                        'Найденный эффект': 'Сведения о конкретном защищённом эффекте не предоставлены',
+                        for (final entry in _object(p['exactParams']).entries)
+                          entry.key: _value(entry.value),
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const DeckPanel(
+                    title: 'Последствия и условия',
+                    child: Text(
+                      'Исполнение не разрешено. Сервис не передал идентичность эффекта.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            DeckActions(
+              children: [
+                const Tooltip(
+                  message: 'Сервис не передал идентичность эффекта',
+                  child: FilledButton(
+                    clipBehavior: Clip.none,
+                    onPressed: null,
+                    child: Text('Открыть запрещённый эффект'),
+                  ),
+                ),
+                _ActionButton(
+                  'Изменить исходный запрос',
+                  sourceMatches && widget.actions.mutate
+                      ? widget.onEditSource
+                      : null,
+                ),
+                _ActionButton('Закрыть план', widget.onClose),
+              ],
+            ),
+            if (!sourceMatches || !widget.actions.mutate)
+              const Text(
+                'Изменение недоступно: нет точной исходной версии или действующего права записи.',
+              ),
+          ] else if (tab == 1 && !invalid) ...[
+            const DeckPanel(
+              title: 'Запросы владельцу',
+              child: Text(
+                'Точное подтверждение выбранного плана выполняется отдельным действием. Текущее согласие не переносится на новый план.',
+              ),
+            ),
+          ] else if (tab == 2 && !invalid) ...[
+            const DeckPanel(
+              title: 'Устарел / истёк срок',
+              child: Text(
+                'После изменения цели, доступа, доверия или истечения срока создайте новый план. Просмотр плана не обновляет согласие.',
+              ),
+            ),
+          ] else ...[
+            _TwoPanels(
+              left: DeckPanel(
+                title: 'Состав плана и проверки',
+                padding: EdgeInsets.zero,
+                child: AutomationPlanSteps(
+                  effects: _rows(p['effects']),
+                  checks: _rows(p['checks']),
+                  recipes: _rows(_object(p['preflight'])['recipes']),
+                ),
+              ),
+              right: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DeckPanel(
+                    title: 'Параметры плана',
+                    child: AutomationFacts(
+                      values: {
+                        'Цель': target == null
+                            ? 'Сведения о цели недоступны'
+                            : '${target.name} · ${AutomationServerTargets.address(target)}',
+                        'Операция':
+                            _matchingProfile(p, widget.automationProfile) ==
+                                null
+                            ? 'Название профиля недоступно'
+                            : '${widget.automationProfile!.name} · версия ${p['profileRevision']}',
+                        'Срок плана': _time(p['expiresAt']),
+                        'Перерыв': 'Сервис не предоставил отдельную оценку',
+                        'Эффекты': _rows(p['effects']).isEmpty
+                            ? 'Не предоставлены'
+                            : _rows(p['effects'])
+                                  .map((row) => _value(row['kind']))
+                                  .join(', '),
+                        'Критерий успеха': _rows(p['checks']).isEmpty
+                            ? 'Не предоставлен'
+                            : _rows(p['checks'])
+                                  .map((row) => _check(row['kind']))
+                                  .join(', '),
+                        'При изменении или expiry':
+                            'Потребуется новая проверка и новый просмотр плана',
+                        'planId': _value(p['id']),
+                        'Digest плана': _value(p['digest']),
+                        'profileId': _value(p['profileId']),
+                        'revision': _value(p['profileRevision']),
+                        'bodyDigest': _value(p['profileDigest']),
+                        for (final entry in _object(p['exactParams']).entries)
+                          entry.key: _value(entry.value),
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const DeckPanel(
+                    title: 'Последствия и условия',
+                    child: Text(
+                      'Подтверждение сохраняет согласие на этот точный план. Запуск задания выполняется отдельно.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            for (final reason in _rows(p['reasons']))
+              Text(_code(reason['code'])),
+            if (!targetMatches ||
+                _matchingProfile(p, widget.automationProfile) == null)
+              const DeckNotice(
+                message: 'Не удалось проверить цель и профиль плана',
+                nextStep: 'Обновите локальные профили и план перед подтверждением или запуском.',
+                tone: DeckTone.warning,
+              ),
+            DeckActions(
+              children: [
+                if (widget.runnable && !invalid) ...[
+                  FilledButton(
+                    clipBehavior: Clip.none,
+                    child: const Text('Подтвердить план'),
+                    onPressed:
+                        widget.actions.mutate &&
+                            targetMatches &&
+                            _matchingProfile(p, widget.automationProfile) !=
+                                null
+                        ? widget.onApprove
+                        : null,
+                  ),
+                  _ActionButton(
+                    'Отклонить план',
+                    widget.actions.mutate ? widget.onDeny : null,
+                  ),
+                  if (widget.allowApply)
+                    FilledButton(
+                      clipBehavior: Clip.none,
+                      onPressed:
+                          widget.actions.mutate &&
+                              targetMatches &&
+                              _matchingProfile(p, widget.automationProfile) !=
+                                  null
+                          ? widget.onApply
+                          : null,
+                      child: const Text('Запустить'),
+                    ),
+                ],
+                if (invalid) ...[
+                  _ActionButton(
+                    'Создать новый план',
+                    sourceMatches && widget.actions.mutate
+                        ? widget.onEditSource
+                        : null,
+                  ),
+                  _ActionButton(
+                    'Просмотреть прежний план',
+                    () => setState(() => showPrevious = !showPrevious),
+                  ),
+                  _ActionButton('Закрыть', widget.onClose),
+                ],
+                if (widget.onClose != null)
+                  _ActionButton('Назад', widget.onClose),
+                if (widget.showRefresh)
+                  _ActionButton(
+                    'Обновить план',
+                    widget.actions.read ? widget.onRefresh : null,
+                  ),
+              ],
+            ),
+          ],
+          if (!invalid || showPrevious)
+            AutomationJsonView(
+              title: 'Неизменный план и технические детали',
+              value: p,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class AutomationJobsSection extends StatefulWidget {
   const AutomationJobsSection({
     super.key,
     required this.jobs,
@@ -1132,181 +2794,634 @@ class AutomationJobsSection extends StatelessWidget {
     required this.onReconcile,
     this.job,
     this.serverId,
+    this.serverProfiles = const [],
+    this.onDetailChanged,
+    this.showHeaderActions = true,
+    this.scopeSelector,
   });
-
   final List<Map<String, Object?>> jobs, events;
   final Map<String, Object?>? job;
   final String? serverId;
+  final List<ProfileView> serverProfiles;
+  final ValueChanged<bool>? onDetailChanged;
+  final Widget? scopeSelector;
+  final bool showHeaderActions;
   final bool loaded, hasMore, canCancel, canReconcile;
   final int droppedEvents;
   final AutomationActionAvailability actions;
-  final VoidCallback onRefresh, onRefreshAuthorities, onMore, onShowPlan;
-  final VoidCallback onCancel, onReconcile;
+  final VoidCallback onRefresh,
+      onRefreshAuthorities,
+      onMore,
+      onShowPlan,
+      onCancel,
+      onReconcile;
   final ValueChanged<String> onSelect;
+  @override
+  State<AutomationJobsSection> createState() => _AutomationJobsSectionState();
+}
+
+class _AutomationJobsSectionState extends State<AutomationJobsSection> {
+  late bool showDetail = widget.job != null;
+  int tab = 0;
+  String search = '';
+  String? stateFilter;
+  bool filters = false;
+  late bool eventsVisible = !const {
+    'unknown',
+    'cancel-requested',
+  }.contains(widget.job?['state']);
+  @override
+  void didUpdateWidget(covariant AutomationJobsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.job?['id'] != widget.job?['id']) {
+      eventsVisible = !const {
+        'unknown',
+        'cancel-requested',
+      }.contains(widget.job?['state']);
+      showDetail = widget.job != null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final job = widget.job;
     final outcome = _object(job?['outcome']);
-    return _Section(
-      child: DeckFormSection(
-        title: 'Задания сервера',
-        description: serverId == null
-            ? 'Задания в текущем контексте сервера.'
-            : 'Сервер: $serverId',
+    final rows = widget.jobs
+        .map((row) => _object(row['job']))
+        .where(
+          (row) =>
+              (tab == 0 ||
+                  tab == 1 &&
+                      const {
+                        'queued',
+                        'running',
+                        'reconciling',
+                        'cancel-requested',
+                      }.contains(row['state']) ||
+                  tab == 2 &&
+                      const {
+                        'failed',
+                        'unknown',
+                        'cancel-requested',
+                        'cancelled',
+                      }.contains(row['state'])) &&
+              (stateFilter == null || row['state'] == stateFilter) &&
+              '${row['id']} ${row['profileId']} ${row['state']}'
+                  .toLowerCase()
+                  .contains(search.toLowerCase()),
+        )
+        .toList();
+    final target = AutomationServerTargets.resolve(
+      widget.serverId ?? '',
+      widget.serverProfiles,
+    );
+    final contextLine = target == null
+        ? 'Сервер: ${widget.serverId ?? 'не выбран'}'
+        : '${target.name} · ${AutomationServerTargets.address(target)}';
+    Widget eventTimeline() => DeckPanel(
+      title: 'Ход выполнения',
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DeckActions(
-            children: [
-              _ActionButton(
-                'Обновить задания',
-                actions.read ? onRefresh : null,
-              ),
-              _ActionButton(
-                'Обновить разрешения',
-                actions.read ? onRefreshAuthorities : null,
-              ),
-            ],
-          ),
-          if (loaded && jobs.isEmpty)
-            const DeckNotice(
-              message: 'Заданий на этом сервере пока нет',
-              tone: DeckTone.neutral,
+          if (widget.events.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('События пока не получены'),
             ),
-          for (final row in jobs)
+          for (var i = 0; i < widget.events.length; i++)
             Builder(
               builder: (context) {
-                final entry = _object(row['job']);
-                return DeckSurface(
-                  enabled: actions.select,
-                  selected: job?['id'] == entry['id'],
-                  onTap: () => onSelect(entry['id'] as String),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                final event = widget.events[i];
+                final success = event['checkResult'] == 'passed';
+                final role = success
+                    ? 'available'
+                    : event['state'] == 'running'
+                    ? 'running'
+                    : 'unknown';
+                final stamp = DateTime.tryParse('${event['timestamp']}')
+                    ?.toUtc();
+                final clock = stamp == null
+                    ? 'Не предоставлено'
+                    : '${stamp.hour.toString().padLeft(2, '0')}:${stamp.minute.toString().padLeft(2, '0')}:${stamp.second.toString().padLeft(2, '0')}';
+                final title = event['kind'] == 'state'
+                    ? 'Состояние задания'
+                    : event['kind'] == 'dropped'
+                    ? 'Пропуски событий'
+                    : event['stepId'] == null
+                    ? 'Ход задания'
+                    : _value(event['stepId']);
+                final detail = event['kind'] == 'dropped'
+                    ? 'Пропущено событий: ${_value(event['droppedCount'])}'
+                    : event['kind'] == 'state'
+                    ? _jobState(event['state'])
+                    : event['checkResult'] != null
+                    ? 'Результат: ${_result(event['checkResult'])}'
+                    : _value(event['safeCode']);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      DeckStatus(
-                        label: _jobState(entry['state']),
-                        tone: _jobTone(entry['state']),
-                      ),
-                      DeckKeyValue(
-                        label: 'Задание',
-                        value: _value(entry['id']),
-                        selectable: true,
-                      ),
-                      if (entry['updatedAt'] != null)
-                        DeckKeyValue(
-                          label: 'Обновлено',
-                          value: _time(entry['updatedAt']),
+                      Container(
+                        width: 25,
+                        height: 25,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: deckColors(context)[role]),
                         ),
+                        child: success
+                            ? DeckIcon(
+                                'check',
+                                size: 13,
+                                color: deckColors(context)[role],
+                              )
+                            : Text(
+                                '${i + 1}',
+                                style: BrandTypography.caption.copyWith(
+                                  color: deckColors(context)[role],
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              title,
+                              style: BrandTypography.table.copyWith(
+                                fontFamily: BrandAssets.semiboldFamily,
+                                fontWeight: BrandTypography.semiboldWeight,
+                                fontVariations:
+                                    BrandTypography.semiboldVariations,
+                              ),
+                            ),
+                            Text(
+                              detail,
+                              style: BrandTypography.caption.copyWith(
+                                color: deckColors(context)['muted'],
+                                height: 20 / 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 70,
+                        child: Tooltip(
+                          message: _time(event['timestamp']),
+                          child: Text(
+                            clock,
+                            style: BrandTypography.log.copyWith(
+                              fontSize: 12,
+                              height: 20 / 12,
+                              color: deckColors(context)['muted'],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 );
               },
             ),
-          if (hasMore)
-            _ActionButton('Ещё задания', actions.read ? onMore : null),
-          if (job != null)
-            DeckSurface(
-              child: DeckFormSection(
-                title: 'Выбранное задание',
-                children: [
-                  DeckStatus(
-                    label: _jobState(job!['state']),
-                    tone: _jobTone(job!['state']),
-                  ),
-                  if (job!['state'] == 'unknown')
-                    const DeckNotice(
-                      title: 'Исход не подтверждён',
-                      message: 'На сервере могли произойти изменения. Уточните результат перед следующим действием.',
-                      tone: DeckTone.unknown,
-                    ),
-                  if (job!['cancelRequested'] == true)
-                    const DeckNotice(
-                      message: 'Остановка запрошена. Текущий шаг ещё может завершиться; дождитесь подтверждённого результата.',
-                    ),
-                  if (outcome.isNotEmpty) ...[
-                    DeckKeyValue(
-                      label: 'Изменения',
-                      value: switch (outcome['effects']) {
-                        'none' => 'Подтверждено отсутствие изменений',
-                        'confirmed' => 'Изменения подтверждены',
-                        'uncertain' => 'Возможны неподтверждённые изменения',
-                        _ => 'Не предоставлено',
-                      },
-                    ),
-                    if (outcome['safeCode'] != null)
-                      Text(_code(outcome['safeCode'])),
-                    const DeckSectionHeader(title: 'Проверки результата'),
-                    if (_rows(outcome['checks']).isEmpty)
-                      const Text('Результаты проверок не предоставлены'),
-                    for (final check in _rows(outcome['checks']))
-                      DeckStatus(
-                        label:
-                            '${_value(check['stepId'])} · ${_value(check['checkId'])}: ${_result(check['result'])}',
-                        tone: check['result'] == 'passed'
-                            ? DeckTone.success
-                            : check['result'] == 'failed'
-                            ? DeckTone.error
-                            : DeckTone.unknown,
-                      ),
-                  ],
+        ],
+      ),
+    );
+    if (showDetail &&
+        job != null &&
+        (job['state'] == 'unknown' || job['cancelRequested'] == true)) {
+      final unknown = job['state'] == 'unknown';
+      final effects = switch (outcome['effects']) {
+        'none' => 'Подтверждено отсутствие изменений',
+        'confirmed' => 'Изменения подтверждены',
+        'uncertain' => 'Возможны неподтверждённые изменения',
+        _ => 'Не предоставлено',
+      };
+      final last = widget.events.lastOrNull;
+      final lastText = last == null
+          ? 'Не предоставлено'
+          : '${_value(last['kind'])} · ${_value(last['stepId'])} · ${_time(last['timestamp'])}';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _AutomationHero(
+            title: unknown ? 'Неизвестный исход задания' : 'Остановка задания',
+            state: unknown
+                ? 'Состояние: Исход не подтверждён'
+                : 'Состояние: Остановка запрошена',
+            tone: unknown ? DeckTone.unknown : DeckTone.warning,
+          ),
+          const SizedBox(height: 20),
+          if (unknown) ...[
+            const DeckNotice(
+              title: 'Следующий шаг',
+              message: 'Проверить прежнее задание',
+              tone: DeckTone.warning,
+            ),
+            const SizedBox(height: 20),
+          ],
+          DeckPanel(
+            title: 'Контекст и проверка результата',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AutomationFacts(
+                  values: unknown
+                      ? {
+                          'Задание': _value(job['id']),
+                          'Цель': contextLine,
+                          'Состояние': 'Исход не подтверждён',
+                          'Последнее событие': lastText,
+                          'Следующий шаг': 'Проверить прежнее задание',
+                          'Ограничение':
+                              'Новые конфликтующие изменения заблокированы',
+                          'Повтор': 'Новый apply не запускается; проверяется прежний job',
+                          'Изменения': effects,
+                        }
+                      : {
+                          'Цель': contextLine,
+                          'Состояние': 'Остановка запрошена',
+                          'jobId': _value(job['id']),
+                          'planId': _value(job['immutablePlanId']),
+                          'cancelRequested': switch (job['cancelRequested']) {
+                            true => 'Остановка запрошена',
+                            false => 'Остановка не запрошена',
+                            _ => 'Состояние запроса не получено',
+                          },
+                          'Текущий шаг': 'Не предоставлено',
+                          'Уже выполнено': effects,
+                          'Последствие': 'Автоматический откат не обещается',
+                        },
+                ),
+                if (_rows(outcome['checks']).isNotEmpty) ...[
+                  const SizedBox(height: 16),
                   const Text(
-                    '«Остановить после текущего шага» запрашивает остановку задания. «Перестать ждать ответ» прекращает только ожидание в интерфейсе.',
+                    'Проверки результата',
+                    style: BrandTypography.button,
                   ),
-                  DeckActions(
-                    children: [
-                      _ActionButton(
-                        'План задания',
-                        actions.read ? onShowPlan : null,
-                      ),
-                      if (canCancel)
-                        _ActionButton(
-                          'Остановить после текущего шага',
-                          actions.mutate ? onCancel : null,
-                        ),
-                      if (canReconcile)
-                        _ActionButton(
-                          'Уточнить результат',
-                          actions.mutate ? onReconcile : null,
-                        ),
-                    ],
-                  ),
-                  DeckStatus(
-                    label:
-                        'Получено событий: ${events.length}. Пропущено в источнике: $droppedEvents',
-                    tone: droppedEvents > 0
-                        ? DeckTone.warning
-                        : DeckTone.neutral,
-                  ),
-                  ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: const DeckFocusLabel(
-                      child: Text('Последние 200 полученных событий'),
+                  for (final check in _rows(outcome['checks']))
+                    Text(
+                      '${_value(check['stepId'])} · ${_value(check['checkId'])}: ${_result(check['result'])}',
                     ),
-                    expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (events.isEmpty)
-                        const Text('События пока не получены'),
-                      for (final event in events)
-                        DeckKeyValue(
-                          label: _time(event['timestamp']),
-                          value: event['kind'] == 'dropped'
-                              ? 'Пропущено событий: ${_value(event['droppedCount'])}'
-                              : event['kind'] == 'state'
-                              ? _jobState(event['state'])
-                              : '${event['stepId'] == null ? 'Ход задания' : _value(event['stepId'])}${event['checkResult'] == null ? '' : ': ${_result(event['checkResult'])}'}${event['safeCode'] == null ? '' : '. ${_code(event['safeCode'])}'}',
-                        ),
-                    ],
-                  ),
-                  AutomationJsonView(
-                    title: 'Результат и проверки задания',
-                    value: job,
-                  ),
-                  AutomationJsonView(
-                    title: 'Данные полученных событий',
-                    value: events,
-                  ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          DeckActions(
+            children: [
+              if (unknown) ...[
+                FilledButton(
+                  clipBehavior: Clip.none,
+                  onPressed: widget.actions.mutate && widget.canReconcile
+                      ? widget.onReconcile
+                      : null,
+                  child: const Text('Уточнить результат'),
+                ),
+                _ActionButton(
+                  'Открыть план',
+                  widget.actions.read ? widget.onShowPlan : null,
+                ),
+              ] else
+                FilledButton(
+                  clipBehavior: Clip.none,
+                  onPressed: widget.actions.read
+                      ? () => widget.onSelect(job['id'] as String)
+                      : null,
+                  child: const Text('Обновить состояние'),
+                ),
+              _ActionButton(
+                unknown ? 'Показать события' : 'Открыть события',
+                () => setState(() => eventsVisible = !eventsVisible),
+              ),
+            ],
+          ),
+          if (eventsVisible) ...[
+            const SizedBox(height: 20),
+            eventTimeline(),
+            DeckStatus(
+              label:
+                  'Получено событий: ${widget.events.length}. Пропущено в источнике: ${widget.droppedEvents}',
+              tone: widget.droppedEvents > 0
+                  ? DeckTone.warning
+                  : DeckTone.neutral,
+            ),
+          ],
+          AutomationJsonView(title: 'Результат и проверки задания', value: job),
+          TextButton(
+            clipBehavior: Clip.none,
+            onPressed: () {
+              setState(() => showDetail = false);
+              widget.onDetailChanged?.call(false);
+            },
+            child: const Text('К заданиям'),
+          ),
+        ],
+      );
+    }
+    return _Section(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!showDetail) ...[
+            DeckTabs(
+              labels: const ['Все', 'Выполняются', 'Требуют внимания'],
+              selected: tab,
+              onSelected: (next) => setState(() => tab = next),
+            ),
+            const DeckTabsGap(),
+            DeckPanel(
+              title: 'Область просмотра',
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.sizeOf(context).width <= 520 ? 16 : 18,
+                vertical: 12,
+              ),
+              trailing: widget.scopeSelector == null
+                  ? null
+                  : TextButton(
+                      clipBehavior: Clip.none,
+                      onPressed: () => showMotionDialog<void>(
+                        context: context,
+                        barrierDismissible: true,
+                        builder: (_) => DeckDialogLayout(
+                          title: 'Область просмотра',
+                          child: widget.scopeSelector!,
+                        ),
+                      ),
+                      child: const Text('Выбрать сервер'),
+                    ),
+              child: AutomationFacts(
+                tableContext: true,
+                values: {'Область': contextLine},
               ),
             ),
+            SizedBox(height: MediaQuery.sizeOf(context).width <= 520 ? 16 : 20),
+            DeckActions(
+              phoneBasis: 130,
+              children: [
+                if (widget.showHeaderActions)
+                  _ActionButton(
+                    'Обновить задания',
+                    widget.actions.read ? widget.onRefresh : null,
+                  ),
+                if (widget.showHeaderActions)
+                  _ActionButton(
+                    'Обновить разрешения',
+                    widget.actions.read ? widget.onRefreshAuthorities : null,
+                  ),
+                OutlinedButton(
+                  clipBehavior: Clip.none,
+                  onPressed: () => setState(() => filters = !filters),
+                  child: const Text('Фильтры'),
+                ),
+              ],
+            ),
+            if (filters) ...[
+              const SizedBox(height: 12),
+              DeckPanel(
+                title: 'Фильтры заданий',
+                child: DropdownButtonFormField<String>(
+                  initialValue: stateFilter ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Состояние задания',
+                  ),
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Все состояния'),
+                    ),
+                    for (final state in {
+                      if (stateFilter != null) stateFilter!,
+                      ...widget.jobs
+                          .map((row) => _object(row['job'])['state'])
+                          .whereType<String>(),
+                    })
+                      DropdownMenuItem(
+                        value: state,
+                        child: Text(_jobState(state)),
+                      ),
+                  ],
+                  onChanged: (next) =>
+                      setState(() => stateFilter = next == '' ? null : next),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Фильтры применяются к полученной странице этого сервера. Общая история всех серверов пока недоступна.',
+              ),
+            ],
+            const SizedBox(height: 18),
+            if (!widget.loaded)
+              const DeckStatus(label: 'Задания ещё не прочитаны')
+            else if (rows.isEmpty)
+              const DeckEmptyState(
+                title: 'Заданий на этом сервере пока нет',
+                description: 'Обновите задания или измените локальный фильтр.',
+                icon: 'jobs',
+              )
+            else
+              AutomationLoadedTable(
+                hasMore: widget.hasMore,
+                onMore: widget.actions.read ? widget.onMore : null,
+                columns: const [
+                  'Задание',
+                  'Операция',
+                  'Источник',
+                  'Состояние',
+                  'Начало',
+                ],
+                rows: [
+                  for (final row in rows)
+                    [
+                      Text(_value(row['id']), style: BrandTypography.log),
+                      Text(
+                        'Профиль ${_value(row['profileId'])} · v${_value(row['profileRevision'])}',
+                      ),
+                      Text(
+                        row['grantId'] == null
+                            ? 'Владелец'
+                            : 'ИИ · ${row['grantId']}',
+                      ),
+                      DeckStatus(
+                        label: _jobState(row['state']),
+                        tone: _jobTone(row['state']),
+                      ),
+                      Text(_time(row['createdAt'])),
+                    ],
+                ],
+                selected: rows.indexWhere((row) => row['id'] == job?['id']),
+                onSelect: widget.actions.select
+                    ? (index) {
+                        widget.onSelect(rows[index]['id'] as String);
+                        setState(() => showDetail = true);
+                        widget.onDetailChanged?.call(true);
+                      }
+                    : null,
+                footer: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Получено: ${widget.jobs.length} · только выбранный сервер',
+                    ),
+                    if (widget.hasMore)
+                      _ActionButton(
+                        'Ещё задания',
+                        widget.actions.read ? widget.onMore : null,
+                      ),
+                  ],
+                ),
+              ),
+          ],
+          if (job != null && showDetail) ...[
+            _AutomationHero(
+              title: job['state'] == 'unknown'
+                  ? 'Неизвестный исход задания'
+                  : job['cancelRequested'] == true
+                  ? 'Остановка задания'
+                  : 'Ход задания',
+              state: _jobState(job['state']),
+              tone: _jobTone(job['state']),
+              contextLine: 'Задание: ${job['id']}',
+            ),
+            const SizedBox(height: 20),
+            if (job['state'] == 'unknown')
+              const DeckNotice(
+                title: 'Исход не подтверждён',
+                message: 'На сервере могли произойти изменения. Уточните результат перед следующим действием.',
+                tone: DeckTone.unknown,
+              ),
+            if (job['cancelRequested'] == true)
+              const DeckNotice(
+                message: 'Остановка запрошена. Текущий шаг ещё может завершиться; дождитесь подтверждённого результата.',
+              ),
+            const SizedBox(height: 20),
+            _TwoPanels(
+              left: eventsVisible
+                  ? eventTimeline()
+                  : const DeckPanel(
+                      title: 'Ход выполнения',
+                      child: Text('Полученные события скрыты локально.'),
+                    ),
+              right: DeckPanel(
+                title: 'Контекст задания',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AutomationFacts(
+                      values: {
+                        'Задание': _value(job['id']),
+                        'Цель': contextLine,
+                        'Операция':
+                            'Профиль ${_value(job['profileId'])} · версия ${_value(job['profileRevision'])}',
+                        'Состояние': _jobState(job['state']),
+                        'Основание':
+                            _object(job['authorityRef'])['kind'] == 'approval'
+                            ? 'Подтверждённый владельцем план'
+                            : _value(_object(job['authorityRef'])['kind']),
+                        'Источник': job['grantId'] == null
+                            ? 'Владелец'
+                            : 'ИИ · ${job['grantId']}',
+                      },
+                    ),
+                    if (outcome.isNotEmpty) ...[
+                      DeckKeyValue(
+                        label: 'Изменения',
+                        value: switch (outcome['effects']) {
+                          'none' => 'Подтверждено отсутствие изменений',
+                          'confirmed' => 'Изменения подтверждены',
+                          'uncertain' => 'Возможны неподтверждённые изменения',
+                          _ => 'Не предоставлено',
+                        },
+                      ),
+                      if (outcome['safeCode'] != null)
+                        Text(_code(outcome['safeCode'])),
+                      const DeckSectionHeader(title: 'Проверки результата'),
+                      if (_rows(outcome['checks']).isEmpty)
+                        const Text('Результаты проверок не предоставлены'),
+                      for (final check in _rows(outcome['checks']))
+                        DeckStatus(
+                          label:
+                              '${_value(check['stepId'])} · ${_value(check['checkId'])}: ${_result(check['result'])}',
+                          tone: check['result'] == 'passed'
+                              ? DeckTone.success
+                              : check['result'] == 'failed'
+                              ? DeckTone.error
+                              : DeckTone.unknown,
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            DeckStatus(
+              label:
+                  'Получено событий: ${widget.events.length}. Пропущено в источнике: ${widget.droppedEvents}',
+              tone: widget.droppedEvents > 0
+                  ? DeckTone.warning
+                  : DeckTone.neutral,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '«Остановить после текущего шага» запрашивает остановку задания. «Перестать ждать ответ» прекращает только ожидание в интерфейсе.',
+            ),
+            DeckActions(
+              children: [
+                _ActionButton(
+                  'План задания',
+                  widget.actions.read ? widget.onShowPlan : null,
+                ),
+                _ActionButton(
+                  job['cancelRequested'] == true
+                      ? 'Обновить состояние'
+                      : 'Обновить',
+                  widget.actions.read
+                      ? () => widget.onSelect(job['id'] as String)
+                      : null,
+                ),
+                _ActionButton(
+                  eventsVisible ? 'Скрыть события' : 'Показать события',
+                  () => setState(() => eventsVisible = !eventsVisible),
+                ),
+                if (widget.canCancel && job['state'] != 'unknown')
+                  _ActionButton(
+                    'Остановить после текущего шага',
+                    widget.actions.mutate ? widget.onCancel : null,
+                  ),
+                if (widget.canReconcile)
+                  _ActionButton(
+                    'Уточнить результат',
+                    widget.actions.mutate ? widget.onReconcile : null,
+                  ),
+              ],
+            ),
+            AutomationJsonView(
+              title: 'Результат и проверки задания',
+              value: job,
+            ),
+            AutomationJsonView(
+              title: 'Данные полученных событий',
+              value: widget.events,
+            ),
+            TextButton(
+              clipBehavior: Clip.none,
+              onPressed: () {
+                setState(() => showDetail = false);
+                widget.onDetailChanged?.call(false);
+              },
+              child: const Text('К заданиям'),
+            ),
+          ],
         ],
       ),
     );
@@ -1341,7 +3456,7 @@ class AutomationAuthoritiesSection extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      ExpansionTile(
+      _AutomationExpansion(
         tilePadding: EdgeInsets.zero,
         title: const DeckFocusLabel(
           child: Text('Запросы подтверждения этого сервера'),
@@ -1387,7 +3502,7 @@ class AutomationAuthoritiesSection extends StatelessWidget {
             _ActionButton('Ещё запросы', actions.read ? onMoreApprovals : null),
         ],
       ),
-      ExpansionTile(
+      _AutomationExpansion(
         tilePadding: EdgeInsets.zero,
         title: const DeckFocusLabel(child: Text('Делегированные версии')),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1460,7 +3575,7 @@ class AutomationAuthoritiesSection extends StatelessWidget {
   );
 }
 
-class AutomationGrantsSection extends StatelessWidget {
+class AutomationGrantsSection extends StatefulWidget {
   const AutomationGrantsSection({
     super.key,
     required this.grants,
@@ -1474,10 +3589,16 @@ class AutomationGrantsSection extends StatelessWidget {
     required this.onCopyConfiguration,
     this.launchConfiguration,
     this.serverProfiles = const [],
+    this.showHeaderActions = true,
+    this.onSelectionChanged,
+    this.onConfigurationChanged,
   });
 
+  final ValueChanged<Map<String, Object?>>? onSelectionChanged;
+  final ValueChanged<bool>? onConfigurationChanged;
   final List<AutomationGrantPresentation> grants;
   final List<ProfileView> serverProfiles;
+  final bool showHeaderActions;
   final bool loaded;
   final AutomationActionAvailability actions;
   final Map<String, Object?>? launchConfiguration;
@@ -1486,125 +3607,247 @@ class AutomationGrantsSection extends StatelessWidget {
   final ValueChanged<Map<String, Object?>> onEdit, onRevoke;
 
   @override
-  Widget build(BuildContext context) => _Section(
-    child: ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      title: const DeckFocusLabel(
-        child: Text('Доступ ИИ рабочего пространства'),
-      ),
-      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+  State<AutomationGrantsSection> createState() =>
+      _AutomationGrantsSectionState();
+}
+
+class _AutomationGrantsSectionState extends State<AutomationGrantsSection> {
+  String? selectedId;
+  bool configurationClosed = false;
+  @override
+  void didUpdateWidget(covariant AutomationGrantsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.launchConfiguration != widget.launchConfiguration)
+      configurationClosed = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.launchConfiguration != null && !configurationClosed)
+      return AutomationMcpConfigurationSection(
+        configuration: widget.launchConfiguration!,
+        grants: widget.grants,
+        serverProfiles: widget.serverProfiles,
+        canRead: widget.actions.read,
+        onCopy: widget.onCopyConfiguration,
+        onClose: () {
+          setState(() => configurationClosed = true);
+          widget.onConfigurationChanged?.call(false);
+        },
+      );
+    final selected = widget.grants
+        .where(
+          (row) =>
+              row.value['id'] ==
+              (selectedId ?? widget.grants.firstOrNull?.value['id']),
+        )
+        .firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.showHeaderActions) ...[
+          DeckActions(
+            children: [
+              _ActionButton(
+                'Выдать доступ',
+                widget.actions.mutate ? widget.onCreate : null,
+              ),
+              _ActionButton(
+                'Изменить права',
+                widget.actions.mutate &&
+                        selected != null &&
+                        selected.value['revokedAt'] == null
+                    ? () => widget.onEdit(selected.value)
+                    : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+        DeckPanel(
+          title: 'Область просмотра',
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width <= 520 ? 16 : 18,
+            vertical: 12,
+          ),
+          child: const AutomationFacts(
+            tableContext: true,
+            values: {
+              'Истёкший grant':
+                  'Не даёт новых вызовов; перевыпуск отдельным действием',
+              'Author-only': 'Подготовка профилей без серверов; чтение целей и apply запрещены',
+            },
+          ),
+        ),
+        SizedBox(height: MediaQuery.sizeOf(context).width <= 520 ? 16 : 20),
         DeckActions(
+          phoneBasis: 130,
           children: [
-            _ActionButton('Обновить клиентов', actions.read ? onRefresh : null),
-            _ActionButton('Подключить ИИ', actions.mutate ? onCreate : null),
+            _ActionButton(
+              'Отозвать',
+              widget.actions.mutate &&
+                      selected != null &&
+                      selected.value['revokedAt'] == null
+                  ? () => widget.onRevoke(selected.value)
+                  : null,
+            ),
+            _ActionButton(
+              'Конфигурация MCP',
+              widget.actions.read && selected?.current == true
+                  ? () => widget.onConfigure(selected!.value['id'] as String)
+                  : null,
+            ),
           ],
         ),
-        if (loaded && grants.isEmpty)
-          const _Section(
-            child: DeckNotice(
-              message: 'Клиентов ИИ пока нет',
-              tone: DeckTone.neutral,
-            ),
-          ),
-        for (final grant in grants)
-          _Section(
-            child: DeckSurface(
-              child: DeckFormSection(
-                title: _value(grant.value['label']),
-                children: [
-                  DeckStatus(
-                    label: grant.value['revokedAt'] != null
-                        ? 'Доступ отозван'
+        const SizedBox(height: 18),
+        if (!widget.loaded)
+          const DeckStatus(label: 'Клиенты ИИ ещё не прочитаны')
+        else if (widget.grants.isEmpty)
+          const DeckEmptyState(
+            title: 'Клиентов ИИ пока нет',
+            description: 'Выдайте отдельный доступ каждому клиенту.',
+            icon: 'key',
+          )
+        else
+          AutomationLoadedTable(
+            columns: const ['Клиент', 'Права', 'Цели', 'Срок', 'Состояние'],
+            rows: [
+              for (final grant in widget.grants)
+                [
+                  Text(_value(grant.value['label'])),
+                  Text((grant.value['scopes'] as List).map(_scope).join(' · ')),
+                  Text(
+                    _targetIds(grant.value['serverIds']).isEmpty
+                        ? 'Без серверов'
+                        : _targetIds(grant.value['serverIds'])
+                              .map((id) {
+                                final target = AutomationServerTargets.resolve(
+                                  id,
+                                  widget.serverProfiles,
+                                );
+                                return target == null
+                                    ? 'Сведения о цели недоступны'
+                                    : '${target.name} · ${AutomationServerTargets.address(target)}';
+                              })
+                              .join(', '),
+                  ),
+                  Text(_time(grant.value['expiresAt'])),
+                  Text(
+                    grant.value['revokedAt'] != null
+                        ? 'Отозван'
                         : grant.current
-                        ? 'Доступ действует'
-                        : 'Срок доступа истёк',
-                    tone: grant.current ? DeckTone.available : DeckTone.warning,
-                  ),
-                  DeckKeyValue(
-                    label: 'Выданные права',
-                    value: (grant.value['scopes'] as List)
-                        .map(_scope)
-                        .join(', '),
-                  ),
-                  AutomationServerTargets(
-                    serverIds: _targetIds(grant.value['serverIds']),
-                    serverProfiles: serverProfiles,
-                  ),
-                  DeckKeyValue(
-                    label: 'Действует до',
-                    value: _time(grant.value['expiresAt']),
-                  ),
-                  const Text(
-                    'Отзыв блокирует следующие шаги. Текущий шаг задания может завершиться.',
-                  ),
-                  AutomationJsonView(
-                    title: 'Серверы и выданные права',
-                    value: grant.value,
-                  ),
-                  DeckActions(
-                    children: [
-                      if (grant.current)
-                        _ActionButton(
-                          'Конфигурация MCP',
-                          actions.read
-                              ? () => onConfigure(grant.value['id'] as String)
-                              : null,
-                        ),
-                      if (grant.value['revokedAt'] == null) ...[
-                        _ActionButton(
-                          'Изменить права',
-                          actions.mutate ? () => onEdit(grant.value) : null,
-                        ),
-                        _ActionButton(
-                          'Отозвать доступ',
-                          actions.mutate ? () => onRevoke(grant.value) : null,
-                        ),
-                      ],
-                    ],
+                        ? 'Действует'
+                        : 'Истёк',
                   ),
                 ],
-              ),
-            ),
+            ],
+            selected: widget.grants.indexOf(selected ?? widget.grants.first),
+            onSelect: (index) {
+              setState(
+                () => selectedId = widget.grants[index].value['id'] as String,
+              );
+              widget.onSelectionChanged?.call(widget.grants[index].value);
+            },
           ),
-        if (launchConfiguration != null)
-          _Section(
-            child: DeckSurface(
-              child: DeckFormSection(
-                title: 'Конфигурация MCP',
-                description: 'Передайте клиенту ИИ команду и отдельные аргументы. Секрет доступа в этой конфигурации не показывается.',
-                children: [
-                  DeckKeyValue(
-                    label: 'Команда',
-                    value: _value(launchConfiguration!['command']),
-                    selectable: true,
-                    valueStyle: BrandTypography.log,
-                  ),
-                  DeckKeyValue(
-                    label: 'Аргументы',
-                    value: _value(launchConfiguration!['args']),
-                    selectable: true,
-                    valueStyle: BrandTypography.log,
-                  ),
-                  AutomationJsonView(
-                    title: 'Команда и аргументы MCP',
-                    value: launchConfiguration,
-                  ),
-                  DeckActions(
-                    children: [
-                      _ActionButton(
-                        'Скопировать конфигурацию',
-                        actions.read ? onCopyConfiguration : null,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+        const AutomationFreshness(
+          source: 'Локальная служба · доступ ИИ рабочего пространства',
+        ),
+        if (selected != null)
+          AutomationJsonView(
+            title: 'Доступ ИИ рабочего пространства',
+            value: selected.value,
           ),
+        TextButton(
+          clipBehavior: Clip.none,
+          onPressed: widget.actions.read ? widget.onRefresh : null,
+          child: const Text('Обновить клиентов'),
+        ),
       ],
-    ),
-  );
+    );
+  }
+}
+
+class AutomationMcpConfigurationSection extends StatelessWidget {
+  const AutomationMcpConfigurationSection({
+    super.key,
+    required this.configuration,
+    required this.grants,
+    required this.serverProfiles,
+    required this.canRead,
+    required this.onCopy,
+    required this.onClose,
+  });
+  final Map<String, Object?> configuration;
+  final List<AutomationGrantPresentation> grants;
+  final List<ProfileView> serverProfiles;
+  final bool canRead;
+  final VoidCallback onCopy, onClose;
+  @override
+  Widget build(BuildContext context) {
+    final args = configuration['args'];
+    String? id;
+    if (args is List) {
+      final indices = [
+        for (var i = 0; i < args.length - 1; i++)
+          if (args[i] == '--grant-id') i,
+      ];
+      if (indices.length == 1 && args[indices.single + 1] is String)
+        id = args[indices.single + 1] as String;
+    }
+    final matching = grants.where((row) => row.value['id'] == id).toList();
+    final grant = matching.length == 1 ? matching.single : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DeckPanel(
+          title: 'Сведения',
+          child: AutomationFacts(
+            values: {
+              'Клиент': _value(grant?.value['label']),
+              'Транспорт': 'stdio',
+              'Команда': _value(configuration['command']),
+              'Аргументы': _value(configuration['args']),
+              'Доступ': 'Ограничен выданными правами',
+              'Статус': 'Конфигурация получена',
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        DeckPanel(
+          title: 'Точные значения',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AutomationExactValue(
+                label: 'Команда',
+                value: _value(configuration['command']),
+              ),
+              const SizedBox(height: 16),
+              AutomationExactValue(
+                label: 'Аргументы',
+                value: _value(configuration['args']),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        DeckActions(
+          children: [
+            FilledButton(
+              clipBehavior: Clip.none,
+              onPressed: canRead ? onCopy : null,
+              child: const Text('Скопировать конфигурацию'),
+            ),
+            _ActionButton('Закрыть', onClose),
+          ],
+        ),
+        AutomationJsonView(
+          title: 'Команда и аргументы MCP',
+          value: configuration,
+        ),
+      ],
+    );
+  }
 }
 
 class AutomationJsonEditorDialog extends StatelessWidget {
@@ -1618,6 +3861,7 @@ class AutomationJsonEditorDialog extends StatelessWidget {
     this.preview,
     this.purpose,
     this.target,
+    this.clientLabel,
     this.contextDetails,
     this.onChanged,
     this.serverProfiles = const [],
@@ -1627,17 +3871,27 @@ class AutomationJsonEditorDialog extends StatelessWidget {
     this.requestRetained = false,
     this.canContinue = true,
     this.ownerStatus,
+    this.parameterDefinitions = const {},
+    this.submitLabel = 'Продолжить',
+    this.asPage = false,
+    this.workspaceBounds,
+    this.pageInsets,
   });
 
   final String title;
   final TextEditingController input;
-  final String? error, purpose, target;
+  final String? error, purpose, target, clientLabel;
   final Map<String, Object?>? preview, contextDetails;
   final List<ProfileView> serverProfiles;
   final List<String> targetServerIds;
   final bool contextCurrent;
   final bool saving, requestRetained, canContinue;
   final Widget? ownerStatus;
+  final Map<String, Object?> parameterDefinitions;
+  final String submitLabel;
+  final bool asPage;
+  final ValueGetter<Rect?>? workspaceBounds;
+  final ValueGetter<EdgeInsetsGeometry>? pageInsets;
   bool get _locked => saving || requestRetained;
   final ValueChanged<String>? onChanged;
   final VoidCallback onClose, onContinue;
@@ -1648,48 +3902,114 @@ class AutomationJsonEditorDialog extends StatelessWidget {
   ], serverProfiles);
 
   @override
-  Widget build(BuildContext context) => DeckDialogLayout(
+  Widget build(BuildContext context) => AutomationFormPageFrame(
     title: title,
-    maxWidth: 720,
-    target: target == null ? null : Text(target!),
+    asPage: asPage,
+    workspaceBounds: workspaceBounds,
+    pageInsets: pageInsets,
+    helper: _BeforeContinue(purpose: purpose),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // The source hides the decorative aside on compact/phone layouts.
+        // Keep the owner's operation explanation in the actual form.
+        if (purpose != null && MediaQuery.sizeOf(context).width <= 960) ...[
+          Text(
+            purpose!,
+            style: BrandTypography.caption.copyWith(
+              height: 20 / 12,
+              color: deckColors(context)['muted'],
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+        if (clientLabel != null)
+          AutomationFormValue(label: 'ИИ-клиент', value: clientLabel!),
+        if (target != null)
+          AutomationFormValue(label: 'Профиль', value: target!),
         if (!contextCurrent)
           const DeckNotice(
             message: _changedTargetMessage,
             tone: DeckTone.warning,
           ),
-        if (targetServerIds.isNotEmpty)
-          AutomationServerTargets(
-            serverIds: targetServerIds,
-            serverProfiles: serverProfiles,
+        if (targetServerIds.isNotEmpty) ...[
+          AutomationFormValue(
+            label: 'Цель',
+            value: targetServerIds
+                .map((id) {
+                  final row = AutomationServerTargets.resolve(
+                    id,
+                    serverProfiles,
+                  );
+                  return row == null
+                      ? 'Сведения о цели недоступны'
+                      : '${row.name} · ${AutomationServerTargets.address(row)}';
+                })
+                .join(', '),
           ),
-        if (purpose != null) ...[
-          Text(purpose!),
-          const SizedBox(height: BrandSpacing.space16),
+          const SizedBox(height: 20),
         ],
-        if (preview != null) ...[
-          _EditorPreview(preview!, serverProfiles: serverProfiles),
-          const SizedBox(height: BrandSpacing.space16),
-        ],
-        TextField(
-          controller: input,
-          enabled: !_locked,
-          readOnly: _locked,
-          onChanged: _locked ? null : onChanged,
-          minLines: 8,
-          maxLines: 18,
-          decoration: InputDecoration(
-            labelText: 'JSON',
-            errorText: error,
-            errorMaxLines: 20,
+        AutomationStructuredDraft(
+          input: input,
+          enabled: !_locked && contextCurrent,
+          onChanged: onChanged,
+          serverProfiles: serverProfiles,
+          parameterDefinitions: parameterDefinitions,
+        ),
+        if (!_jsonObject(input.text) && preview != null)
+          AutomationFacts(
+            values: {
+              if (preview!['scopes'] is List)
+                'Права последнего просмотра': (preview!['scopes'] as List)
+                    .map(_scope)
+                    .join(', '),
+              if (preview!['serverIds'] is List)
+                'Цели последнего просмотра':
+                    _targetIds(preview!['serverIds']).isEmpty
+                    ? 'Без доступа к серверам'
+                    : _targetIds(preview!['serverIds'])
+                          .map((id) {
+                            final row = AutomationServerTargets.resolve(
+                              id,
+                              serverProfiles,
+                            );
+                            return row == null
+                                ? 'Сведения о цели недоступны'
+                                : '${row.name} · ${AutomationServerTargets.address(row)}';
+                          })
+                          .join(', '),
+              if (preview!['lifetimeSeconds'] != null)
+                'Срок последнего просмотра':
+                    '${preview!['lifetimeSeconds']} секунд',
+            },
           ),
-          style: _locked
-              ? BrandTypography.log.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                )
-              : BrandTypography.log,
+        const SizedBox(height: 16),
+        _AutomationExpansion(
+          tilePadding: EdgeInsets.zero,
+          initiallyExpanded: !_jsonObject(input.text),
+          title: const Text('JSON · дополнительные сведения'),
+          children: [
+            Semantics(
+              label: 'JSON',
+              child: TextField(
+                controller: input,
+                enabled: !_locked,
+                readOnly: _locked,
+                onChanged: _locked ? null : onChanged,
+                minLines: 8,
+                maxLines: 18,
+                decoration: InputDecoration(
+                  errorText: error,
+                  errorMaxLines: 20,
+                ),
+                style: _locked
+                    ? BrandTypography.log.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      )
+                    : BrandTypography.log,
+              ),
+            ),
+          ],
         ),
         if (ownerStatus != null) ...[
           const SizedBox(height: BrandSpacing.space16),
@@ -1703,13 +4023,18 @@ class AutomationJsonEditorDialog extends StatelessWidget {
       ],
     ),
     actions: [
-      TextButton(onPressed: onClose, child: const Text('Закрыть')),
       FilledButton(
+        clipBehavior: Clip.none,
         onPressed:
             contextCurrent && _targetsAvailable && canContinue && !_locked
             ? onContinue
             : null,
-        child: const Text('Продолжить'),
+        child: Text(submitLabel),
+      ),
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: onClose,
+        child: const Text('Отмена'),
       ),
     ],
   );
@@ -1741,8 +4066,14 @@ class AutomationProfileEditorDialog extends StatelessWidget {
     this.contextCurrent = true,
     this.ownerStatus,
     this.basisReview,
+    this.asPage = false,
+    this.workspaceBounds,
+    this.pageInsets,
   });
 
+  final bool asPage;
+  final ValueGetter<Rect?>? workspaceBounds;
+  final ValueGetter<EdgeInsetsGeometry>? pageInsets;
   final TextEditingController name, description, body;
   final AutomationProfileRecord? existing;
   final int? baseRevision;
@@ -1755,110 +4086,173 @@ class AutomationProfileEditorDialog extends StatelessWidget {
   final VoidCallback onClose, onSave, onValidate;
 
   @override
-  Widget build(BuildContext context) => DeckDialogLayout(
-    title: existing == null ? 'Новый Ansible-профиль' : 'Новая версия профиля',
-    maxWidth: 720,
-    child: DeckFormSection(
-      title: 'Описание и содержимое',
-      description: 'Сохранение создаёт неизменную версию профиля и не запускает действия на сервере.',
-      children: [
-        TextField(
-          controller: name,
-          enabled: contextCurrent && !saving && !requestRetained,
-          style: Theme.of(context).textTheme.bodyLarge,
-          decoration: InputDecoration(
-            labelText: 'Название',
-            errorText: nameError,
-            errorMaxLines: 20,
+  Widget build(BuildContext context) => _ProfileEditorPage(owner: this);
+}
+
+class _ProfileEditorPage extends StatefulWidget {
+  const _ProfileEditorPage({required this.owner});
+  final AutomationProfileEditorDialog owner;
+  @override
+  State<_ProfileEditorPage> createState() => _ProfileEditorPageState();
+}
+
+class _ProfileEditorPageState extends State<_ProfileEditorPage> {
+  int tab = 0;
+  @override
+  Widget build(BuildContext context) {
+    final w = widget.owner;
+    return AutomationFormPageFrame(
+      title: 'Редактор Ansible-профиля',
+      asPage: w.asPage,
+      workspaceBounds: w.workspaceBounds,
+      pageInsets: w.pageInsets,
+      tabs: DeckTabs(
+        labels: const ['Назначение', 'Шаги', 'Параметры', 'Проверки'],
+        selected: tab,
+        onSelected: (next) => setState(() => tab = next),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AutomationProfileFields(
+            showTabs: false,
+            selectedSection: tab,
+            body: w.body,
+            enabled: w.contextCurrent && !w.saving && !w.requestRetained,
+            onChanged: w.onBodyChanged,
+            identityFields: [
+              AutomationLabeledField(
+                label: 'Название',
+                required: true,
+                child: TextField(
+                  key: const ValueKey('automation-field-Название'),
+                  controller: w.name,
+                  enabled: w.contextCurrent && !w.saving && !w.requestRetained,
+                  style: BrandTypography.body.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    height: MediaQuery.sizeOf(context).width <= 520
+                        ? 22 / 14
+                        : 20 / 14,
+                  ),
+                  decoration: deckFormDecoration(context)
+                      .copyWith(errorText: w.nameError, errorMaxLines: 20),
+                ),
+              ),
+              SizedBox(
+                height: MediaQuery.sizeOf(context).width <= 520 ? 20 : 18,
+              ),
+              AutomationLabeledField(
+                label: 'Описание',
+                child: TextField(
+                  key: const ValueKey('automation-field-Описание'),
+                  controller: w.description,
+                  enabled: w.contextCurrent && !w.saving && !w.requestRetained,
+                  style: BrandTypography.log.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14,
+                    height: MediaQuery.sizeOf(context).width <= 520
+                        ? 22 / 14
+                        : 20 / 14,
+                  ),
+                  minLines: 2,
+                  maxLines: null,
+                  decoration: deckFormDecoration(
+                    context,
+                  ).copyWith(errorText: w.descriptionError, errorMaxLines: 20),
+                ),
+              ),
+            ],
           ),
-        ),
-        TextField(
-          controller: description,
-          enabled: contextCurrent && !saving && !requestRetained,
-          style: Theme.of(context).textTheme.bodyLarge,
-          maxLines: null,
-          decoration: InputDecoration(
-            labelText: 'Описание',
-            errorText: descriptionError,
-            errorMaxLines: 20,
-          ),
-        ),
-        ExcludeSemantics(
-          child: Text(
-            'Шаги и параметры профиля (JSON)',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-        ),
-        const SizedBox(height: BrandSpacing.space8),
-        Semantics(
-          label: 'Шаги и параметры профиля (JSON)',
-          child: TextField(
-            controller: body,
-            enabled: contextCurrent && !saving && !requestRetained,
-            onChanged: onBodyChanged,
-            minLines: 8,
-            maxLines: 16,
-            decoration: InputDecoration(errorText: error, errorMaxLines: 20),
-            style: BrandTypography.log.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
+          const SizedBox(height: BrandSpacing.space8),
+          if (tab > 0 || !_profileBodyValid(w.body.text) || w.error != null)
+            _AutomationExpansion(
+              tilePadding: EdgeInsets.zero,
+              initiallyExpanded: !_profileBodyValid(w.body.text),
+              title: const Text('Шаги и параметры профиля (JSON)'),
+              children: [
+                Semantics(
+                  label: 'Шаги и параметры профиля (JSON)',
+                  child: TextField(
+                    controller: w.body,
+                    enabled:
+                        w.contextCurrent && !w.saving && !w.requestRetained,
+                    onChanged: w.onBodyChanged,
+                    minLines: 8,
+                    maxLines: 16,
+                    decoration: InputDecoration(
+                      errorText: w.error,
+                      errorMaxLines: 20,
+                    ),
+                    style: BrandTypography.log.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+          if (w.existing != null)
+            Text(
+              'Основа: версия ${w.baseRevision}. Текущая версия: ${w.existing!.headRevision}.',
+            ),
+          if (w.existing != null)
+            const DeckNotice(
+              message: 'Для новой версии потребуется отдельное разрешение на запуск.',
+              tone: DeckTone.neutral,
+            ),
+          if (w.validation != null) _Validation(w.validation!),
+          if (!w.contextCurrent)
+            const DeckNotice(
+              message: 'Контекст профиля изменился. Прежний редактор больше не может сохранять или подтверждать изменения.',
+              tone: DeckTone.warning,
+            ),
+          if (w.ownerStatus != null) w.ownerStatus!,
+          if (w.basisReview != null) w.basisReview!,
+          if (w.saveError != null && w.ownerStatus == null)
+            DeckNotice(
+              title: w.saveUnconfirmed ? 'Исход записи не подтверждён' : null,
+              message: w.saveError!,
+              nextStep: w.saveUnconfirmed
+                  ? 'Закройте редактор, чтобы использовать предусмотренные действия сохранённого запроса.'
+                  : null,
+              tone: w.saveUnconfirmed ? DeckTone.unknown : DeckTone.warning,
+            ),
+          if (w.saving)
+            const DeckStatus(label: 'Сохранение профиля', pending: true),
+          if (w.validating)
+            const DeckStatus(
+              label: 'Проверка содержимого профиля',
+              pending: true,
+            ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          clipBehavior: Clip.none,
+          onPressed: w.contextCurrent && !w.saving && w.canValidate
+              ? w.onValidate
+              : null,
+          child: Text(w.validating ? 'Проверка…' : 'Проверить без сохранения'),
         ),
-        if (existing != null)
-          Text(
-            'Основа: версия $baseRevision. Текущая версия: ${existing!.headRevision}.',
-          ),
-        if (existing != null)
-          const DeckNotice(
-            message:
-                'Для новой версии потребуется отдельное разрешение на запуск.',
-            tone: DeckTone.neutral,
-          ),
-        if (validation != null) _Validation(validation!),
-        if (!contextCurrent)
-          const DeckNotice(
-            message: 'Контекст профиля изменился. Прежний редактор больше не может сохранять или подтверждать изменения.',
-            tone: DeckTone.warning,
-          ),
-        if (ownerStatus != null) ownerStatus!,
-        if (basisReview != null) basisReview!,
-        if (saveError != null && ownerStatus == null)
-          DeckNotice(
-            title: saveUnconfirmed ? 'Исход записи не подтверждён' : null,
-            message: saveError!,
-            nextStep: saveUnconfirmed
-                ? 'Закройте редактор, чтобы использовать предусмотренные действия сохранённого запроса.'
-                : null,
-            tone: saveUnconfirmed ? DeckTone.unknown : DeckTone.warning,
-          ),
-        if (saving)
-          const DeckStatus(label: 'Сохранение профиля', pending: true),
-        if (validating)
-          const DeckStatus(
-            label: 'Проверка содержимого профиля',
-            pending: true,
-          ),
+        OutlinedButton(
+          clipBehavior: Clip.none,
+          onPressed:
+              !w.contextCurrent ||
+                  w.validating ||
+                  w.saving ||
+                  w.requestRetained ||
+                  !w.canSave
+              ? null
+              : w.onSave,
+          child: const Text('Сохранить версию'),
+        ),
+        OutlinedButton(
+          clipBehavior: Clip.none,
+          onPressed: w.onClose,
+          child: const Text('Закрыть'),
+        ),
       ],
-    ),
-    actions: [
-      TextButton(onPressed: onClose, child: const Text('Закрыть')),
-      FilledButton(
-        onPressed:
-            !contextCurrent ||
-                validating ||
-                saving ||
-                requestRetained ||
-                !canSave
-            ? null
-            : onSave,
-        child: const Text('Сохранить версию'),
-      ),
-      OutlinedButton(
-        onPressed: contextCurrent && !saving && canValidate ? onValidate : null,
-        child: Text(validating ? 'Проверка…' : 'Проверить без сохранения'),
-      ),
-    ],
-  );
+    );
+  }
 }
 
 class AutomationProfileBasisReview extends StatelessWidget {
@@ -1914,6 +4308,7 @@ class AutomationProfileBasisReview extends StatelessWidget {
           ),
         if (submission.canReadBasis)
           OutlinedButton(
+            clipBehavior: Clip.none,
             onPressed: canRead && !submission.basisLoading ? onRead : null,
             child: const Text('Перечитать текущую версию'),
           ),
@@ -1941,6 +4336,7 @@ class AutomationProfileBasisReview extends StatelessWidget {
               'Сначала закройте сохранённый запрос в этом редакторе. Это не отменяет выполненные действия.',
             ),
           OutlinedButton(
+            clipBehavior: Clip.none,
             onPressed: canAccept && !requestRetained ? onAccept : null,
             child: const Text('Принять текущую версию как основу'),
           ),
@@ -1961,14 +4357,22 @@ class AutomationPlanDecisionDialog extends StatefulWidget {
     this.automationProfile,
     this.contextCurrent = true,
     this.now,
+    this.onAlternate,
+    this.asPage = false,
+    this.workspaceBounds,
+    this.pageInsets,
   });
 
   final Map<String, Object?> plan;
   final bool approve;
   final VoidCallback onBack, onConfirm;
+  final VoidCallback? onAlternate;
   final List<ProfileView> serverProfiles;
   final AutomationProfileRecord? automationProfile;
   final bool contextCurrent;
+  final bool asPage;
+  final ValueGetter<Rect?>? workspaceBounds;
+  final ValueGetter<EdgeInsetsGeometry>? pageInsets;
 
   /// A presentation clock basis for deterministic synthetic fixtures. The live
   /// owner uses the real clock and retains its final admission/deadline check.
@@ -2022,55 +4426,69 @@ class _AutomationPlanDecisionDialogState
     _invalidated = _invalidated || !_current;
   }
 
+  void _confirm() {
+    if (_invalidated || !_current || !_canConsent) {
+      if (mounted) {
+        setState(() => _invalidated = _invalidated || !_current);
+      }
+      return;
+    }
+    widget.onConfirm();
+  }
+
   @override
-  Widget build(BuildContext context) => DeckDialogLayout(
-    title: _approve ? 'Подтвердить этот план?' : 'Отклонить этот план?',
-    maxWidth: 720,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          _approve
-              ? 'Вы подтверждаете только показанный неизменный план. Для запуска потребуется отдельное действие.'
-              : 'Отклонение этого плана не запускает действий на сервере.',
-        ),
-        const SizedBox(height: BrandSpacing.space16),
-        if (_expired)
-          const DeckNotice(
-            title: 'Срок плана истёк',
-            message: 'Создайте новый план. Прежнее согласие нельзя применить.',
-            tone: DeckTone.warning,
+  Widget build(BuildContext context) {
+    final content = DeckPage(
+      title: 'Подтверждение плана',
+      description: 'Проверьте цель, последствия и условия выбранного действия',
+      eyebrow: 'Задания / Рабочее пространство',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_expired)
+            const DeckNotice(
+              title: 'Срок плана истёк',
+              message:
+                  'Создайте новый план. Прежнее согласие нельзя применить.',
+              tone: DeckTone.warning,
+            ),
+          if (_invalidated || !_current)
+            const DeckNotice(
+              message: _changedTargetMessage,
+              tone: DeckTone.warning,
+            ),
+          AutomationPlanSection(
+            plan: _plan,
+            serverProfiles: _serverProfiles,
+            automationProfile: _profile,
+            runnable: _plan['status'] == 'runnable',
+            expired: _expired,
+            allowApply: false,
+            showRefresh: false,
+            actions: AutomationActionAvailability(
+              read: _current,
+              mutate: !_invalidated && _current && _canConsent,
+              select: _current,
+            ),
+            onApprove: _approve
+                ? _confirm
+                : widget.onAlternate ?? widget.onBack,
+            onDeny: !_approve ? _confirm : widget.onAlternate ?? widget.onBack,
+            onApply: () {},
+            onRefresh: () {},
+            onClose: widget.onBack,
           ),
-        if (_invalidated || !_current)
-          const DeckNotice(
-            message: _changedTargetMessage,
-            tone: DeckTone.warning,
-          ),
-        _PlanSummary(
-          _plan,
-          serverProfiles: _serverProfiles,
-          automationProfile: _profile,
-        ),
-        AutomationJsonView(title: 'Точный план и хеш', value: _plan),
-      ],
-    ),
-    actions: [
-      TextButton(onPressed: widget.onBack, child: const Text('Назад')),
-      FilledButton(
-        onPressed: _invalidated || !_current || !_canConsent
-            ? null
-            : () {
-                if (_expired) {
-                  setState(() {});
-                  return;
-                }
-                if (!_invalidated && _current && _canConsent)
-                  widget.onConfirm();
-              },
-        child: Text(_approve ? 'Подтвердить план' : 'Отклонить план'),
+        ],
       ),
-    ],
-  );
+    );
+    return widget.asPage
+        ? content
+        : AutomationWorkspaceOverlay(
+            workspaceBounds: widget.workspaceBounds,
+            pageInsets: widget.pageInsets,
+            child: content,
+          );
+  }
 }
 
 class AutomationConfirmationDialog extends StatelessWidget {
@@ -2091,8 +4509,16 @@ class AutomationConfirmationDialog extends StatelessWidget {
     title: title,
     child: Text(message),
     actions: [
-      TextButton(onPressed: onBack, child: const Text('Назад')),
-      FilledButton(onPressed: onConfirm, child: Text(confirmLabel)),
+      TextButton(
+        clipBehavior: Clip.none,
+        onPressed: onBack,
+        child: const Text('Назад'),
+      ),
+      FilledButton(
+        clipBehavior: Clip.none,
+        onPressed: onConfirm,
+        child: Text(confirmLabel),
+      ),
     ],
   );
 }

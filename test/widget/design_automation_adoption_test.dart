@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
+import 'package:serverdeck/automation/automation_panel.dart';
 import 'package:serverdeck/software/software_panel.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
@@ -94,6 +95,7 @@ AutomationJobsSection jobs({
 AutomationGrantsSection grants({
   bool current = true,
   bool revoked = false,
+  bool configuration = false,
   VoidCallback onRevoke = noop,
 }) => AutomationGrantsSection(
   serverProfiles: [DesignServerFixtures.profile(connectionRevision: '2')],
@@ -105,7 +107,9 @@ AutomationGrantsSection grants({
   ],
   loaded: true,
   actions: enabled,
-  launchConfiguration: DesignAutomationFixtures.launchConfiguration(),
+  launchConfiguration: configuration
+      ? DesignAutomationFixtures.launchConfiguration()
+      : null,
   onRefresh: noop,
   onCreate: noop,
   onConfigure: (_) {},
@@ -131,16 +135,17 @@ void main() {
     '16 recipe loading stays explicit and pending mutations are disabled',
     (tester) async {
       var connected = 0, created = 0;
-      Widget actions() => AutomationProfileActions(
-        actions: disabled,
-        hasServer: true,
-        installationCatalog: true,
-        onRefresh: noop,
-        onCreate: () => created++,
-        onLoadRecipes: () => connected++,
+      Widget actions(String section) => Wrap(
+        children: automationPageActions(
+          section: section,
+          availability: disabled,
+          onRefresh: noop,
+          onCreate: () => created++,
+          onLoadRecipes: () => connected++,
+        ),
       );
-      await tester.pumpWidget(host(actions()));
-      await tester.pumpWidget(host(actions(), dark: true, scale: 2));
+      await tester.pumpWidget(host(actions('catalog')));
+      await tester.pumpWidget(host(actions('catalog'), dark: true, scale: 2));
       expect(connected + created, 0);
       expect(
         tester
@@ -149,9 +154,16 @@ void main() {
         isNull,
       );
       expect(
+        button('Новый профиль'),
+        findsNothing,
+        reason: 'Catalog header only exposes catalog actions',
+      );
+      await tester.pumpWidget(host(actions('profiles'), dark: true, scale: 2));
+      expect(
         tester.widget<OutlinedButton>(button('Новый профиль')).onPressed,
         isNull,
       );
+      expect(connected + created, 0);
       await tester.pumpWidget(
         host(
           AutomationRecipesSection(
@@ -171,9 +183,11 @@ void main() {
       '16-19 exact recipes and plain plan contract ${dark ? 'dark' : 'light'}',
       (tester) async {
         String? digest;
+        final recipes = GlobalKey<AutomationRecipesSectionState>();
         await tester.pumpWidget(
           host(
             AutomationRecipesSection(
+              key: recipes,
               catalog: DesignAutomationFixtures.catalog(),
               canMutate: true,
               onCreatePlan: (value) => digest = value,
@@ -182,13 +196,25 @@ void main() {
           ),
         );
         expect(digest, isNull);
-        expect(find.text('Только чистая установка'), findsOneWidget);
-        expect(find.text('Максимум подключений'), findsOneWidget);
-        expect(
-          find.text('PostgreSQL License\nСинтетический пример лицензии'),
-          findsOneWidget,
+        recipes.currentState!.selectFirst();
+        await tester.pumpAndSettle();
+        expect(digest, isNull);
+        expect(find.textContaining('Только чистая установка;'), findsOneWidget);
+        await tester.ensureVisible(
+          find.text('Лицензии, начальные настройки и точные условия'),
         );
-        await tapVisible(tester, 'План установки PostgreSQL 16');
+        await tester.tap(
+          find.text('Лицензии, начальные настройки и точные условия'),
+        );
+        await tester.pumpAndSettle();
+        final recipe = tester
+            .widgetList<SelectableText>(find.byType(SelectableText))
+            .singleWhere(
+              (widget) => widget.data?.contains('"licenseNotices"') == true,
+            );
+        expect(recipe.data, contains('PostgreSQL License'));
+        expect(recipe.data, contains('"max_connections": 100'));
+        await tapVisible(tester, 'Создать план');
         expect(digest, DesignAutomationFixtures.recipe()['digest']);
 
         var applied = 0, approved = 0;
@@ -198,15 +224,23 @@ void main() {
             dark: dark,
           ),
         );
-        expect(find.text('Сервер'), findsOneWidget);
-        expect(find.text('Синтетический сервер'), findsOneWidget);
-        expect(find.text('192.0.2.44:2222'), findsOneWidget);
+        expect(find.text('Цель'), findsOneWidget);
+        expect(
+          find.text('Синтетический сервер · 192.0.2.44:2222'),
+          findsOneWidget,
+        );
         expect(find.text('Привет'), findsNWidgets(2));
         expect(
           find.text('Изменить конфигурацию: Приветствие сервера'),
           findsOneWidget,
         );
-        expect(find.text('Проверить содержимое файла'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AutomationPlanSteps),
+            matching: find.text('Проверить содержимое файла'),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.text('${DesignAutomationFixtures.expiresAt} (UTC)'),
           findsOneWidget,
@@ -235,13 +269,13 @@ void main() {
         );
         expect(button('Запустить'), findsNothing);
         expect(button('Подтвердить план'), findsNothing);
-        expect(button('Обновить план'), findsOneWidget);
+        expect(button('Создать новый план'), findsOneWidget);
         expect(
-          find.text(
-            invalidReason ??
-                'Создайте новый план. Прежний план нельзя запустить.',
-          ),
-          findsOneWidget,
+          tester
+              .widgetList<AutomationFacts>(find.byType(AutomationFacts))
+              .first
+              .values['Причина'],
+          invalidReason ?? 'Срок плана истёк',
         );
       }
     },
@@ -267,8 +301,10 @@ void main() {
           dialog: true,
         ),
       );
-      expect(find.text('Синтетический сервер'), findsOneWidget);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
+      expect(
+        find.text('Синтетический сервер · 192.0.2.44:2222'),
+        findsOneWidget,
+      );
       expect(
         find.text('Изменить конфигурацию: Приветствие сервера'),
         findsOneWidget,
@@ -295,6 +331,8 @@ void main() {
       );
       expect(find.text('Исход не подтверждён'), findsWidgets);
       expect(find.text('Возможны неподтверждённые изменения'), findsOneWidget);
+      expect(button('Показать события'), findsOneWidget);
+      await tapVisible(tester, 'Показать события');
       expect(
         find.text('Получено событий: 3. Пропущено в источнике: 7'),
         findsOneWidget,
@@ -339,12 +377,9 @@ void main() {
       await tester.pumpWidget(
         host(jobs(state: 'cancel-requested', canCancel: false)),
       );
-      expect(
-        find.text(
-          'Остановка запрошена. Текущий шаг ещё может завершиться; дождитесь подтверждённого результата.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Состояние: Остановка запрошена'), findsOneWidget);
+      expect(find.text('Автоматический откат не обещается'), findsOneWidget);
+      expect(button('Обновить состояние'), findsOneWidget);
       expect(button('Остановить после текущего шага'), findsNothing);
     },
   );
@@ -354,20 +389,23 @@ void main() {
     (tester) async {
       var revoked = 0;
       await tester.pumpWidget(host(grants(onRevoke: () => revoked++)));
-      await tester.tap(find.text('Доступ ИИ рабочего пространства'));
-      await tester.pumpAndSettle();
       expect(
         find.text(
-          'Чтение состояния, Чтение журналов, Создание и изменение профилей, Создание планов, Запуск заданий',
+          'Чтение состояния · Чтение журналов · Создание и изменение профилей · Создание планов · Запуск заданий',
         ),
+        findsWidgets,
+      );
+      expect(
+        find.text('Синтетический сервер · 192.0.2.44:2222'),
         findsOneWidget,
       );
-      expect(find.text('Синтетический сервер'), findsOneWidget);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
-      expect(find.text('2026-10-25T17:00:00.000Z (UTC)'), findsOneWidget);
-      expect(find.text(r'C:\Synthetic\ServerDeck\mcp.exe'), findsOneWidget);
-      await tapVisible(tester, 'Отозвать доступ');
+      expect(find.text('2026-10-25T17:00:00.000Z (UTC)'), findsWidgets);
+      await tapVisible(tester, 'Отозвать');
       expect(revoked, 1);
+      await tester.pumpWidget(host(grants(configuration: true)));
+      expect(find.byType(AutomationLoadedTable), findsNothing);
+      expect(find.byType(AutomationMcpConfigurationSection), findsOneWidget);
+      expect(find.text(r'C:\Synthetic\ServerDeck\mcp.exe'), findsWidgets);
     },
   );
 
@@ -378,19 +416,21 @@ void main() {
         await tester.pumpWidget(
           host(grants(current: false, revoked: revoked), dark: revoked),
         );
-        if (find
-            .text(revoked ? 'Доступ отозван' : 'Срок доступа истёк')
-            .evaluate()
-            .isEmpty) {
-          await tester.tap(find.text('Доступ ИИ рабочего пространства'));
-          await tester.pumpAndSettle();
-        }
-        expect(button('Конфигурация MCP'), findsNothing);
         expect(
-          find.text(revoked ? 'Доступ отозван' : 'Срок доступа истёк'),
-          findsOneWidget,
+          tester.widget<OutlinedButton>(button('Конфигурация MCP')).onPressed,
+          isNull,
         );
-        if (revoked) expect(button('Изменить права'), findsNothing);
+        expect(find.text(revoked ? 'Отозван' : 'Истёк'), findsOneWidget);
+        if (revoked) {
+          expect(
+            tester.widget<OutlinedButton>(button('Отозвать')).onPressed,
+            isNull,
+          );
+          expect(
+            tester.widget<OutlinedButton>(button('Изменить права')).onPressed,
+            isNull,
+          );
+        }
       }
     },
   );
@@ -421,11 +461,14 @@ void main() {
       expect(button('Делегировать версию'), findsNothing);
       expect(button('Изменить профиль'), findsOneWidget);
       expect(find.text('Сравнение версий 1 и 2'), findsOneWidget);
-      expect(find.text('/parameters/greeting/default'), findsOneWidget);
-      expect(find.text('Было: Здравствуйте\nСтало: Привет'), findsOneWidget);
+      expect(find.text('/parameters/greeting/default'), findsWidgets);
+      expect(find.text('Было'), findsOneWidget);
+      expect(find.text('Стало'), findsOneWidget);
+      expect(find.text('Здравствуйте'), findsOneWidget);
+      expect(find.text('Привет'), findsOneWidget);
       expect(find.text('Содержимое профиля проверено'), findsOneWidget);
       expect(
-        find.textContaining('Новая версия требует отдельного разрешения'),
+        find.textContaining('Для новой версии потребуется отдельное согласие'),
         findsOneWidget,
       );
     },
@@ -541,8 +584,10 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
-      expect(find.text(profile.name), findsOneWidget);
-      expect(find.text('${profile.address}:${profile.port}'), findsOneWidget);
+      expect(
+        find.text('${profile.name} · ${profile.address}:${profile.port}'),
+        findsOneWidget,
+      );
       expect(chosen, 0);
       await tapVisible(tester, 'Изменить сервер');
       expect(chosen, 1);

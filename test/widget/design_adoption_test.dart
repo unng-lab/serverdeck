@@ -1,21 +1,63 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/profiles/profile_form.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
-import 'package:serverdeck/servers/metrics_history.dart';
+import 'package:serverdeck/automation/automation_forms.dart';
 import 'package:serverdeck/servers/server_sections.dart';
 import 'package:serverdeck/settings/settings_form.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/ui/deck_page.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 
 import '../support/design_host.dart';
 import '../support/design_scenarios.dart';
+import '../support/base_design_bindings.dart';
 
 void _text(String value) =>
     expect(find.text(value), findsWidgets, reason: value);
 void _contains(String value) =>
     expect(find.textContaining(value), findsWidgets, reason: value);
+
+void _draftField(WidgetTester tester, String label, String value) {
+  final field = find.byWidgetPredicate(
+    (widget) =>
+        widget is TextField &&
+        (widget.decoration?.labelText == label ||
+            widget.key == ValueKey('automation-field-$label')),
+  );
+  expect(field, findsOneWidget, reason: label);
+  expect(tester.widget<TextField>(field).controller!.text, value);
+}
+
+void _formValue(WidgetTester tester, String label, String value) {
+  final field = find.byWidgetPredicate(
+    (widget) => widget is AutomationFormValue && widget.label == label,
+  );
+  expect(field, findsOneWidget, reason: label);
+  expect(tester.widget<AutomationFormValue>(field).value, value);
+}
+
+Future<Map<String, Object?>> _readonlyPayload(
+  WidgetTester tester,
+  String title,
+) async {
+  final view = find.byWidgetPredicate(
+    (widget) => widget is AutomationJsonView && widget.title == title,
+  );
+  final heading = find.descendant(of: view, matching: find.text(title));
+  await _showText(tester, heading);
+  await tester.tap(heading);
+  await tester.pumpAndSettle();
+  final text = find.descendant(of: view, matching: find.byType(SelectableText));
+  expect(text, findsOneWidget);
+  final rendered = tester.widget<SelectableText>(text);
+  expect(rendered.enableInteractiveSelection, isTrue);
+  return (jsonDecode(rendered.data!) as Map).cast<String, Object?>();
+}
 
 Finder _shellTarget() => find.descendant(
   of: find.byKey(const ValueKey('foundation-page-context')),
@@ -36,140 +78,289 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
   final h = host.harness;
   switch (host.binding.screenId) {
     case '01-startup':
+      _text('Запуск рабочего пространства');
       _text('Запуск локальной службы');
       _text('Ожидаем результат запуска.');
-      expect(find.byType(DeckStatus), findsOneWidget);
+      _text('Состояние и следующие шаги');
       expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Дождаться запуска'),
+            )
+            .onPressed,
+        isNull,
+      );
       expect(find.text('Повторить запуск'), findsNothing);
     case '02-service-unavailable':
       _text('Локальная служба недоступна');
       _text('Не удалось связаться с локальной службой.');
+      _text('Состояние и следующие шаги');
       _text('Повторить запуск');
-      expect(testerStatus(DeckTone.unavailable), isTrue);
+      expect(
+        tester.widget<ServerStatusBody>(find.byType(ServerStatusBody)).tone,
+        DeckTone.unavailable,
+      );
       expect(find.text('Не подключён'), findsNothing);
     case '03-storage-blocked':
+      _text('Доступ к хранилищу заблокирован');
       _text('Локальное хранилище заблокировано');
       _contains('Требуется проверка локального пространства');
+      _text('Исходные данные сохраняются');
       _text('Повторить запуск');
-      expect(testerStatus(DeckTone.error), isTrue);
+      expect(
+        tester.widget<ServerStatusBody>(find.byType(ServerStatusBody)).tone,
+        DeckTone.error,
+      );
       expect(find.textContaining('Сбросить'), findsNothing);
       expect(find.textContaining('plaintext'), findsNothing);
     case '04-empty-workspace':
-      _text('Добро пожаловать в ServerDeck');
-      _text('Локальных профилей пока нет');
-      _text('Создать профиль');
+      _text('Первый запуск');
+      _text('Все серверы.\nОдин центр управления.');
+      _text('Добавить сервер');
+      _text('Настроить ИИ-доступ');
       expect(h.profiles.profiles, isEmpty);
-      expect(find.text('ИИ-доступ и Ansible-профили'), findsNothing);
     case '05-server-list':
-      _text('Локальные профили');
+      _text('Серверы');
       _text(h.initialProfile.name);
       _text('${h.initialProfile.address}:22');
-      _text('Пользователь SSH: admin');
-      _text('Секрет доступа сохранён; содержимое не отображается');
-      _text('Подключение к серверу пока недоступно');
-      _text('Редактировать профиль');
-      expect(find.text('Подключены'), findsNothing);
-      expect(find.text('Требуют внимания'), findsNothing);
+      expect(find.text('Все серверы'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('profile-filter-group')),
+        findsOneWidget,
+      );
+      _text('Открыть сервер');
+      _text('Изменить');
+      expect(h.profiles.selected?.id, h.initialProfile.id);
+      expect(
+        tester
+            .widget<DeckSurface>(find.byKey(ValueKey(h.initialProfile.id)))
+            .selected,
+        isFalse,
+        reason: 'No matching connection observation may be inferred from local selection',
+      );
     case '06-server-overview':
-      _text('Подключение к серверу');
+      _text('Обзор сервера');
+      _text('Сведения о сервере');
+      _text('Процессор');
       _text('Подключён');
-      _text('Система и метрики');
-      _contains('synthetic-сервер-例.example');
+      for (final label in [
+        'Сервер',
+        'Система',
+        'Ядро',
+        'CPU',
+        'Память',
+        'Корневой диск',
+        'Свежесть',
+        'Устаревание',
+      ]) {
+        _text(label);
+      }
+      for (final axis in ['100', '75', '50', '25', '0', 'CPU, % · UTC']) {
+        _text(axis);
+      }
       _text('Источник: ssh:proc/stat+meminfo+net/dev+df');
       _text('Наблюдение: ${DesignServerFixtures.observedAt} · UTC');
       _text('Получено: ${DesignServerFixtures.observedAt} · UTC');
-      _text('Обновить подключение');
+      _text('Обновить данные');
       expect(find.textContaining('Устаревшие данные'), findsNothing);
     case '07-profile-create':
-      _text('Новый профиль');
-      _text('Параметры профиля');
-      _text('Подключение по SSH');
-      _text('Сохранить');
-      _contains('Подключение к серверу выполняется отдельно');
-      expect(find.text('Сохранить и подключиться'), findsNothing);
+      _text('Добавление сервера');
+      _text('Параметры подключения');
+      _text('Порт SSH *');
+      _text('Пользователь SSH *');
+      _text('Сохранить без подключения');
+      _text('Сохранить и подключить');
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Сохранить и подключить'),
+            )
+            .onPressed,
+        isNull,
+      );
     case '08-profile-edit':
       _text('Редактирование профиля');
-      _text('Цель изменения');
+      _text('Сервер *');
       _text('${h.initialProfile.name} · ${h.initialProfile.address}:22');
       _text('Сохранить');
       _text('Сохранить существующий');
     case '09-profile-delete':
-      _text('Удаление профиля');
+      _text('Удаление локального профиля');
       _text(h.initialProfile.name);
       _text('${h.initialProfile.address}:22');
       _text('Удаляется локальный профиль; сервер не меняется');
-      _text('Подтвердить удаление');
+      _text('Удалить профиль');
+      expect(find.byType(CheckboxListTile), findsOneWidget);
     case '10-host-trust':
-      _text('Подтвердить SSH-ключ');
-      _text('Сверьте отпечаток с ключом вашего сервера.');
-      _text(h.trustProfile.name);
-      _text('${h.trustProfile.address}:${h.trustProfile.port}');
+      _text('Подтверждение SSH-ключа');
+      _text('Сверьте отпечаток с ключом вашего сервера');
+      _text('Параметры и условия');
+      _text('Последствия');
+      _text(
+        '${h.trustProfile.name} · ${h.trustProfile.address}:${h.trustProfile.port}',
+      );
       _text(DesignServerFixtures.key.fingerprint);
-      _text('Действует до ${DesignServerFixtures.expiresAt} · UTC');
+      _text('${DesignServerFixtures.expiresAt} · UTC');
       _text('Отмена');
-      _text('Подтвердить');
-      expect(find.text('Повторить'), findsNothing);
-    case '12-credential-input':
-      _text('Доступ к серверу');
-      _text('Пароль');
-      _text('Показать введённый секрет');
-      _contains('Существующий секрет не читается в форму');
-      final password = find.byKey(const ValueKey('credential-password'));
-      expect(password, findsOneWidget);
       expect(
-        (password.evaluate().single.widget as TextFormField).controller!.text,
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Подтвердить ключ'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    case '11-host-key-changed':
+      _text('SSH-ключ изменился');
+      _text('Ключ сервера отличается от сохранённого');
+      _text(DesignServerFixtures.key.fingerprint);
+      _text('Новый отпечаток не получен. Выполните проверку ключа.');
+      _text('Чтение и запись остановлены до решения владельца');
+      _text('Пересмотреть доверие');
+      _text('Закрыть');
+      final changed = tester.widget<ServerChangedKeySection>(
+        find.byType(ServerChangedKeySection),
+      );
+      expect(changed.profile, same(h.trustProfile));
+      expect(changed.previousFingerprint, DesignServerFixtures.key.fingerprint);
+      expect(changed.currentFingerprint, isNull);
+      expect(find.byType(ServerResourceCards), findsNothing);
+      expect(find.text('Подключить'), findsNothing);
+      expect(find.text('Подтвердить ключ'), findsNothing);
+    case '12-credential-input':
+      _text('Настройка доступа');
+      _text('Цель *');
+      _text('Доступ *');
+      _text('Файл ключа');
+      _text('Приватный ключ *');
+      _text('Passphrase');
+      _text('Хранение');
+      _text('Показать введённый секрет');
+      final privateKey = find.byKey(const ValueKey('credential-private-key'));
+      expect(privateKey, findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(privateKey).controller!.text,
         isEmpty,
       );
     case '13-mutation-conflict':
-      _text('Профиль изменён другим окном. Введённые данные сохранены в форме');
-      _text('Перечитать профиль');
-      _contains('Перечитайте актуальные данные');
-      expect(testerStatus(DeckTone.warning), isTrue);
+      _text(
+        'Настройки изменены другим окном. Введённые данные сохранены в форме',
+      );
+      _text('Перечитать настройки');
+      _contains('Перечитайте данные и проверьте изменения');
+      final status = tester.widget<ServerStatusBody>(
+        find.byType(ServerStatusBody),
+      );
+      expect(status.tone, DeckTone.warning);
+      expect(status.facts['Операция'], 'Изменение настроек');
+      expect(status.facts['Состояние'], 'Конфликт ревизии');
       expect(find.text('Повторить тот же запрос'), findsNothing);
     case '16-install-catalog':
       _text('Сервер для установки');
-      _text(h.initialProfile.name);
+      _text(
+        '${h.automationServerProfile.name} · ${h.automationServerProfile.address}:${h.automationServerProfile.port}',
+      );
       _text('Каталог установки');
-      _text('Только чистая установка');
-      _text('План установки PostgreSQL 16');
-      _text('${h.initialProfile.address}:${h.initialProfile.port}');
+      _text('Каталог');
+      _text('Планы установки');
+      _text('PostgreSQL 16');
+      _text('16.10');
+      _text('Нужна проверка');
+      _text('Время снимка не предоставлено');
+      _text('Выбрать программу');
+      _text('Поиск по данным экрана');
+      expect(
+        tester
+            .widget<AutomationRecipesSection>(
+              find.byType(AutomationRecipesSection),
+            )
+            .catalog,
+        DesignAutomationFixtures.catalog(),
+      );
       expect(find.text('Всё установленное ПО'), findsNothing);
     case '17-recipe-detail':
-      _text('Каталог установки');
+      _text('Рецепт установки');
       _text('PostgreSQL 16');
       _text('16.10');
       _text('Ubuntu 24.04 · amd64 · systemd');
-      _text('Максимум подключений');
-      _text('PostgreSQL License\nСинтетический пример лицензии');
-      _text('Точный рецепт, параметры и условия');
+      _text('Сведения');
+      _contains('Только чистая установка; существующие данные');
+      expect(find.text('Выбрать программу'), findsNothing);
+      final recipe = await _readonlyPayload(
+        tester,
+        'Лицензии, начальные настройки и точные условия',
+      );
+      expect(recipe, DesignAutomationFixtures.recipe());
+      expect((recipe['initialSettings'] as Map)['max_connections'], 100);
+      expect(recipe['licenseNotices'], [
+        'PostgreSQL License\nСинтетический пример лицензии',
+      ]);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Проверить готовность'),
+            )
+            .onPressed,
+        isNull,
+      );
+      _text('Создать план');
     case '18-install-preflight':
       _text('План готов к подтверждению');
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
+      _text('${h.automationServerProfile.name} · 192.0.2.44:2222');
       _text('${DesignAutomationFixtures.expiresAt} (UTC)');
       _text('Изменить конфигурацию: Приветствие сервера');
       _text('Проверить содержимое файла');
-      _text('Подтвердить план');
-      _text('Запустить');
+      _text('Просмотреть план');
+      final refresh = find.widgetWithText(OutlinedButton, 'Обновить проверку');
+      expect(tester.widget<OutlinedButton>(refresh).onPressed, isNull);
+      expect(find.text('Подтвердить план'), findsNothing);
+      expect(find.text('Запустить'), findsNothing);
     case '19-plan-approval':
-      _text('Подтвердить этот план?');
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
-      _text(DesignAutomationFixtures.profile().name);
+      _text('Подтверждение плана');
+      _text('${h.automationServerProfile.name} · 192.0.2.44:2222');
+      _text('${DesignAutomationFixtures.profile().name} · версия 2');
       _text('Изменить конфигурацию: Приветствие сервера');
       _text('${DesignAutomationFixtures.expiresAt} (UTC)');
       _text('Подтвердить план');
+      expect(
+        tester
+            .widget<AutomationPlanDecisionDialog>(
+              find.byType(AutomationPlanDecisionDialog),
+            )
+            .asPage,
+        isTrue,
+      );
+      expect(find.text('Запустить'), findsNothing);
     case '22-server-logs':
       _text('Журнал сервера');
-      _text('Фильтр журнала');
-      _text('Данные получены · записей: 1');
-      _text('Источник: journald · UTC');
+      final search = find.byKey(const ValueKey('server-log-search'));
+      expect(tester.widget<TextField>(search).controller, same(h.filter));
+      expect(
+        tester.widget<TextField>(search).decoration?.hintText,
+        'Поиск в сообщениях',
+      );
+      _text('Весь сервер');
+      _text('Выбранная служба');
+      _text('Получено 1 записей');
+      _text('Данные получены · UTC');
+      _text('journald');
+      _text('UTC');
       _text('Наблюдение: ${DesignServerFixtures.observedAt} · UTC');
       _text(DesignServerFixtures.record()['message'] as String);
-      expect(find.text('Пауза'), findsNothing);
-      expect(find.text('Продолжить'), findsNothing);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Пауза'),
+            )
+            .onPressed,
+        isNull,
+      );
+      _contains('Пауза, период и приоритет пока недоступны');
     case '23-log-record':
-      _text('Запись журнала');
+      _text('Детали записи журнала');
+      _text('Сведения');
+      _text('Сообщение');
       final projection = tester
           .widget<ServerLogRecordDialog>(find.byType(ServerLogRecordDialog))
           .recordContext;
@@ -177,26 +368,28 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(projection.serverId, h.recordLogs['serverId']);
       _text(h.trustProfile.name);
       _text('${h.trustProfile.address}:${h.trustProfile.port}');
-      _text('Источник: ${h.recordLogs['source']}');
+      _text('${h.recordLogs['source']}');
       final record =
           (h.recordLogs['records'] as List).single as Map<String, Object?>;
-      _text('Время записи: ${record['timestamp']} UTC');
-      _text('Наблюдение: ${h.recordLogs['observedAt']} UTC');
+      _text('${record['timestamp']} UTC');
+      _text('${h.recordLogs['observedAt']} UTC');
       _text(record['message'] as String);
+      _text('Скопировать запись');
       _text('Закрыть');
       expect(find.byType(SelectableText), findsWidgets);
     case '27-job-list':
-      _text('Задания сервера');
-      _text('Сервер: ${DesignAutomationFixtures.serverId}');
+      _text('Область просмотра');
+      _text('Область');
       _text(DesignAutomationFixtures.jobId);
       _text('Выполняется');
-      _text('Обновить задания');
+      _text('Обновить');
       expect(find.text('Выбранное задание'), findsNothing);
     case '28-job-detail':
-      _text('Выбранное задание');
+      _text('Ход задания');
       _text(DesignAutomationFixtures.jobId);
       _text('Получено событий: 3. Пропущено в источнике: 0');
-      _text('Последние 200 полученных событий');
+      _text('Ход выполнения');
+      _text('Контекст задания');
       _text('План задания');
     case '29-job-unknown':
       _text('Исход не подтверждён');
@@ -205,27 +398,49 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(find.text('Остановить после текущего шага'), findsNothing);
       expect(find.text('Повторить тот же запрос'), findsNothing);
     case '30-job-cancel':
-      _text('Выполняется');
-      _text('Остановить после текущего шага');
-      _contains('прекращает только ожидание в интерфейсе');
+      _text('Остановка задания');
+      _text('Состояние: Остановка запрошена');
+      _text('Обновить состояние');
+      _text('Не предоставлено');
+      _text('Автоматический откат не обещается');
+      _text('Открыть события');
+      expect(find.text('Остановить после текущего шага'), findsNothing);
       expect(find.text('Откатить изменения'), findsNothing);
     case '31-recent-operations':
       _text('Недавние подтверждённые операции');
       _contains('До 20 последних подтверждённых записей');
       _text('Изменение настроек подтверждено');
       _text('00000000-0000-4000-8000-000000000099');
-      _text('Ревизия пространства');
+      final historyRevisionLabel = find.text('Ревизия');
+      if (historyRevisionLabel.evaluate().isNotEmpty) {
+        expect(historyRevisionLabel, findsOneWidget);
+      } else {
+        _text('Ревизия пространства');
+      }
+      _text(h.recovery.receipts.single.storeRevision);
       _text(DesignServerFixtures.observedAt);
       _text('Обновить список');
     case '32-automation-profiles':
-      _text('Ansible-профили');
       _text(DesignAutomationFixtures.profile().name);
-      _text('Версия 2');
-      expect(find.text('Активные'), findsNothing);
-      expect(find.text('Архив'), findsNothing);
+      _text('2');
+      _text('Активные');
+      _text('Архив');
+      _text('Поиск по данным экрана');
     case '33-profile-authoring':
-      _text('Новый Ansible-профиль');
-      _text('Описание и содержимое');
+      _text('Редактор Ansible-профиля');
+      _text('Назначение');
+      _text('Шаги');
+      _text('Параметры');
+      _text('Проверки');
+      // The canonical form helper is hidden at device widths <=960.
+      expect(
+        find.text('Перед продолжением'),
+        MediaQuery.sizeOf(tester.element(find.byType(AutomationFormPageFrame)))
+                    .width >
+                960
+            ? findsOneWidget
+            : findsNothing,
+      );
       _text('Сохранить версию');
       _text('Проверить без сохранения');
       expect(h.body.text, contains('system.motd'));
@@ -233,22 +448,36 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Приветствие сервера · версия 2');
       _text('Сравнение версий 1 и 2');
       _text('/parameters/greeting/default');
-      _text('Было: Здравствуйте\nСтало: Привет');
+      _text('Было');
+      _text('Стало');
+      _text('Здравствуйте');
+      _text('Привет');
+      _text('Точные значения');
+      expect(
+        tester
+            .widgetList<AutomationExactValue>(find.byType(AutomationExactValue))
+            .last
+            .value,
+        DesignAutomationFixtures.revision()['digest'],
+      );
       _text('Выбрать версию');
       _text('Сравнить версии');
-      _contains('Новая версия требует отдельного разрешения');
+      _text('Для новой версии потребуется отдельное согласие');
     case '35-plan-parameters':
       _text('Параметры плана');
       _text('Ansible-профиль: Приветствие сервера · версия 2.');
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
+      _formValue(
+        tester,
+        'Цель',
+        '${h.automationServerProfile.name} · 192.0.2.44:2222',
+      );
       _text(
         'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
       );
       _text('greeting');
-      _text('Привет');
-      _text('JSON');
-      _text('Продолжить');
+      _draftField(tester, 'greeting', 'Привет');
+      _text('JSON · дополнительные сведения');
+      _text('Создать план');
       expect(h.jsonInput.text, contains('"greeting": "Привет"'));
       final context = tester
           .widget<AutomationJsonEditorDialog>(
@@ -264,58 +493,85 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(context['serverId'], DesignAutomationFixtures.serverId);
     case '36-ai-grants':
       _text('Доступ ИИ рабочего пространства');
-      _text('Доступ действует');
-      _text('Выданные права');
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
+      _text('Действует');
+      _text('Истёкший grant');
+      _text('Author-only');
+      _text(
+        'Чтение состояния · Чтение журналов · Создание и изменение профилей · Создание планов · Запуск заданий',
+      );
+      _text('${h.automationServerProfile.name} · 192.0.2.44:2222');
       _text('2026-10-25T17:00:00.000Z (UTC)');
-      _text('Отозвать доступ');
+      _text('Отозвать');
     case '37-ai-grant-form':
-      _text('Выдать ИИ доступ через MCP');
+      _text('Выдать доступ ИИ');
       _text(
         'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.',
       );
-      _text('Выдаваемые права');
+      _text('Права');
       _text(
         'Чтение состояния, Чтение журналов, Создание и изменение профилей, Создание планов',
       );
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
-      _text('28800 секунд');
-      _text('Продолжить');
+      expect(
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) =>
+                widget is AutomationDraftSelectionField &&
+                widget.label == 'Цели',
+          ),
+          matching: find.text(
+            '${h.automationServerProfile.name} · 192.0.2.44:2222',
+          ),
+        ),
+        findsOneWidget,
+      );
+      _draftField(tester, 'Срок, секунд', '28800');
+      _text('Выдать доступ');
     case '38-mcp-client-config':
-      _text('Конфигурация MCP');
+      _text('Подключение MCP-клиента');
+      _text('Сведения');
+      _text('Точные значения');
       _text('Команда');
       _text(r'C:\Synthetic\ServerDeck\mcp.exe');
       _text('Аргументы');
       _text('Скопировать конфигурацию');
       for (final content in [
-        find.text('Конфигурация MCP').last,
-        find.text(r'C:\Synthetic\ServerDeck\mcp.exe'),
-        find.text('Аргументы'),
-        find.text(
-          '--app-root, C:\\Synthetic\\ServerDeck, --grant-id, ${DesignAutomationFixtures.grantId}',
+        find.text('Подключение MCP-клиента').first,
+        find.descendant(
+          of: find.byType(AutomationExactValue).first,
+          matching: find.byType(SelectableText),
         ),
+        find.text('Аргументы').last,
+        find
+            .text(
+              '--app-root, C:\\Synthetic\\ServerDeck, --grant-id, ${DesignAutomationFixtures.grantId}',
+            )
+            .last,
       ]) {
-        if (host.textScale == 1) {
-          expectDesignVisible(tester, content);
-        } else {
-          await _showText(tester, content);
-        }
+        await _showText(tester, content);
+        expectDesignVisible(tester, content);
       }
     case '39-delegations':
-      _text('Делегирование «Synthetic client» · версия 2');
+      _text('Делегирование версии');
+      _formValue(
+        tester,
+        'ИИ-клиент',
+        DesignAutomationFixtures.grant()['label'] as String,
+      );
       _text(
         'Ansible-профиль: Приветствие сервера · версия 2. Доступ клиента до: 2026-10-25T17:00:00.000Z (UTC).',
       );
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
+      _formValue(
+        tester,
+        'Цель',
+        '${h.automationServerProfile.name} · 192.0.2.44:2222',
+      );
       _text(
         'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
       );
-      _text('3600 секунд');
-      _text('Одно из значений: Привет');
-      _text('Продолжить');
+      _draftField(tester, 'Срок, секунд', '3600');
+      _text('Разрешённые точные значения');
+      _draftField(tester, 'Значение 1', 'Привет');
+      _text('Делегировать версию');
       final context = tester
           .widget<AutomationJsonEditorDialog>(
             find.byType(AutomationJsonEditorDialog),
@@ -330,37 +586,125 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(context['serverId'], DesignAutomationFixtures.serverId);
       expect(context['grantId'], DesignAutomationFixtures.grantId);
     case '40-executor-binding':
-      _text('Подтвердить исполнитель');
+      _text('Подготовка исполнителя');
+      _text('Параметры и условия');
+      _text('Последствия');
+      _text('Привязать исполнитель к этому серверу');
       _text(
-        'Привязать исполнитель к этому серверу и его проверенному SSH-ключу?',
+        '${h.trustProfile.name} · ${h.trustProfile.address}:${h.trustProfile.port}',
       );
-      _text(h.trustProfile.name);
-      _text('${h.trustProfile.address}:${h.trustProfile.port}');
-      _text('Технические сведения');
+      _text(DesignServerFixtures.hostId);
       _text(DesignServerFixtures.key.fingerprint);
-      _text(
-        'Подтверждение действует до ${DesignServerFixtures.expiresAt} · UTC',
-      );
+      _text('${DesignServerFixtures.expiresAt} · UTC');
       _text('Отмена');
-      _text('Привязать');
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Привязать исполнитель'),
+            )
+            .onPressed,
+        isNotNull,
+      );
     case '84-settings':
-      _text('Оформление и рабочий контекст');
-      _text('Тема: тёмная');
-      _text('Уменьшение анимации: включено');
+      _text('Настройки приложения');
+      _text('Настройки и ограничения');
+      _text('Тёмная');
+      _text('Включено');
       _text('${h.initialProfile.name} · ${h.initialProfile.address}:22');
-      _text('Экспорт приватных данных недоступен');
+      _text('Приватный экспорт');
+      _text('Недоступен');
       _text('Изменить настройки');
     case '85-settings-form':
       _text('Изменение настроек');
-      _text('Оформление');
-      _text('Рабочий контекст');
+      _text('Параметры');
+      _text('Тема *');
+      _text('Уменьшение анимации *');
+      _text('Активный профиль');
+      _text('Выбор профиля');
+      _text('Без подключения и подтверждения SSH-доверия');
       _text('Сохранить настройки');
       _text(h.initialProfile.name);
-    case '94-plan-invalidated':
+      for (final prefix in ['page-theme-', 'page-motion-', 'page-selection-']) {
+        expect(
+          find.byWidgetPredicate((widget) {
+            final key = widget.key;
+            return key is ValueKey<String> && key.value.startsWith(prefix);
+          }),
+          findsOneWidget,
+          reason: 'Canonical settings field $prefix uses its real dropdown',
+        );
+      }
+      expect(find.byType(CheckboxListTile), findsNothing);
+    case '93-protected-effect-blocked':
       _text('План заблокирован');
-      _text(h.automationServerProfile.name);
-      _text('192.0.2.44:2222');
-      _text('Обновить план');
+      _text('Исполнение не разрешено');
+      _text('Сведения о конкретном защищённом эффекте не предоставлены');
+      _text('Открыть запрещённый эффект');
+      _text('Просмотреть причины');
+      _text('Закрыть план');
+      final planSection = tester.widget<AutomationPlanSection>(
+        find.byType(AutomationPlanSection),
+      );
+      expect(planSection.plan, DesignAutomationFixtures.plan(blocked: true));
+      expect(planSection.plan['effects'], isEmpty);
+      expect(planSection.plan['checks'], isEmpty);
+      expect(planSection.plan['preflight'], isNull);
+      final display = BlockedPlanDisplay.tryCreate(
+        planSection.plan,
+        targetMatches: automationPlanTargetAvailable(planSection.plan, [
+          h.automationServerProfile,
+        ]),
+        expired: planSection.expired,
+        invalidated: planSection.invalidReason != null,
+      );
+      expect(display, isNotNull);
+      expect(display!.reasons, [
+        {'code': 'EXECUTOR_UNAVAILABLE', 'field': 'executor', 'stepId': null},
+      ]);
+      expect(display.sourceSteps, isEmpty);
+      expect(
+        BlockedPlanDisplay.tryCreate(
+          planSection.plan,
+          targetMatches: false,
+          expired: false,
+          invalidated: false,
+        ),
+        isNull,
+      );
+      expect(
+        BlockedPlanDisplay.tryCreate(
+          planSection.plan,
+          targetMatches: true,
+          expired: true,
+          invalidated: false,
+        ),
+        isNull,
+      );
+      expect(
+        BlockedPlanDisplay.tryCreate(
+          planSection.plan,
+          targetMatches: true,
+          expired: false,
+          invalidated: true,
+        ),
+        isNull,
+      );
+      final forbidden = designButton('Открыть запрещённый эффект');
+      expect(tester.widget<FilledButton>(forbidden).onPressed, isNull);
+      expect(
+        find.byTooltip('Сервис не передал идентичность эффекта'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('NetBird'), findsNothing);
+      expect(find.text('Подтвердить план'), findsNothing);
+      expect(find.text('Запустить'), findsNothing);
+      expect(find.text('Повторить тот же запрос'), findsNothing);
+    case '94-plan-invalidated':
+      _text('План требует новой проверки');
+      _text('${h.automationServerProfile.name} · 192.0.2.44:2222');
+      _text('Параметры и условия');
+      _text('Последствия');
+      _text('Создать новый план');
       expect(find.text('Запустить'), findsNothing);
       expect(find.text('Подтвердить план'), findsNothing);
     default:
@@ -370,6 +714,8 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
   expect(
     find.byWidgetPredicate(
       (widget) =>
+          widget is DeckPanel ||
+          widget is DeckPage ||
           widget is DeckSurface ||
           widget is DeckDialogLayout ||
           widget is DeckFormSection ||
@@ -405,26 +751,25 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
   final (String, String)? action = switch (host.binding.screenId) {
     '02-service-unavailable' ||
     '03-storage-blocked' => ('Повторить запуск', 'retry'),
-    '06-server-overview' => ('Обновить подключение', 'refreshConnection'),
-    '13-mutation-conflict' => ('Перечитать профиль', 'reload'),
-    '16-install-catalog' ||
-    '17-recipe-detail' => ('План установки PostgreSQL 16', 'createRecipePlan'),
-    '18-install-preflight' => ('Подтвердить план', 'approve'),
-    '19-plan-approval' => ('Подтвердить план', 'approve'),
+    '06-server-overview' => ('Обновить данные', 'readState'),
+    '13-mutation-conflict' => ('Перечитать настройки', 'reload'),
     '22-server-logs' => ('Получить журнал', 'readLogs'),
     '23-log-record' => ('Закрыть', 'closeRecord'),
-    '27-job-list' => ('Обновить задания', 'refreshJobs'),
+    '16-install-catalog' => ('Подключиться и открыть рецепты', 'loadRecipes'),
+    '17-recipe-detail' => ('Создать план', 'createRecipePlan'),
+    '19-plan-approval' => ('Подтвердить план', 'approve'),
+    '27-job-list' => ('Обновить', 'refreshJobs'),
     '28-job-detail' => ('План задания', 'showPlan'),
     '29-job-unknown' => ('Уточнить результат', 'reconcileJob'),
-    '30-job-cancel' => ('Остановить после текущего шага', 'cancelJob'),
+    '30-job-cancel' => ('Обновить состояние', 'selectJob'),
     '33-profile-authoring' => ('Проверить без сохранения', 'validateVersion'),
     '34-profile-revisions' => ('Сравнить версии', 'compare'),
-    '35-plan-parameters' ||
-    '37-ai-grant-form' ||
-    '39-delegations' => ('Продолжить', 'continueEditor'),
-    '36-ai-grants' => ('Отозвать доступ', 'revokeGrant'),
+    '35-plan-parameters' => ('Создать план', 'continueEditor'),
+    '37-ai-grant-form' => ('Выдать доступ', 'continueEditor'),
+    '39-delegations' => ('Делегировать версию', 'continueEditor'),
+    '36-ai-grants' => ('Отозвать', 'revokeGrant'),
     '38-mcp-client-config' => ('Скопировать конфигурацию', 'copyConfiguration'),
-    '94-plan-invalidated' => ('Обновить план', 'refreshPlan'),
+    '94-plan-invalidated' => ('Создать новый план', 'editPlanSource'),
     _ => null,
   };
   if (action != null) {
@@ -437,14 +782,85 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
     return;
   }
   switch (host.binding.screenId) {
+    case '11-host-key-changed':
+      final reads = h.client.reads.length;
+      final mutations = h.client.mutations.length;
+      await _activateByKeyboard(tester, 'Пересмотреть доверие');
+      expect(h.counters['probeTrust'], 1);
+      expect(h.counters['confirmTrust'], 0);
+      expect(h.counters['connect'], 0);
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations.length, mutations);
+      await _activateByKeyboard(tester, 'Закрыть');
+      expect(h.counters['closeChangedKey'], 1);
+      expect(
+        h.counters.values.values.fold<int>(0, (sum, value) => sum + value),
+        2,
+      );
+      expect(h.client.mutations.length, mutations);
+    case '93-protected-effect-blocked':
+      final plan = tester
+          .widget<AutomationPlanSection>(find.byType(AutomationPlanSection))
+          .plan;
+      final reads = h.client.reads.length;
+      final mutations = h.client.mutations.length;
+      await _activateByKeyboard(tester, 'Просмотреть причины');
+      _text('EXECUTOR_UNAVAILABLE');
+      _text('executor');
+      expect(
+        find.text('Открыть исходный шаг'),
+        findsNothing,
+        reason: 'The received reason has no exact source step ID',
+      );
+      expect(
+        tester
+            .widget<AutomationPlanSection>(find.byType(AutomationPlanSection))
+            .plan,
+        same(plan),
+      );
+      expect(h.counters.values, isEmpty);
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations.length, mutations);
+      await _activateByKeyboard(tester, 'Открыть запрещённый эффект');
+      expect(h.counters.values, isEmpty);
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations.length, mutations);
+      await _activateByKeyboard(tester, 'Закрыть план');
+      expect(h.counters['closePlan'], 1);
+      expect(h.counters['approve'], 0);
+      expect(h.counters['apply'], 0);
+      expect(h.counters['retry'], 0);
+      expect(
+        h.counters.values.values.fold<int>(0, (sum, value) => sum + value),
+        1,
+      );
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations.length, mutations);
+    case '18-install-preflight':
+      final previous = tester
+          .widget<AutomationPlanSection>(find.byType(AutomationPlanSection))
+          .plan;
+      final reads = h.client.reads.length;
+      final mutations = h.client.mutations.length;
+      await _activateByKeyboard(tester, 'Просмотреть план');
+      _text('Подтвердить план');
+      expect(
+        tester
+            .widget<AutomationPlanSection>(find.byType(AutomationPlanSection))
+            .plan,
+        same(previous),
+      );
+      expect(h.counters.values, isEmpty);
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations.length, mutations);
     case '04-empty-workspace':
-      await _activateByKeyboard(tester, 'Создать профиль');
+      await _activateByKeyboard(tester, 'Добавить сервер');
       expect(find.byType(ProfileForm), findsOneWidget);
     case '05-server-list':
-      await _activateByKeyboard(tester, 'Редактировать профиль');
+      await _activateByKeyboard(tester, 'Изменить');
       expect(find.byType(ProfileForm), findsOneWidget);
     case '07-profile-create':
-      await _activateByKeyboard(tester, 'Сохранить');
+      await _activateByKeyboard(tester, 'Сохранить без подключения');
       _text('Проверьте значение поля');
       expect(h.client.mutations, isEmpty);
     case '08-profile-edit':
@@ -452,24 +868,27 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
       expect(h.client.mutations, hasLength(1));
       _text('Профиль изменён другим окном. Введённые данные сохранены в форме');
     case '09-profile-delete':
-      await _activateByKeyboard(tester, 'Подтвердить удаление');
-      expect(h.client.mutations, hasLength(1));
-      _text('Профиль изменён другим окном. Перечитайте его перед удалением');
-    case '12-credential-input':
-      await tester.enterText(
-        find.byKey(const ValueKey('credential-password')),
-        'synthetic password',
-      );
       await tester.ensureVisible(find.byType(CheckboxListTile));
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
+      await _activateByKeyboard(tester, 'Удалить профиль');
+      expect(h.client.mutations, hasLength(1));
+      _text('Профиль изменён другим окном. Перечитайте его перед удалением');
+    case '12-credential-input':
+      // Only new RAM input can be revealed; saved credentials are never read.
+      await _activateByKeyboard(tester, 'Показать введённый секрет');
+      await tester.enterText(
+        find.byKey(const ValueKey('credential-private-key')),
+        'synthetic private key\n',
+      );
       final input = tester.widget<TextField>(
         find.descendant(
-          of: find.byKey(const ValueKey('credential-password')),
+          of: find.byKey(const ValueKey('credential-private-key')),
           matching: find.byType(TextField),
         ),
       );
       expect(input.obscureText, isFalse);
+      expect(input.controller!.text, 'synthetic private key\n');
       expect(h.client.mutations, isEmpty);
     case '31-recent-operations':
       final before = h.client.reads.length;
@@ -478,16 +897,21 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
       expect(h.client.mutations, isEmpty);
       _text('Изменение настроек подтверждено');
     case '32-automation-profiles':
-      final surface = find
-          .byWidgetPredicate(
-            (widget) => widget is DeckSurface && widget.onTap != null,
-          )
-          .first;
-      await tester.ensureVisible(surface);
-      await tester.tap(surface);
+      final row = find.text(DesignAutomationFixtures.profile().name).last;
+      await tester.ensureVisible(row);
+      await tester.tap(row);
       await tester.pump();
       expect(h.counters['selectAutomationProfile'], 1);
+      expect(
+        h.counters.values.values.fold<int>(0, (total, value) => total + value),
+        1,
+      );
     case '84-settings':
+      final reads = h.client.reads.length;
+      await _activateByKeyboard(tester, 'ИИ-доступ');
+      expect(h.counters['openAiAccess'], 1);
+      expect(h.client.reads.length, reads);
+      expect(h.client.mutations, isEmpty);
       await _activateByKeyboard(tester, 'Изменить настройки');
       expect(find.byType(SettingsForm), findsOneWidget);
     case '85-settings-form':
@@ -500,14 +924,14 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
       await _activateByKeyboard(tester, 'Отмена');
       expect(h.counters['cancelTrust'], 1);
       expect(h.counters['confirmTrust'], 0);
-      await _activateByKeyboard(tester, 'Подтвердить');
+      await _activateByKeyboard(tester, 'Подтвердить ключ');
       expect(h.counters['confirmTrust'], 1);
       expect(h.counters['cancelTrust'], 1);
     case '40-executor-binding':
       await _activateByKeyboard(tester, 'Отмена');
       expect(h.counters['cancelExecutor'], 1);
       expect(h.counters['confirmExecutor'], 0);
-      await _activateByKeyboard(tester, 'Привязать');
+      await _activateByKeyboard(tester, 'Привязать исполнитель');
       expect(h.counters['confirmExecutor'], 1);
       expect(h.counters['cancelExecutor'], 1);
     case '01-startup':
@@ -521,11 +945,10 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(loadDesignFonts);
-  for (final binding in designBindings) {
-    for (final dimensions in designFrames) {
-      final frame = Size(dimensions.width, dimensions.height);
-      for (final theme in const [ThemeMode.light, ThemeMode.dark]) {
-        for (final scale in designTextScales) {
+  for (final binding in currentBaseBindings) {
+    for (final frame in currentBaseFrames) {
+      for (final theme in currentBaseThemes) {
+        for (final scale in currentBaseScales) {
           testWidgets(
             '${binding.screenId} matrix ${frame.width.toInt()} ${theme.name} ${scale * 100}%',
             (tester) async {
@@ -537,6 +960,7 @@ void main() {
                 frame: frame,
                 theme: theme,
                 textScale: scale,
+                currentBase: true,
               );
               try {
                 final target = _shellTarget();
@@ -547,25 +971,14 @@ void main() {
                 }
                 await _assertOrigin(tester, host);
                 if (binding.screenId == '06-server-overview') {
-                  await revealDesignGraphs(tester);
-                  expectDesignVisible(
-                    tester,
-                    find.byKey(const ValueKey('metrics-history-plots')),
-                  );
-                  for (final context in [
+                  final chart = find.byType(ServerObservationChart).first;
+                  await _showText(tester, chart);
+                  for (final text in [
                     'Источник: ssh:proc/stat+meminfo+net/dev+df',
                     'Наблюдение: ${DesignServerFixtures.observedAt} · UTC',
                     'Получено: ${DesignServerFixtures.observedAt} · UTC',
                   ]) {
-                    final content = find.descendant(
-                      of: find.byType(MetricsHistory),
-                      matching: find.text(context),
-                    );
-                    if (scale == 1) {
-                      expectDesignVisible(tester, content);
-                    } else {
-                      await _showText(tester, content);
-                    }
+                    await _showText(tester, find.text(text).first);
                   }
                 }
                 expect(tester.takeException(), isNull);

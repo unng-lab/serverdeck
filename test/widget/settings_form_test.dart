@@ -141,15 +141,21 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Тема: тёмная'), findsOneWidget);
-      expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
+      expect(find.text('Тёмная'), findsOneWidget);
+      expect(find.text('Включено'), findsOneWidget);
       expect(find.text('Saved profile · 192.0.2.1:22'), findsOneWidget);
       await tester.tap(find.text('Изменить настройки'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byType(CheckboxListTile));
-      await tester.tap(find.byType(CheckboxListTile));
+      final motion = find.byWidgetPredicate(
+        (widget) => widget is MotionDropdown<bool>,
+      );
+      await tester.ensureVisible(motion);
+      await tester.tap(motion);
       await tester.pumpAndSettle();
-      expect(find.text('Уменьшение анимации: включено'), findsOneWidget);
+      await tester.tap(find.text('Выключено').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<MotionDropdown<bool>>(motion).initialValue, isFalse);
+      expect(model.settings!.reduceMotion, isTrue);
       expect(client.sent, isEmpty);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
@@ -158,7 +164,7 @@ void main() {
       // section has an unfinished load, so inspect a frame without settling it.
       await tester.pump();
       expect(find.textContaining('Saved profile'), findsNothing);
-      expect(find.text('Тема: тёмная'), findsNothing);
+      expect(find.text('Тёмная'), findsNothing);
       expect(client.sent, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
     },

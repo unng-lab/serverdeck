@@ -61,8 +61,12 @@ void main() {
       find.text('Удаляется локальный профиль; сервер не меняется'),
       findsOneWidget,
     );
-    await tester.ensureVisible(find.text('Подтвердить удаление'));
-    await tester.tap(find.text('Подтвердить удаление'));
+    await tester.ensureVisible(find.text('Удалить профиль'));
+    await tester.ensureVisible(find.text('Цель и последствия проверены'));
+    await tester.tap(find.text('Цель и последствия проверены'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Удалить профиль'));
+    await tester.tap(find.text('Удалить профиль'));
     await tester.pumpAndSettle();
     expect(client.sent.single.method, ApiMethod.profilesDelete);
     expect(find.text('Удалено'), findsNothing);
@@ -84,7 +88,11 @@ void main() {
         'result': null,
       });
       await show(tester);
-      await tester.tap(find.text('Подтвердить удаление'));
+      await tester.ensureVisible(find.text('Цель и последствия проверены'));
+      await tester.tap(find.text('Цель и последствия проверены'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Удалить профиль'));
+      await tester.tap(find.text('Удалить профиль'));
       await tester.pumpAndSettle();
       expect(find.text('Удаление не подтверждено'), findsOneWidget);
       await tester.ensureVisible(find.text('Проверить результат'));
@@ -124,7 +132,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Saved profile'), findsOneWidget);
     expect(find.text('Changed by another window'), findsNothing);
-    await tester.tap(find.text('Подтвердить удаление'));
+    await tester.ensureVisible(find.text('Цель и последствия проверены'));
+    await tester.tap(find.text('Цель и последствия проверены'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Удалить профиль'));
+    await tester.tap(find.text('Удалить профиль'));
     await tester.pumpAndSettle();
     expect(client.sent, hasLength(1));
     await tester.ensureVisible(find.text('Перечитать профиль'));
@@ -135,13 +147,60 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Подтвердить удаление'),
+            find.widgetWithText(FilledButton, 'Удалить профиль'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.ensureVisible(find.text('Цель и последствия проверены'));
+    await tester.tap(find.text('Цель и последствия проверены'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Удалить профиль'),
           )
           .onPressed,
       isNotNull,
     );
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'delete confirmation is retired by a ready cycle before a frame',
+    (tester) async {
+      await show(tester);
+      await tester.ensureVisible(find.text('Цель и последствия проверены'));
+      await tester.tap(find.text('Цель и последствия проверены'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Удалить профиль'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      bootstrap.show(ReadinessState.unavailable);
+      bootstrap.show(ReadinessState.ready);
+      client.events.add(fixture.snapshot());
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Удалить профиль'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(client.sent, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('Escape cancels without request and returns focus to launcher', (
     tester,
@@ -206,18 +265,16 @@ void main() {
             home: ProfileDelete(model: model, initial: initial),
           ),
         );
-        await tester.ensureVisible(find.text('Подтвердить удаление'));
+        await tester.ensureVisible(find.text('Удалить профиль'));
         await tester.pumpAndSettle();
         expect(
           tester
-              .getSize(
-                find.widgetWithText(FilledButton, 'Подтвердить удаление'),
-              )
+              .getSize(find.widgetWithText(FilledButton, 'Удалить профиль'))
               .height,
           greaterThanOrEqualTo(48),
         );
         expect(tester.takeException(), isNull);
-        await tester.ensureVisible(find.text('Отмена'));
+        await tester.ensureVisible(find.text('Назад'));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });

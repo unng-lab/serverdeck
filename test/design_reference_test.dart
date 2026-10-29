@@ -41,7 +41,11 @@ void main() {
   ) as List).cast<Map<String, Object?>>();
   final mapSource = File('specs/003-design-system/screen-map.md')
       .readAsStringSync();
-  final rows = _mapRows(mapSource);
+  final historicalMap = mapSource
+      .split('## Историческая карта 003.1–003.3')
+      .last;
+  final currentMap = mapSource.split('## Историческая карта 003.1–003.3').first;
+  final rows = _mapRows(historicalMap);
   final taskSource = File('specs/003-design-system/tasks.md')
       .readAsStringSync();
   final taskIds = RegExp(
@@ -49,43 +53,65 @@ void main() {
     multiLine: true,
   ).allMatches(taskSource).map((match) => match.group(1)!).toSet();
 
-  test(
-    '98 stable IDs map once to 35 origins and 63 catalogue-only concepts',
-    () {
-      final ids = registry.map((row) => row['id'] as String).toList();
-      final originIds = registry
-          .where((row) => row['implemented'] == true)
-          .map((row) => row['id'] as String)
-          .toSet();
-      final conceptIds = registry
-          .where((row) => row['implemented'] == false)
-          .map((row) => row['id'] as String)
-          .toSet();
-      expect(ids, hasLength(98));
-      expect(ids.toSet(), hasLength(98));
-      expect(originIds, hasLength(35));
-      expect(conceptIds, hasLength(63));
-      expect(rows.keys.toSet(), ids.toSet());
-      // Check the physical rows as well: a map alone would hide duplicates.
-      expect(
-        RegExp(r'^\| `\d\d-[^`]+`', multiLine: true).allMatches(mapSource),
-        hasLength(98),
-      );
-      expect(designBindings, hasLength(35));
-      expect(
-        designBindings.map((binding) => binding.screenId).toSet(),
-        originIds,
-      );
-      expect(designConcepts, hasLength(63));
-      expect(
-        designConcepts.map((concept) => concept.screenId).toSet(),
-        conceptIds,
-      );
-      expect(designBindings.map((binding) => binding.group).toSet(), {
-        for (var i = 1; i <= 12; i++) 'A${i.toString().padLeft(2, '0')}',
-      });
-    },
-  );
+  test('historical98 registry remains35origins63concepts without claiming current acceptance', () {
+    final ids = registry.map((row) => row['id'] as String).toList();
+    final originIds = registry
+        .where((row) => row['implemented'] == true)
+        .map((row) => row['id'] as String)
+        .toSet();
+    final conceptIds = registry
+        .where((row) => row['implemented'] == false)
+        .map((row) => row['id'] as String)
+        .toSet();
+    expect(ids, hasLength(98));
+    expect(ids.toSet(), hasLength(98));
+    expect(originIds, hasLength(35));
+    expect(conceptIds, hasLength(63));
+    expect(rows.keys.toSet(), ids.toSet());
+    // Check the physical rows as well: a map alone would hide duplicates.
+    expect(
+      RegExp(r'^\| `\d\d-[^`]+`', multiLine: true).allMatches(historicalMap),
+      hasLength(98),
+    );
+    expect(designBindings, hasLength(35));
+    expect(
+      designBindings.map((binding) => binding.screenId).toSet(),
+      originIds,
+    );
+    expect(designConcepts, hasLength(63));
+    expect(
+      designConcepts.map((concept) => concept.screenId).toSet(),
+      conceptIds,
+    );
+    expect(designBindings.map((binding) => binding.group).toSet(), {
+      for (var i = 1; i <= 12; i++) 'A${i.toString().padLeft(2, '0')}',
+    });
+  });
+
+  test('current003 has37 unique base entries and61 future owners', () {
+    final current = _mapRows(currentMap);
+    expect(current, hasLength(37));
+    final original = registry
+        .where((row) => row['implemented'] == true)
+        .map((row) => row['id'] as String)
+        .toSet();
+    expect(current.keys.toSet(), {
+      ...original,
+      '11-host-key-changed',
+      '93-protected-effect-blocked',
+    });
+    expect(
+      RegExp(r'^\| `\d\d-[^`]+`', multiLine: true).allMatches(currentMap),
+      hasLength(37),
+    );
+    for (final row in current.values) {
+      expect(row[5], contains('T13'));
+      expect(row.last, contains('не проверено заново'));
+    }
+    final delivery = File('specs/design-delivery.md').readAsStringSync();
+    final ownership = _mapRows(delivery);
+    expect(ownership.keys.toSet(), registry.map((row) => row['id']).toSet());
+  });
 
   for (final binding in designBindings) {
     test(
@@ -187,14 +213,46 @@ void main() {
         final sections = File('lib/${family}_sections.dart').readAsStringSync();
         final leaf = family.split('/').last;
         expect(panel, contains("import '${leaf}_sections.dart'"));
+        var liveOwners = panel;
+        if (family == 'servers/server') {
+          // The workspace owns target selection and passes its real selector
+          // into the panel's log filter region; the panel owns log operations.
+          final workspace = File('lib/shell/base_workspace.dart')
+              .readAsStringSync();
+          expect(
+            workspace,
+            contains("import '../servers/server_sections.dart'"),
+          );
+          expect(
+            RegExp(
+              r'Widget _logTargetSelector\(\) => ServerLogTargetSelector\(',
+            ).hasMatch(workspace),
+            isTrue,
+          );
+          expect(
+            RegExp(
+              r'contextBar:\s*_section == FoundationSection\.logs\s*\? _logTargetSelector\(\)\s*:\s*null',
+            ).hasMatch(workspace),
+            isTrue,
+          );
+          expect(
+            RegExp(r'targetSelector:\s*widget\.contextBar').hasMatch(panel),
+            isTrue,
+          );
+          liveOwners = '$panel\n$workspace';
+        }
         final declarations = RegExp(
-          r'class ((?:Server|Automation)\w+) extends StatelessWidget',
+          r'class (_?(?:Server|Automation)\w+) extends (?:StatelessWidget|StatefulWidget|State<[^>]+>)',
         ).allMatches(sections).toList();
         final classes = declarations.map((match) => match.group(1)!).toList();
         expect(classes, isNotEmpty);
+        // Some retained components also own shared target resolution/address
+        // helpers. Their actual static calls are production consumption too.
+        bool referencesClass(String source, String name) =>
+            RegExp('\\b${RegExp.escape(name)}\\s*(?:\\(|\\.)').hasMatch(source);
         final reachable = {
           for (final name in classes)
-            if (panel.contains('$name(')) name,
+            if (referencesClass(liveOwners, name)) name,
         };
         var changed = true;
         while (changed) {
@@ -208,7 +266,8 @@ void main() {
                   : declarations[i + 1].start,
             );
             for (final dependency in classes) {
-              if (body.contains('$dependency(') && reachable.add(dependency)) {
+              if (referencesClass(body, dependency) &&
+                  reachable.add(dependency)) {
                 changed = true;
               }
             }

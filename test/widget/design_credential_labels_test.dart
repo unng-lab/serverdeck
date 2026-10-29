@@ -151,8 +151,15 @@ Future<void> _expectField(
   required bool enabled,
   required bool masked,
 }) async {
-  await _show(tester, find.text(label));
-  _expectGlyphs(tester, label);
+  final owner = tester.widget<CredentialInput>(
+    find.ancestor(of: _field(id), matching: find.byType(CredentialInput)),
+  );
+  final caption =
+      (owner.compact || owner.pageTarget != null) && id != 'passphrase'
+      ? '$label *'
+      : label;
+  await _show(tester, find.text(caption));
+  _expectGlyphs(tester, caption);
   final field = tester.widget<TextFormField>(_field(id));
   final editor = _editor(tester, id);
   expect(field.controller!.text, value);

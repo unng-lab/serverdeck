@@ -508,6 +508,7 @@ class DesignPrivacyRemoteBody {
   });
 
   ServerOverviewSection _overview() => ServerOverviewSection(
+    profile: DesignServerFixtures.profile(address: _hostname),
     connection: ServerConnectionSection(
       connection: DesignServerFixtures.connection(),
       trust: DesignServerFixtures.trust(),

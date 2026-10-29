@@ -6,7 +6,6 @@ import 'package:serverdeck/automation/automation_sections.dart';
 import 'package:serverdeck/theme/brand_assets.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
-import 'package:serverdeck/ui/deck_components.dart';
 
 import '../support/design_automation_fixtures.dart';
 import '../support/design_host.dart' show loadDesignFonts;
@@ -21,7 +20,7 @@ const _available = AutomationActionAvailability(
 
 Finder _value(String label) => find.descendant(
   of: find.byWidgetPredicate(
-    (widget) => widget is DeckKeyValue && widget.label == label,
+    (widget) => widget is AutomationExactValue && widget.label == label,
   ),
   matching: find.byType(EditableText),
 );
@@ -95,8 +94,6 @@ void main() {
                   ),
                 ),
               );
-              await tester.pumpAndSettle();
-              await tester.tap(find.text('Доступ ИИ рабочего пространства'));
               await tester.pumpAndSettle();
               final value = _value(label);
               await _show(tester, value);
@@ -181,23 +178,31 @@ void main() {
               }
 
               final caption = tester.renderObject<RenderParagraph>(
-                find.text(label),
+                find.descendant(
+                  of: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is AutomationExactValue && widget.label == label,
+                  ),
+                  matching: find.text(label),
+                ),
               );
               final captionStyle = (caption.text as TextSpan).style!;
-              expect(captionStyle.fontFamily, BrandAssets.uiFont);
-              expect(captionStyle.fontSize, 12);
-              expect(captionStyle.height! * captionStyle.fontSize!, 16);
+              expect(captionStyle.fontFamily, BrandAssets.semiboldFamily);
+              expect(captionStyle.fontWeight, BrandTypography.semiboldWeight);
+              expect(captionStyle.fontSize, 13);
+              expect(captionStyle.height! * captionStyle.fontSize!, 20);
               final human = tester.renderObject<RenderParagraph>(
-                find.text('Синтетический сервер'),
+                find.text('ИИ-клиент для синтетического сервера'),
               );
               final humanStyle = (human.text as TextSpan).style!;
-              expect(humanStyle.fontFamily, BrandAssets.uiFont);
-              expect(humanStyle.fontSize, 14);
-              expect(humanStyle.height! * humanStyle.fontSize!, 20);
-              final address = tester.widget<EditableText>(_value('Адрес'));
-              expect(address.style.fontFamily, BrandAssets.uiFont);
-              expect(address.style.fontSize, 14);
-              expect(address.style.height! * address.style.fontSize!, 20);
+              // The source description-list uses Mono for every dd value;
+              // its label and the separate exact-value caption stay in UI.
+              expect(humanStyle.fontFamily, BrandAssets.monoFont);
+              expect(humanStyle.fontSize, width <= 520 ? 13 : 12);
+              expect(
+                humanStyle.height! * humanStyle.fontSize!,
+                width <= 520 ? 22 : 20,
+              );
 
               final first = render
                   .getBoxesForSelection(
@@ -219,7 +224,7 @@ void main() {
               editor.focusNode.unfocus();
               await tester.pumpAndSettle();
               final copy = find.widgetWithText(
-                OutlinedButton,
+                FilledButton,
                 'Скопировать конфигурацию',
               );
               await _show(tester, copy);

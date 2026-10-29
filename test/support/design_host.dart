@@ -1,29 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart' show SvgPicture, vg;
 import 'package:serverdeck/profiles/profile_list.dart';
 import 'package:serverdeck/shell/foundation_shell.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
-import 'package:serverdeck_protocol/models.dart' show ReadinessState;
+import 'package:serverdeck_protocol/models.dart' show ReadinessState, ErrorCode;
 
 import 'design_scenarios.dart';
+export 'design_fonts.dart' show loadDesignFonts;
 
-Future<void>? _fontsLoaded;
-
-Future<void> loadDesignFonts() => _fontsLoaded ??= _loadDesignFonts();
-
-Future<void> _loadDesignFonts() async {
-  final sans = FontLoader('Noto Sans')
-    ..addFont(rootBundle.load('assets/brand/fonts/NotoSans-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/brand/fonts/NotoSans-SemiBold.ttf'));
-  final mono = FontLoader('Noto Sans Mono')
-    ..addFont(rootBundle.load('assets/brand/fonts/NotoSansMono-Regular.ttf'));
-  final unicode = FontLoader('Noto Sans SC')
-    ..addFont(rootBundle.load('assets/brand/fonts/NotoSansSC-Variable.ttf'));
-  final icons = FontLoader('MaterialIcons')
-    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
-  await Future.wait([sans.load(), mono.load(), unicode.load(), icons.load()]);
+/// Await actual vector loaders and decoding, rather than photographing their
+/// blank asynchronous placeholders. No application state or timeout is changed.
+Future<void> loadDesignVectorAssets(WidgetTester tester) async {
+  final elements = find.byType(SvgPicture).evaluate().toList();
+  await tester.runAsync<void>(() async {
+    await Future.wait([
+      for (final element in elements)
+        (element.widget as SvgPicture).bytesLoader.loadBytes(element),
+    ]);
+    await vg.waitForPendingDecodes();
+  });
+  await tester.pump();
 }
 
 /// One bounded, reduced-motion production fixture for assertions and captures.
@@ -36,7 +34,10 @@ class DesignFixtureHost {
     this.frame,
     this.theme, {
     this.textScale = 1,
-  }) : fixture = binding.build(harness);
+    this.currentBase = false,
+  }) : fixture = currentBase
+           ? harness.buildCurrentOrigin(binding.screenId)
+           : binding.build(harness);
 
   final AcceptanceBinding binding;
   final DesignScenarioHarness harness;
@@ -44,12 +45,14 @@ class DesignFixtureHost {
   ThemeMode theme;
   double textScale;
   final Widget fixture;
+  final bool currentBase;
   final boundaryKey = GlobalKey();
 
   String get baselineState => switch (binding.screenId) {
-    '05-server-list' => 'profile-expanded',
-    '12-credential-input' => 'credential-password',
-    '31-recent-operations' => 'history-open',
+    '05-server-list' => 'profile-cards',
+    '12-credential-input' =>
+      currentBase ? 'credential-private-key' : 'credential-password',
+    '31-recent-operations' => 'history-page',
     '36-ai-grants' => 'grants-expanded',
     '38-mcp-client-config' => 'configuration-visible',
     _ => binding.states.first,
@@ -77,6 +80,7 @@ class DesignFixtureHost {
       binding.screenId == '84-settings';
 
   Widget _home() {
+    if (currentBase) return _currentHome();
     if (_modal || binding.group == 'A01') return Scaffold(body: fixture);
     final content = _ownScroll
         ? fixture
@@ -98,6 +102,75 @@ class DesignFixtureHost {
       recoveryAction: binding.screenId == '31-recent-operations'
           ? fixture
           : null,
+    );
+  }
+
+  FoundationSection get currentSection {
+    final number = int.parse(binding.screenId.split('-').first);
+    if (number == 13 ||
+        number == 36 ||
+        number == 37 ||
+        number == 38 ||
+        number == 84 ||
+        number == 85)
+      return FoundationSection.settings;
+    if (number == 22 || number == 23) return FoundationSection.logs;
+    if (number >= 16 && number <= 19) return FoundationSection.software;
+    if (number >= 27 && number <= 39 || number == 93 || number == 94)
+      return FoundationSection.jobs;
+    return FoundationSection.servers;
+  }
+
+  Widget _currentHome() {
+    final number = int.parse(binding.screenId.split('-').first);
+    final isPage = {
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      11,
+      12,
+      13,
+      16,
+      17,
+      18,
+      22,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      34,
+      36,
+      38,
+      84,
+      85,
+      93,
+      94,
+    }.contains(number);
+    final modal = {10, 19, 23, 33, 35, 37, 39, 40}.contains(number);
+    final content = isPage || modal
+        ? fixture
+        : SingleChildScrollView(child: fixture);
+    final readiness = switch (number) {
+      1 => ReadinessState.starting,
+      2 => ReadinessState.unavailable,
+      3 => ReadinessState.storageBlocked,
+      _ => ReadinessState.ready,
+    };
+    return FoundationShell(
+      state: readiness,
+      section: currentSection,
+      reason: number == 2
+          ? ErrorCode.serviceUnavailable
+          : number == 3
+          ? ErrorCode.storageBlocked
+          : null,
+      onRetry: harness.counters.callback('retry'),
+      contentBuilder: (_, _) => content,
     );
   }
 
@@ -123,12 +196,14 @@ class DesignFixtureHost {
     theme = next;
     await tester.pumpWidget(_app());
     await tester.pump();
+    if (currentBase) await loadDesignVectorAssets(tester);
   }
 
   Future<void> setTextScale(WidgetTester tester, double next) async {
     textScale = next;
     await tester.pumpWidget(_app());
     await tester.pump();
+    if (currentBase) await loadDesignVectorAssets(tester);
   }
 
   Future<void> close(WidgetTester tester) async {
@@ -147,6 +222,7 @@ Future<DesignFixtureHost> mountDesignFixture(
   required ThemeMode theme,
   double textScale = 1,
   DesignFixtureOptions options = const DesignFixtureOptions(),
+  bool currentBase = false,
 }) async {
   tester.view.physicalSize = frame;
   tester.view.devicePixelRatio = 1;
@@ -162,11 +238,14 @@ Future<DesignFixtureHost> mountDesignFixture(
     frame,
     theme,
     textScale: textScale,
+    currentBase: currentBase,
   );
   await tester.pumpWidget(host._app());
   await tester.pump();
-  if (binding.screenId == '16-install-catalog' ||
-      binding.screenId == '84-settings') {
+  if (currentBase) await loadDesignVectorAssets(tester);
+  if (!currentBase &&
+      (binding.screenId == '16-install-catalog' ||
+          binding.screenId == '84-settings')) {
     final section = binding.screenId == '84-settings' ? 'settings' : 'software';
     final navigation = find.byKey(ValueKey('foundation-navigation-$section'));
     await tester.ensureVisible(navigation);
@@ -175,36 +254,29 @@ Future<DesignFixtureHost> mountDesignFixture(
     await tester.pump();
   }
   switch (binding.screenId) {
-    case '05-server-list':
-      final profile = find.descendant(
-        of: find.byType(ExpansionTile),
-        matching: find.text(harness.profiles.profiles.single.name),
-      );
-      await tester.scrollUntilVisible(
-        profile,
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(ProfileList),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.ensureVisible(profile);
-      await tester.pump();
-      expect(profile.hitTestable(), findsOneWidget);
-      await tester.tap(profile);
-      await tester.pump();
     case '12-credential-input':
-      await tester.ensureVisible(find.text('Без секрета / удалить'));
-      await tester.tap(find.text('Без секрета / удалить'));
+      final choice = currentBase
+          ? 'Сохранить существующий'
+          : 'Без секрета / удалить';
+      await tester.ensureVisible(find.text(choice));
+      await tester.tap(find.text(choice));
       await tester.pump();
-      await tester.tap(find.text('Новый пароль').last);
+      await tester.tap(
+        find.text(currentBase ? 'Новый приватный ключ' : 'Новый пароль').last,
+      );
       await tester.pump();
     case '31-recent-operations':
+      if (currentBase) break;
       await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
       await tester.pump();
+    case '17-recipe-detail':
+      if (!currentBase) break;
+      // Establish the loaded selection through the production state API. The
+      // catalogue header owns Choose program; the detail has no duplicate.
+      host.harness.recipesKey.currentState!.selectFirst();
+      await tester.pump();
     case '36-ai-grants' || '38-mcp-client-config':
+      if (currentBase) break;
       await tester.tap(find.text('Доступ ИИ рабочего пространства'));
       await tester.pump();
       if (binding.screenId == '38-mcp-client-config') {
@@ -218,6 +290,7 @@ Future<DesignFixtureHost> mountDesignFixture(
       break;
   }
   await tester.pump();
+  if (currentBase) await loadDesignVectorAssets(tester);
   return host;
 }
 

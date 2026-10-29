@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/servers/metrics_history.dart';
 import 'package:serverdeck/servers/server_sections.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/ui/deck_icon.dart';
 import 'package:serverdeck_protocol/host_trust.dart';
 import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/remote_reads.dart';
@@ -307,27 +309,85 @@ Future<void> _click(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
-void _status(String text, DeckTone tone) {
-  final matching = find.byWidgetPredicate(
+void _status(String text, DeckTone tone, {Finder? within}) {
+  final status = find.byWidgetPredicate(
     (widget) =>
         widget is DeckStatus &&
         widget.label.contains(text) &&
         widget.tone == tone,
   );
+  final matching = within == null
+      ? status
+      : find.descendant(of: within, matching: status);
   expect(matching, findsWidgets);
   final icon = switch (tone) {
-    DeckTone.available => Icons.circle_outlined,
-    DeckTone.unavailable => Icons.close,
-    DeckTone.unknown => Icons.help_outline,
-    DeckTone.warning => Icons.warning_amber_rounded,
-    DeckTone.error => Icons.report_outlined,
-    DeckTone.running => Icons.timelapse,
-    DeckTone.success => Icons.check,
-    DeckTone.neutral => Icons.info_outline,
+    DeckTone.available || DeckTone.success => 'check',
+    DeckTone.unavailable => 'close',
+    DeckTone.unknown || DeckTone.neutral => 'info',
+    DeckTone.warning || DeckTone.error => 'warning',
+    DeckTone.running => 'clock',
   };
   expect(
-    find.descendant(of: matching, matching: find.byIcon(icon)),
+    find.descendant(
+      of: matching,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is DeckIcon && widget.name == icon,
+      ),
+    ),
     findsWidgets,
+  );
+}
+
+void _resourceValues(List<String> expected) {
+  final cards = find.byType(ServerResourceCards);
+  expect(cards, findsOneWidget);
+  for (var i = 0; i < expected.length; i++) {
+    final label = find.descendant(
+      of: cards,
+      matching: find.text(['CPU', 'Память', 'Диск /'][i]),
+    );
+    final card = find
+        .ancestor(of: label, matching: find.byType(DeckSurface))
+        .first;
+    expect(
+      find.descendant(of: card, matching: find.text(expected[i])),
+      findsOneWidget,
+    );
+  }
+}
+
+Future<void> _recordValue(
+  WidgetTester tester,
+  String label,
+  String value, {
+  Finder? owner,
+}) async {
+  final row = find.descendant(
+    of: owner ?? find.byType(ServerLogRecordDialog),
+    matching: find.byKey(ServerFactRowKey(label)),
+  );
+  expect(row, findsOneWidget);
+  final labelText = find.descendant(of: row, matching: find.text(label));
+  expect(labelText, findsOneWidget);
+  final editor = find.descendant(
+    of: row,
+    matching: find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.controller.text == value,
+    ),
+  );
+  expect(editor, findsOneWidget);
+  await tester.ensureVisible(editor);
+  await tester.pumpAndSettle();
+  expectDesignVisible(tester, editor);
+  final field = tester.widget<EditableText>(editor);
+  expect(field.readOnly, isTrue);
+  expect(field.maxLines, isNull);
+  final data = tester.getSemantics(editor).getSemanticsData();
+  expect(data.value, value);
+  expect(data.flagsCollection.isReadOnly, isTrue);
+  expect(
+    tester.getSemantics(labelText).getSemanticsData().label,
+    contains(label),
   );
 }
 
@@ -354,17 +414,49 @@ Future<void> _pending(
   Widget child,
 ) async {
   await _mount(tester, child, frame, dark);
-  expect(find.text('Выполняется операция сервера'), findsOneWidget);
-  expect(
-    find.byWidgetPredicate((widget) => widget is DeckStatus && widget.pending),
-    findsOneWidget,
+  expect(find.text('Выполняется операция сервера'), findsWidgets);
+  final pending = find.byWidgetPredicate(
+    (widget) => widget is DeckStatus && widget.pending,
   );
-  for (final element in find.byType(OutlinedButton).evaluate()) {
-    expect((element.widget as OutlinedButton).onPressed, isNull);
+  expect(pending, findsWidgets);
+  final ownerButtons = find
+      .byWidgetPredicate(
+        (widget) => widget is OutlinedButton || widget is FilledButton,
+      )
+      .evaluate()
+      .where(
+        (element) =>
+            find
+                .descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.text('Поиск'),
+                )
+                .evaluate()
+                .isEmpty &&
+            find
+                .descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.text('Фильтры'),
+                )
+                .evaluate()
+                .isEmpty,
+      )
+      .toList();
+  for (final element in ownerButtons) {
+    expect((element.widget as ButtonStyleButton).onPressed, isNull);
   }
-  expect(find.byIcon(Icons.timelapse), findsOneWidget);
-  for (final button
-      in find.byType(OutlinedButton).evaluate().take(2).toList()) {
+  for (final element in pending.evaluate()) {
+    expect(
+      find.descendant(
+        of: find.byWidget(element.widget),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is DeckIcon && widget.name == 'clock',
+        ),
+      ),
+      findsOneWidget,
+    );
+  }
+  for (final button in ownerButtons.take(2)) {
     final target = find.byWidget(button.widget);
     await tester.ensureVisible(target);
     await tester.tap(target, warnIfMissed: false);
@@ -600,21 +692,27 @@ Future<void> _overview(
   );
   switch (cat) {
     case DesignStateCategory.successfulEmpty:
-      expect(find.text('Истории пока нет.'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(MetricsHistory),
+          matching: find.text('Истории пока нет.'),
+        ),
+        findsOneWidget,
+      );
       expect(
         tester.widget<MetricsHistory>(find.byType(MetricsHistory)).points,
         isEmpty,
       );
     case DesignStateCategory.data:
-      expect(find.text('CPU: 25% · RAM: 50% · Диск /: 75%'), findsOneWidget);
+      _resourceValues(['25 %', '50 %', '75 %']);
       _context();
     case DesignStateCategory.denied:
       _status('Недостаточно прав', DeckTone.warning);
-      expect(find.text('CPU: —% · RAM: —% · Диск /: —%'), findsOneWidget);
+      _resourceValues(['—', '—', '—']);
       _context(observation: false);
     case DesignStateCategory.unsupported:
       _status('Источник не поддерживается', DeckTone.warning);
-      expect(find.text('CPU: —% · RAM: —% · Диск /: —%'), findsOneWidget);
+      _resourceValues(['—', '—', '—']);
       _context(observation: false);
     case DesignStateCategory.stale:
       _status('Устаревшие данные', DeckTone.warning);
@@ -629,7 +727,13 @@ Future<void> _overview(
         ),
         findsOneWidget,
       );
-      expect(find.text('Истории пока нет.'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(MetricsHistory),
+          matching: find.text('Истории пока нет.'),
+        ),
+        findsNothing,
+      );
     case DesignStateCategory.incomplete:
       _status('Получены неполные данные', DeckTone.warning);
       expect(find.text('Ошибок разбора: 2'), findsWidgets);
@@ -656,7 +760,7 @@ Future<void> _overview(
       dark,
     );
     _status('Данных пока нет', DeckTone.unknown);
-    expect(find.text('CPU: —% · RAM: —% · Диск /: —%'), findsOneWidget);
+    _resourceValues(['—', '—', '—']);
     expect(find.text('Исход не подтверждён'), findsNothing);
     expect(find.textContaining('Наблюдение:'), findsNothing);
   }
@@ -805,18 +909,68 @@ Future<void> _logs(
     frame,
     dark,
   );
-  _context(received: false);
+  final qualityText = switch (cat) {
+    DesignStateCategory.denied => 'Недостаточно прав',
+    DesignStateCategory.unsupported => 'Не поддерживается',
+    DesignStateCategory.stale => 'Данные устарели',
+    DesignStateCategory.dropped ||
+    DesignStateCategory.incomplete => 'Неполные данные',
+    _ => 'Данные получены',
+  };
+  final semantics = tester.ensureSemantics();
+  try {
+    final owner = find.byType(ServerLogsSection);
+    for (final entry in {
+      'Сервер': DesignServerFixtures.serverId,
+      'Источник': '${data['source']}',
+      'Время': 'UTC',
+      'Буфер': 'Получено ${(data['records'] as List).length} записей',
+      'Качество': qualityText,
+    }.entries) {
+      await _recordValue(tester, entry.key, entry.value, owner: owner);
+    }
+    final footer = find.byKey(const ValueKey('server-log-footer'));
+    final observed = find.descendant(
+      of: footer,
+      matching: find.text('Наблюдение: ${data['observedAt']} · UTC'),
+    );
+    expect(observed, findsOneWidget);
+    await tester.ensureVisible(observed);
+    await tester.pumpAndSettle();
+    expectDesignVisible(tester, observed);
+  } finally {
+    semantics.dispose();
+  }
+  _status(
+    '$qualityText · UTC',
+    cat == DesignStateCategory.denied ||
+            cat == DesignStateCategory.unsupported ||
+            cat == DesignStateCategory.stale ||
+            cat == DesignStateCategory.dropped ||
+            cat == DesignStateCategory.incomplete
+        ? DeckTone.warning
+        : DeckTone.available,
+    within: find.byKey(const ValueKey('server-log-toolbar')),
+  );
   expect(filter.text, 'Unicode 例');
   switch (cat) {
     case DesignStateCategory.successfulEmpty:
       expect(find.text('Записей по выбранному фильтру нет.'), findsOneWidget);
-      _status('Данные получены · записей: 0', DeckTone.available);
+      _status(
+        'Данные получены · UTC',
+        DeckTone.available,
+        within: find.byKey(const ValueKey('server-log-toolbar')),
+      );
     case DesignStateCategory.data:
       expect(
         find.text(DesignServerFixtures.record()['message']! as String),
         findsOneWidget,
       );
-      _status('Данные получены · записей: 1', DeckTone.available);
+      _status(
+        'Данные получены · UTC',
+        DeckTone.available,
+        within: find.byKey(const ValueKey('server-log-toolbar')),
+      );
     case DesignStateCategory.denied:
       _status('Недостаточно прав', DeckTone.warning);
       expect(
@@ -968,31 +1122,26 @@ Future<void> _record(
     frame,
     dark,
   );
-  final tile = find.byType(ListTile);
+  final tile = find.byKey(const ValueKey('server-log-row-0'));
   await tester.ensureVisible(tile);
   await tester.tap(tile);
   await tester.pumpAndSettle();
   expect(find.byType(ServerLogRecordDialog), findsOneWidget);
-  expect(find.text('Запись журнала'), findsOneWidget);
+  expect(find.text('Детали записи журнала'), findsOneWidget);
   final semantics = tester.ensureSemantics();
-  final contextText = [
-    profile.name,
-    '[2001:db8::44]:2222',
-    'Источник: ${logs['source']}',
-    'Время записи: ${selected['timestamp']} UTC',
-    'Наблюдение: ${logs['observedAt']} UTC',
-  ];
-  for (final text in contextText) {
-    final label = find.descendant(
-      of: find.byType(ServerLogRecordDialog),
-      matching: find.text(text),
-    );
-    expect(label, findsOneWidget);
-    await tester.ensureVisible(label);
-    await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel(text), findsOneWidget);
+  try {
+    for (final entry in {
+      'Сервер': profile.name,
+      'Адрес': '[2001:db8::44]:2222',
+      'Источник': '${logs['source']}',
+      'Время': '${selected['timestamp']} UTC',
+      'Наблюдение': '${logs['observedAt']} UTC',
+    }.entries) {
+      await _recordValue(tester, entry.key, entry.value);
+    }
+  } finally {
+    semantics.dispose();
   }
-  semantics.dispose();
   expect(
     find.byWidgetPredicate(
       (widget) => widget is SelectableText && widget.data == message,
@@ -1039,7 +1188,7 @@ Future<void> _recordIdentity(
       frame.size.width == 1100 && frame.scale == 1 ||
       frame.size.width == 360 && frame.scale == 2;
   Future<ServerLogRecordDialog> open() async {
-    final tile = find.byType(ListTile);
+    final tile = find.byKey(const ValueKey('server-log-row-0'));
     await tester.ensureVisible(tile);
     await tester.tap(tile);
     await tester.pumpAndSettle();
@@ -1062,24 +1211,15 @@ Future<void> _recordIdentity(
       ),
       findsOneWidget,
     );
-    final labels = [
+    final notices = [
       if (profile == null) ...[
-        logs['serverId'] == null
-            ? 'Цель записи не указана'
-            : 'Цель записи: ${logs['serverId']}',
         'Параметры цели записи не подтверждены текущими сведениями',
         'Закройте окно и получите журнал для текущих параметров.',
-      ] else ...[
-        profile.name,
-        '[${profile.address}]:${profile.port}',
       ],
-      'Источник: ${logs['source']}',
-      'Время записи: ${row['timestamp']} UTC',
-      'Наблюдение: ${logs['observedAt']} UTC',
     ];
     final semantics = tester.ensureSemantics();
     try {
-      for (final label in labels) {
+      for (final label in notices) {
         final text = find.descendant(
           of: find.byType(ServerLogRecordDialog),
           matching: find.text(label),
@@ -1093,6 +1233,19 @@ Future<void> _recordIdentity(
           find.bySemanticsLabel(RegExp(RegExp.escape(label))),
           findsWidgets,
         );
+      }
+      for (final entry in {
+        'Сервер':
+            profile?.name ??
+            (logs['serverId'] == null
+                ? 'Цель записи не указана'
+                : 'Цель записи: ${logs['serverId']}'),
+        if (profile != null) 'Адрес': '[${profile.address}]:${profile.port}',
+        'Источник': '${logs['source']}',
+        'Время': '${row['timestamp']} UTC',
+        'Наблюдение': '${logs['observedAt']} UTC',
+      }.entries) {
+        await _recordValue(tester, entry.key, entry.value);
       }
     } finally {
       semantics.dispose();
@@ -1212,7 +1365,7 @@ Future<void> _recordIdentity(
           expect(position.maxScrollExtent, greaterThan(0));
           position.jumpTo(position.maxScrollExtent);
           await tester.pumpAndSettle();
-          final close = find.widgetWithText(TextButton, 'Закрыть');
+          final close = _button('Закрыть');
           await tester.ensureVisible(close);
           await tester.pumpAndSettle();
           expect(close.hitTestable(), findsOneWidget);
@@ -1368,6 +1521,7 @@ Future<void> _review(
   final capturedInspection = state.inspection!;
   Widget review({ProfileView? profile}) => executor
       ? ServerExecutorConfirmation(
+          asPage: true,
           inspection: capturedInspection,
           profile: profile ?? capturedProfile,
           changes: state,
@@ -1377,6 +1531,7 @@ Future<void> _review(
           onConfirm: () => counts.hit('confirm'),
         )
       : ServerTrustConfirmation(
+          asPage: true,
           challenge: capturedChallenge,
           profile: profile ?? capturedProfile,
           changes: state,
@@ -1386,7 +1541,7 @@ Future<void> _review(
           onConfirm: () => counts.hit('confirm'),
         );
   await _mount(tester, review(), frame, dark);
-  final confirm = executor ? 'Привязать' : 'Подтвердить';
+  final confirm = executor ? 'Привязать исполнитель' : 'Подтвердить ключ';
   if (cat == DesignStateCategory.validation) {
     state.profile = DesignServerFixtures.profile(address: '192.0.2.99');
     state.changed();
@@ -1405,7 +1560,11 @@ Future<void> _review(
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(_button(confirm)).onPressed, isNull);
     expect(counts.value('confirm'), 0);
-    if (!executor) expect(find.text('[2001:db8::44]:22'), findsOneWidget);
+    if (!executor)
+      expect(
+        find.text('${capturedProfile.name} · [2001:db8::44]:22'),
+        findsOneWidget,
+      );
     await _capture(tester, scenario, frame, dark, counts, [
       'Actual review context change then restore permanently retires consent',
       'Frozen valid original trust target is not silently retargeted; no invalid confirm',
@@ -1423,8 +1582,8 @@ Future<void> _review(
       state.profile = mismatch;
       await _mount(tester, review(profile: mismatch), frame, dark);
       expect(tester.widget<FilledButton>(_button(confirm)).onPressed, isNull);
-      expect(find.text(mismatch.name), findsNothing);
-      expect(find.text('192.0.2.44:2222'), findsNothing);
+      expect(find.textContaining('${mismatch.name} ·'), findsNothing);
+      expect(find.textContaining('192.0.2.44:2222'), findsNothing);
       expect(counts.value('confirm'), 0);
     }
     state.profile = capturedProfile;
@@ -1447,8 +1606,16 @@ Future<void> _review(
     expect(counts.value('confirm'), 0);
     expect(tester.widget<FilledButton>(_button(confirm)).onPressed, isNull);
   } else {
-    expect(find.text('[2001:db8::44]:22'), findsOneWidget);
-    expect(find.text(capturedProfile.name), findsOneWidget);
+    final target = find.descendant(
+      of: find.byKey(ServerFactRowKey(executor ? 'Цель' : 'Сервер')),
+      matching: find.byType(EditableText),
+    );
+    expect(target, findsOneWidget);
+    expect(
+      tester.widget<EditableText>(target).controller.text,
+      '${capturedProfile.name} · [2001:db8::44]:22',
+    );
+    expect(tester.widget<EditableText>(target).readOnly, isTrue);
     expect(find.text(DesignServerFixtures.key.fingerprint), findsOneWidget);
     expect(find.textContaining('UTC'), findsOneWidget);
     expect(tester.widget<FilledButton>(_button(confirm)).onPressed, isNotNull);

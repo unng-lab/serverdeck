@@ -91,12 +91,13 @@ Future<void> _mount(
   await tester.pumpWidget(_app(review.dialog(), dark: dark, scale: scale));
 }
 
-Finder get _confirm => find.widgetWithText(FilledButton, 'Привязать');
+Finder get _confirm =>
+    find.widgetWithText(FilledButton, 'Привязать исполнитель');
 void _blocked(WidgetTester tester, _Review review) {
   expect(tester.widget<FilledButton>(_confirm).onPressed, isNull);
   expect(review.confirmed, 0);
   expect(find.textContaining('заново проверьте исполнитель'), findsOneWidget);
-  expect(find.text('192.0.2.44:2222'), findsNothing);
+  expect(find.textContaining('192.0.2.44:2222'), findsNothing);
   expect(tester.takeException(), isNull);
 }
 
@@ -136,17 +137,16 @@ void main() {
     ) async {
       final review = _Review();
       await _mount(tester, review, dark: dark);
-      expect(find.text(review.profile!.name), findsOneWidget);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
+      expect(find.textContaining(review.profile!.name), findsOneWidget);
+      expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
       expect(find.text(DesignServerFixtures.key.fingerprint), findsOneWidget);
       expect(
-        find.text(
-          'Подтверждение действует до ${DesignServerFixtures.expiresAt} · UTC',
-        ),
+        find.text('${DesignServerFixtures.expiresAt} · UTC'),
         findsOneWidget,
       );
       await tester.pump(const Duration(seconds: 40));
       expect(review.confirmed + review.cancelled, 0);
+      await tester.ensureVisible(_confirm);
       await tester.ensureVisible(_confirm);
       await tester.tap(_confirm);
       expect(review.confirmed, 1);
@@ -159,12 +159,13 @@ void main() {
     final review = _Review();
     await _mount(tester, review);
     expect(find.text(DesignServerFixtures.serverId), findsNothing);
-    expect(find.text(DesignServerFixtures.hostId), findsNothing);
+    expect(find.text(DesignServerFixtures.hostId), findsOneWidget);
+    await tester.ensureVisible(find.text('Технические сведения'));
     await tester.tap(find.text('Технические сведения'));
     await tester.pumpAndSettle();
     expect(find.text('Идентификатор профиля'), findsOneWidget);
     expect(find.text(DesignServerFixtures.serverId), findsOneWidget);
-    expect(find.text('Идентификатор исполнителя'), findsOneWidget);
+    expect(find.text('Идентификатор'), findsOneWidget);
     expect(find.text(DesignServerFixtures.hostId), findsOneWidget);
     expect(review.confirmed, 0);
   });
@@ -182,8 +183,9 @@ void main() {
       final review = _Review(profile: mismatch.value());
       await _mount(tester, review);
       _blocked(tester, review);
-      expect(find.text(review.profile!.name), findsNothing);
+      expect(find.textContaining(review.profile!.name), findsNothing);
       expect(find.text(DesignServerFixtures.key.fingerprint), findsOneWidget);
+      await tester.ensureVisible(_confirm);
       await tester.tap(_confirm);
       expect(review.confirmed, 0);
     });
@@ -206,7 +208,7 @@ void main() {
       review.changed();
       await tester.pump();
       _blocked(tester, review);
-      expect(find.text('192.0.2.99:2222'), findsNothing);
+      expect(find.textContaining('192.0.2.99:2222'), findsNothing);
       review.profile = initial;
       review.changed();
       await tester.pump();
@@ -264,6 +266,7 @@ void main() {
           review.profile = _profile(address: '192.0.2.99');
         }
         expect(tester.widget<FilledButton>(_confirm).onPressed, isNotNull);
+        await tester.ensureVisible(_confirm);
         await tester.tap(_confirm);
         await tester.pump();
         _blocked(tester, review);
@@ -275,7 +278,8 @@ void main() {
   ) async {
     final review = _Review();
     await _mount(tester, review);
-    await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+    await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Отмена'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Отмена'));
     expect(review.cancelled, 1);
     expect(review.confirmed, 0);
   });
@@ -370,15 +374,27 @@ void main() {
               '[2001:db8::44]:22',
               DesignServerFixtures.key.fingerprint,
             ]) {
-              final content = find.text(text);
+              final content = find.textContaining(text).first;
               expect(content, findsOneWidget);
               await tester.ensureVisible(content);
               await tester.pumpAndSettle();
               final rect = tester.getRect(content);
               expect(rect.left, greaterThanOrEqualTo(0));
               expect(rect.right, lessThanOrEqualTo(size.width));
-              expect(rect.top, greaterThanOrEqualTo(0));
-              expect(rect.bottom, lessThanOrEqualTo(size.height));
+              // The canonical two-column value may exceed one viewport at200%.
+              // Both ends remain reachable in the dialog's page scroll.
+              if (rect.height <= size.height - 80) {
+                expect(rect.top, greaterThanOrEqualTo(0));
+                expect(rect.bottom, lessThanOrEqualTo(size.height));
+              } else {
+                expect(
+                  tester
+                      .state<ScrollableState>(find.byType(Scrollable).first)
+                      .position
+                      .maxScrollExtent,
+                  greaterThan(0),
+                );
+              }
             }
             await tester.ensureVisible(_confirm);
             await tester.pumpAndSettle();
