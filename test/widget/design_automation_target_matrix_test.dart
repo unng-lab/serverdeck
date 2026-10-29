@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
-import 'package:serverdeck/ui/deck_components.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/models.dart';
 
@@ -26,7 +25,7 @@ const _automationName =
     'Приветствие 例 — утверждённая версия для архивного сервера';
 const _otherId = '00000000-0000-4000-8000-000000000203';
 const _otherName = 'Другой выбранный сервер';
-const _missingTarget = 'Название и адрес целевого сервера недоступны';
+const _missingTarget = 'Сведения о цели недоступны';
 const _changedContext =
     'Контекст цели изменился. Закройте окно и заново проверьте действие.';
 const _actions = AutomationActionAvailability(
@@ -103,17 +102,6 @@ void _frame(WidgetTester tester, Size size) {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 }
-
-Finder _value(String label) => find
-    .descendant(
-      of: find.byWidgetPredicate(
-        (widget) => widget is DeckKeyValue && widget.label == label,
-      ),
-      matching: find.byWidgetPredicate(
-        (widget) => widget is SelectableText || widget is Text,
-      ),
-    )
-    .last;
 
 Finder _button(String label) => find.ancestor(
   of: find.text(label),
@@ -211,22 +199,27 @@ void main() {
           expect(_canConfirm(tester), isTrue);
           final scrollable = find.byType(Scrollable).first;
           final scroll = tester.state<ScrollableState>(scrollable).position;
-          for (final entry in {
-            'Сервер': _targetName,
-            'Адрес': '[2001:db8:1234:5678::44]:2222',
-            'Ansible-профиль': _automationName,
-            'Версия профиля': '2',
-            'Хеш версии профиля': plan['profileDigest'],
-            'Действует до': '${plan['expiresAt']} (UTC)',
-          }.entries) {
-            final value = _value(entry.key);
-            final widget = tester.widget(value);
-            expect(
-              widget is Text ? widget.data : (widget as SelectableText).data,
-              entry.value,
-            );
-            await _reveal(tester, value);
+          for (final value in [
+            '$_targetName · [2001:db8:1234:5678::44]:2222',
+            '$_automationName · версия 2',
+            '${plan['expiresAt']} (UTC)',
+          ]) {
+            await _reveal(tester, find.text(value));
           }
+          final details = find.text('Неизменный план и технические детали');
+          await _reveal(tester, details);
+          await tester.tap(details);
+          await tester.pumpAndSettle();
+          final raw = tester
+              .widgetList<SelectableText>(find.byType(SelectableText))
+              .singleWhere(
+                (widget) => widget.data?.contains('"profileDigest"') == true,
+              );
+          final exact = (jsonDecode(raw.data!) as Map).cast<String, Object?>();
+          expect(exact['profileId'], plan['profileId']);
+          expect(exact['profileRevision'], 2);
+          expect(exact['profileDigest'], plan['profileDigest']);
+          expect(exact['serverId'], plan['serverId']);
           expect(find.text('8'), findsNothing);
           expect(scroll.pixels, greaterThan(0));
           expect(confirms, 0);
@@ -278,18 +271,13 @@ void main() {
           section: true,
         ),
       );
-      await tester.tap(find.text('Доступ ИИ рабочего пространства'));
-      await tester.pumpAndSettle();
       expect(find.text(_otherName), findsNothing);
       for (final text in [
-        first.name,
-        '[2001:db8:1234:5678::44]:2222',
-        second.name,
-        'mail.example.test:22',
+        '${first.name} · [2001:db8:1234:5678::44]:2222, ${second.name} · mail.example.test:22',
       ]) {
         await _reveal(tester, find.text(text));
       }
-      final details = find.text('Идентификаторы целевых серверов');
+      final details = find.text('Доступ ИИ рабочего пространства');
       await _reveal(tester, details);
       await tester.tap(details);
       await tester.pumpAndSettle();
@@ -369,6 +357,7 @@ void main() {
           else
             'greeting': 'Привет',
         };
+        input.text = jsonEncode(preview);
         await tester.pumpWidget(
           _app(
             AutomationJsonEditorDialog(
@@ -390,11 +379,13 @@ void main() {
           ),
         );
         expect(find.text(_otherName), findsNothing);
-        await _reveal(tester, find.text(_targetName));
-        await _reveal(tester, find.text('[2001:db8:1234:5678::44]:2222'));
+        final target = find.text(
+          '$_targetName · [2001:db8:1234:5678::44]:2222',
+        );
+        await _reveal(tester, target);
         expect(continues, 0);
         expect(closes, 0);
-        await _tap(tester, 'Закрыть');
+        await _tap(tester, 'Отмена');
         expect(closes, 1);
         expect(continues, 0);
         await tester.pumpWidget(const SizedBox());
@@ -622,7 +613,7 @@ void main() {
 
       await mount();
       final state = key.currentState;
-      await _reveal(tester, _value('Ansible-профиль'));
+      await _reveal(tester, find.text('$_automationName · версия 2'));
       for (final size in _frames) {
         tester.view.physicalSize = size;
         await mount(dark: true);

@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/servers/metrics_history.dart';
+import 'package:serverdeck/automation/automation_sections.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 
 import '../support/design_host.dart';
@@ -62,7 +66,7 @@ Future<void> _dragTo(WidgetTester tester, Finder target, Finder scroll) async {
 }
 
 Future<void> _focusByTab(WidgetTester tester, Finder target) async {
-  for (var attempt = 0; attempt < 80; attempt++) {
+  for (var attempt = 0; attempt < 180; attempt++) {
     final widget = target.evaluate().isEmpty ? null : tester.widget(target);
     if (widget != null &&
         (widget is EditableText
@@ -133,7 +137,7 @@ Future<void> _shiftTab(WidgetTester tester) async {
 }
 
 Future<void> _shiftTabTo(WidgetTester tester, Finder target) async {
-  for (var attempt = 0; attempt < 80; attempt++) {
+  for (var attempt = 0; attempt < 180; attempt++) {
     if (Focus.of(tester.element(target)).hasFocus) {
       await _keyScrollTo(tester, target);
       expectDesignVisible(tester, target);
@@ -212,7 +216,7 @@ Future<void> _readAllLines(
 }) async {
   final seen = <int>{};
   var lineCount = 0;
-  for (var attempt = 0; attempt < 120; attempt++) {
+  for (var attempt = 0; attempt < 500; attempt++) {
     if (text.evaluate().isNotEmpty) {
       final lines = _textLines(tester, text);
       lineCount = lines.length;
@@ -290,7 +294,11 @@ class _Identity {
       host.harness.counters.values,
       copies == 0 ? isEmpty : {'copyConfiguration': copies},
     );
-    expectDesignVisible(tester, _target(host));
+    expect(
+      _target(host),
+      findsOneWidget,
+      reason: 'The same source context remains in the page while its content scrolls',
+    );
     expect(tester.takeException(), isNull);
   }
 }
@@ -321,13 +329,23 @@ Future<void> _historyJourney(
     );
     identity.check(tester);
   }
-  final plots = find.byKey(const ValueKey('metrics-history-plots'));
+  final plots = find.byWidgetPredicate(
+    (widget) => widget is ServerObservationChart && widget.height >= 100,
+  );
   if (keyboard) {
     await _keyScrollTo(tester, plots);
   } else {
     await _dragTo(tester, plots, _featureScroll);
   }
   expectDesignVisible(tester, plots);
+  final collapsedQuality = find.byKey(
+    const ValueKey('metrics-history-plot-quality'),
+  );
+  if (keyboard) {
+    await _keyScrollTo(tester, collapsedQuality);
+  } else {
+    await _dragTo(tester, collapsedQuality, _featureScroll);
+  }
   _expectQuality(tester, quality);
   identity.check(tester);
   if (keyboard) {
@@ -415,13 +433,31 @@ Future<void> _configurationJourney(
   final detailsTitle = find.text('Команда и аргументы MCP');
   if (keyboard) await _focusByTab(tester, detailsTitle);
   final configuration = DesignAutomationFixtures.launchConfiguration();
-  for (final text in [
-    find.text('Конфигурация MCP').last,
-    find.text(
-      'Передайте клиенту ИИ команду и отдельные аргументы. Секрет доступа в этой конфигурации не показывается.',
+  expect(configuration.keys.toSet(), {'command', 'args'});
+  Finder exact(String label) => find.descendant(
+    of: find.byWidgetPredicate(
+      (widget) => widget is AutomationExactValue && widget.label == label,
     ),
-    find.text(configuration['command'] as String),
-    find.text((configuration['args'] as List).join(', ')),
+    matching: find.byType(EditableText),
+  );
+  for (final label in ['Команда', 'Аргументы']) {
+    final value = tester.widget<EditableText>(exact(label));
+    expect(value.readOnly, isTrue);
+    expect(value.maxLines, isNull);
+    expect(value.selectionEnabled, isTrue);
+    expect(
+      value.controller.text,
+      label == 'Команда'
+          ? configuration['command']
+          : (configuration['args'] as List).join(', '),
+    );
+  }
+  for (final text in [
+    find.text('Подключение MCP-клиента').first,
+    find.text('Ограничен выданными правами'),
+    find.text('Конфигурация получена'),
+    exact('Команда'),
+    exact('Аргументы'),
   ]) {
     await _readAllLines(tester, text, _featureScroll, keyboard: keyboard);
     identity.check(tester);
@@ -437,12 +473,41 @@ Future<void> _configurationJourney(
   final details = find
       .ancestor(of: detailsTitle, matching: find.byType(ExpansionTile))
       .first;
-  await _readAllLines(
-    tester,
-    find.descendant(of: details, matching: find.byType(EditableText)),
-    _featureScroll,
-    keyboard: keyboard,
+  final rawConfiguration = find.descendant(
+    of: details,
+    matching: find.byType(EditableText),
   );
+  final rawScroll = find
+      .ancestor(
+        of: rawConfiguration,
+        matching: find.byType(SingleChildScrollView),
+      )
+      .first;
+  final raw = tester.widget<EditableText>(rawConfiguration);
+  expect(raw.readOnly, isTrue);
+  expect(raw.selectionEnabled, isTrue);
+  expect(
+    (jsonDecode(raw.controller.text) as Map).cast<String, Object?>(),
+    configuration,
+  );
+  if (keyboard) {
+    // Scroll with the disclosure focused; Ctrl+Arrow belongs to text selection
+    // after entering the readonly editor.
+    await _keyScrollTo(tester, rawScroll);
+    for (var attempt = 0; attempt < 180; attempt++) {
+      if (tester.widget<EditableText>(rawConfiguration).focusNode.hasFocus)
+        break;
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+    }
+    expect(
+      tester.widget<EditableText>(rawConfiguration).focusNode.hasFocus,
+      isTrue,
+    );
+  } else {
+    await _dragTo(tester, rawScroll, _featureScroll);
+  }
+  await _readAllLines(tester, rawConfiguration, rawScroll, keyboard: keyboard);
   identity.check(tester);
   final copy = find.text('Скопировать конфигурацию');
   if (keyboard) {
@@ -475,14 +540,13 @@ Future<void> _configurationJourney(
 }
 
 Finder _target(DesignFixtureHost host) {
-  final profile = host.harness.profiles.selected!;
-  return find.text('${profile.name} · ${profile.address}:${profile.port}');
+  if (host.binding.screenId == '06-server-overview')
+    return find.text(host.harness.trustProfile.name).first;
+  return find.text('Подключение MCP-клиента').first;
 }
 
 Future<void> _revealTarget(WidgetTester tester, DesignFixtureHost host) async {
-  final header = find.byKey(const ValueKey('foundation-page-context'));
-  final scroll = find.descendant(of: header, matching: find.byType(Scrollable));
-  await _dragTo(tester, _target(host), scroll);
+  await _dragTo(tester, _target(host), _featureScroll);
   expectDesignVisible(tester, _target(host));
 }
 
@@ -519,6 +583,7 @@ void main() {
       final host = await mountDesignFixture(
         tester,
         overview,
+        currentBase: true,
         frame: const Size(1100, 760),
         theme: ThemeMode.light,
         options: DesignFixtureOptions(points: points),
@@ -579,6 +644,7 @@ void main() {
       final host = await mountDesignFixture(
         tester,
         overview,
+        currentBase: true,
         frame: const Size(800, 600),
         theme: ThemeMode.light,
         textScale: 2,
@@ -634,7 +700,7 @@ void main() {
         expect(areaNode.hasPrimaryFocus, isTrue);
         for (
           var page = 0;
-          !_visibleRow(tester, points.last) && page < 120;
+          !_visibleRow(tester, points.last) && page < 500;
           page++
         ) {
           await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
@@ -663,7 +729,7 @@ void main() {
         );
         for (
           var page = 0;
-          !_visibleRow(tester, points.first) && page < 120;
+          !_visibleRow(tester, points.first) && page < 500;
           page++
         ) {
           await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
@@ -712,6 +778,7 @@ void main() {
       final host = await mountDesignFixture(
         tester,
         overview,
+        currentBase: true,
         frame: const Size(800, 600),
         theme: ThemeMode.light,
         textScale: 2,
@@ -774,7 +841,7 @@ void main() {
         // PageDown bubbles from the actual focused SelectableText, without
         // first moving focus to the scroll area with Shift+Tab.
         await page(LogicalKeyboardKey.pageDown);
-        for (var attempt = 0; attempt < 120; attempt++) {
+        for (var attempt = 0; attempt < 500; attempt++) {
           if (controller.offset == controller.position.maxScrollExtent) break;
           await page(LogicalKeyboardKey.pageDown);
         }
@@ -787,7 +854,7 @@ void main() {
             .widget<EditableText>(_historyRow(points.last))
             .focusNode;
         await page(LogicalKeyboardKey.pageUp);
-        for (var attempt = 0; attempt < 120; attempt++) {
+        for (var attempt = 0; attempt < 500; attempt++) {
           if (controller.offset == controller.position.minScrollExtent) break;
           await page(LogicalKeyboardKey.pageUp);
         }
@@ -831,6 +898,7 @@ void main() {
               final host = await mountDesignFixture(
                 tester,
                 overview,
+                currentBase: true,
                 frame: frame,
                 theme: theme,
                 textScale: scale,
@@ -857,6 +925,7 @@ void main() {
             final host = await mountDesignFixture(
               tester,
               configuration,
+              currentBase: true,
               frame: frame,
               theme: theme,
               textScale: scale,

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../servers/server_compositions.dart';
 import '../shell/error_view.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_icon.dart';
+import '../ui/deck_page.dart';
+import '../theme/brand_theme.dart';
 import 'mutation_controller.dart';
 
 class MutationStatus extends StatelessWidget {
@@ -14,17 +19,40 @@ class MutationStatus extends StatelessWidget {
     this.reloading = false,
     this.readPending = false,
     this.onReadCommitted,
-  });
+    this.asPage = false,
+  }) : _reviewBody = false,
+       _onClose = null,
+       _targetCaption = null;
+
+  const MutationStatus.review({
+    super.key,
+    required this.controller,
+    required this.onReload,
+    this.deleting = false,
+    this.settings = false,
+    this.reloading = false,
+    this.readPending = false,
+    this.onReadCommitted,
+    VoidCallback? onClose,
+    String? targetCaption,
+  }) : _targetCaption = targetCaption,
+       _onClose = onClose,
+       asPage = true,
+       _reviewBody = true;
   final MutationController controller;
   final VoidCallback onReload;
   final bool deleting;
+  final bool asPage;
   final bool settings;
+  final bool _reviewBody;
+  final String? _targetCaption;
+  final VoidCallback? _onClose;
   final bool reloading;
   final bool readPending;
   final VoidCallback? onReadCommitted;
   @override
   Widget build(BuildContext context) {
-    if (reloading) {
+    if (reloading && !_reviewBody) {
       return DeckStatus(
         label: settings
             ? 'Чтение актуальных настроек'
@@ -33,7 +61,11 @@ class MutationStatus extends StatelessWidget {
       );
     }
     final state = controller.state;
-    if (state == MutationPresentation.idle) return const SizedBox.shrink();
+    if (state == MutationPresentation.idle) {
+      return _reviewBody && _onClose != null
+          ? DeckActions(children: [_closeAction()])
+          : const SizedBox.shrink();
+    }
     final label = switch (state) {
       MutationPresentation.submitting => deleting ? 'Удаление' : 'Сохранение',
       MutationPresentation.unknown =>
@@ -81,62 +113,479 @@ class MutationStatus extends StatelessWidget {
       MutationPresentation.failed => 'Локальная служба отклонила изменение. Проверьте причину перед новым действием.',
       MutationPresentation.idle => '',
     };
+    if (_reviewBody) {
+      return Semantics(
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DeckTabs(
+              labels: const [
+                'Конфликт',
+                'Ожидание',
+                'Исход неизвестен',
+                'Сохранено',
+              ],
+              selected: _tab(state),
+              onSelected: null,
+            ),
+            const DeckTabsGap(),
+            ServerStatusBody(
+              title: _title(state),
+              icon: state == MutationPresentation.conflict
+                  ? 'warning'
+                  : state == MutationPresentation.succeeded ||
+                        state == MutationPresentation.committed
+                  ? 'check'
+                  : 'info',
+              tone: tone,
+              facts: {
+                'Операция': settings
+                    ? 'Изменение настроек'
+                    : deleting
+                    ? 'Удаление профиля'
+                    : 'Изменение профиля',
+                'Состояние': switch (state) {
+                  MutationPresentation.conflict => 'Конфликт ревизии',
+                  MutationPresentation.failed =>
+                    deleting ? 'Удаление отклонено' : 'Сохранение отклонено',
+                  MutationPresentation.submitting =>
+                    deleting ? 'Удаление' : 'Сохранение',
+                  MutationPresentation.unknown => 'Исход записи неизвестен',
+                  MutationPresentation.waiting => 'Операция ещё выполняется',
+                  MutationPresentation.retryAllowed => 'Запрос не найден',
+                  MutationPresentation.committed => 'Запись подтверждена',
+                  MutationPresentation.succeeded =>
+                    deleting ? 'Удалено' : 'Сохранено',
+                  MutationPresentation.idle => '',
+                },
+                'Черновик': deleting
+                    ? 'Подтверждение удаления сохранено'
+                    : 'Черновик сохранён',
+                'Следующий шаг': state == MutationPresentation.conflict
+                    ? 'Перечитайте данные и проверьте изменения'
+                    : detail,
+                'Неизвестный исход': switch (state) {
+                  MutationPresentation.conflict => 'Подтверждённый конфликт не является неизвестным исходом записи',
+                  MutationPresentation.committed ||
+                  MutationPresentation.succeeded =>
+                    'Запись подтверждена локальной службой',
+                  MutationPresentation.failed =>
+                    'Изменение отклонено локальной службой',
+                  _ => detail,
+                },
+                if (_targetCaption != null) 'Цель': _targetCaption,
+              },
+              details: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(label, key: const ValueKey('mutation-current-status')),
+                  if (controller.requestId != null)
+                    DeckKeyValue(
+                      label: 'Исходный запрос',
+                      value: controller.requestId!,
+                      selectable: true,
+                    ),
+                  if (controller.error != null)
+                    Text(ReadErrorView.category(controller.error!)),
+                  if (reloading)
+                    DeckStatus(
+                      label: settings
+                          ? 'Чтение актуальных настроек'
+                          : 'Чтение актуального профиля',
+                      pending: true,
+                    ),
+                ],
+              ),
+              actions: [
+                ..._reviewActions(state),
+                if (_onClose != null) _closeAction(),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     return Semantics(
       liveRegion: true,
-      child: DeckNotice(
-        title: label,
-        message: controller.error == null
-            ? detail
-            : ReadErrorView.category(controller.error!),
-        nextStep: controller.busy && state != MutationPresentation.submitting
-            ? 'Ожидаем ответ текущей проверки; повторные действия недоступны.'
-            : controller.error == null
-            ? null
-            : detail,
-        tone: tone,
-        actions: [
-          if (!controller.busy) ...[
-            if ({
-              MutationPresentation.unknown,
-              MutationPresentation.waiting,
-              MutationPresentation.retryAllowed,
-            }.contains(state))
-              _action(
-                'Проверить результат',
-                () => controller.checkResult().ignore(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              for (final entry in const [
+                'Конфликт',
+                'Ожидание',
+                'Исход неизвестен',
+                'Сохранено',
+              ].asMap().entries)
+                Semantics(
+                  selected: entry.key == _tab(state),
+                  child: Tooltip(
+                    message:
+                        'Состояние определяется результатом текущей операции.',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: entry.key == _tab(state)
+                                ? deckColors(context)['accent']
+                                : deckColors(context)['border'],
+                            width: entry.key == _tab(state) ? 2 : 1,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        entry.value,
+                        style: BrandTypography.caption.copyWith(
+                          color: deckColors(
+                            context,
+                          )[entry.key == _tab(state) ? 'accent' : 'muted'],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          DeckPanel(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                children: [
+                  DeckIcon(
+                    state == MutationPresentation.conflict
+                        ? 'warning'
+                        : state == MutationPresentation.succeeded ||
+                              state == MutationPresentation.committed
+                        ? 'check'
+                        : 'info',
+                    size: 38,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    switch (state) {
+                      MutationPresentation.succeeded => 'Изменение завершено',
+                      MutationPresentation.committed => 'Запись подтверждена',
+                      MutationPresentation.failed => 'Изменение отклонено',
+                      MutationPresentation.submitting ||
+                      MutationPresentation.waiting => 'Ожидание результата',
+                      _ => 'Сохранение требует проверки',
+                    },
+                    textAlign: TextAlign.center,
+                    style: BrandTypography.title.copyWith(fontSize: 22),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    label,
+                    key: const ValueKey('mutation-current-status'),
+                    textAlign: TextAlign.center,
+                    style: BrandTypography.body,
+                  ),
+                ],
               ),
-            if (state == MutationPresentation.retryAllowed)
-              _action(
-                'Повторить тот же запрос',
-                () => controller.retry().ignore(),
-              ),
-            if (state == MutationPresentation.committed)
-              _action(
-                'Перечитать состояние',
-                readPending
-                    ? null
-                    : onReadCommitted ??
-                          () => controller.refreshCommitted().ignore(),
-              ),
-            if (state == MutationPresentation.conflict)
-              _action(
-                settings ? 'Перечитать настройки' : 'Перечитать профиль',
-                readPending ? null : onReload,
-              ),
-            if (state == MutationPresentation.failed)
-              _action(
-                deleting ? 'Вернуться к подтверждению' : 'Исправить ввод',
-                controller.reset,
-              ),
-          ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          DeckNotice(
+            message: controller.error == null
+                ? detail
+                : ReadErrorView.category(controller.error!),
+            nextStep:
+                controller.busy && state != MutationPresentation.submitting
+                ? 'Ожидаем ответ текущей проверки; повторные действия недоступны.'
+                : controller.error == null
+                ? null
+                : detail,
+            tone: tone,
+            actions: [
+              if (!controller.busy) ...[
+                if ({
+                  MutationPresentation.unknown,
+                  MutationPresentation.waiting,
+                  MutationPresentation.retryAllowed,
+                }.contains(state))
+                  _action(
+                    'Проверить результат',
+                    () => controller.checkResult().ignore(),
+                  ),
+                if (state == MutationPresentation.retryAllowed)
+                  _action(
+                    'Повторить тот же запрос',
+                    () => controller.retry().ignore(),
+                  ),
+                if (state == MutationPresentation.committed)
+                  _action(
+                    'Перечитать состояние',
+                    readPending
+                        ? null
+                        : onReadCommitted ??
+                              () => controller.refreshCommitted().ignore(),
+                  ),
+                if (state == MutationPresentation.conflict)
+                  _action(
+                    settings ? 'Перечитать настройки' : 'Перечитать профиль',
+                    readPending ? null : onReload,
+                  ),
+                if (state == MutationPresentation.failed)
+                  _action(
+                    deleting ? 'Вернуться к подтверждению' : 'Исправить ввод',
+                    controller.reset,
+                  ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          DeckPanel(
+            title: 'Полные сведения',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DeckKeyValue(label: 'Состояние', value: state.name),
+                if (controller.requestId != null)
+                  DeckKeyValue(
+                    label: 'Исходный запрос',
+                    value: controller.requestId!,
+                    selectable: true,
+                  ),
+                DeckKeyValue(label: 'Следующий шаг', value: detail),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  static Widget _action(String label, VoidCallback? action) => OutlinedButton(
-    style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-    onPressed: action,
-    child: Text(label),
+  static int _tab(MutationPresentation state) => switch (state) {
+    MutationPresentation.conflict => 0,
+    MutationPresentation.submitting || MutationPresentation.waiting => 1,
+    MutationPresentation.unknown ||
+    MutationPresentation.retryAllowed ||
+    MutationPresentation.failed => 2,
+    _ => 3,
+  };
+
+  static String _title(MutationPresentation state) => switch (state) {
+    MutationPresentation.succeeded => 'Изменение завершено',
+    MutationPresentation.committed => 'Запись подтверждена',
+    MutationPresentation.failed => 'Изменение отклонено',
+    MutationPresentation.submitting ||
+    MutationPresentation.waiting => 'Ожидание результата',
+    _ => 'Сохранение требует проверки',
+  };
+
+  List<Widget> _reviewActions(MutationPresentation state) {
+    final actions = <Widget>[];
+    void add(String label, VoidCallback? callback) {
+      actions.add(_action(label, callback, primary: actions.isEmpty));
+    }
+
+    if (!controller.busy && !reloading) {
+      if ({
+        MutationPresentation.unknown,
+        MutationPresentation.waiting,
+        MutationPresentation.retryAllowed,
+      }.contains(state)) {
+        add('Проверить результат', () => controller.checkResult().ignore());
+      }
+      if (state == MutationPresentation.retryAllowed) {
+        add('Повторить тот же запрос', () => controller.retry().ignore());
+      }
+      if (state == MutationPresentation.committed) {
+        add(
+          'Перечитать состояние',
+          readPending
+              ? null
+              : onReadCommitted ?? () => controller.refreshCommitted().ignore(),
+        );
+      }
+      if (state == MutationPresentation.conflict) {
+        add(
+          settings ? 'Перечитать настройки' : 'Перечитать профиль',
+          readPending ? null : onReload,
+        );
+      }
+      if (state == MutationPresentation.failed) {
+        add(
+          deleting ? 'Вернуться к подтверждению' : 'Исправить ввод',
+          controller.reset,
+        );
+      }
+    }
+    return actions;
+  }
+
+  Widget _closeAction() => OutlinedButton(
+    key: const ValueKey('mutation-review-close'),
+    clipBehavior: Clip.none,
+    autofocus: true,
+    onPressed: _onClose,
+    child: const Text('Закрыть'),
   );
+
+  Widget _action(String label, VoidCallback? action, {bool primary = false}) {
+    final minimum = Size(asPage ? 44 : 48, asPage ? 44 : 48);
+    return primary
+        ? FilledButton(
+            clipBehavior: Clip.none,
+            style: FilledButton.styleFrom(minimumSize: minimum),
+            onPressed: action,
+            child: Text(label),
+          )
+        : OutlinedButton(
+            clipBehavior: Clip.none,
+            style: OutlinedButton.styleFrom(minimumSize: minimum),
+            onPressed: action,
+            child: Text(label),
+          );
+  }
+}
+
+class _CloseMutationReview extends Intent {
+  const _CloseMutationReview();
+}
+
+/// The same operation's page presentation; showing it performs no owner action.
+class MutationReviewPage extends StatelessWidget {
+  const MutationReviewPage({
+    super.key,
+    required this.controller,
+    required this.onReload,
+    this.settings = false,
+    this.deleting = false,
+    this.reloading = false,
+    this.readPending = false,
+    this.onReadCommitted,
+    this.onClose,
+    this.targetCaption,
+  });
+  final MutationController controller;
+  final VoidCallback onReload;
+  final VoidCallback? onReadCommitted, onClose;
+  final bool settings, deleting, reloading, readPending;
+  final String? targetCaption;
+
+  @override
+  Widget build(BuildContext context) => Shortcuts(
+    shortcuts: const {
+      SingleActivator(LogicalKeyboardKey.escape): _CloseMutationReview(),
+    },
+    child: Actions(
+      actions: {
+        _CloseMutationReview: CallbackAction<_CloseMutationReview>(
+          onInvoke: (_) {
+            onClose?.call();
+            return null;
+          },
+        ),
+      },
+      child: DeckPage(
+        title: 'Сохранение требует проверки',
+        eyebrow: '${settings ? 'Настройки' : 'Серверы'} / Рабочее пространство',
+        description: 'Состояние и следующие доступные действия',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MutationStatus.review(
+              controller: controller,
+              onReload: onReload,
+              settings: settings,
+              deleting: deleting,
+              reloading: reloading,
+              readPending: readPending,
+              onReadCommitted: onReadCommitted,
+              onClose: onClose,
+              targetCaption: targetCaption,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Keeps the ordinary editor alive but outside paint, semantics and shortcuts.
+/// Its owner's readiness/enabled rebuilds continue, including private disposal.
+class MutationPresentationSwitch extends StatefulWidget {
+  const MutationPresentationSwitch({
+    super.key,
+    required this.showReview,
+    required this.form,
+    required this.review,
+    this.enabled = true,
+  });
+  final bool enabled;
+  final bool showReview;
+  final Widget form, review;
+  @override
+  State<MutationPresentationSwitch> createState() =>
+      _MutationPresentationSwitchState();
+}
+
+class _MutationPresentationSwitchState
+    extends State<MutationPresentationSwitch> {
+  final _formFocus = FocusScopeNode(debugLabel: 'Mutation ordinary editor');
+  final _reviewFocus = FocusScopeNode(debugLabel: 'Mutation result review');
+  FocusNode? _previous;
+  int _epoch = 0;
+  @override
+  void didUpdateWidget(covariant MutationPresentationSwitch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showReview == widget.showReview) return;
+    final epoch = ++_epoch;
+    if (widget.showReview) {
+      final focused = FocusManager.instance.primaryFocus;
+      if (_formFocus.descendants.contains(focused)) _previous = focused;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _epoch) return;
+      if (widget.showReview) {
+        _reviewFocus.requestFocus();
+      } else {
+        final previous = _previous;
+        _previous = null;
+        if (previous?.context?.mounted == true && previous!.canRequestFocus)
+          previous.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _epoch++;
+    _previous = null;
+    _formFocus.dispose();
+    _reviewFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => !widget.enabled
+      ? widget.form
+      : Stack(
+          children: [
+            Visibility(
+              visible: !widget.showReview,
+              maintainState: true,
+              child: ExcludeFocus(
+                excluding: widget.showReview,
+                child: ExcludeSemantics(
+                  excluding: widget.showReview,
+                  child: FocusScope(node: _formFocus, child: widget.form),
+                ),
+              ),
+            ),
+            if (widget.showReview)
+              FocusScope(node: _reviewFocus, child: widget.review),
+          ],
+        );
 }

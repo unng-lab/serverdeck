@@ -84,12 +84,20 @@ class BrandColors extends ThemeExtension<BrandColors> {
 
 /// UI/table/log/title/label styles retain the source's sizes and line heights.
 abstract final class BrandTypography {
+  // The bundled face already contains the source's 600 outlines. A normal
+  // request avoids DirectWrite applying synthetic bold a second time.
+  static const semiboldWeight = FontWeight.w400;
+  // The static Sans face ignores this axis; the variable Unicode fallback
+  // retains the source's 600 weight when it supplies missing glyphs.
+  static const semiboldVariations = [FontVariation('wght', 600)];
   static const button = TextStyle(
-    fontFamily: BrandAssets.uiFont,
+    fontFamily: BrandAssets.semiboldFamily,
     fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 13,
     height: 20 / 13,
-    fontWeight: FontWeight.w600,
+    fontWeight: semiboldWeight,
+    fontVariations: semiboldVariations,
+    letterSpacing: 0,
   );
   static const tableHeader = button;
   static const body = TextStyle(
@@ -98,6 +106,9 @@ abstract final class BrandTypography {
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.w400,
+    // An explicit regular role must not inherit a parent semibold axis.
+    fontVariations: [],
+    letterSpacing: 0,
   );
   static const table = TextStyle(
     fontFamily: BrandAssets.uiFont,
@@ -105,6 +116,9 @@ abstract final class BrandTypography {
     fontSize: 13,
     height: 20 / 13,
     fontWeight: FontWeight.w400,
+    // An explicit regular role must not inherit a parent semibold axis.
+    fontVariations: [],
+    letterSpacing: 0,
   );
   static const log = TextStyle(
     fontFamily: BrandAssets.monoFont,
@@ -112,13 +126,18 @@ abstract final class BrandTypography {
     fontSize: 13,
     height: 20 / 13,
     fontWeight: FontWeight.w400,
+    // An explicit regular role must not inherit a parent semibold axis.
+    fontVariations: [],
+    letterSpacing: 0,
   );
   static const title = TextStyle(
-    fontFamily: BrandAssets.uiFont,
+    fontFamily: BrandAssets.semiboldFamily,
     fontFamilyFallback: BrandAssets.fontFamilyFallback,
     fontSize: 24,
     height: 32 / 24,
-    fontWeight: FontWeight.w600,
+    fontWeight: semiboldWeight,
+    fontVariations: semiboldVariations,
+    letterSpacing: 0,
   );
   static const label = TextStyle(
     fontFamily: BrandAssets.uiFont,
@@ -126,6 +145,9 @@ abstract final class BrandTypography {
     fontSize: 12,
     height: 16 / 12,
     fontWeight: FontWeight.w400,
+    // An explicit regular role must not inherit a parent semibold axis.
+    fontVariations: [],
+    letterSpacing: 0,
   );
   static const caption = label;
 }
@@ -143,8 +165,16 @@ abstract final class BrandTheme {
       headlineMedium: BrandTypography.title,
       headlineSmall: BrandTypography.title,
       titleLarge: BrandTypography.title,
-      titleMedium: BrandTypography.body.copyWith(fontWeight: FontWeight.w600),
-      titleSmall: BrandTypography.table.copyWith(fontWeight: FontWeight.w600),
+      titleMedium: BrandTypography.body.copyWith(
+        fontFamily: BrandAssets.semiboldFamily,
+        fontWeight: BrandTypography.semiboldWeight,
+        fontVariations: BrandTypography.semiboldVariations,
+      ),
+      titleSmall: BrandTypography.table.copyWith(
+        fontFamily: BrandAssets.semiboldFamily,
+        fontWeight: BrandTypography.semiboldWeight,
+        fontVariations: BrandTypography.semiboldVariations,
+      ),
       bodyLarge: BrandTypography.body,
       bodyMedium: BrandTypography.body,
       bodySmall: BrandTypography.table,
@@ -209,7 +239,7 @@ abstract final class BrandTheme {
         style: _button(colors, _ButtonKind.filled),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: _button(colors, _ButtonKind.filled),
+        style: _button(colors, _ButtonKind.filled, responsive: false),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _button(colors, _ButtonKind.outlined),
@@ -221,6 +251,7 @@ abstract final class BrandTheme {
         style: _button(
           colors,
           _ButtonKind.text,
+          responsive: false,
         ).copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.all(12))),
       ),
       cardTheme: CardThemeData(
@@ -244,8 +275,12 @@ abstract final class BrandTheme {
       ),
       inputDecorationTheme: InputDecorationThemeData(
         filled: true,
-        fillColor: colors['surface'],
-        labelStyle: BrandTypography.body.copyWith(color: colors['muted']),
+        fillColor: colors['bg'],
+        labelStyle: BrandTypography.button.copyWith(
+          fontSize: 12,
+          height: 20 / 12,
+          color: colors['muted'],
+        ),
         hintStyle: BrandTypography.body.copyWith(color: colors['muted']),
         errorStyle: BrandTypography.caption.copyWith(color: colors['error']),
         contentPadding: const EdgeInsets.all(BrandSpacing.space12),
@@ -299,67 +334,96 @@ abstract final class BrandTheme {
     borderSide: BorderSide(color: color),
   );
 
-  static ButtonStyle _button(BrandColors colors, _ButtonKind kind) =>
-      ButtonStyle(
-        textStyle: const WidgetStatePropertyAll(BrandTypography.button),
-        minimumSize: const WidgetStatePropertyAll(
-          Size(BrandGeometry.minTarget, BrandGeometry.minTarget),
-        ),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(
-            horizontal: BrandSpacing.space16,
-            vertical: BrandSpacing.space12,
-          ),
-        ),
-        iconSize: const WidgetStatePropertyAll(BrandGeometry.iconSize),
-        visualDensity: VisualDensity.standard,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        elevation: const WidgetStatePropertyAll(0),
-        animationDuration: const Duration(milliseconds: 120),
-        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
-        shadowColor: const WidgetStatePropertyAll(Colors.transparent),
-        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        side: const WidgetStatePropertyAll(BorderSide.none),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-              BrandGeometry.radiusControl +
-                  BrandGeometry.focusGap +
-                  BrandGeometry.focusWidth,
+  static ButtonStyle _button(
+    BrandColors colors,
+    _ButtonKind kind, {
+    bool responsive = true,
+  }) => ButtonStyle(
+    textStyle: const WidgetStatePropertyAll(BrandTypography.button),
+    minimumSize: const WidgetStatePropertyAll(
+      Size(BrandGeometry.minTarget, BrandGeometry.minTarget),
+    ),
+    padding: WidgetStatePropertyAll(
+      responsive
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(
+              horizontal: BrandSpacing.space16,
+              vertical: BrandSpacing.space12,
             ),
-          ),
+    ),
+    iconSize: const WidgetStatePropertyAll(BrandGeometry.iconSize),
+    visualDensity: VisualDensity.standard,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    elevation: const WidgetStatePropertyAll(0),
+    animationDuration: const Duration(milliseconds: 120),
+    backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+    shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+    surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    side: const WidgetStatePropertyAll(BorderSide.none),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          BrandGeometry.radiusControl +
+              BrandGeometry.focusGap +
+              BrandGeometry.focusWidth,
         ),
-        foregroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return colors['disabled'];
-          if (states.contains(WidgetState.error)) return colors['text'];
-          if (states.contains(WidgetState.selected)) return colors['text'];
-          return kind == _ButtonKind.filled
-              ? colors['onAccent']
-              : colors['text'];
-        }),
-        backgroundBuilder: (context, states, child) => CustomPaint(
-          painter: _ButtonPainter(colors, kind, states),
-          child: child,
-        ),
+      ),
+    ),
+    foregroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) return colors['disabled'];
+      if (states.contains(WidgetState.error)) return colors['text'];
+      if (states.contains(WidgetState.selected)) return colors['text'];
+      return kind == _ButtonKind.filled ? colors['onAccent'] : colors['text'];
+    }),
+    backgroundBuilder: (context, states, child) {
+      final phone =
+          responsive &&
+          (MediaQuery.maybeSizeOf(context)?.width ?? double.infinity) <= 520;
+      final widget = context.widget;
+      final explicitPadding =
+          widget is ButtonStyleButton && widget.style?.padding != null;
+      final inheritedPadding =
+          child is Padding &&
+          child.padding.resolve(Directionality.of(context)) != EdgeInsets.zero;
+      return CustomPaint(
+        painter: _ButtonPainter(colors, kind, states, phone: phone),
+        child: responsive && !explicitPadding && !inheritedPadding
+            ? Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: phone ? 13 : 17,
+                  vertical: 12,
+                ),
+                child: child,
+              )
+            : child,
       );
+    },
+  );
 }
 
 enum _ButtonKind { filled, outlined, text }
 
-/// Reserves four pixels inside the hit area. The transparent gap exposes the
-/// actual adjacent surface, including when a button is placed on a card.
+/// Desktop reserves four pixels inside the hit area. Phone controls use the
+/// full box, with their focus outline painted outside on the adjacent surface.
 class _ButtonPainter extends CustomPainter {
-  _ButtonPainter(this.colors, this.kind, Set<WidgetState> states)
-    : states = Set.of(states);
+  _ButtonPainter(
+    this.colors,
+    this.kind,
+    Set<WidgetState> states, {
+    this.phone = false,
+  }) : states = Set.of(states);
   final BrandColors colors;
   final _ButtonKind kind;
   final Set<WidgetState> states;
+  final bool phone;
 
   @override
   void paint(Canvas canvas, Size size) {
     const inset = BrandGeometry.focusWidth + BrandGeometry.focusGap;
-    final rect = (Offset.zero & size).deflate(inset);
+    final rect = phone
+        ? Offset.zero & size
+        : (Offset.zero & size).deflate(inset);
     final radius = Radius.circular(BrandGeometry.radiusControl);
     final control = RRect.fromRectAndRadius(rect, radius);
     final disabled = states.contains(WidgetState.disabled);
@@ -376,7 +440,11 @@ class _ButtonPainter extends CustomPainter {
     } else if (kind == _ButtonKind.filled) {
       fill = colors[hovered ? 'accentHover' : 'accent'];
     } else {
-      fill = hovered ? colors['hover'] : Colors.transparent;
+      fill = hovered
+          ? colors['hover']
+          : kind == _ButtonKind.outlined
+          ? colors['surface']
+          : Colors.transparent;
     }
     canvas.drawRRect(control, Paint()..color = fill);
     if (kind == _ButtonKind.outlined || disabled || error || selected) {
@@ -398,9 +466,16 @@ class _ButtonPainter extends CustomPainter {
     if (states.contains(WidgetState.focused)) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          (Offset.zero & size).deflate(BrandGeometry.focusWidth / 2),
-          const Radius.circular(
-            BrandGeometry.radiusControl + inset - BrandGeometry.focusWidth / 2,
+          phone
+              ? rect.inflate(
+                  BrandGeometry.focusGap + BrandGeometry.focusWidth / 2,
+                )
+              : (Offset.zero & size).deflate(BrandGeometry.focusWidth / 2),
+          Radius.circular(
+            BrandGeometry.radiusControl +
+                (phone
+                    ? BrandGeometry.focusGap + BrandGeometry.focusWidth / 2
+                    : inset - BrandGeometry.focusWidth / 2),
           ),
         ),
         Paint()
@@ -415,6 +490,7 @@ class _ButtonPainter extends CustomPainter {
   bool shouldRepaint(covariant _ButtonPainter oldDelegate) =>
       colors != oldDelegate.colors ||
       kind != oldDelegate.kind ||
+      phone != oldDelegate.phone ||
       !setEquals(states, oldDelegate.states);
 }
 

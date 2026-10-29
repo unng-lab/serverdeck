@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/app.dart';
+import 'package:serverdeck/automation/automation_sections.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/profiles/profile_controller.dart';
@@ -245,8 +246,12 @@ void registerDesignPrivacyStateCases({bool fullAdaptive = false}) {
           final secret = root.secretState;
           final settingsDraft = family == 'settings-form-root'
               ? tester
-                    .widget<CheckboxListTile>(find.byType(CheckboxListTile))
-                    .value
+                    .widget<MotionDropdown<bool>>(
+                      find.byWidgetPredicate(
+                        (widget) => widget is MotionDropdown<bool>,
+                      ),
+                    )
+                    .initialValue
               : null;
           final next = _Variant(
             variant.size.width == 1100
@@ -278,8 +283,12 @@ void registerDesignPrivacyStateCases({bool fullAdaptive = false}) {
           if (settingsDraft != null) {
             expect(
               tester
-                  .widget<CheckboxListTile>(find.byType(CheckboxListTile))
-                  .value,
+                  .widget<MotionDropdown<bool>>(
+                    find.byWidgetPredicate(
+                      (widget) => widget is MotionDropdown<bool>,
+                    ),
+                  )
+                  .initialValue,
               settingsDraft,
             );
           }
@@ -484,7 +493,54 @@ class _Root {
         builder: (dialog) => remote!.build(dialog),
       );
       await tester.pumpAndSettle();
+      if (family == 'software-catalog' || family == 'recipe-detail') {
+        // The canonical catalog starts with loaded rows. Reach the selected
+        // descriptor through its actual local action before probing retirement.
+        final section = tester.widget<AutomationRecipesSection>(bodyFinder);
+        final rows = (section.catalog['recipes']! as List)
+            .cast<Map<String, Object?>>();
+        expect(rows, isNotEmpty);
+        final beforeSelection = Map<String, int>.of(counts);
+        final loaded = find.descendant(
+          of: bodyFinder,
+          matching: find.text(automationRecipeTitle(rows.first)),
+        );
+        expect(loaded, findsOneWidget);
+        await tester.ensureVisible(loaded);
+        await tester.tap(loaded);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .state<AutomationRecipesSectionState>(bodyFinder)
+              .selectedRecipeTitle,
+          automationRecipeTitle(rows.first),
+        );
+        expect(
+          counts,
+          beforeSelection,
+          reason: 'Opening a loaded recipe is local and must not create a plan or read',
+        );
+      }
       await _expandAll(tester, bodyFinder);
+      if (family == 'software-catalog' || family == 'recipe-detail') {
+        final advanced = find.descendant(
+          of: bodyFinder,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is AutomationJsonView &&
+                widget.title ==
+                    'Лицензии, начальные настройки и точные условия',
+          ),
+        );
+        expect(advanced, findsOneWidget);
+        final payload = tester.widget<EditableText>(
+          find.descendant(of: advanced, matching: find.byType(EditableText)),
+        );
+        expect(payload.readOnly, isTrue);
+        for (final marker in _markers) {
+          expect(payload.controller.text, contains(marker));
+        }
+      }
       return;
     }
     if (family == 'credential-picker') {
@@ -527,9 +583,15 @@ class _Root {
       if (family == 'settings-form-root') {
         await _click(tester, 'Изменить настройки');
         bodyType = SettingsForm;
-        await _click(tester, 'Уменьшение анимации');
+        final motion = find.byWidgetPredicate(
+          (widget) => widget is MotionDropdown<bool>,
+        );
+        await tester.ensureVisible(motion);
+        await tester.tap(motion);
+        await tester.pumpAndSettle();
+        await _click(tester, 'Выключено');
         expect(
-          tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+          tester.widget<MotionDropdown<bool>>(motion).initialValue,
           isFalse,
         );
       }
@@ -538,7 +600,7 @@ class _Root {
     if (family == 'history-root') {
       await tester.tap(find.byTooltip('Недавние подтверждённые операции'));
       await tester.pumpAndSettle();
-      bodyType = DeckDialogLayout;
+      bodyType = RecentOperationsView;
       _markers.add(_receiptId);
       expect(
         find.byKey(const RecentOperationReceiptKey(_receiptId)),
@@ -548,8 +610,8 @@ class _Root {
     }
     if (family == 'empty-root-create' || family == 'create-root') {
       expect(model.profiles, isEmpty);
-      expect(find.text('Локальных профилей пока нет'), findsOneWidget);
-      await _click(tester, 'Создать профиль');
+      expect(find.text('Все серверы.\nОдин центр управления.'), findsOneWidget);
+      await _click(tester, 'Добавить сервер');
       bodyType = ProfileForm;
       await tester.enterText(
         find.byKey(const ValueKey('profile-address')),
@@ -560,12 +622,14 @@ class _Root {
         'private-user',
       );
     } else {
-      await _click(tester, _oldName);
       if (family == 'profile-root') {
         bodyType = ProfileList;
         _markers.addAll([_oldName, _oldAddress]);
         return;
       }
+      await tester.ensureVisible(find.byTooltip('Действия профиля $_oldName'));
+      await tester.tap(find.byTooltip('Действия профиля $_oldName'));
+      await tester.pumpAndSettle();
       await _click(
         tester,
         family == 'delete-root' ? 'Удалить профиль' : 'Редактировать профиль',
@@ -802,7 +866,9 @@ class _Root {
 
 Future<void> _click(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
-  final candidates = find.text(label);
+  final candidates = label == 'Настройки'
+      ? find.byKey(const ValueKey('foundation-navigation-settings'))
+      : find.text(label);
   if (candidates.evaluate().isEmpty &&
       find.byType(ProfileList).evaluate().isNotEmpty) {
     // ProfileList is a real lazy ListView. At200% the header alone can fill

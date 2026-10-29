@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/shell/error_view.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
-import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode;
 
 void main() {
@@ -25,12 +25,18 @@ void main() {
         ),
       );
       expect(categories.add(ReadErrorView.category(code)), isTrue);
-      expect(find.text(ReadErrorView.category(code)), findsOneWidget);
-      expect(find.byType(DeckNotice), findsOneWidget);
-      expect(find.byType(DeckStatus), findsOneWidget);
+      expect(find.text(ReadErrorView.category(code)), findsWidgets);
+      final status = tester.widget<ServerStatusBody>(
+        find.byType(ServerStatusBody),
+      );
+      expect(status.title, ReadErrorView.category(code));
+      expect(status.facts['Источник'], 'Локальная служба');
+      expect(status.facts['Следующий шаг'], isNotEmpty);
       if (find.text('Повторить чтение').evaluate().isNotEmpty) {
+        await tester.ensureVisible(find.text('Повторить чтение'));
         await tester.tap(find.text('Повторить чтение'));
       } else if (find.text('Повторить проверку службы').evaluate().isNotEmpty) {
+        await tester.ensureVisible(find.text('Повторить проверку службы'));
         await tester.tap(find.text('Повторить проверку службы'));
       } else {
         expect(find.byType(FilledButton), findsNothing);

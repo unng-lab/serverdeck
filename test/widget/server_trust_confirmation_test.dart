@@ -41,7 +41,7 @@ Future<void> _mount(WidgetTester tester, _ReviewState state) async {
   );
 }
 
-Finder get _confirm => find.widgetWithText(FilledButton, 'Подтвердить');
+Finder get _confirm => find.widgetWithText(FilledButton, 'Подтвердить ключ');
 
 void _expectBlocked(WidgetTester tester, _ReviewState state) {
   expect(tester.widget<FilledButton>(_confirm).onPressed, isNull);
@@ -89,11 +89,12 @@ void main() {
   ) async {
     final state = _ReviewState();
     await _mount(tester, state);
-    expect(find.text('192.0.2.44:2222'), findsOneWidget);
-    expect(find.text(state.profile!.name), findsOneWidget);
+    expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
+    expect(find.textContaining(state.profile!.name), findsOneWidget);
     expect(find.text(state.challenge!.key.fingerprint), findsOneWidget);
     expect(state.confirmed, 0);
     expect(tester.takeException(), isNull);
+    await tester.ensureVisible(_confirm);
     await tester.tap(_confirm);
     expect(state.confirmed, 1);
     expect(state.cancelled, 0);
@@ -106,7 +107,7 @@ void main() {
       profile: DesignServerFixtures.profile(address: '2001:db8::44', port: 22),
     );
     await _mount(tester, state);
-    expect(find.text('[2001:db8::44]:22'), findsOneWidget);
+    expect(find.textContaining('[2001:db8::44]:22'), findsOneWidget);
     expect(find.text(state.challenge!.key.fingerprint), findsOneWidget);
     expect(tester.widget<FilledButton>(_confirm).onPressed, isNotNull);
     expect(state.confirmed, 0);
@@ -119,10 +120,11 @@ void main() {
     final state = _ReviewState();
     await _mount(tester, state);
     expect(find.text(DesignServerFixtures.serverId), findsNothing);
+    await tester.ensureVisible(find.text('Технические сведения'));
     await tester.tap(find.text('Технические сведения'));
     await tester.pumpAndSettle();
     expect(find.text(DesignServerFixtures.serverId), findsOneWidget);
-    expect(find.text('192.0.2.44:2222'), findsOneWidget);
+    expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
     expect(state.confirmed, 0);
   });
 
@@ -144,9 +146,10 @@ void main() {
       final state = _ReviewState(profile: mismatch.value());
       await _mount(tester, state);
       _expectBlocked(tester, state);
-      expect(find.text('192.0.2.44:2222'), findsNothing);
-      expect(find.text(state.profile!.name), findsNothing);
+      expect(find.textContaining('192.0.2.44:2222'), findsNothing);
+      expect(find.textContaining(state.profile!.name), findsNothing);
       expect(find.text(state.challenge!.key.fingerprint), findsOneWidget);
+      await tester.ensureVisible(_confirm);
       await tester.tap(_confirm);
       expect(state.confirmed, 0);
     });
@@ -168,9 +171,9 @@ void main() {
       state.changed();
       await tester.pump();
       _expectBlocked(tester, state);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
-      expect(find.text('192.0.2.99:2222'), findsNothing);
-      expect(find.text('192.0.2.44:2223'), findsNothing);
+      expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
+      expect(find.textContaining('192.0.2.99:2222'), findsNothing);
+      expect(find.textContaining('192.0.2.44:2223'), findsNothing);
       state.profile = initial;
       state.changed();
       await tester.pump();
@@ -185,6 +188,7 @@ void main() {
     await _mount(tester, state);
     state.profile = DesignServerFixtures.profile(address: '192.0.2.99');
     expect(tester.widget<FilledButton>(_confirm).onPressed, isNotNull);
+    await tester.ensureVisible(_confirm);
     await tester.tap(_confirm);
     await tester.pump();
     _expectBlocked(tester, state);
@@ -227,7 +231,8 @@ void main() {
   testWidgets('cancel does not confirm trust', (tester) async {
     final state = _ReviewState();
     await _mount(tester, state);
-    await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+    await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Отмена'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Отмена'));
     expect(state.cancelled, 1);
     expect(state.confirmed, 0);
     expect(tester.takeException(), isNull);
@@ -252,7 +257,7 @@ void main() {
       same(dialogState),
     );
     expect(tester.widget<FilledButton>(_confirm).onPressed, isNotNull);
-    expect(find.text('192.0.2.44:2222'), findsOneWidget);
+    expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
     expect(state.confirmed, 0);
     expect(state.cancelled, 0);
     expect(tester.takeException(), isNull);
@@ -307,10 +312,11 @@ void main() {
     await tester.pump();
     // The prior button can retain its handler until the next frame, so the
     // handler itself must reject the changed target immediately.
+    await tester.ensureVisible(_confirm);
     await tester.tap(_confirm);
     await tester.pumpAndSettle();
     _expectBlocked(tester, state);
-    expect(find.text('192.0.2.44:2222'), findsOneWidget);
-    expect(find.text('192.0.2.99:2222'), findsNothing);
+    expect(find.textContaining('192.0.2.44:2222'), findsOneWidget);
+    expect(find.textContaining('192.0.2.99:2222'), findsNothing);
   });
 }

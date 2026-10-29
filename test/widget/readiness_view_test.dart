@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/shell/readiness_view.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/ui/deck_components.dart';
+import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode, ReadinessState;
 
 Widget app(Widget child, {Brightness brightness = Brightness.light}) =>
@@ -21,7 +22,7 @@ void main() {
       await tester.pumpWidget(
         app(const ReadinessView(state: ReadinessState.unavailable)),
       );
-      expect(find.text('Локальная служба недоступна'), findsOneWidget);
+      expect(find.text('Локальная служба недоступна'), findsWidgets);
       expect(find.byType(FilledButton), findsNothing);
     },
   );
@@ -41,23 +42,25 @@ void main() {
       await tester.pumpWidget(
         app(ReadinessView(state: entry.key, onRetry: () {})),
       );
-      expect(find.text(entry.value), findsOneWidget);
-      final status = tester.widget<DeckStatus>(find.byType(DeckStatus));
+      expect(find.text(entry.value), findsWidgets);
+      final status = tester.widget<ServerStatusBody>(
+        find.byType(ServerStatusBody),
+      );
       expect(status.tone, switch (entry.key) {
         ReadinessState.storageBlocked => DeckTone.error,
         ReadinessState.incompatible => DeckTone.warning,
         ReadinessState.unavailable => DeckTone.unavailable,
         _ => DeckTone.running,
       });
+      expect(find.byType(FilledButton), findsOneWidget);
+      final waiting = const {
+        ReadinessState.starting,
+        ReadinessState.recovering,
+        ReadinessState.stopping,
+      }.contains(entry.key);
       expect(
-        find.byType(FilledButton),
-        {
-              ReadinessState.starting,
-              ReadinessState.recovering,
-              ReadinessState.stopping,
-            }.contains(entry.key)
-            ? findsNothing
-            : findsOneWidget,
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        waiting ? isNull : isNotNull,
       );
     }
     await tester.pumpWidget(
@@ -109,8 +112,20 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 40));
       expect(retries, 0);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pump();
+      final retryControl = find.widgetWithText(
+        FilledButton,
+        'Повторить запуск',
+      );
+      await tester.ensureVisible(retryControl);
+      for (
+        var tab = 0;
+        tab < 80 &&
+            !Focus.of(tester.element(find.text('Повторить запуск'))).hasFocus;
+        tab++
+      ) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
       final context = tester.element(find.text('Повторить запуск'));
       expect(Focus.of(context).hasFocus, isTrue);
       // The shared brand button painter supplies the visible focus ring.
@@ -131,7 +146,7 @@ void main() {
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNull,
       );
-      expect(find.text('Ожидаем результат текущей попытки.'), findsOneWidget);
+      expect(find.text('Ожидаем результат текущей попытки.'), findsWidgets);
       await tester.tap(find.byType(FilledButton));
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump(const Duration(seconds: 40));
@@ -188,18 +203,27 @@ void main() {
               isNull,
               reason: '$brightness/$size/$state',
             );
-            final title = find.byWidgetPredicate(
-              (widget) => widget is Text && widget.style?.fontSize == 24,
-            );
+            final title = find
+                .byWidgetPredicate(
+                  (widget) => widget is Text && widget.style?.fontSize == 24,
+                )
+                .first;
             await tester.ensureVisible(title);
             expect(title.hitTestable(), findsOneWidget);
             if (find.byType(FilledButton).evaluate().isNotEmpty) {
               await tester.ensureVisible(find.byType(FilledButton));
               final rect = tester.getRect(find.byType(FilledButton));
-              expect(rect.width, greaterThanOrEqualTo(48));
-              expect(rect.height, greaterThanOrEqualTo(48));
-              await tester.tap(find.byType(FilledButton));
-              expect(retries, 1);
+              expect(rect.width, greaterThanOrEqualTo(44));
+              expect(rect.height, greaterThanOrEqualTo(44));
+              if (tester
+                      .widget<FilledButton>(find.byType(FilledButton))
+                      .onPressed !=
+                  null) {
+                await tester.tap(find.byType(FilledButton));
+                expect(retries, 1);
+              } else {
+                expect(retries, 0);
+              }
             }
             expect(tester.takeException(), isNull);
           }

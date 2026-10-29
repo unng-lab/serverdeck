@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/brand_assets.dart';
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
+import 'deck_icon.dart';
+import 'deck_action_flow.dart';
+import 'deck_control_target.dart';
 
 /// Presentation meaning supplied by the owner of the operation/observation.
 enum DeckTone {
@@ -21,15 +25,12 @@ BrandColors _colors(BuildContext context) =>
 
 String _role(DeckTone tone) => tone == DeckTone.neutral ? 'muted' : tone.name;
 
-IconData _symbol(DeckTone tone) => switch (tone) {
-  DeckTone.neutral => Icons.info_outline,
-  DeckTone.available => Icons.circle_outlined,
-  DeckTone.unavailable => Icons.close,
-  DeckTone.unknown => Icons.help_outline,
-  DeckTone.warning => Icons.warning_amber_rounded,
-  DeckTone.error => Icons.report_outlined,
-  DeckTone.running => Icons.timelapse,
-  DeckTone.success => Icons.check,
+String _symbol(DeckTone tone) => switch (tone) {
+  DeckTone.neutral || DeckTone.unknown => 'info',
+  DeckTone.available || DeckTone.success => 'check',
+  DeckTone.unavailable => 'close',
+  DeckTone.warning || DeckTone.error => 'warning',
+  DeckTone.running => 'clock',
 };
 
 /// A surface is focusable only when it has an enabled action.
@@ -101,7 +102,7 @@ class _DeckSurfaceState extends State<DeckSurface> {
           style: BrandTypography.body.copyWith(
             color: colors[widget.enabled ? 'text' : 'disabled'],
           ),
-          child: widget.child,
+          child: DeckHitOverflow(child: widget.child),
         ),
       ),
     );
@@ -360,14 +361,24 @@ class DeckStatus extends StatelessWidget {
     required this.label,
     this.tone = DeckTone.neutral,
     this.pending = false,
+    this.compact = false,
   });
   final String label;
   final DeckTone tone;
   final bool pending;
+  final bool compact;
   @override
   Widget build(BuildContext context) {
     final effective = pending ? DeckTone.running : tone;
     final color = _colors(context)[_role(effective)];
+    final lineHeight = MediaQuery.sizeOf(context).width <= 520 ? 20.0 : 18.0;
+    final symbol = switch (effective) {
+      DeckTone.available || DeckTone.success => '●',
+      DeckTone.warning || DeckTone.error => '!',
+      DeckTone.unavailable => '×',
+      DeckTone.running => '◷',
+      DeckTone.neutral || DeckTone.unknown => '○',
+    };
     return Semantics(
       liveRegion: pending,
       child: Row(
@@ -376,22 +387,39 @@ class DeckStatus extends StatelessWidget {
         children: [
           ExcludeSemantics(
             child: SizedBox(
-              width: BrandGeometry.iconSize,
-              height: BrandGeometry.iconSize,
-              child: pending && !MediaQuery.disableAnimationsOf(context)
+              width: compact ? 12 : BrandGeometry.iconSize,
+              height: compact ? lineHeight : BrandGeometry.iconSize,
+              child: compact
+                  ? Center(
+                      child: Text(
+                        symbol,
+                        textScaler: TextScaler.noScaling,
+                        style: BrandTypography.caption.copyWith(
+                          fontSize: 13,
+                          height: lineHeight / 13,
+                          color: color,
+                        ),
+                      ),
+                    )
+                  : pending && !MediaQuery.disableAnimationsOf(context)
                   ? CircularProgressIndicator(strokeWidth: 2, color: color)
-                  : Icon(
+                  : DeckIcon(
                       _symbol(effective),
                       color: color,
                       size: BrandGeometry.iconSize,
                     ),
             ),
           ),
-          const SizedBox(width: BrandSpacing.space8),
+          SizedBox(width: compact ? 5 : BrandSpacing.space8),
           Flexible(
             child: Text(
               label,
-              style: BrandTypography.body.copyWith(color: color),
+              style: compact
+                  ? BrandTypography.caption.copyWith(
+                      color: color,
+                      height: lineHeight / 12,
+                    )
+                  : BrandTypography.body.copyWith(color: color),
             ),
           ),
         ],
@@ -415,28 +443,97 @@ class DeckNotice extends StatelessWidget {
   final DeckTone tone;
   final List<Widget> actions;
   @override
-  Widget build(BuildContext context) => DeckSurface(
-    error: tone == DeckTone.error,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DeckStatus(label: title ?? message, tone: tone),
-        if (title != null) ...[
-          const SizedBox(height: BrandSpacing.space8),
-          Text(message),
+  Widget build(BuildContext context) {
+    final colors = _colors(context);
+    final phone = MediaQuery.sizeOf(context).width <= 520;
+    final color = colors[_role(tone)];
+    final line = phone ? 22.0 : 20.0;
+    final heading = BrandTypography.body.copyWith(
+      fontSize: 13,
+      height: line / 13,
+      color: colors['text'],
+    );
+    final titleStyle = heading.copyWith(
+      fontFamily: BrandAssets.semiboldFamily,
+      fontWeight: BrandTypography.semiboldWeight,
+      fontVariations: BrandTypography.semiboldVariations,
+    );
+    final secondary = BrandTypography.caption.copyWith(
+      fontSize: 12,
+      height: 20 / 12,
+      color: colors['muted'],
+    );
+    final icon = switch (tone) {
+      DeckTone.error || DeckTone.unavailable => 'close',
+      DeckTone.warning => 'warning',
+      DeckTone.success || DeckTone.available => 'check',
+      _ => 'info',
+    };
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: colors['surface'],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colors['border']),
+            ),
+            // The separate stripe supplies the remaining two left-border pixels.
+            padding: EdgeInsets.fromLTRB(
+              phone ? 14 : 17,
+              phone ? 14 : 13,
+              phone ? 12 : 15,
+              phone ? 14 : 13,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: ExcludeSemantics(
+                    child: DeckIcon(icon, size: phone ? 18 : 17, color: color),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title ?? message,
+                        style: title == null ? heading : titleStyle,
+                      ),
+                      if (title != null) ...[
+                        const SizedBox(height: 3),
+                        Text(message, style: secondary),
+                      ],
+                      if (nextStep != null) ...[
+                        const SizedBox(height: 3),
+                        Text(nextStep!, style: secondary),
+                      ],
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: BrandSpacing.space12),
+                        DeckActions(children: actions),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            child: ColoredBox(color: color),
+          ),
         ],
-        if (nextStep != null) ...[
-          const SizedBox(height: BrandSpacing.space8),
-          Text(nextStep!),
-        ],
-        if (actions.isNotEmpty) ...[
-          const SizedBox(height: BrandSpacing.space12),
-          DeckActions(children: actions),
-        ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class DeckKeyValue extends StatelessWidget {
@@ -490,16 +587,45 @@ class DeckActions extends StatelessWidget {
     super.key,
     required this.children,
     this.alignment = WrapAlignment.start,
+    this.phoneBasis,
   });
   final List<Widget> children;
   final WrapAlignment alignment;
+  final double? phoneBasis;
   @override
-  Widget build(BuildContext context) => Wrap(
+  Widget build(BuildContext context) => DeckActionFlow(
+    expand: phoneBasis != null && MediaQuery.sizeOf(context).width <= 520,
+    controlInset: MediaQuery.sizeOf(context).width <= 520 ? 0 : 4,
+    basis: phoneBasis,
     alignment: alignment,
-    spacing: BrandSpacing.space8,
-    runSpacing: BrandSpacing.space8,
-    crossAxisAlignment: WrapCrossAlignment.center,
     children: children,
+  );
+}
+
+/// Source form footers keep one full-width action per row on phones.
+/// The same render ancestry preserves each native button across breakpoints.
+class DeckFormActions extends StatelessWidget {
+  const DeckFormActions({super.key, required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => DeckHitOverflow(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final phone = MediaQuery.sizeOf(context).width <= 520;
+        return DeckActionFlow(
+          expand: MediaQuery.sizeOf(context).width <= 760,
+          basis: phone
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width <= 760
+              ? 0
+              : null,
+          spacing: phone ? 10 : 8,
+          controlInset: phone ? 0 : 4,
+          alignment: WrapAlignment.end,
+          children: children,
+        );
+      },
+    ),
   );
 }
 

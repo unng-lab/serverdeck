@@ -167,13 +167,26 @@ void main() {
                   );
               }
 
+              if (form == _Form.delete) {
+                await tester.ensureVisible(find.byType(CheckboxListTile));
+                await tester.tap(find.byType(CheckboxListTile));
+                await tester.pump();
+              }
               await action(switch (form) {
                 _Form.profile => 'Сохранить',
                 _Form.settings => 'Сохранить настройки',
-                _Form.delete => 'Подтвердить удаление',
+                _Form.delete => 'Удалить профиль',
               });
               expect(client.sent, hasLength(1));
-              expect(find.text('Сохранено'), findsNothing);
+              expect(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Text &&
+                      widget.key == const ValueKey('mutation-current-status') &&
+                      widget.data == 'Сохранено',
+                ),
+                findsNothing,
+              );
               expect(find.text('Удалено'), findsNothing);
               expectDraft();
               final external = fixture.snapshot(revision: '2');
@@ -216,7 +229,10 @@ void main() {
                     true,
                   );
                 if (form == _Form.delete)
-                  expect(find.text('Changed externally'), findsOneWidget);
+                  expect(
+                    find.textContaining('Changed externally'),
+                    findsOneWidget,
+                  );
               } else {
                 await action('Проверить результат');
                 expect(client.queried, hasLength(1));
@@ -228,7 +244,7 @@ void main() {
                 bootstrap.show(ReadinessState.unavailable);
                 await tester.pumpAndSettle();
                 expect(find.text('RAM draft'), findsNothing);
-                expect(find.text('Changed externally'), findsNothing);
+                expect(find.textContaining('Changed externally'), findsNothing);
                 final close = find.widgetWithText(OutlinedButton, 'Закрыть');
                 await tester.ensureVisible(close);
                 await tester.pumpAndSettle();

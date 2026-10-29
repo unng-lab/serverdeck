@@ -263,7 +263,7 @@ const _originSource30 = DesignStateSource(
 );
 const _originSource31 = DesignStateSource(
   'lib/profiles/recovery_view.dart',
-  'class _History',
+  'class RecentOperationsView',
 );
 const _originSource32 = DesignStateSource(
   'lib/automation/automation_sections.dart',
@@ -2522,7 +2522,10 @@ const _stateExpectations052 = <String>[
 
 // Explicit shared contract first used by state-31-recent-operations-loading.
 const _stateSources036 = <DesignStateSource>[
-  DesignStateSource('lib/profiles/recovery_view.dart', 'class _History'),
+  DesignStateSource(
+    'lib/profiles/recovery_view.dart',
+    'class RecentOperationsView',
+  ),
   DesignStateSource(
     'lib/profiles/startup_recovery.dart',
     'class StartupRecovery',
@@ -2564,7 +2567,10 @@ const _stateExpectations056 = <String>[
 
 // Explicit shared contract first used by state-31-recent-operations-localUnavailable.
 const _stateSources037 = <DesignStateSource>[
-  DesignStateSource('lib/profiles/recovery_view.dart', 'class _History'),
+  DesignStateSource(
+    'lib/profiles/recovery_view.dart',
+    'class RecentOperationsView',
+  ),
   DesignStateSource(
     'lib/profiles/startup_recovery.dart',
     'class StartupRecovery',

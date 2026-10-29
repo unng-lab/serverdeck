@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serverdeck_protocol/models.dart' hide ReadinessView;
 
+import '../servers/server_compositions.dart';
 import '../shell/readiness_view.dart';
 import '../shell/error_view.dart';
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_page.dart';
+import 'profile_presentation.dart';
 import 'mutation_controller.dart';
 import 'mutation_status.dart';
 import 'profile_controller.dart';
@@ -15,9 +18,17 @@ class _CloseDelete extends Intent {
 }
 
 class ProfileDelete extends StatefulWidget {
-  const ProfileDelete({super.key, required this.model, required this.initial});
+  const ProfileDelete({
+    super.key,
+    required this.model,
+    required this.initial,
+    this.asPage = false,
+    this.onClose,
+  });
   final ProfileController model;
   final ProfileView initial;
+  final bool asPage;
+  final VoidCallback? onClose;
   @override
   State<ProfileDelete> createState() => _ProfileDeleteState();
 }
@@ -26,8 +37,9 @@ class _ProfileDeleteState extends State<ProfileDelete> {
   late ProfileView target;
   late final MutationController mutation;
   bool _reloading = false, _missing = false;
-  bool _readingError = false;
+  bool _readingError = false, _confirmed = false;
   String? _readError;
+  int _consentEpoch = -1;
   @override
   void initState() {
     super.initState();
@@ -39,6 +51,8 @@ class _ProfileDeleteState extends State<ProfileDelete> {
     if (_reloading ||
         _readingError ||
         _missing ||
+        !_confirmed ||
+        _consentEpoch != widget.model.bootstrap.readinessEpoch ||
         !widget.model.loaded ||
         mutation.state != MutationPresentation.idle)
       return;
@@ -67,6 +81,7 @@ class _ProfileDeleteState extends State<ProfileDelete> {
             'Профиль уже удалён другим окном; ваше удаление не выполнено';
       } else {
         target = current;
+        _confirmed = false;
         _readError = null;
         mutation.reset();
       }
@@ -94,7 +109,14 @@ class _ProfileDeleteState extends State<ProfileDelete> {
     mutation.refreshCommitted().ignore();
   }
 
-  void _close() => Navigator.of(context).maybePop();
+  void _close() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([
@@ -105,7 +127,9 @@ class _ProfileDeleteState extends State<ProfileDelete> {
     builder: (context, _) {
       final ready = widget.model.bootstrap.state == ReadinessState.ready;
       final idle = mutation.state == MutationPresentation.idle;
-      return Shortcuts(
+      if (_consentEpoch != widget.model.bootstrap.readinessEpoch)
+        _confirmed = false;
+      final form = Shortcuts(
         shortcuts: const {
           SingleActivator(LogicalKeyboardKey.escape): _CloseDelete(),
         },
@@ -118,47 +142,84 @@ class _ProfileDeleteState extends State<ProfileDelete> {
               },
             ),
           },
-          child: DeckDialogLayout(
+          child: ProfileEditorFrame(
+            asPage: widget.asPage,
+            showHelper: false,
+            plan: ready,
+            actionReview: ready
+                ? CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Цель и последствия проверены'),
+                    subtitle: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Удаляется локальный профиль; сервер не меняется'),
+                        Text(
+                          'Проверьте цель и последствия. Назад сохраняет профиль.',
+                        ),
+                      ],
+                    ),
+                    value: _confirmed,
+                    onChanged:
+                        idle && !_reloading && !_readingError && !_missing
+                        ? (value) => setState(() {
+                            _confirmed = value ?? false;
+                            _consentEpoch =
+                                widget.model.bootstrap.readinessEpoch;
+                          })
+                        : null,
+                  )
+                : null,
+            description:
+                'Проверьте цель, последствия и условия выбранного действия',
             title: ready
-                ? 'Удаление профиля'
+                ? 'Удаление локального профиля'
                 : 'Локальное пространство недоступно',
             target: ready
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      DeckKeyValue(label: 'Профиль', value: target.name),
-                      DeckKeyValue(
-                        label: 'Адрес SSH',
-                        value: target.address.contains(':')
-                            ? '[${target.address}]:${target.port}'
-                            : '${target.address}:${target.port}',
-                      ),
-                    ],
+                ? ServerFactRows(
+                    facts: {
+                      'Цель':
+                          '${target.name} · ${target.address.contains(':') ? '[${target.address}]' : target.address}:${target.port}',
+                      'Будет удалено':
+                          'Локальный профиль, ссылки и сохранённые наблюдения',
+                      'На сервере': 'Изменений нет',
+                      'Проверка': 'Локальная служба проверит активные и неподтверждённые операции перед удалением',
+                    },
                   )
                 : null,
             actions: [
               if (ready)
                 FilledButton(
+                  clipBehavior: Clip.none,
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size(48, 48),
+                    minimumSize: Size(
+                      widget.asPage ? 44 : 48,
+                      widget.asPage ? 44 : 48,
+                    ),
                   ),
                   onPressed:
                       idle &&
                           !_reloading &&
                           !_readingError &&
                           !_missing &&
+                          _confirmed &&
                           widget.model.loaded
                       ? () => _delete().ignore()
                       : null,
-                  child: const Text('Подтвердить удаление'),
+                  child: const Text('Удалить профиль'),
                 ),
               OutlinedButton(
+                clipBehavior: Clip.none,
                 autofocus: true,
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(48, 48),
+                  minimumSize: Size(
+                    widget.asPage ? 44 : 48,
+                    widget.asPage ? 44 : 48,
+                  ),
                 ),
                 onPressed: _close,
-                child: Text(idle ? 'Отмена' : 'Закрыть'),
+                child: Text(idle ? 'Назад' : 'Закрыть'),
               ),
             ],
             child: !ready
@@ -172,11 +233,15 @@ class _ProfileDeleteState extends State<ProfileDelete> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const DeckNotice(
-                        title: 'Подтверждение удаления',
-                        message:
-                            'Удаляется локальный профиль; сервер не меняется',
-                        nextStep: 'Для удаления этого профиля нажмите «Подтвердить удаление». Отмена сохраняет профиль.',
+                      const DeckPanel(
+                        title: 'Последствия',
+                        child: ServerFactRows(
+                          facts: {
+                            'Будет удалено': 'Локальный профиль, ссылки и сохранённые наблюдения',
+                            'На сервере': 'Изменений нет',
+                            'Проверка': 'Локальная служба проверит активные и неподтверждённые операции перед удалением',
+                          },
+                        ),
                       ),
                       if (widget.model.error case final code?) ...[
                         const SizedBox(height: BrandSpacing.space16),
@@ -200,9 +265,10 @@ class _ProfileDeleteState extends State<ProfileDelete> {
                         const SizedBox(height: BrandSpacing.space16),
                         DeckNotice(message: _readError!, tone: DeckTone.error),
                       ],
-                      if (!idle) ...[
+                      if (!widget.asPage && !idle) ...[
                         const SizedBox(height: BrandSpacing.space16),
                         MutationStatus(
+                          asPage: widget.asPage,
                           controller: mutation,
                           deleting: true,
                           reloading: _reloading,
@@ -218,6 +284,22 @@ class _ProfileDeleteState extends State<ProfileDelete> {
                     ],
                   ),
           ),
+        ),
+      );
+      return MutationPresentationSwitch(
+        enabled: widget.asPage,
+        showReview: widget.asPage && ready && !idle,
+        form: form,
+        review: MutationReviewPage(
+          controller: mutation,
+          targetCaption:
+              '${target.name} · ${target.address.contains(':') ? '[${target.address}]' : target.address}:${target.port}',
+          deleting: true,
+          reloading: _reloading,
+          readPending: _readingError,
+          onReadCommitted: _readCommitted,
+          onReload: () => _reload().ignore(),
+          onClose: _close,
         ),
       );
     },

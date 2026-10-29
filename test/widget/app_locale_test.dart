@@ -52,10 +52,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(ModalRoute.of(tester.element(settings)), same(route));
         expect(
-          tester
-              .widget<Text>(find.byKey(const ValueKey('foundation-page-title')))
-              .data,
-          'Настройки',
+          tester.widget<FoundationShell>(find.byType(FoundationShell)).section,
+          FoundationSection.settings,
         );
         expect(
           Localizations.localeOf(tester.element(settings)),

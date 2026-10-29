@@ -3,6 +3,8 @@ import 'package:serverdeck_protocol/models.dart' show ErrorCode;
 
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_page.dart';
+import '../servers/server_compositions.dart';
 
 /// Only a safe code enters presentation; private exception text is excluded.
 class ReadErrorView extends StatelessWidget {
@@ -76,44 +78,42 @@ class ReadErrorView extends StatelessWidget {
       ErrorCode.unauthorized => DeckTone.error,
       _ => DeckTone.warning,
     };
-    final notice = DeckNotice(
-      title: category(code),
-      message: hint,
-      tone: tone,
-      actions: [
-        if (read || check)
-          FilledButton(
-            onPressed: reading
-                ? null
-                : read
-                ? onReadAgain
-                : onCheckService,
-            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-            child: Text(
-              read ? 'Повторить чтение' : 'Повторить проверку службы',
-            ),
-          ),
-      ],
-    );
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(BrandSpacing.space24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: Semantics(
-            liveRegion: true,
-            child: reading
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      DeckStatus(label: pendingLabel, pending: true),
-                      const SizedBox(height: BrandSpacing.space12),
-                      notice,
-                    ],
-                  )
-                : notice,
-          ),
+    return DeckPage(
+      title: 'Не удалось прочитать локальные данные',
+      eyebrow: 'Рабочее пространство',
+      description: 'Состояние чтения локальной службы',
+      child: Semantics(
+        liveRegion: true,
+        child: ServerStatusBody(
+          title: category(code),
+          tone: tone,
+          icon: code == ErrorCode.storageBlocked ? 'shield' : 'network',
+          facts: {
+            'Состояние': category(code),
+            'Источник': 'Локальная служба',
+            'Данные': 'Сохранённые данные не удалены',
+            'Следующий шаг': hint,
+          },
+          details: reading
+              ? Padding(
+                  padding: const EdgeInsets.only(top: BrandSpacing.space12),
+                  child: DeckStatus(label: pendingLabel, pending: true),
+                )
+              : null,
+          actions: [
+            if (read || check)
+              FilledButton(
+                clipBehavior: Clip.none,
+                onPressed: reading
+                    ? null
+                    : read
+                    ? onReadAgain
+                    : onCheckService,
+                child: Text(
+                  read ? 'Повторить чтение' : 'Повторить проверку службы',
+                ),
+              ),
+          ],
         ),
       ),
     );

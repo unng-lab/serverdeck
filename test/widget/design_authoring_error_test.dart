@@ -124,12 +124,22 @@ void main() {
                     widget is TextField &&
                     identical(widget.controller, flow.body),
               );
+              if (field.evaluate().isEmpty) {
+                final steps = find.widgetWithText(TextButton, 'Шаги');
+                await tester.ensureVisible(steps);
+                await tester.tap(steps);
+                await tester.pumpAndSettle();
+                final details = find.text('Шаги и параметры профиля (JSON)');
+                await tester.ensureVisible(details);
+                await tester.tap(details);
+                await tester.pumpAndSettle();
+              }
               await tester.ensureVisible(field);
               await tester.enterText(field, source);
               tester.testTextInput.hide();
               await tester.pumpAndSettle();
               final save = find.widgetWithText(
-                FilledButton,
+                OutlinedButton,
                 'Сохранить версию',
               );
               await tester.ensureVisible(save);
@@ -151,7 +161,10 @@ void main() {
               );
               final error = find.text(message);
               expect(error, findsOneWidget);
-              await tester.ensureVisible(error);
+              await Scrollable.ensureVisible(
+                tester.element(error),
+                alignment: .1,
+              );
               await tester.pumpAndSettle();
               final paragraph = tester.renderObject<RenderParagraph>(error);
               expect(
@@ -183,9 +196,9 @@ void main() {
               expect(rect.bottom, lessThanOrEqualTo(frame.height));
               expect(find.bySemanticsLabel(message), findsWidgets);
               for (final action in [
-                find.widgetWithText(TextButton, 'Закрыть'),
+                find.widgetWithText(OutlinedButton, 'Закрыть'),
                 save,
-                find.widgetWithText(OutlinedButton, 'Проверить без сохранения'),
+                find.widgetWithText(FilledButton, 'Проверить без сохранения'),
               ]) {
                 await tester.ensureVisible(action);
                 await tester.pumpAndSettle();
@@ -197,7 +210,10 @@ void main() {
                 expect(tester.getSize(action).width, greaterThanOrEqualTo(44));
                 expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
               }
-              await tester.ensureVisible(error);
+              await Scrollable.ensureVisible(
+                tester.element(error),
+                alignment: .1,
+              );
               await tester.pumpAndSettle();
               await captureDesignState(
                 tester,

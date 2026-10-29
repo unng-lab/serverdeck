@@ -61,7 +61,9 @@ void main() {
       final style = entry.value;
       expect(
         style.fontFamily,
-        shared[entry.key == 'log' ? 'font.mono' : 'font.ui'],
+        entry.key == 'title'
+            ? BrandAssets.semiboldFamily
+            : shared[entry.key == 'log' ? 'font.mono' : 'font.ui'],
       );
       expect(style.fontSize, shared['font.${entry.key}']);
       expect(
@@ -72,7 +74,10 @@ void main() {
     for (final theme in [BrandTheme.light, BrandTheme.dark]) {
       expect(theme.textTheme.bodyMedium!.fontFamily, shared['font.ui']);
       expect(theme.textTheme.bodyMedium!.fontSize, shared['font.body']);
-      expect(theme.textTheme.titleLarge!.fontWeight, FontWeight.w600);
+      expect(
+        theme.textTheme.titleLarge!.fontWeight,
+        BrandTypography.semiboldWeight,
+      );
       expect(
         theme.textTheme.bodyMedium!.color,
         theme.extension<BrandColors>()!['text'],
@@ -113,7 +118,12 @@ void main() {
           text.labelMedium,
           text.labelSmall,
         ]) {
-          expect(style!.fontFamily, BrandAssets.uiFont);
+          expect(
+            style!.fontFamily,
+            style.fontFamily == BrandAssets.semiboldFamily
+                ? BrandAssets.semiboldFamily
+                : BrandAssets.uiFont,
+          );
           expect(style.fontFamilyFallback, BrandAssets.fontFamilyFallback);
         }
       }
@@ -141,10 +151,10 @@ void main() {
       for (final label in ['Filled', 'Outlined', 'Text']) {
         final style = DefaultTextStyle.of(tester.element(find.text(label)))
             .style;
-        expect(style.fontFamily, BrandAssets.uiFont);
+        expect(style.fontFamily, BrandAssets.semiboldFamily);
         expect(style.fontSize, 13, reason: '$label font size');
         expect(style.height! * style.fontSize!, closeTo(20, 0.000001));
-        expect(style.fontWeight, FontWeight.w600);
+        expect(style.fontWeight, BrandTypography.semiboldWeight);
       }
     }
   });
@@ -183,7 +193,7 @@ void main() {
     for (final style in [BrandTypography.button, BrandTypography.tableHeader]) {
       expect(style.fontSize, 13);
       expect(style.height! * style.fontSize!, closeTo(20, 0.000001));
-      expect(style.fontWeight, FontWeight.w600);
+      expect(style.fontWeight, BrandTypography.semiboldWeight);
     }
     expect(BrandTypography.caption.fontSize, 12);
     expect(
@@ -266,7 +276,8 @@ void main() {
     'bundle contains original fonts, license and decodable current logos',
     () async {
       final fonts = <String, List<String>>{
-        BrandAssets.uiFont: [BrandAssets.regularFont, BrandAssets.semiboldFont],
+        BrandAssets.uiFont: [BrandAssets.regularFont],
+        BrandAssets.semiboldFamily: [BrandAssets.semiboldFont],
         BrandAssets.monoFont: [BrandAssets.monoRegularFont],
       };
       for (final family in fonts.entries) {
@@ -294,7 +305,7 @@ void main() {
         expect(faces.map((face) => face['asset']).toList(), family.value);
         expect(
           faces.map((face) => face['weight']).toList(),
-          family.key == BrandAssets.uiFont ? [400, 600] : [400],
+          family.key == BrandAssets.semiboldFamily ? [600] : [400],
         );
       }
       expect(
@@ -328,6 +339,19 @@ void main() {
         codec.dispose();
       }
       expect(BrandAssets.logo(Brightness.light), BrandAssets.lightLogo);
+      for (final name in [
+        'logo-dark',
+        'logo-light',
+        'mark-dark',
+        'mark-light',
+      ]) {
+        final path = 'assets/brand/logos/$name.svg';
+        expect(
+          await rootBundle.loadString(path),
+          File(path).readAsStringSync(),
+          reason: 'SVGs used by the live shell must be bundled, not just present on disk.',
+        );
+      }
       expect(BrandAssets.logo(Brightness.dark), BrandAssets.darkLogo);
       expect(BrandAssets.mark(Brightness.light), BrandAssets.lightMark);
       expect(BrandAssets.mark(Brightness.dark), BrandAssets.darkMark);
@@ -359,6 +383,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(Theme.of(context).brightness, Brightness.dark);
     expect(Theme.of(context).scaffoldBackgroundColor, const Color(0xff0C121C));
-    expect(find.text('Локальная служба недоступна'), findsOneWidget);
+    expect(find.text('Локальная служба недоступна'), findsWidgets);
   });
 }

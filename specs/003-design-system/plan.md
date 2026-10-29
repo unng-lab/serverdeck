@@ -1,3 +1,76 @@
+# Актуальный план 003.4: дизайн базового приложения
+
+Дата: 2026-10-28. Действуют [спецификация](spec.md), [визуальный контракт](contracts/full-application.md) и последнее прямое решение пользователя: закончить интерфейс приложения обычной Flutter-разработкой. Отдельный язык визуальных привязок, общий JSON-корпус, собственные reference readers/validators, граф хешированных receipts и source-renderer удалены из требований. Их задачи отменены, а не объявлены выполненными.
+
+## Результат и границы
+
+Сначала переносится общая оболочка и 37 базовых сценариев, перечисленных в [карте экранов](screen-map.md). Остальные 61 экран получают функциональность и дизайн в своих пакетах по [программе всех 98 экранов](../design-delivery.md). Цветовая тема и отдельные панели не заменяют полную композицию макета.
+
+Приложение использует действующие locald, Local API, controllers, доверие, credentials и владельцев операций из 001/021. Смена оформления не добавляет backend, provider, store, протокол или новые полномочия. Применение дизайна сохраняет собственные данные установленной новой реализации.
+
+Визуальная основа — [HTML](../../docs/design/ServerDeck-design.html), [98 screen IDs](../../docs/design/screens.json), [правила дизайна](../../docs/design/DESIGN.md), [брендбук](../../docs/brandbook/README.md) и [токены](../../docs/brandbook/tokens/serverdeck.tokens.json). Действующие защитные требования владельца поведения имеют приоритет над демонстрационными действиями макета. Конкретные размеры, роли и адаптация определены FA03–FA05.
+
+## Техническая основа и ответственность
+
+| Область | Место работы | Ответственность |
+| --- | --- | --- |
+| Темы и ассеты | `lib/theme/` | Точные светлые/тёмные роли, Noto Sans/Mono, лицензированный Unicode fallback, исходные SVG, reduced motion. |
+| Общие компоненты | `lib/ui/` | Страницы, панели, формы, таблицы/карточки, tabs, notices, focus и доступные значения; принимают данные и прежние callbacks. |
+| Оболочка и навигация | `lib/shell/`, `lib/app.dart` | Пять разделов, sidebar/rail/phone nav, RAM-цель и безопасный caller context. |
+| Профили и настройки | `lib/profiles/`, `lib/settings/` | Существующие формы, credentials, validation/CAS/recovery и theme/settings lifecycle. |
+| Сервер и журнал | `lib/servers/` | Текущие наблюдения, ресурсы, история, trust, executor, журнал и полные детали записи. |
+| ПО и автоматизация | `lib/software/`, `lib/automation/` | Действующие recipes, profiles/revisions, планы/jobs, grants/config/delegations и их guards. |
+| Проверки | Обычные `test/` и существующие fake helpers | Настоящие production widgets/controllers с подменёнными внешними зависимостями; проверка значений, действий, состояния и доступности. |
+
+Новая схема хранения не нужна. `DeckLocation` и локальные drafts остаются RAM-состоянием UI. Один существующий owner управляет каждым lifecycle; новая композиция не создаёт второго controller, подписку, dispatch или согласие. Standalone constructors могут сохраняться для обычных тестов, но приложение использует те же виджеты.
+
+## Композиции и адаптация
+
+- Desktop шире 1060: sidebar 210, topbar 56, padding content 26/28/24. Compact 521–1060: rail 68, topbar 56, padding 24. Phone до 520: topbar 62, content 22/16/24, bottom nav 68 плюс safe area.
+- Сохраняются header, workspace/operator context, filters, summary, panels/cards, source/time/quality и реальные действия каждого сценария. На phone списки переходят в одну колонку без горизонтального выхода всей страницы.
+- При 200% растёт текст, строки и высота controls; длинные значения переносятся, actions/filters оборачиваются, контекст прокручивается со страницей. Иконки, padding и plot heights не удваиваются. Phone nav следует FA05 и освобождает место клавиатуре.
+- Theme/resize сохраняют допустимые draft, target, filter, tab, pause и scroll. Потеря private readiness удаляет приватные editors/контекст прежним production путём; поздний ответ не возвращает их.
+- График и его текстовая альтернатива используют один полученный ряд: не более 120 точек, только int 0–100, явные gaps/unknown/stale и UTC. Сохранённые мини-графики тоже имеют текстовые значения и времена.
+
+## Данные и работающие действия
+
+Локальный поиск, tabs и filters списка серверов работают над уже загруженными профилями и известным состоянием связи. Неизвестная связь не становится disconnected/connected ради заполнения карточки. Выбор цели в ПО, Сервере, Журналах и Заданиях использует общую RAM-навигацию; чужой saved default не заменяет явно выбранный или исчезнувший ID.
+
+Глобальные Журналы и Задания используют имеющихся target-bound owners. Переход и просмотр не подключают сервер, не создают план/approval/job и не записывают настройки. Pending блокирует повтор того же действия; unknown сохраняет request identity и явный recovery.
+
+Структурированные automation editors сохраняют полный исходный JSON и обычные редактируемые промежуточные значения. Unsafe nested shapes получают ошибку без cast/assertion; invalid полный документ не допускается к admission/save. Guard делегирования и происхождение числового ввода сохраняются по T153/T160/T161. Проверка UI не заменяет авторизацию сервиса.
+
+Страница 13 использует тот же form State/controller/request и реальный контекст операции. Status review показывает канонический heading/tabs/hero и следующие шаги, удерживая draft; скрытая форма недоступна для paint, semantics, focus и keyboard actions. Private retirement продолжает удалять editors. Для 93 действителен только matching blocked plan; неизвестный защищённый эффект не получает активное действие (FA07.1).
+
+Читаемая [таблица действий](contracts/base-affordances.md) и карта экранов помогают сверке. Они не требуют исполняемого manifest, отдельного валидатора или нового test protocol.
+
+## Последовательность реализации
+
+1. T129–T130: завершить shared theme/components и обычную оболочку.
+2. T131–T135, T142–T145: закончить композиции семейств в их действующих модулях и обычные переходы между ними.
+3. T148–T150, T153, T160–T161, T163, T170: закрыть подтверждённые дефекты target, полного JSON, истории, доступности и production status/context. Уже внесённое исправление проверяется, а не переписывается ради новой архитектуры.
+4. T136/T146: привести обычные widget regressions к фактическому интерфейсу, сохранив реальные проверки действий, full values/copy, focus/keyboard, private retirement и отсутствия скрытых эффектов.
+5. T137/T138/T147: выполнить действующие static/unit/widget checks и независимое ревью, прямо сверить реальный интерфейс с каноническими макетами; исправить найденное.
+6. T139/T152: собрать согласованную Windows-версию, проверить состав, установить без потери данных и показать обычное приложение. Записать фактический результат и оставшиеся ограничения.
+
+## Проверки и завершение
+
+Применяется текущий [unit/widget/static stage](../../AGENTS.md). Pinned SDK, lockfile restores, root format/analyze/test, package analysis, protocol pure units и выбранный fake scheduler запускаются по [quickstart](quickstart.md). Native/FFI/service/SSH/container/integration qualification сюда не входит.
+
+Обычные widget tests проверяют 37 сценариев и применимые состояния на 1100×760, 800×600, 390×800, 360×800, в двух темах и при 100%/200% текста. Проверки должны находить реальный дефект: неверную цель/guard, потерянный draft, clipping, недоступный focus, неправильный полный текст или лишний callback. Отдельная fixture-галерея не заменяет production-композицию.
+
+Прямое визуальное сравнение проверяет основные области, отступы, шрифты, иконки, переносы и состояния по FA09. Различия фактических данных с демо-макетом объясняются; обязательные области не скрываются. Не требуется создавать второй renderer, 592 файлов эталона или граф доказательств. Компьютерная/UI-автоматизация не используется вопреки указанию пользователя.
+
+После применимых checks выполняется независимый review/fix loop по AGENTS. Старые passes и галочки относятся к своему исходному scope. Новые проверки и visual/install/show остаются незавершёнными, пока реально не выполнены; [evidence](evidence.md) не подменяет их планом.
+
+## История
+
+Исторический план ниже сохранён для завершённых задач и старых ссылок. Его native/CI/fixture процедуры и прежние критерии не являются инструкцией к текущему этапу. При расхождении действуют спецификация, план выше и AGENTS. История выполненных задач сохраняется в [tasks](tasks.md); отменённая reference-инфраструктура не возвращается из исторического текста.
+
+# Сохранённый исторический план и evidence предыдущего scope
+
+Следующий текст сохранён полностью как история прежних003.1–003.3 и релизных продолжений. Для текущей003.4 scope, геометрия, tasks и проверки определяются разделом выше и актуальными связанными артефактами; прошлые результаты сохраняют только свой фактический scope.
+
 # Implementation Plan: Дизайн и доступность
 
 ## Обычный выпуск 0.2.0 (2026-10-27)
@@ -658,3 +731,108 @@ Meaningful RED ожидает null phase/code на absent/corrupt raw stdout в 
 После исправления двух confirmed P2 первые reviews/RED сохранены. Fresh Dart round2 review завершён0findings на11inputs, fresh PS round2 review —0findings на13inputs/0SHA mismatches. Actual local gates: T116pure24/localdanalyze0, rootformat641/0changes/analyze0/Flutter7505passed+1expectedopt-inskip, normalprivatef1 all27gateway+30grant=57passed, Windowsanalyze0/fullserial168passed, isolatedcontrolledPS18groups/exit0. Final updatedquota10/10 на том же unactivatedc45 завершились 2026-10-27T07:04:43.5345163Z, 468147ms: десять actual quota bodies/reporterSuccess=true/process0, strictscope sourceBefore=sourceAfter и normalRelease7/privatef1 preservation подтверждены. Подробные receipts и ограничения — в [evidence](evidence.md#t116t117-локальная-реализация-проверки-и-повторные-reviews).
 
 T116/T117 закрыты только в local implementation/checks/clean scoped review scope;117unique tasks теперь checked, прежние115task lines не изменены, у T116/T117 изменены только markers. Partial failed round2 и interrupted controlled runs остаются сохранёнными и не считаются passes. Local resolver-only3/3 не установил причину CI7; исторический pwsh/ucrtbase crash имеет только корреляционную связь с локальным resolver failure. После этой factual записи обязательны fresh strictlinks/diff, frozen13 и отдельный completed fresh independent recording review до commit. Workingmetadata+8 не является новым release: HEAD/source/privateinstall+7/02ac, source-onlyMIT/publicZIP+SHA, privatef1/unactivatedc45/старыеversions/workspace и открытые native/signing/full001/021/005 gates сохраняются. Exact future successful fullcoldCI обязателен до merge/tag/source release; CI7cause неизвестна, commit8/CI8/build8/install8/source8/tag/merge/publication здесь не заявлены.
+
+### Уточнение canonical navigation36–38 и действий32/36 (2026-10-29)
+
+DeckView.grants принадлежит Settings, как nav реестра для36/37/38. BaseWorkspace сохраняет AutomationPanel/grants как реальный content этого typed view, а Settings root остаётся SettingsView; текущие callers и ключи owner/target/private epoch сохраняются. Остальные jobs/profile/delegation views не перемещаются. Unit-stage граница final TrustedApiClient остаётся прежней: fake-boundary navigation/shared widget проверки и независимое чтение actual non-null wiring, без native startup. T180 задаёт проверяемую коррекцию и ограничения acceptance.
+
+T179 возвращает source variants двух header actions32/36 и desktop intrinsic/phone full-width action32. Обычный outlined button имеет surface fill, text/ghost — transparent; исправление не меняет согласованные target44, состояния/focus и contrast border FA04. Это существующие presentation components, без новой темы, схемы или другого исполнителя действий.
+
+Обязательный вход «Задания → ИИ-доступ» из FA06 размещается в существующей области page actions списка заданий. BaseWorkspace передаёт локальный callback `_automation(DeckView.grants)` через optional workspaceActions существующему AutomationPanel; на detail28 действие не добавляется. При отсутствии trusted client тот же вход доступен в actions существующей fallback-страницы, без подключения или выдачи полномочий. Остальные standalone callers получают пустой список по умолчанию. Это навигация RAM location, не grant/read/write API; Settings root открывается обычным основным пунктом. Настоящий BaseWorkspace widget-тест проверяет вход из Jobs во всех16условиях, точную selected section, последующий Settings root и отсутствие скрытых эффектов.
+
+### Коррекция description-list AutomationFacts (T182)
+
+Прямая сверка36 показала лишнюю высоту области сведений и другой разделитель. Source CSS задаёт отдельные dt/dd cells с9px vertical padding и12px grid gap; table-context body уменьшает только vertical padding до12. AutomationFacts сейчас даёт10px и общий border, принудительно складывает desktop200%, а его default value использует другую роль. Исправляется только presentation существующих данных: базовые значения Mono12/20, table-context UI12/20, phone13/22; явные styles остаются overrides. Phone stack использует действующий viewport520 и исходные dt/dd margins/borders; новый breakpoint от text scale не вводится. Table-context columns имеют min110 для label, обычные1:1.3; при узкой области value переносится, горизонтальный overflow не создаётся. Два tableContext callers27/36 получают12px vertical body padding при прежних horizontal18/16; responsibility DeckPanel и остальные callers не меняются. Проверка — обычный production widget и исходный CSS/PNG, без DSL/схем/адаптера. Данные, callbacks, API/credentials/trust/owner lifecycles этим не затрагиваются.
+
+### Существующий author-only entry из Jobs (T183)
+
+FA06 требует вход32 из Jobs независимо от server selection. Используется уже введённый workspaceActions список: второй локальный navigation button вызывает _automation(automationProfiles), рядом с существующим grant entry. Показ ограничен Jobs list, не job detail и не standalone callers; заголовок null-client fallback различает Jobs/Ansible-профили/Доступ ИИ. Fallback automation не конструирует trusted controller и не выдаёт выбор сервера за подтверждённый Local API: показывает «Подключение к службе не подтверждено» с объяснением необходимости подтверждённого локального соединения. Target selector остаётся информацией/выбором RAM цели, не условием подготовки профиля без сервера; при client=null действия authoring недоступны по прежней границе. Non-null branch сохраняет тот же AutomationPanel initialSection=profiles, client/key/target и действующий owner/правила author-only. Основная кнопка Jobs возвращает jobs root; общая история хранит точного caller. Ни новых API, native checks, provider choices, credentials, миграций, storage owners или permissions это не вводит. Direct BaseWorkspace тесты с null client и существующей fake внешней границей проверяют entry и последствия; real trusted constructor проверяется независимым чтением, без native startup.
+### Phone control и flex action groups (T184)
+
+Окончательный phone CSS имеет44px visible min-height, padding11px vertical/12px horizontal и1px border; font14px нормализуется в13/20 по FA04. В существующем painter44px hit box ошибочно deflate4 даёт36px visible phone control и сдвиг4px. Phone painter использует полный видимый box с8px radius, focus stroke2 снаружи через2px gap. Standard clipBehavior:Clip.none у существующих FilledButton/OutlinedButton/TextButton в lib разрешает этот внешний focus; никаких новых pointer/keyboard handlers не вводится. Ownership padding переносится в context-aware brand backgroundBuilder: phone content inset13horizontal/12vertical (включая физический1px border), desktop остаётся прежним16/12. ButtonStyle.padding обнуляется, чтобы не складывать два слоя. Desktop painter reserve/geometry/state roles не меняются.
+
+DeckPage phone header использует source flex1/1/auto, table-actionbar27/36 — flex1/1/130px; оба с8px main/run gaps и vertical center. Для упаковки basis ограничивается min-content и доступной шириной; в строке остаток распределяется поровну поверх basis. Ровно такой объём содержит новый обычный UI layout widget в lib/ui/; он не хранит data/context/authority, не создаёт callbacks и не генерирует макеты. Desktop Wrap и default DeckActions сохраняются,130px phone mode включается лишь в main bars27/36. Keyboard/focus/semantics и порядок children сохраняются; реальные role colors, full labels и эффекты проверяются на production buttons. Form-actions full-width stack остаётся отдельной уже требуемой геометрией T129/T143, не принятой этой правкой. Состав release, providers, credentials, сервисы и проверочная стадия не меняются.
+Реализация T184 сохраняет desktop wrapping в non-expand режиме общего DeckActionFlow; его intrinsic width уже включает gaps, поэтому прежний _ActionGroupIntrinsic удалён. Существующий _DeckContentStorage хранит один presentation GlobalKey для header action group, сохраняя тот же button State/focus при перемещении группы между Row и phone Column; прежний PageStorageBucket не меняется. Default DeckActions остаётся Wrap, а только bars27/36 с phoneBasis130 используют стабильный Flow в обеих раскладках. Их исходный phone panel-to-bar gap16 сохранён отдельно от desktop20. Собственный padding у tabs/navigation/profile-name buttons не складывается с новым default; IconButton/ElevatedButton получают прежний non-responsive style. Эти изменения касаются physical UI и identity, не domain owners.
+### Общая панель таблиц и visible/hit geometry (T185)
+
+AutomationLoadedTable сохраняет текущие query/status/page/awaitingPage, native popup state и callbacks. Новые обычные UI primitives размещаются в lib/ui/; query controller остаётся у существующего owner, локальный FocusNode search живёт и освобождается вместе с его widget State. Search сохраняет native TextField editing/selection/semantics, no floating label. Visible height=max(40desktop/44phone, scaled20pxLine+16), Surface fill; UI13/20desktop или14/20phone, regular. Prefix15 имеет left11 и input start34: prefix box30 с учётом публичного Material3 gap4. Border layout dimensions1 одинаковы normal/focus; focus stroke2 offset2 рисуется снаружи и не меняет layout.
+
+Filter chrome использует Caption regular12/18desktop и12/20phone, glyph12, radius7; visible height=max(36/44, scaledLine+12desktop/24phone). Padding с border:11h/6vdesktop,13h/12vphone. Normal Surface/Control/Muted, active Selected/Accent/Accent, hover сохраняет существующую hover роль; disabled Tags непрозрачен, без dispatch и с прежним tooltip. All selected iff status==null; query не меняет status selection. PopupMenuButton/его options и lifecycle сохраняются; публичный Material3 icon+style branch допускает caption trigger с правильным focus без изменения темы menu items. Reset и paging сохраняют прежние точные функции.
+
+Toolbar — обычная width-driven упаковка: search min(available,360), source space-between, gap10desktop/12phone; group gaps8, table gap16desktop/13phone. Никакого принудительного stack от textScale. Widgets/native hit and semantics остаются≥44, а layout/paint сохраняют source visible размеры. Обычный Flutter hit/layout proxy может размещать native44target поверх меньшего visible box; он должен сохранять native semantics/actions и проверяться реальными taps на внешних краях через всех предков, не клонировать handlers.
+
+Та же visible/hit граница применяется desktop header и bars27/36: DeckActionFlow получает опциональный inset4, исключает reserve8 из intrinsic/layout, размещает native children с offset-4 и сохраняет стандартные handlers/semantics44. Phone inset0; default Flow/DeckActions и form footers вне режима не меняются. Default desktop padding17h/12v включает source12h/7v, border1 и reserve4; explicit custom padding, IconButton и ElevatedButton сохраняют прежнее. Существующие PageStorageBucket/action GlobalKey остаются владельцами presentation identity. Проверки включают реальные outer-fringe taps и semantics, focus/resize, popup item keyboard navigation, полные данные и existing API effect counts. Wire/storage/authority/runtime prerequisites не меняются. Это app UI, не новый reference renderer или test framework.
+### Геометрия строк и phone cards общей таблицы (T187)
+
+В AutomationRecordTable сохраняются публичные columns/rows/onSelect/selected/footer/caption/showFooter, точные индексы callbacks и native InkWell keyboard/tap behavior. Это только presentation; владельцы данных, paging/filtering в AutomationLoadedTable, API/авторизация/credentials и runtime prerequisites не меняются. FA04 имеет приоритет: table header остаётся Noto Sans13/20/600, data13/20/400, metadata12/16/400. Предыдущее предположение о необходимости заменить header на12/18/400 было ошибочным прочтением CSS без разрешённого override FA04; такой замены не делать.
+
+Desktop/compact использует общую table panel radius12/border1. У каждого header cell padding horizontal12/vertical10, у каждого data cell12 с каждой стороны; нет дополнительного правого padding поверх равных column slots. Cells вертикально центрированы. Data text defaults устанавливаются внутри Material строки, чтобы Material не заменял13/20 на body14/20. Первый default text cell получает source emphasis600; явные стили переданных widgets (mono/status/прочие специальные роли) сохраняются. Между rows один border1; перед footer ровно один separator, без двойной последней линии. Caption/footer сохраняют свой фактический текст и callbacks; footer outer padding desktop11v/16h, phone top12/остальные0. Footer metadata остаётся12/16 по FA04. Полная отдельная paint/hit геометрия pager остаётся обязательной в T129/T133 и не объявляется закрытой этим исправлением.
+
+Phone определяется исходным device viewport≤520 (MediaQuery), а не шириной вложенного panel или величиной шрифта. Phone table wrapper прозрачен, без общей border/radius/clip. Каждая data row — отдельная Surface карточка с border1/radius10/padding16, selected/hover и существующим native onTap; gap между карточками10. Caption при наличии — отдельная Surface область с border/radius9 и gap10 до rows. Первый cell занимает всю ширину: default UI15/22/600, padding-bottom12 и border-bottom1; далее gap14. Остальные cells — две равные колонки с gap12 horizontal/14 vertical, label12/16 muted и gap4 до default data13/20. Все columns сохраняются, в том числе5+, порядок исходный. Две колонки остаются при200%; текст переносится и увеличивает card height. Никакого forced card mode от textScale на desktop и forced одной колонки от textScale на phone. Ничего не обрезать и не сокращать, без скрытия обязательного содержимого. Explicit cell widgets не заменяются копиями данных ради дизайна.
+
+Реализация остаётся в текущем AutomationRecordTable и обычных Flutter widgets, без новых reader/DSL/manifest/validators. Обычные widget tests проверяют4frames/2themes/100–200%,520/521, default и explicit styles, реальные cell insets/column slots/row heights, separate phone card borders/gap/padding, labels и полные длинные значения, selected и исходный onSelect index, отсутствие неявных effects. Сохранить T185/T186 keyboard/filter/paging/resize regressions. До implementation links и независимое readiness review; после — mandatory static/unit/widget checks и fresh code review. T129/T133, остальные compositions и37/98 не закрываются по одному этому scope.
+
+### Канонический toolbar списка серверов (T188)
+
+В ProfileList остаются нынешние владельцы `_search`, `_searchFocus`, `_filters`, `_tag`, `_status`, `_descending`, controller и borrowed observations. Никакого read/connect/select-profile/save от фильтрации, смены темы/ширины или открытия меню. Search matching/sort/status/tag predicates и counts не меняются. Header «Найти сервер» вызывает прежний FocusNode; `_aiButton` сохраняет существующий маршрут. Summary сохраняет все фактические категории, включая attention/unknown; их нельзя удалить ради demo snapshot.
+
+Бар «Фильтры / ИИ-доступ» использует существующий DeckActions(phoneBasis:130): desktop visible36/native44 с inset4, phone flex basis130 и min44. «Фильтры» — текстовый OutlinedButton без отсутствующего в source icon, прежний toggle `_filters`; второй callback прежний. Expanded sort/reset controls остаются со своими прежними callback semantics.
+
+Search использует DeckSearchField с новым необязательным `labelText` (default прежний для AutomationLoadedTable). Для05 label — «Поиск по имени, адресу или меткам», существующие controller/focus/onChanged. Остальная paint/layout/semantics геометрия T185 переиспользуется без копии renderer: Surface,13/20desktop14/20phone, search glyph15/x11/inputx34, visible40/44/native≥44/focus2gap2. Toolbar: width-driven Wrap spaceBetween, search min(available,360), gap10desktop12phone, filter group gap8; перед cards gap16desktop13phone. Те же обычные DeckHitOverflow wrappers обеспечивают native fringe taps через Wrap/SizedBox.
+
+«Все N» — DeckFilterChip с N=controller.profiles.length (не число filtered rows), selected iff `_status==null && _tag==null`, query не влияет. Этот callback очищает только status/tag, сохраняя search и sort, как прежний; «Сбросить фильтры» по-прежнему очищает ещё query. Status/tag triggers — native PopupMenuButton<String> с DeckFilterChip.style/content, selected caption по фактическому выбранному значению, status icon filter12, tags trailing chevron12. Все существующие options сохраняются: connected/attention и полученные connecting/closing/disconnected/unknown, stale selected status «Нет текущих наблюдений»; sorted unique tags из всех profiles плюс сохранённый missing selected tag; пустое значение сбрасывает соответствующий фильтр. InitialValue точный current value, cancel/Escape ничего не меняет. Stable trigger keys/State сохраняются при выборе, theme и resize; native keyboard/menu lifecycle и no implicit effects проверяются через UI. Dropdown формы и прочие MotionDropdown не переделываются.
+
+Normal popup использует native маршрут; при Motion.reduced popUpAnimationStyle=AnimationStyle.noAnimation (публичный API pinned SDK). Menu text/style сохраняет прежние caption roles05; сохранить DeckFocusLabel для item focus. Каждый private menu option child обёрнут существующим PrivateDialogGate с launchEpoch из PrivateSessionScope при открытии; при потере readiness/смене epoch labels/semantics немедленно удаляются, старый route снимается существующим gate, поздний выбор не выполняет setState. Callback дополнительно проверяет mounted и тот же authorized epoch (без scope в обычном standalone widget test допускается прежний unscoped fake host). Это UI lifetime guard, не источник полномочий. Такой же reduced-motion/private gate применяется к существующему status PopupMenuButton AutomationLoadedTable, сохраняя exact options/onSelected/query/page/reset semantics T185/T186; никакого нового menu framework или service owner.
+
+Проверки обычными production widgets/fake boundaries:4frames/2themes/100–200% и520/521, размеры toolbar/chips/поиска, реальные44px fringe taps/semantics, focus от header action и сохранение query/selection/focus при theme/resize, native keyboard open/traverse/select/Escape и reduced no-animation, status+tag+query intersections/reset/sort/empty/stale choices. Menu privacy проверяется на открытых реальных status/tag options при readiness loss/epoch replacement и позднем выборе; никакого частного содержимого в render/semantics и0 неявных API effects. Сохранить существующие ProfileList и T185/T186 filter/paging tests. До code links+independent readiness; затем mandatory static/unit/widget и fresh code review. Широкие T129/T131 и остальной37/98 scope, полный pager и другие body action groups остаются обязательными.
+
+
+## T213 — выбор исходного SemiBold
+
+Требование точных Noto Sans400/600 из FA03/FA04 реализуется обычными Flutter font families: `BrandAssets.uiFont` остаётся Regular, отдельная `BrandAssets.semiboldFamily` загружает тот же исходный SemiBold без изменения bytes. Все UI styles600, включая copyWith из regular styles, явно выбирают это семейство. Unicode fallback и исходные размеры/интерлиньяж/spacing сохраняются. Pubspec и обычный test loader используют одинаковые имена и файлы; runtime FontLoader/новых зависимостей нет. Проверка — обычный TextPainter/widget regression с независимо загруженными one-face aliases и фактические styles production widgets; затем обязательные format/analyze/unit-widget и независимый review. Переход не добавляет API/store/provider/миграцию или квалификацию native. Полная прямая сверка T191 повторяет затронутые кадры после исправления, T192 остаётся открытой до финальной поставки.
+
+
+### Уточнение T213 после raster probe
+
+Отдельный SemiBold face в Windows widget runner сообщает движку Normal: запрос600 вызывает fake bold поверх уже исходного600. `t213-ink-probe-2.log` показывает при одинаковой ширине377.256 alpha657438 для Normal и879009 для600. Поэтому semibold роли используют отдельную family с исходным SemiBold и `BrandTypography.semiboldWeight = FontWeight.w400` как запрос движку без дополнительного утолщения; фактическое начертание остаётся600 из неизменённого файла. Это правило действует только вместе с semibold family, не переводит regular/mono/fallback на600. Тесты оценивают family, файл, метрики и реальное растровое изображение относительно отдельно загруженного исходного600 без fake bold; числовое свойство TextStyle.fontWeight не является доказательством фактического600. Весь ранее определённый scope и приёмка сохраняются. T213 не завершён, первые captures с отдельной family и запросом600 тоже предварительны и не приняты.
+
+
+Для semibold roles companion `semiboldVariations = [FontVariation('wght', 600)]` сохраняет600 в variable Unicode fallback; статический исходный Sans SemiBold игнорирует отсутствующую ось. Existing CJK raster test сравнивает fallback с независимым SC600, поэтому normal engine request не может молча заменить его на400. Моноширинный metric600 остаётся прежним Mono и не меняется в T213.
+
+
+## T214 — summary и действия существующего ProfileList
+
+Использовать обычный Flutter layout существующей ProfileList: count+caption — одна переносимая группа, statuses — реальные прежние counts, source fleet spacing/type/phone rules по T214. Title TextButton сохраняет прежний onPressed и State; painted content выравнивается по source без padding4, минимальный44 hit/focus сохраняется существующим DeckControlTarget/native slot. Existing Open/Edit buttons получают исходные glyphs через DeckButtonLabel. Никакого подключения, controller/API, нового статуса, fake observation или reference machinery. Проверки directly mount production ProfileList с прежним fake controller: source geometry обеих тем/frames/scales, exact profile dispatch, отсутствие лишнего remote call, сохранение query/focus при resize. До реализации — linkcheck и отдельный readonly readiness review; после — обязательные unit/widget/static и fresh code review. Это дополнение T129/T188/T191, а не отмена выполненных задач.
+
+
+## T215 — readonly описание выбора профиля
+
+Только поле «Выбор профиля» существующей SettingsForm меняет InputDecorator/Text на обычный native readonly TextFormField с прежними label/decoration/style/value. При text scale1 — single-line с native горизонтальным просмотром/selection полного значения; при scale>1 — maxLines:null для FA05. Константа неизменяема, нет listener/onChanged/нового owner или remote effects. Остальные fields/JSON editors/CAS и сохранение не меняются. Проверяются source42/44 при100%, полная readOnly semantics/selection/focus, отсутствие ввода/dispatch и полный wrap/growth200%. База — прямое сравнение пары85; links и readonly readiness предшествуют реализации, mandatory static/unit/widget и code review следуют за ней.
+
+
+## T216 — граница inherited font variations
+
+Explicit regular BrandTypography.body/table/log/label задают пустые fontVariations, чтобы стандартный TextStyle.merge сбрасывал inherited wght600. Semibold роли сохраняют свою family/normal request/wght600 для исходного Sans600 и SC600. Никаких custom TextStyle subclasses, renderer или runtime font remapping: обычные constants и native merge. Приёмка — реальная первая ячейка AutomationRecordTable с явными Body/Mono и CJK, desktop/phone, raster против независимого SC400; существующий standalone SC600/400 и Sans source face tests сохраняются. Это исправление confirmed review, новые продуктовые/архитектурные решения не требуются.
+
+
+## T217 — source readonly inputs в остальных формах
+
+Использовать обычный Flutter readonly input с existing decoration/external label и owner-provided String. Нужен native controller, обновляемый при изменении входного value, сохраняющий selection/focus при равном value, ограничивающий selection новым диапазоном при изменении и освобождаемый приdispose. Это UI state, не новый store/binding protocol. Повторно использовать существующий form presentation слой; source single-line при100 и wrap при scale>1 как T215, явный multiline file-status имеет min60. Callers и неизменяемые security/DTO boundaries перечислены в T217; filename/path не добавляются. Проверять реальные AutomationFormValue/ProfileForm/CredentialInput consumers и обновления value с прежними context/guards, обе themes/frames/scales. Перед реализацией links и readonly readiness; после — mandatory unit/widget/static и fresh review. Новые renderer/DSL/schema bundles не нужны.
+
+
+T217 также сохраняет два соседних source edges `.form-section{border-bottom:1px}` и `.form-actions{border-top:1px}` в page form containers. Не компенсировать недостающий separator изменением readonly field height или padding. Контрольный85 имеет border rows449–450, raised451 и outer bottom519 при1100/dark/100; это новая прямая сверка, не отмена восстановления control42 в T215. Аналогичные ProfileFormScaffold/automation containers проверяются по тому же source CSS. Это presentation correction без новых product decisions.
+
+
+## Завершение003 — порядок пользователя2026-10-29
+
+Приоритетом является целиком законченная реализация текущих37 базовых сценариев003, затем промежуточная локальная normal Release-сборка/сохранная установка, затем полный обязательный unit/widget/static gate. Адресные прогоны запускаются только для упавших сценариев, а не перед каждой небольшой правкой. Финальные clean checks/review/CI/source identity остаются обязательными для окончательной приёмки/публикации исходников.004–020 не реализуются в этой задаче; roadmap98 сохраняется отдельно. Проверить дублирование тестов, не сокращая различимые контракты поведения. Новые reference frameworks и новые native workloads не вводятся.
+
+
+### Промежуточная003 версия
+
+После внесения текущего implementation batch готовится `0.3.0-preview.1+12`: minor increment отражает новый пользовательский интерфейс/навигацию поверх публичной0.2.0, preview честно отделяет промежуточную поставку от завершённой приёмки. Сначала normal local Release build/install с сохранением прежних версий и workspace, затем единый полный static/unit/widget gate; адресные прогоны только по его падениям. Публичный Windows binary не загружается. Для GitHub source-only prerelease сохраняются MIT, точный commit/tag/assets и действующий unit CI gate; локальная сборка доступна пользователю до ожидания этих проверок. Source identity незакоммиченного candidate не выдаётся за final commit.
+
+
+Следующий единый corrective batch T218–T226 использует0.3.0-preview.2+13; опубликованныйsource/installedpreview1 остаётся неизменным. Реализация batch завершена перед его normal build/install; новый fullstatic/unitwidget gate иfresh independentcode review выполняются после промежуточной установки по установленному пользователем порядку. Тесты прежнего4932b94 не являются pass новых изменений.
+
+Phase10 T229–T244, полученная прямой сверкой всех primary viewport условий, поставляется private candidate0.3.0-preview.3+14 тем же порядком whole implementation batch → normal build/install → mandatory gate/review → текущая visual verification. Используется существующий widget-capture из FA10; это отдельное получение артефактов для FA09, не диагностический повтор пройденного теста и не runtime/native qualification. Предыдущие source/installed версии сохраняются. Мелкие presentation adapters остаются в обычных Flutter widgets/render objects; новый reference renderer, язык данных, corpus/validator или installer framework не создаётся.

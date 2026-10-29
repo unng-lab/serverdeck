@@ -1,7 +1,7 @@
 name: serverdeck
 description: Local Windows server workspace.
 publish_to: none
-version: 0.2.0+10
+version: 0.3.0-preview.3+14
 environment:
   sdk: '>=3.13.5 <4.0.0'
 dependencies:
@@ -14,6 +14,7 @@ dependencies:
   serverdeck_windows:
     path: packages/serverdeck_windows
   cryptography: 2.9.0
+  flutter_svg: 2.3.0
   isar_community_flutter_libs: 3.3.2
 dev_dependencies:
   analyzer: 13.3.0
@@ -27,6 +28,7 @@ dependency_overrides:
 flutter:
   uses-material-design: true
   assets:
+    - assets/brand/icons/
     - assets/brand/fonts/OFL.txt
     - assets/brand/fonts/OFL-NotoSansSC.txt
     - assets/brand/fonts/NotoSansSC-SOURCE.json
@@ -34,11 +36,17 @@ flutter:
     - assets/brand/logos/logo-light.png
     - assets/brand/logos/mark-dark.png
     - assets/brand/logos/mark-light.png
+    - assets/brand/logos/logo-dark.svg
+    - assets/brand/logos/logo-light.svg
+    - assets/brand/logos/mark-dark.svg
+    - assets/brand/logos/mark-light.svg
   fonts:
     - family: Noto Sans
       fonts:
         - asset: assets/brand/fonts/NotoSans-Regular.ttf
           weight: 400
+    - family: Noto Sans SemiBold
+      fonts:
         - asset: assets/brand/fonts/NotoSans-SemiBold.ttf
           weight: 600
     - family: Noto Sans Mono

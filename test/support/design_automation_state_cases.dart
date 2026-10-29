@@ -67,6 +67,38 @@ Finder _button(String label) => find
     )
     .first;
 
+Finder _draftField(TextEditingController controller) => find.byWidgetPredicate(
+  (widget) => widget is TextField && identical(widget.controller, controller),
+);
+
+Future<Finder> _showDraftField(
+  WidgetTester tester,
+  TextEditingController controller, {
+  bool profile = false,
+}) async {
+  final field = _draftField(controller);
+  if (field.evaluate().isEmpty) {
+    final title = profile
+        ? 'Шаги и параметры профиля (JSON)'
+        : 'JSON · дополнительные сведения';
+    if (profile && find.text(title).evaluate().isEmpty) {
+      await _click(tester, 'Шаги');
+    }
+    final details = find.text(title);
+    await tester.ensureVisible(details);
+    await tester.pumpAndSettle();
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+  }
+  expect(field, findsOneWidget);
+  return field;
+}
+
+Finder _comparisonValue(String value) => find.descendant(
+  of: find.byType(AutomationRecordTable),
+  matching: find.text(value),
+);
+
 const _enabled = AutomationActionAvailability(
   read: true,
   mutate: true,
@@ -254,6 +286,8 @@ class _Context {
   AutomationRecipesSection recipes({bool enabled = true}) =>
       AutomationRecipesSection(
         catalog: DesignAutomationFixtures.catalog(enabled: enabled),
+        serverId: DesignAutomationFixtures.serverId,
+        serverProfiles: serverProfiles,
         canMutate: actions.mutate,
         onCreatePlan: counters.change('createRecipePlan'),
       );
@@ -265,6 +299,7 @@ class _Context {
         runnable: !expired && invalidReason == null,
         expired: expired,
         invalidReason: invalidReason,
+        showPreflight: id == '18-install-preflight',
         actions: actions,
         onApprove: callback('approve'),
         onDeny: callback('deny'),
@@ -434,6 +469,7 @@ class _Context {
       '28-job-detail' ||
       '29-job-unknown' ||
       '30-job-cancel' => jobs(
+        detail: id != '27-job-list',
         state: id == '29-job-unknown'
             ? 'unknown'
             : id == '30-job-cancel'
@@ -680,17 +716,71 @@ Future<void> _loading(
     ),
   );
   await _mount(tester, composed, variant);
-  expect(find.text(context.phase.label), findsOneWidget);
+  expect(
+    find.descendant(
+      of: find.byType(AutomationStatusSection),
+      matching: find.text(context.phase.label),
+    ),
+    findsOneWidget,
+  );
   expect(find.byType(CircularProgressIndicator), findsNothing);
   expect(context.counters['phaseDispatch'], 1);
-  for (final widget
-      in find
-          .byType(OutlinedButton)
-          .evaluate()
-          .map((element) => element.widget as OutlinedButton)) {
-    // Stop waiting remains available; all same-operation section actions use
-    // the actual disabled availability passed by the owner phase.
-    expect(widget.onPressed, isNull);
+  if (const {
+    '16-install-catalog',
+    '17-recipe-detail',
+    '18-install-preflight',
+  }.contains(context.id)) {
+    // Selecting an already loaded row only changes local presentation. Its
+    // actual durable action remains disabled by the existing owner phase.
+    final recipe = find.text('PostgreSQL 16');
+    await tester.ensureVisible(recipe);
+    await tester.tap(recipe);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ButtonStyleButton>(_button('Создать план')).onPressed,
+      isNull,
+    );
+  }
+  const ownerActions = {
+    'Создать план',
+    'Подтвердить план',
+    'Отклонить план',
+    'Запустить',
+    'Обновить план',
+    'Обновить',
+    'Обновить задания',
+    'План задания',
+    'Остановить после текущего шага',
+    'Уточнить результат',
+    'Обновить состояние',
+    'Проверить версию',
+    'Сравнить версии',
+    'Изменить профиль',
+    'Делегировать версию',
+    'Архивировать',
+    'Выдать доступ',
+    'Изменить права',
+    'Отозвать',
+    'Конфигурация MCP',
+    'Обновить клиентов',
+    'Скопировать конфигурацию',
+    'Обновить разрешения',
+    'Создать новый план',
+    'Выбрать версию',
+  };
+  for (final label in ownerActions) {
+    final buttons = find.ancestor(
+      of: find.text(label),
+      matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+    );
+    for (final button in buttons.evaluate()) {
+      expect(
+        (button.widget as ButtonStyleButton).onPressed,
+        isNull,
+        reason:
+            'The actual owner action $label must remain disabled; local view controls may remain available',
+      );
+    }
   }
   await _passive(tester, context, composed, variant);
   expect(context.counters['phaseDispatch'], 1);
@@ -730,7 +820,7 @@ Future<void> _empty(
       label = 'Ansible-профилей пока нет';
     case '34-profile-revisions':
       child = _scroll(context.revision(noChanges: true));
-      label = 'Изменений в полученном сравнении нет';
+      label = 'В полученном сравнении изменений нет';
     case '36-ai-grants':
       child = _scroll(context.grants());
       label = 'Клиентов ИИ пока нет';
@@ -757,13 +847,7 @@ Future<void> _empty(
 }
 
 Future<void> _expand(WidgetTester tester, String id) async {
-  if (id == '36-ai-grants' || id == '38-mcp-client-config') {
-    if (find.text('Клиентов ИИ пока нет').evaluate().isEmpty &&
-        find.text('Выданные права').evaluate().isEmpty) {
-      await tester.tap(find.text('Доступ ИИ рабочего пространства'));
-      await tester.pumpAndSettle();
-    }
-  } else if (id == '39-delegations') {
+  if (id == '39-delegations') {
     if (find.text('Делегирований пока нет').evaluate().isEmpty &&
         find.text('Действует до').evaluate().isEmpty) {
       await tester.tap(find.text('Делегированные версии'));
@@ -785,8 +869,12 @@ Future<void> _data(
       SoftwarePanel(profiles: harness.profiles, client: null),
       variant,
     );
-    expect(find.text('Установка ПО'), findsOneWidget);
-    expect(find.text(harness.profiles.profiles.single.name), findsOneWidget);
+    expect(find.text('Каталог установки'), findsOneWidget);
+    final selected = harness.profiles.profiles.single;
+    expect(
+      find.text('${selected.name} · ${selected.address}:${selected.port}'),
+      findsOneWidget,
+    );
     expect(harness.client.mutations, isEmpty);
     await _capture(tester, context, variant, 'local-software-selection', [
       'Actual SoftwarePanel current local profile metadata',
@@ -806,35 +894,88 @@ Future<void> _data(
   await _expand(tester, context.id);
   switch (context.id) {
     case '16-install-catalog' || '17-recipe-detail':
+      final row = find.text('PostgreSQL 16');
+      await tester.ensureVisible(row);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
       expect(find.text('PostgreSQL 16'), findsOneWidget);
       expect(find.text('16.10'), findsOneWidget);
+      final title = find.text('Лицензии, начальные настройки и точные условия');
+      await tester.ensureVisible(title);
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      final raw = tester.widget<SelectableText>(
+        find.descendant(
+          of: find.byType(AutomationJsonView),
+          matching: find.byType(SelectableText),
+        ),
+      );
+      expect((jsonDecode(raw.data!) as Map)['licenseNotices'], [
+        'PostgreSQL License\nСинтетический пример лицензии',
+      ]);
+    case '18-install-preflight' || '94-plan-invalidated':
       expect(
-        find.text('PostgreSQL License\nСинтетический пример лицензии'),
+        find.text('Синтетический сервер · 192.0.2.44:2222'),
         findsOneWidget,
       );
-    case '18-install-preflight' || '94-plan-invalidated':
-      expect(find.text('Синтетический сервер'), findsOneWidget);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
-      expect(find.text('Привет'), findsWidgets);
+      if (context.id == '18-install-preflight')
+        expect(find.text('Привет'), findsWidgets);
       if (context.id == '94-plan-invalidated')
-        expect(find.text('План больше не действует'), findsOneWidget);
+        expect(find.text('План больше не действует'), findsWidgets);
+      if (context.id == '94-plan-invalidated') {
+        await _click(tester, 'Просмотреть прежний план');
+        final title = find.text('Неизменный план и технические детали');
+        await tester.ensureVisible(title);
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        final payload = tester.widget<SelectableText>(
+          find.byType(SelectableText),
+        );
+        final previous = (jsonDecode(payload.data!) as Map)
+            .cast<String, Object?>();
+        expect(previous['exactParams'], {'greeting': 'Привет'});
+        expect(previous, DesignAutomationFixtures.plan());
+      }
     case '19-plan-approval':
-      expect(find.text('Синтетический сервер'), findsOneWidget);
-      expect(find.text('192.0.2.44:2222'), findsOneWidget);
+      expect(
+        find.text('Синтетический сервер · 192.0.2.44:2222'),
+        findsOneWidget,
+      );
       expect(context.counters['confirm'], 0);
     case '27-job-list' ||
         '28-job-detail' ||
         '29-job-unknown' ||
         '30-job-cancel':
-      expect(find.text('Выбранное задание'), findsOneWidget);
+      if (context.id != '30-job-cancel')
+        expect(find.text(DesignAutomationFixtures.jobId), findsWidgets);
+      if (context.id == '27-job-list')
+        expect(find.text('Контекст задания'), findsNothing);
+      if (context.id == '28-job-detail')
+        expect(find.text('Контекст задания'), findsOneWidget);
+      if (context.id == '29-job-unknown' || context.id == '30-job-cancel')
+        expect(find.text('Контекст и проверка результата'), findsOneWidget);
       if (context.id == '29-job-unknown')
         expect(
           find.text('Возможны неподтверждённые изменения'),
           findsOneWidget,
         );
       if (context.id == '30-job-cancel') {
-        expect(find.textContaining('Остановка запрошена.'), findsOneWidget);
+        expect(find.text('Состояние: Остановка запрошена'), findsOneWidget);
         expect(find.text('Остановить после текущего шага'), findsNothing);
+        final title = find.text('Результат и проверки задания');
+        await tester.ensureVisible(title);
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        final payload = tester.widget<SelectableText>(
+          find.byType(SelectableText),
+        );
+        final captured = (jsonDecode(payload.data!) as Map)
+            .cast<String, Object?>();
+        expect(captured['id'], DesignAutomationFixtures.jobId);
+        expect(
+          captured,
+          DesignAutomationFixtures.job(state: 'cancel-requested'),
+        );
       }
     case '32-automation-profiles':
       expect(
@@ -844,15 +985,24 @@ Future<void> _data(
     case '33-profile-authoring':
       expect(context.body.text, jsonEncode(DesignAutomationFixtures.body()));
     case '34-profile-revisions':
-      expect(find.text('/parameters/greeting/default'), findsOneWidget);
+      expect(_comparisonValue('/parameters/greeting/default'), findsOneWidget);
     case '35-plan-parameters' || '37-ai-grant-form':
-      expect(find.byType(TextField), findsOneWidget);
+      final draft = await _showDraftField(tester, context.input);
+      expect(tester.widget<TextField>(draft).controller, same(context.input));
       expect(context.input.text, jsonEncode(_input(context.id)));
     case '36-ai-grants':
-      expect(find.text('Доступ действует'), findsOneWidget);
+      expect(find.text('Действует'), findsOneWidget);
     case '38-mcp-client-config':
-      expect(find.text(r'C:\Synthetic\ServerDeck\mcp.exe'), findsOneWidget);
-      expect(find.text('Аргументы'), findsOneWidget);
+      final exact = tester
+          .widgetList<AutomationExactValue>(find.byType(AutomationExactValue))
+          .toList();
+      expect(exact.first.value, r'C:\Synthetic\ServerDeck\mcp.exe');
+      expect(
+        exact.last.value,
+        (DesignAutomationFixtures.launchConfiguration()['args'] as List).join(
+          ', ',
+        ),
+      );
     case '39-delegations':
       expect(find.text('Делегирование версии'), findsOneWidget);
       expect(find.text('Действует до'), findsOneWidget);
@@ -896,13 +1046,16 @@ Future<void> _data(
         variant,
       );
       await _expand(tester, context.id);
+      expect(find.text(revoked ? 'Отозван' : 'Истёк'), findsOneWidget);
       expect(
-        find.text(revoked ? 'Доступ отозван' : 'Срок доступа истёк'),
-        findsOneWidget,
+        tester.widget<ButtonStyleButton>(_button('Конфигурация MCP')).onPressed,
+        isNull,
       );
-      expect(find.text('Конфигурация MCP'), findsNothing);
       if (revoked)
-        expect(find.text('Изменить права'), findsNothing);
+        expect(
+          tester.widget<ButtonStyleButton>(_button('Изменить права')).onPressed,
+          isNull,
+        );
       else
         expect(find.text('Изменить права'), findsOneWidget);
       await _capture(
@@ -967,7 +1120,7 @@ Future<void> _failure(
     );
     expect(
       find.text(ReadErrorView.category(typed)),
-      findsOneWidget,
+      findsWidgets,
       reason: 'Actual software profile read failure must not be shown as indefinite loading.',
     );
     expect(find.text('Ожидание списка серверов'), findsNothing);
@@ -1145,6 +1298,9 @@ Future<void> _stale(
     await _mount(tester, child, variant);
     expect(find.text('Запустить'), findsNothing);
     expect(find.text('Подтвердить план'), findsNothing);
+    expect(find.text('Создать новый план'), findsOneWidget);
+    if (find.text('Обновить план').evaluate().isEmpty)
+      await _click(tester, 'Просмотреть прежний план');
     expect(find.text('Обновить план'), findsOneWidget);
     expect(context.counters['apply'] + context.counters['approve'], 0);
     await _capture(
@@ -1170,16 +1326,13 @@ Future<void> _stale(
     retained();
     await tester.pumpAndSettle();
     expect(context.counters['confirm'], 0);
-    expect(find.text('Срок плана истёк'), findsOneWidget);
-    expect(
-      tester.widget<ButtonStyleButton>(_button('Подтвердить план')).onPressed,
-      isNull,
-    );
+    expect(find.text('Срок плана истёк'), findsWidgets);
+    expect(find.text('Подтвердить план'), findsNothing);
     now = DesignAutomationFixtures.presentationNow();
     await _mount(tester, child, variant);
     expect(
-      tester.widget<ButtonStyleButton>(_button('Подтвердить план')).onPressed,
-      isNull,
+      find.text('Подтвердить план'),
+      findsNothing,
       reason: 'Observed deadline retirement cannot restore old consent when a synthetic clock rewinds.',
     );
     await _capture(tester, context, variant, 'deadline-retired', [
@@ -1207,6 +1360,10 @@ Future<void> _jobQuality(
     ),
     variant,
   );
+  final received =
+      'Получено событий: ${dropped ? 3 : 200}. Пропущено в источнике: ${dropped ? 7 : 0}';
+  if (find.text(received).evaluate().isEmpty)
+    await _click(tester, 'Показать события');
   expect(
     find.text(
       'Получено событий: ${dropped ? 3 : 200}. Пропущено в источнике: ${dropped ? 7 : 0}',
@@ -1223,9 +1380,15 @@ Future<void> _jobQuality(
     findsOneWidget,
   );
   expect(find.text('Возможны неподтверждённые изменения'), findsOneWidget);
-  await tester.ensureVisible(find.text('Последние 200 полученных событий'));
-  await tester.tap(find.text('Последние 200 полученных событий'));
-  await tester.pumpAndSettle();
+  expect(
+    tester
+        .widget<AutomationJobsSection>(find.byType(AutomationJobsSection))
+        .events,
+    DesignAutomationFixtures.events(
+      count: dropped ? 3 : 200,
+      dropped: dropped ? 7 : 0,
+    ),
+  );
   if (dropped) expect(find.text('Пропущено событий: 7'), findsOneWidget);
   expect(context.counters.values, isEmpty);
   await _capture(
@@ -1253,7 +1416,7 @@ Future<void> _incomplete(
       find.text('Сравнение неполное: часть изменений не получена'),
       findsOneWidget,
     );
-    expect(find.text('/parameters/greeting/default'), findsOneWidget);
+    expect(_comparisonValue('/parameters/greeting/default'), findsOneWidget);
   } else {
     await _mount(
       tester,
@@ -1292,7 +1455,14 @@ Future<void> _unknown(
         variant,
       );
       expect(find.text('Уточнить результат'), findsNothing);
-      await tester.tap(find.text('Исход не подтверждён').first);
+      final row = find
+          .descendant(
+            of: find.byType(AutomationLoadedTable),
+            matching: find.text(DesignAutomationFixtures.jobId),
+          )
+          .first;
+      await tester.ensureVisible(row);
+      await tester.tap(row);
       await tester.pumpAndSettle();
       expect(context.counters['selectJob'], 1);
     }
@@ -1489,10 +1659,8 @@ void registerDesignAutomationStateCases({bool fullAdaptive = false}) {
             variant,
           );
           expect(
-            tester
-                .widget<ButtonStyleButton>(_button('Подтвердить план'))
-                .onPressed,
-            isNull,
+            find.text('Подтвердить план'),
+            findsNothing,
             reason: 'An expired exact plan must not keep an active old consent callback.',
           );
           expect(confirmed, 0);
@@ -1831,7 +1999,9 @@ class _JsonRecoveryFixture extends ChangeNotifier {
 String _jsonDraftSource(AutomationUiPhase phase) =>
     '  ${jsonEncode(switch (phase) {
       AutomationUiPhase.createPlan => {'greeting': 0},
-      AutomationUiPhase.delegate => {..._input('39-delegations'), 'lifetimeSeconds': 0},
+      // A legal client draft still exercises a delayed owner VALIDATION result
+      // (for example a state/policy change), after pre-admission validation.
+      AutomationUiPhase.delegate => {..._input('39-delegations'), 'lifetimeSeconds': 3600},
       AutomationUiPhase.version => {'revision': 1},
       AutomationUiPhase.compare => {'fromRevision': 1, 'toRevision': 1},
       _ => {..._input('37-ai-grant-form'), 'label': 'Точный черновик 日本語', 'lifetimeSeconds': 0},
@@ -1874,6 +2044,42 @@ Future<void> _captureJsonCheckpoint(
 );
 
 void _registerGenericRecoveryJourneys(_Variant variant) {
+  testWidgets(
+    'T160 delegation original zero-TTL draft rejects before admission ${variant.suffix}',
+    (tester) async {
+      // Preserve the original T099 zero-TTL input at its real admission stage;
+      // the delayed recovery journey above keeps a valid client-side request.
+      final text =
+          '  ${jsonEncode({..._input('39-delegations'), 'lifetimeSeconds': 0})}\n ';
+      final fixture = _JsonRecoveryFixture(
+        AutomationUiPhase.delegate,
+        source: text,
+      );
+      try {
+        await _mount(tester, fixture.editor(), variant);
+        await _click(tester, 'Продолжить');
+        expect(fixture.submits, 0);
+        expect(fixture.closes, 0);
+        expect(fixture.pending, isNull);
+        expect(fixture.identity, isNull);
+        expect(fixture.identities, isEmpty);
+        expect(fixture.submission.saving, isFalse);
+        expect(fixture.submission.requestRetained, isFalse);
+        expect(fixture.submission.error, automationDraftInputError());
+        expect(fixture.input.text, text);
+        expect(
+          tester
+              .widget<TextField>(await _showDraftField(tester, fixture.input))
+              .enabled,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        fixture.dispose();
+      }
+    },
+  );
   testWidgets(
     'T099 pre-dispatch target rejection preserves draft ${variant.suffix}',
     (tester) async {
@@ -1961,7 +2167,9 @@ void _registerGenericRecoveryJourneys(_Variant variant) {
           expect(fixture.closes, 0);
           expect(fixture.submission.saving, isTrue);
           expect(
-            tester.widget<TextField>(find.byType(TextField)).enabled,
+            tester
+                .widget<TextField>(await _showDraftField(tester, fixture.input))
+                .enabled,
             isFalse,
           );
           fixture.gate!.complete();
@@ -1973,7 +2181,9 @@ void _registerGenericRecoveryJourneys(_Variant variant) {
           original();
           await tester.pumpAndSettle();
           expect(fixture.submits, 1);
-          await tester.ensureVisible(find.byType(TextField));
+          await tester.ensureVisible(
+            await _showDraftField(tester, fixture.input),
+          );
           await tester.pumpAndSettle();
           await _captureJsonCheckpoint(
             tester,
@@ -2021,7 +2231,9 @@ void _registerGenericRecoveryJourneys(_Variant variant) {
         expect(fixture.submission.requestRetained, isFalse);
         expect(fixture.input.text, originalText);
         expect(
-          tester.widget<TextField>(find.byType(TextField)).enabled,
+          tester
+              .widget<TextField>(await _showDraftField(tester, fixture.input))
+              .enabled,
           isTrue,
         );
         await _captureJsonCheckpoint(
@@ -2031,7 +2243,7 @@ void _registerGenericRecoveryJourneys(_Variant variant) {
           't099-grant-dismissed-exact-draft',
         );
         await tester.enterText(
-          find.byType(TextField),
+          await _showDraftField(tester, fixture.input),
           '  ${jsonEncode({..._input('37-ai-grant-form'), 'label': 'Исправлено 日本語', 'lifetimeSeconds': 3600})}\n ',
         );
         expect(fixture.submits, 1);
@@ -2062,7 +2274,9 @@ void _registerGenericRecoveryJourneys(_Variant variant) {
           expect(fixture.submission.requestRetained, isFalse);
           expect(fixture.pending, 'Чужая запись');
           expect(
-            tester.widget<TextField>(find.byType(TextField)).enabled,
+            tester
+                .widget<TextField>(await _showDraftField(tester, fixture.input))
+                .enabled,
             isTrue,
           );
           expect(find.text('Повторить тот же запрос'), findsNothing);
@@ -2251,18 +2465,22 @@ void _registerGenericDraftRegressions(_Variant variant) {
         expect(fixture.closes, 0);
         expect(find.byType(AutomationJsonEditorDialog), findsOneWidget);
         expect(
-          tester.widget<TextField>(find.byType(TextField)).controller,
+          tester
+              .widget<TextField>(await _showDraftField(tester, fixture.input))
+              .controller,
           same(fixture.input),
         );
         expect(fixture.input.text, text);
         expect(
           tester
-              .widget<TextField>(find.byType(TextField))
+              .widget<TextField>(await _showDraftField(tester, fixture.input))
               .decoration!
               .errorText,
           automationMessage('VALIDATION'),
         );
-        await tester.ensureVisible(find.byType(TextField));
+        await tester.ensureVisible(
+          await _showDraftField(tester, fixture.input),
+        );
         await tester.pumpAndSettle();
         await _captureJsonCheckpoint(
           tester,
@@ -2875,7 +3093,14 @@ void _registerProfileLifecycleRegressions(_Variant variant) {
         expect(dispatches, 1);
         expect(successCloses, 0);
         for (final field in find.byType(TextField).evaluate()) {
-          expect((field.widget as TextField).enabled, isFalse);
+          final input = field.widget as TextField;
+          // Readonly context remains selectable; mutating editors stay blocked.
+          if (input.readOnly) {
+            expect(input.onChanged, isNull);
+            expect(input.onSubmitted, isNull);
+          } else {
+            expect(input.enabled, isFalse);
+          }
         }
         await _click(tester, 'Закрыть');
         expect(closeRequests, 1);

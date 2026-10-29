@@ -294,7 +294,8 @@ const designBindings = <AcceptanceBinding>[
     notApplicableReason: 'General software inventory N/A; history не создаёт samples, отдельный collector или DTO fields.',
     productionWidgets: [
       'ServerOverviewSection',
-      'ServerSystemSection',
+      'ServerResourceCards',
+      'ServerObservationChart',
       'MetricsHistory',
     ],
   ),
@@ -458,7 +459,7 @@ const designBindings = <AcceptanceBinding>[
     ],
     states: ['challenge', 'cancel', 'expired', 'changed', 'readiness-loss'],
     notApplicableReason: 'Автоматическое принятие ключа и generic retry обхода mismatch N/A: запрещены owner safeguards.',
-    productionWidgets: ['ServerConfirmationDialog', 'ServerTrustConfirmation'],
+    productionWidgets: ['ServerPlanDialog', 'ServerTrustConfirmation'],
   ),
   AcceptanceBinding(
     screenId: '12-credential-input',
@@ -1328,10 +1329,7 @@ const designBindings = <AcceptanceBinding>[
       'readiness-loss',
     ],
     notApplicableReason: 'Автоматическая установка executor/расширение прав от чтения или resize N/A: отдельное existing owner action.',
-    productionWidgets: [
-      'ServerConfirmationDialog',
-      'ServerExecutorConfirmation',
-    ],
+    productionWidgets: ['ServerPlanDialog', 'ServerExecutorConfirmation'],
   ),
   AcceptanceBinding(
     screenId: '84-settings',

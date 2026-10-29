@@ -3,12 +3,15 @@ import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_windows/operational_auth_client.dart';
 
 import '../automation/automation_panel.dart';
+import '../automation/automation_sections.dart';
 import '../profiles/profile_controller.dart';
 import '../profiles/profile_form.dart';
 import '../shell/error_view.dart';
 import '../theme/motion.dart';
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_page.dart';
+import '../ui/deck_control_target.dart';
 
 /// Server and recipe records remain owned by the same local service.
 class SoftwarePanel extends StatefulWidget {
@@ -16,9 +19,18 @@ class SoftwarePanel extends StatefulWidget {
     super.key,
     required this.profiles,
     required this.client,
-  });
+    this.serverId,
+    this.onServerSelected,
+    this.onPlanReview,
+  }) : assert(serverId == null || onServerSelected != null);
   final ProfileController profiles;
   final TrustedApiClient? client;
+
+  /// A non-null navigation target stays explicit even if its profile disappears.
+  /// A null target may use the saved initial default. Selection stays in RAM.
+  final String? serverId;
+  final ValueChanged<String>? onServerSelected;
+  final VoidCallback Function()? onPlanReview;
 
   @override
   State<SoftwarePanel> createState() => _SoftwarePanelState();
@@ -26,9 +38,29 @@ class SoftwarePanel extends StatefulWidget {
 
 class _SoftwarePanelState extends State<SoftwarePanel> {
   String? _selected;
+  int _selectionEpoch = 0;
+  String? get _selectedId =>
+      widget.serverId ??
+      (widget.onServerSelected == null ? _selected : null) ??
+      widget.profiles.selected?.id;
+
+  @override
+  void didUpdateWidget(covariant SoftwarePanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.profiles, widget.profiles) ||
+        !identical(oldWidget.client, widget.client) ||
+        oldWidget.serverId != widget.serverId ||
+        (oldWidget.onServerSelected == null) !=
+            (widget.onServerSelected == null)) {
+      _selectionEpoch++;
+      _selected = null;
+    }
+  }
 
   Future<void> _chooseServer() async {
     final owner = widget.profiles;
+    final client = widget.client;
+    final epoch = ++_selectionEpoch;
     final value = await showMotionDialog<String>(
       context: context,
       barrierDismissible: true,
@@ -54,7 +86,7 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: BrandSpacing.space8),
                     child: DeckSurface(
-                      selected: row.id == (_selected ?? owner.selected?.id),
+                      selected: row.id == _selectedId,
                       onTap: () => Navigator.pop(dialog, row.id),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,6 +102,7 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
           ),
           actions: [
             TextButton(
+              clipBehavior: Clip.none,
               onPressed: () => Navigator.pop(dialog),
               child: const Text('Отмена'),
             ),
@@ -78,12 +111,19 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
       ),
     );
     if (!mounted ||
+        epoch != _selectionEpoch ||
         !identical(owner, widget.profiles) ||
+        !identical(client, widget.client) ||
         !owner.loaded ||
         value == null ||
         !owner.profiles.any((row) => row.id == value))
       return;
-    setState(() => _selected = value);
+    final select = widget.onServerSelected;
+    if (select != null) {
+      select(value);
+    } else {
+      setState(() => _selected = value);
+    }
   }
 
   @override
@@ -105,27 +145,45 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
           child: DeckStatus(label: 'Ожидание списка серверов', pending: true),
         );
       }
-      final selected = _selected ?? widget.profiles.selected?.id;
+      final selected = _selectedId;
       final target = profiles.any((row) => row.id == selected)
           ? selected
           : null;
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: BrandSpacing.space16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const DeckSectionHeader(
-              title: 'Установка ПО',
-              description: 'Выберите сервер, откройте доступные точные рецепты и проверьте план перед запуском.',
-            ),
-            const SizedBox(height: BrandSpacing.space24),
-            if (profiles.isEmpty) ...[
-              DeckNotice(
+      final selector = SoftwareServerSelector(
+        profiles: profiles,
+        selectedId: target,
+        onChoose: () => _chooseServer(),
+      );
+      if (target != null && widget.client != null)
+        return AutomationPanel(
+          key: ValueKey(target),
+          client: widget.client!,
+          serverId: target,
+          serverProfiles: profiles,
+          installationCatalog: true,
+          onPlanReview: widget.onPlanReview,
+          contextBar: selector,
+          contextBarBuilder: (environment) => SoftwareServerSelector(
+            profiles: profiles,
+            selectedId: target,
+            onChoose: () => _chooseServer(),
+            environment: environment,
+          ),
+        );
+      return DeckPage(
+        title: 'Каталог установки',
+        description: 'Выберите сервер, откройте доступные точные рецепты и проверьте план перед запуском.',
+        eyebrow: 'ПО / Рабочее пространство',
+        contextBar: profiles.isEmpty ? null : selector,
+        child: profiles.isEmpty
+            ? DeckEmptyState(
                 title: 'Серверов пока нет',
-                message: 'Добавьте сервер, чтобы открыть каталог установки.',
-                tone: DeckTone.neutral,
+                description:
+                    'Добавьте сервер, чтобы открыть каталог установки.',
+                icon: 'software',
                 actions: [
                   FilledButton(
+                    clipBehavior: Clip.none,
                     onPressed: () => showMotionDialog<void>(
                       context: context,
                       barrierDismissible: false,
@@ -134,30 +192,11 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
                     child: const Text('Добавить сервер'),
                   ),
                 ],
+              )
+            : const DeckNotice(
+                message: 'Выберите сервер. Доступ и доверие подготавливаются в разделе «Серверы».',
+                tone: DeckTone.neutral,
               ),
-            ] else ...[
-              SoftwareServerSelector(
-                profiles: profiles,
-                selectedId: target,
-                onChoose: () => _chooseServer(),
-              ),
-              const SizedBox(height: BrandSpacing.space16),
-              if (target != null && widget.client != null)
-                AutomationPanel(
-                  key: ValueKey(target),
-                  client: widget.client!,
-                  serverId: target,
-                  serverProfiles: profiles,
-                  installationCatalog: true,
-                )
-              else
-                const DeckNotice(
-                  message: 'Выберите сервер. Доступ и доверие подготавливаются в разделе «Серверы».',
-                  tone: DeckTone.neutral,
-                ),
-            ],
-          ],
-        ),
       );
     },
   );
@@ -171,40 +210,39 @@ class SoftwareServerSelector extends StatelessWidget {
     required this.profiles,
     required this.selectedId,
     required this.onChoose,
+    this.environment,
   });
 
   final List<ProfileView> profiles;
   final String? selectedId;
   final VoidCallback onChoose;
+  final String? environment;
 
   @override
   Widget build(BuildContext context) {
     final selected = profiles.where((row) => row.id == selectedId).firstOrNull;
-    return DeckSurface(
-      child: DeckFormSection(
-        title: 'Сервер для установки',
-        description: 'Выбор сервера не устанавливает подключение. Открытие рецептов выполняется отдельным действием.',
-        children: [
-          if (selected != null) ...[
-            DeckKeyValue(label: 'Сервер', value: selected.name),
-            DeckKeyValue(
-              label: 'Адрес',
-              value:
-                  '${selected.address.contains(':') ? '[${selected.address}]' : selected.address}:${selected.port}',
-              selectable: true,
-            ),
-          ],
-          DeckActions(
-            children: [
-              OutlinedButton(
-                onPressed: onChoose,
-                child: Text(
-                  selected == null ? 'Выбрать сервер' : 'Изменить сервер',
-                ),
-              ),
-            ],
-          ),
-        ],
+    return DeckPanel(
+      title: 'Область просмотра',
+      trailing: DeckControlTarget(
+        visibleHeight: MediaQuery.textScalerOf(context)
+            .scale(MediaQuery.sizeOf(context).width <= 520 ? 22 : 20),
+        child: TextButton(
+          clipBehavior: Clip.none,
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          onPressed: onChoose,
+          child: Text(selected == null ? 'Выбрать сервер' : 'Изменить сервер'),
+        ),
+      ),
+      child: AutomationFacts(
+        tableContext: true,
+        values: {
+          'Сервер для установки': selected == null
+              ? 'Сервер не выбран'
+              : '${selected.name} · ${AutomationServerTargets.address(selected)}',
+          'Среда': environment == 'ubuntu24.04-amd64-systemd'
+              ? 'Ubuntu 24.04 · amd64 · systemd'
+              : environment ?? 'Не предоставлено',
+        },
       ),
     );
   }

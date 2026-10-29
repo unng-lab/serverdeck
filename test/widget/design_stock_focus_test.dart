@@ -7,6 +7,7 @@ import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/servers/server_sections.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
+import 'package:serverdeck/ui/deck_action_flow.dart';
 
 import '../support/design_host.dart' show loadDesignFonts;
 import '../support/design_scenario_harness.dart';
@@ -37,6 +38,43 @@ Future<Map<String, Object>> _expectFocusOutline(
     background,
     background,
   ], reason: 'Keyboard focus must paint its 2px outline and 2px gap');
+  expect(stockContrast(focus, background), greaterThanOrEqualTo(3));
+  return {
+    'focusArgb': focus.toARGB32(),
+    'backgroundArgb': background.toARGB32(),
+    'leftSampleArgb': [for (final color in row) color.toARGB32()],
+    'outlineWidth': 2,
+    'gap': 2,
+    'indicatorContrast': stockContrast(focus, background),
+  };
+}
+
+Future<Map<String, Object>> _expectControlFocusOutline(
+  WidgetTester tester,
+  GlobalKey boundary,
+  Finder control,
+  ThemeData theme, {
+  Color? gapBackground,
+  Color? selectedBackground,
+  bool outside = false,
+}) async {
+  final raster = await StockPaintRaster.capture(tester, boundary);
+  final rect = tester.getRect(control);
+  final contentBackground = raster.dominant(rect);
+  if (selectedBackground != null) expect(contentBackground, selectedBackground);
+  final background = gapBackground ?? contentBackground;
+  final focus = theme.extension<BrandColors>()!['focus'];
+  final row = [
+    for (final delta in outside ? [-3.5, -2.5, -1.5, -.5] : [.5, 1.5, 2.5, 3.5])
+      raster.pixel(Offset(rect.left + delta, rect.center.dy)),
+  ];
+  expect(
+    row,
+    [focus, focus, background, background],
+    reason: outside
+        ? 'The phone button must paint its 2px focus outside the control with a 2px gap.'
+        : 'The interactive control must paint its 2px focus and 2px gap inside its reserved hit area.',
+  );
   expect(stockContrast(focus, background), greaterThanOrEqualTo(3));
   return {
     'focusArgb': focus.toARGB32(),
@@ -107,20 +145,58 @@ void main() {
                 'credential' => find.text('Показать введённый секрет'),
                 'settings' => find.text('Уменьшение анимации'),
                 'profile' => find.text(harness.initialProfile.name),
-                _ => find.textContaining(' UTC').last,
+                _ =>
+                  find
+                      .descendant(
+                        of: find.byKey(const ValueKey('server-log-row-0')),
+                        matching: find.text('09:00:00'),
+                      )
+                      .first,
               };
-              final tile = _tile(label);
+              final tile = scenario == 'profile'
+                  ? find
+                        .ancestor(of: label, matching: find.byType(TextButton))
+                        .first
+                  : scenario == 'log'
+                  ? find.byKey(const ValueKey('server-log-row-0'))
+                  : _tile(label);
               await stockTabTo(tester, tile);
               expect(stockContainsFocus(tester, tile), isTrue);
               expect(tester.getSize(tile).height, greaterThanOrEqualTo(44));
               final paint = await stockExpectReadable(tester, boundary, label);
               Map<String, Object>? subtitlePaint;
               if (scenario == 'log') {
+                final logs = tester
+                    .widget<ServerLogsSection>(find.byType(ServerLogsSection))
+                    .logs!;
+                final record =
+                    (logs['records'] as List).first as Map<String, Object?>;
+                final timestamp = '${record['timestamp']} UTC';
+                expect(
+                  find.descendant(
+                    of: tile,
+                    matching: find.byWidgetPredicate(
+                      (widget) =>
+                          widget is Tooltip && widget.message == timestamp,
+                    ),
+                  ),
+                  findsOneWidget,
+                );
+                expect(
+                  tester.getSemantics(tile).getSemanticsData().label,
+                  contains('Полная запись $timestamp'),
+                );
                 final subtitle = find.descendant(
                   of: tile,
                   matching: find.byWidgetPredicate(
                     (widget) => widget is Text && widget.maxLines == 4,
                   ),
+                );
+                final unit = record['unit'];
+                expect(
+                  tester.widget<Text>(subtitle).textSpan!.toPlainText(),
+                  '${unit is String && unit.isNotEmpty ? '$unit ' : ''}'
+                  '${record['message']}',
                 );
                 subtitlePaint = await stockExpectReadable(
                   tester,
@@ -128,12 +204,30 @@ void main() {
                   subtitle,
                 );
               }
-              final outline = await _expectFocusOutline(
-                tester,
-                boundary,
-                label,
-                theme,
-              );
+              final outline = scenario == 'profile' || scenario == 'log'
+                  ? await _expectControlFocusOutline(
+                      tester,
+                      boundary,
+                      scenario == 'profile'
+                          ? find
+                                .ancestor(
+                                  of: tile,
+                                  matching: find.byType(DeckActionFlow),
+                                )
+                                .first
+                          : tile,
+                      theme,
+                      outside: scenario == 'profile',
+                      // The log row's selected Container starts after the
+                      // DeckFocusLabel's reserved 2px stroke plus 2px gap.
+                      gapBackground: scenario == 'log'
+                          ? theme.extension<BrandColors>()!['bg']
+                          : null,
+                      selectedBackground: scenario == 'log'
+                          ? theme.extension<BrandColors>()!['selected']
+                          : null,
+                    )
+                  : await _expectFocusOutline(tester, boundary, label, theme);
               expect(harness.client.mutations, isEmpty);
               await captureStockPaint(
                 tester,
@@ -170,8 +264,8 @@ void main() {
                   scenario == 'credential' || scenario == 'settings'
                       ? 'CheckboxListTile'
                       : scenario == 'profile'
-                      ? 'ExpansionTile'
-                      : 'ListTile',
+                      ? 'TextButton'
+                      : 'InkWell',
                 ],
                 width: width,
                 theme: dark ? 'dark' : 'light',

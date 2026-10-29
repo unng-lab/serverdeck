@@ -121,8 +121,8 @@ void main() {
     );
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Сохранить'));
-    await tester.tap(find.text('Сохранить'));
+    await tester.ensureVisible(find.text('Сохранить без подключения'));
+    await tester.tap(find.text('Сохранить без подключения'));
     await tester.pumpAndSettle();
     expect(client.sent, isEmpty);
     expect(find.text('Проверьте значение поля'), findsWidgets);

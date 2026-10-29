@@ -4,6 +4,37 @@
 
 - Spec Kit is installed in this repository: `.specify/` and `.agents/skills/speckit-*`.
 - If the user asks to work through Spec Kit, use the Spec Kit skills and workflow.
+- The user's 2026-10-28 cleanup instruction removes the custom design-binding
+  language, duplicate reference validators, schema bundles and hash/receipt
+  pipeline. Keep design work in Flutter with ordinary unit/widget tests and
+  direct comparison with the canonical mockups. Do not recreate that machinery.
+- The user temporarily permitted Computer Use on 2026-10-29, then explicitly
+  suspended it again. Do not use Computer Use or desktop UI automation until
+  the user grants new permission. Ordinary executable launch for delivery
+  remains authorized; this does not authorize native/integration test workloads.
+
+## Current user priority — 2026-10-29
+
+- The intermediate003 visual-correction candidate is `0.3.0-preview.3+14`.
+  Prior private `0.3.0-preview.2+13` installations remain preserved. The
+  released/installed `0.3.0-preview.1+12` remains preserved. Earlier
+  `0.2.1+11` installations are preserved historical progress builds. Its normal
+  local build/install precedes the final full test run by explicit user order.
+
+- The current task is **003 only**. Do not implement packages004–020 as part of
+  this task. Their product roadmap is preserved, not a prerequisite for003.
+- Finish the remaining003 implementation as one batch, then prepare and install
+  an intermediate Windows Release build so the user can use it. Do not block
+  that local delivery on repeated full test cycles for individual UI changes.
+- Run the full mandatory static/unit/widget set after that implementation and
+  intermediate install. Run targeted tests only for scenarios that fail in the
+  full run; fix them and rerun the mandatory set before final completion.
+- Audit test duplication without deleting distinct behavior, privacy, identity,
+  concurrency, recovery or accessibility coverage merely to shorten the run.
+- The validation stage remains static/unit/widget only, locally and in CI.
+  No native/integration dispatch, provider work or public Windows
+  binaries follows from this order. Existing source-only publication and CI
+  gates remain applicable; local intermediate delivery may precede them.
 
 ## Required Checks
 
@@ -21,6 +52,16 @@
   (Flutter version `0.2.0+10`), following the completed PR #3 / preview9.
   Required checks use unit/widget tests and static analysis only. The ordinary
   release label does not establish platform or whole-product acceptance.
+- The user's 2026-10-28 instruction explicitly continues the same local and CI
+  unit/widget/static stage for the corrected `003.4` base-page design port.
+  The current implementation scope is existing base functions with their exact
+  canonical design; future feature packages own their design and functionality
+  together. A private build, preservation-safe install and actual UI showing are
+  authorized delivery actions. No public release, new provider deployment or
+  native/integration test dispatch follows from that instruction.
+- The corrected private base-design build uses Flutter metadata `0.2.1+11`.
+  It continues this same unit/widget/static stage; the version increment does
+  not establish visual, platform or native qualification, or publish a release.
 - Use the pinned Flutter 3.47.7 / Dart 3.13.5 SDK via
   `tools/foundation-sdk.ps1`; SDK preparation resolves locked tooling and
   verifies identity. It does not authorize native build or fixture scripts.

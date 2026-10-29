@@ -7,6 +7,8 @@ abstract final class BrandAssets {
   static const logoMinWidth = BrandGeometry.logoMinWidth;
   static const markMinSize = BrandGeometry.markMinSize;
   static const uiFont = 'Noto Sans';
+  // A one-face family avoids platform-dependent matching to the regular face.
+  static const semiboldFamily = 'Noto Sans SemiBold';
   static const monoFont = 'Noto Sans Mono';
   static const regularFont = 'assets/brand/fonts/NotoSans-Regular.ttf';
   static const semiboldFont = 'assets/brand/fonts/NotoSans-SemiBold.ttf';

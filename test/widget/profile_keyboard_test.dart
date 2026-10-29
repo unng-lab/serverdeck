@@ -251,10 +251,19 @@ void main() {
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-        await tester.pump();
+        if (deleting) {
+          await tester.ensureVisible(find.text('Цель и последствия проверены'));
+          await tester.tap(find.text('Цель и последствия проверены'));
+          await tester.pump();
+          await tester.ensureVisible(find.text('Удалить профиль'));
+          Focus.of(tester.element(find.text('Удалить профиль'))).requestFocus();
+          await tester.pump();
+        } else {
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+        }
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
         expect(client.sent, hasLength(1));

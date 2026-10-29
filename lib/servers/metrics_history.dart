@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
+import '../ui/deck_icon.dart';
 
 /// Bounded source-order observations. Presentation never samples or polls.
 class MetricsHistory extends StatefulWidget {
@@ -19,11 +21,13 @@ class MetricsHistory extends StatefulWidget {
     this.observedAt,
     this.receivedAt,
     this.actions,
+    this.showPlots = true,
+    this.showHeading = true,
   });
 
   final List<Object?> points;
   final String? quality, source, observedAt, receivedAt;
-  final bool stale;
+  final bool stale, showPlots, showHeading;
   final Widget? actions;
 
   @override
@@ -143,10 +147,11 @@ class _MetricsHistoryState extends State<MetricsHistory> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const DeckSectionHeader(
-          title: 'История ресурсов',
-          description: 'До 10 минут · значения от 0 до 100%',
-        ),
+        if (widget.showHeading)
+          const DeckSectionHeader(
+            title: 'История ресурсов',
+            description: 'До 10 минут · значения от 0 до 100%',
+          ),
         const SizedBox(height: BrandSpacing.space8),
         if (widget.source != null) Text('Источник: ${widget.source}'),
         if (widget.observedAt != null)
@@ -159,99 +164,114 @@ class _MetricsHistoryState extends State<MetricsHistory> {
             'В истории есть пропуски значений; они не заменены нулями.',
           ),
         const SizedBox(height: BrandSpacing.space12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final viewport = MediaQuery.sizeOf(context).width;
-            final phone = viewport <= BrandGeometry.phoneBreakpoint;
-            final preferred = viewport > BrandGeometry.compactBreakpoint
-                ? 300.0
-                : 270.0;
-            final width = math.min(preferred, constraints.maxWidth);
-            final plots = SizedBox(
-              key: const ValueKey('metrics-history-plots'),
-              width: width,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        if (!widget.showPlots)
+          DeckStatus(
+            key: const ValueKey('metrics-history-plot-quality'),
+            label: _qualityLabel(quality),
+            tone: _qualityTone(quality),
+          ),
+        if (widget.showPlots)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final viewport = MediaQuery.sizeOf(context).width;
+              final phone = viewport <= BrandGeometry.phoneBreakpoint;
+              final preferred = viewport > BrandGeometry.compactBreakpoint
+                  ? 300.0
+                  : 270.0;
+              final width = math.min(preferred, constraints.maxWidth);
+              final plots = SizedBox(
+                key: const ValueKey('metrics-history-plots'),
+                width: width,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DeckStatus(
+                      key: const ValueKey('metrics-history-plot-quality'),
+                      label: _qualityLabel(quality),
+                      tone: _qualityTone(quality),
+                    ),
+                    const SizedBox(height: BrandSpacing.space8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (
+                          var index = 0;
+                          index < _series.length;
+                          index++
+                        ) ...[
+                          if (index > 0)
+                            const SizedBox(width: BrandSpacing.space8),
+                          Expanded(
+                            child: _SeriesPlot(
+                              series: _series[index],
+                              rows: rows,
+                              color: colors[_series[index].role],
+                              grid: colors['border'],
+                              stale: stale,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              );
+              final actions = widget.actions;
+              if (actions == null) {
+                return Align(alignment: Alignment.centerRight, child: plots);
+              }
+              final minimumActions =
+                  280 * MediaQuery.textScalerOf(context).scale(14) / 14;
+              if (!phone &&
+                  constraints.maxWidth >=
+                      width + BrandSpacing.space24 + minimumActions) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: const ValueKey('server-overview-actions'),
+                        child: actions,
+                      ),
+                    ),
+                    const SizedBox(width: BrandSpacing.space24),
+                    plots,
+                  ],
+                );
+              }
+              final actionGroup = KeyedSubtree(
+                key: const ValueKey('server-overview-actions'),
+                child: actions,
+              );
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DeckStatus(
-                    key: const ValueKey('metrics-history-plot-quality'),
-                    label: _qualityLabel(quality),
-                    tone: _qualityTone(quality),
-                  ),
-                  const SizedBox(height: BrandSpacing.space8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (var index = 0; index < _series.length; index++) ...[
-                        if (index > 0)
-                          const SizedBox(width: BrandSpacing.space8),
-                        Expanded(
-                          child: _SeriesPlot(
-                            series: _series[index],
-                            rows: rows,
-                            color: colors[_series[index].role],
-                            grid: colors['border'],
-                            stale: stale,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            );
-            final actions = widget.actions;
-            if (actions == null) {
-              return Align(alignment: Alignment.centerRight, child: plots);
-            }
-            final minimumActions =
-                280 * MediaQuery.textScalerOf(context).scale(14) / 14;
-            if (!phone &&
-                constraints.maxWidth >=
-                    width + BrandSpacing.space24 + minimumActions) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: KeyedSubtree(
-                      key: const ValueKey('server-overview-actions'),
-                      child: actions,
-                    ),
-                  ),
-                  const SizedBox(width: BrandSpacing.space24),
-                  plots,
+                  if (!phone) ...[
+                    actionGroup,
+                    const SizedBox(height: BrandSpacing.space16),
+                  ],
+                  Align(alignment: Alignment.centerRight, child: plots),
+                  if (phone) ...[
+                    const SizedBox(height: BrandSpacing.space16),
+                    actionGroup,
+                  ],
                 ],
               );
-            }
-            final actionGroup = KeyedSubtree(
-              key: const ValueKey('server-overview-actions'),
-              child: actions,
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!phone) ...[
-                  actionGroup,
-                  const SizedBox(height: BrandSpacing.space16),
-                ],
-                Align(alignment: Alignment.centerRight, child: plots),
-                if (phone) ...[
-                  const SizedBox(height: BrandSpacing.space16),
-                  actionGroup,
-                ],
-              ],
-            );
-          },
-        ),
+            },
+          ),
         const SizedBox(height: BrandSpacing.space12),
         Align(
           alignment: Alignment.centerLeft,
           child: Semantics(
             expanded: _expanded,
             child: TextButton.icon(
+              clipBehavior: Clip.none,
               onPressed: () => setState(() => _expanded = !_expanded),
-              icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+              icon: Transform.rotate(
+                angle: _expanded ? math.pi : 0,
+                child: const DeckIcon('chevron'),
+              ),
               label: const Text('Значения истории'),
             ),
           ),
@@ -295,39 +315,52 @@ class _MetricsHistoryState extends State<MetricsHistory> {
                         ),
                       ),
                       Flexible(
-                        child: ListView.builder(
-                          key: const ValueKey('metrics-history-values'),
-                          controller: _valuesController,
-                          primary: false,
-                          shrinkWrap: true,
-                          itemCount: rows.length,
-                          itemBuilder: (context, index) {
-                            final row = rows[index];
-                            final gap = index == 0
-                                ? null
-                                : _gapReason(rows[index - 1], row);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: BrandSpacing.space4,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (gap != null)
-                                    Text(
-                                      'Разрыв перед наблюдением ${index + 1}: $gap',
-                                    ),
-                                  _HistoryValue(
-                                    '${_timeLabel(row)} · CPU: ${_valueLabel(row['cpuPercent'])} · RAM: ${_valueLabel(row['memoryUsedPercent'])} · Диск /: ${_valueLabel(row['rootDiskUsedPercent'])}',
-                                    style: BrandTypography.table.copyWith(
-                                      color: colors['text'],
-                                    ),
-                                    onFocus: _revealValuesQuality,
+                        child: FocusTraversalGroup(
+                          policy: OrderedTraversalPolicy(),
+                          child: ListView.builder(
+                            key: const ValueKey('metrics-history-values'),
+                            controller: _valuesController,
+                            primary: false,
+                            shrinkWrap: true,
+                            // A scaled row can be taller than the viewport.
+                            // Keep its adjacent row available for Shift+Tab
+                            // without retaining all 120 samples or focus nodes.
+                            scrollCacheExtent: ScrollCacheExtent.pixels(
+                              MediaQuery.textScalerOf(context).scale(400),
+                            ),
+                            itemCount: rows.length,
+                            itemBuilder: (context, index) {
+                              final row = rows[index];
+                              final gap = index == 0
+                                  ? null
+                                  : _gapReason(rows[index - 1], row);
+                              return FocusTraversalOrder(
+                                order: NumericFocusOrder(index.toDouble()),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: BrandSpacing.space4,
                                   ),
-                                ],
-                              ),
-                            );
-                          },
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (gap != null)
+                                        Text(
+                                          'Разрыв перед наблюдением ${index + 1}: $gap',
+                                        ),
+                                      _HistoryValue(
+                                        '${_timeLabel(row)} · CPU: ${_valueLabel(row['cpuPercent'])} · RAM: ${_valueLabel(row['memoryUsedPercent'])} · Диск /: ${_valueLabel(row['rootDiskUsedPercent'])}',
+                                        style: BrandTypography.table.copyWith(
+                                          color: colors['text'],
+                                        ),
+                                        onFocus: _revealValuesQuality,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -531,7 +564,8 @@ class _SeriesPainter extends CustomPainter {
     final points = <Offset>[];
     int? last;
     for (var index = 0; index < rows.length; index++) {
-      final value = _validValue(rows[index][series.field]), time = times[index];
+      final value = historyPercentValue(rows[index][series.field]),
+          time = times[index];
       if (value == null || time == null) {
         last = null;
         continue;
@@ -629,7 +663,8 @@ void _drawSymbol(Canvas canvas, Offset point, String id, Color color) {
   }
 }
 
-int? _validValue(Object? value) =>
+/// Shared plot/text projection: invalid samples remain gaps, never coercions.
+int? historyPercentValue(Object? value) =>
     value is int && value >= 0 && value <= 100 ? value : null;
 int? _time(Map<String, Object?> row) =>
     DateTime.tryParse('${row['receivedAt']}')?.millisecondsSinceEpoch;
@@ -641,9 +676,10 @@ String _timeLabel(Map<String, Object?> row) {
 }
 
 String _valueLabel(Object? value) =>
-    _validValue(value) == null ? 'нет данных' : '$value%';
+    historyPercentValue(value) == null ? 'нет данных' : '$value%';
 bool _hasMissingValues(List<Map<String, Object?>> rows) => rows.any(
-  (row) => _series.any((series) => _validValue(row[series.field]) == null),
+  (row) =>
+      _series.any((series) => historyPercentValue(row[series.field]) == null),
 );
 String? _gapReason(Map<String, Object?> previous, Map<String, Object?> next) {
   final first = _time(previous), second = _time(next);

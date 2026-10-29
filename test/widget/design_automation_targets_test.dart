@@ -74,8 +74,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Синтетический сервер'), findsOneWidget);
-    expect(find.text('192.0.2.44:2222'), findsOneWidget);
+    expect(find.text('Синтетический сервер · 192.0.2.44:2222'), findsOneWidget);
   });
 
   testWidgets(

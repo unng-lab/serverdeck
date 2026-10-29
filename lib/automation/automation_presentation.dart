@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:serverdeck_protocol/automation/grant_records.dart';
 import 'package:serverdeck_protocol/automation/profile_body.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/automation/values.dart';
 import 'package:serverdeck_protocol/codec.dart';
+import 'package:serverdeck_protocol/validation.dart';
 
 /// Display vocabulary only. Native admission and outcome remain owner decisions.
 String automationMessage(String code) => switch (code) {
@@ -124,6 +126,24 @@ class AutomationDraftTargetUnavailable implements Exception {
   const AutomationDraftTargetUnavailable();
 }
 
+void _validateDelegationDraft(Map<String, Object?> value) {
+  requireFields(value, {'lifetimeSeconds', 'predicates'});
+  final lifetime = value['lifetimeSeconds'], predicates = value['predicates'];
+  if (lifetime is! int ||
+      lifetime < 300 ||
+      lifetime > 86400 ||
+      predicates is! Map<String, Object?> ||
+      predicates.length > 32) {
+    invalidAutomationValue();
+  }
+  for (final entry in predicates.entries) {
+    automationIdentifier(entry.key);
+    final predicate = entry.value;
+    if (predicate is! Map<String, Object?>) invalidAutomationValue();
+    ParameterConstraint.fromJson(predicate);
+  }
+}
+
 /// Form state only: the route owns its exact text and the borrowed owner owns
 /// admission, payload, request identity, execution and recovery.
 class AutomationJsonDraftSubmission extends ChangeNotifier {
@@ -166,7 +186,11 @@ class AutomationJsonDraftSubmission extends ChangeNotifier {
         source: source,
         current: (value) => current() && (draftCurrent?.call(value) ?? true),
         targetsAvailable: targetsAvailable,
-        submit: (value) => submit(value, () => admitted = true),
+        submit: (value) {
+          if (phase == AutomationUiPhase.delegate)
+            _validateDelegationDraft(value);
+          return submit(value, () => admitted = true);
+        },
       );
       if (!admitted) {
         saving = false;

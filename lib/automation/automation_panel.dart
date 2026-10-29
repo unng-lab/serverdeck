@@ -12,8 +12,167 @@ import 'automation_sections.dart';
 import 'automation_presentation.dart';
 import '../servers/server_controller.dart';
 import '../theme/motion.dart';
-import '../theme/brand_tokens.dart';
-import '../ui/deck_components.dart';
+import '../ui/deck_icon.dart';
+import '../ui/deck_page.dart';
+
+String automationPageDescription(String screenId) => switch (screenId) {
+  '17-recipe-detail' ||
+  '34-profile-revisions' ||
+  '38-mcp-client-config' => 'Сведения, наблюдения и доступные действия',
+  '18-install-preflight' || '19-plan-approval' =>
+    'Проверьте цель, последствия и условия выбранного действия',
+  '28-job-detail' ||
+  '30-job-cancel' => 'Состояние шагов, события и результат выполнения',
+  '29-job-unknown' =>
+    'Уточните результат прежней операции перед следующим действием',
+  '94-plan-invalidated' =>
+    'Для продолжения нужна новая проверка исходного состояния',
+  '93-protected-effect-blocked' => 'Исполнение плана не разрешено',
+  _ => 'Просматривайте данные, состояние и доступные действия',
+};
+
+/// Shared production composition. Fixture transports may supply the same body
+/// widgets without constructing an authenticated runtime controller.
+class AutomationPageFrame extends StatelessWidget {
+  const AutomationPageFrame({
+    super.key,
+    required this.title,
+    this.description,
+    this.screenId,
+    this.catalog = false,
+    this.contextBar,
+    required this.section,
+    required this.onSelected,
+    this.actions = const [],
+    required this.child,
+  });
+  final String title;
+  final String? description, screenId;
+  final bool catalog;
+  final Widget? contextBar;
+  final String section;
+  final ValueChanged<String> onSelected;
+  final List<Widget> actions;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    final catalogList =
+        screenId == '16-install-catalog' ||
+        screenId == null &&
+            catalog &&
+            section == 'catalog' &&
+            title == 'Каталог установки';
+    return DeckPage(
+      title: title,
+      description: description,
+      eyebrow:
+          screenId == '36-ai-grants' ||
+              screenId == '38-mcp-client-config' ||
+              section == 'grants'
+          ? 'Настройки / Рабочее пространство'
+          : catalog
+          ? 'ПО / Рабочее пространство'
+          : 'Задания / Рабочее пространство',
+      actions: actions,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (catalogList) ...[
+            DeckTabs(
+              labels: const ['Каталог', 'Планы установки'],
+              selected: section == 'plans' ? 1 : 0,
+              onSelected: (index) =>
+                  onSelected(index == 0 ? 'catalog' : 'plans'),
+            ),
+            const DeckTabsGap(),
+          ],
+          if (catalogList && contextBar != null) ...[
+            contextBar!,
+            const SizedBox(height: 20),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared list-header controls. Each callback is supplied by the existing
+/// owner; this builder only places the canonical controls in their page region.
+List<Widget> automationPageActions({
+  required String section,
+  required AutomationActionAvailability availability,
+  required VoidCallback onRefresh,
+  required VoidCallback onCreate,
+  required VoidCallback onLoadRecipes,
+  VoidCallback? onOpenJob,
+  VoidCallback? onSelectRecipe,
+  VoidCallback? onEdit,
+  bool detail = false,
+}) {
+  if (detail) return const [];
+  return switch (section) {
+    'catalog' => [
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.read ? onLoadRecipes : null,
+        child: const Text('Подключиться и открыть рецепты'),
+      ),
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: onSelectRecipe,
+        child: const Text('Выбрать программу'),
+      ),
+    ],
+    'profiles' => [
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.mutate ? onCreate : null,
+        child: const Text('Новый профиль'),
+      ),
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.read ? onRefresh : null,
+        child: const DeckButtonLabel(
+          icon: 'refresh',
+          label: 'Обновить профили',
+        ),
+      ),
+    ],
+    'jobs' => [
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.read ? onRefresh : null,
+        child: const DeckButtonLabel(icon: 'refresh', label: 'Обновить'),
+      ),
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.read ? onOpenJob : null,
+        child: const Text('Открыть задание'),
+      ),
+    ],
+    'grants' => [
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.mutate ? onCreate : null,
+        child: const Text('Выдать доступ'),
+      ),
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.mutate ? onEdit : null,
+        child: const Text('Изменить права'),
+      ),
+    ],
+    'authorities' => [
+      OutlinedButton(
+        clipBehavior: Clip.none,
+        onPressed: availability.read ? onRefresh : null,
+        child: const Text('Обновить разрешения'),
+      ),
+    ],
+    _ => const [],
+  };
+}
 
 class AutomationPanel extends StatefulWidget {
   const AutomationPanel({
@@ -22,17 +181,39 @@ class AutomationPanel extends StatefulWidget {
     this.serverId,
     this.installationCatalog = false,
     this.serverProfiles = const [],
+    this.initialSection,
+    this.contextBar,
+    this.contextBarBuilder,
+    this.workspaceActions = const [],
+    this.onPlanReview,
+    this.onOpenServers,
   });
   final TrustedApiClient client;
   final String? serverId;
   final bool installationCatalog;
   final List<ProfileView> serverProfiles;
+  final String? initialSection;
+  final Widget? contextBar;
+  final Widget Function(String? environment)? contextBarBuilder;
+  final List<Widget> workspaceActions;
+
+  /// Temporarily presents the plan review in Jobs without changing its owner.
+  final VoidCallback Function()? onPlanReview;
+  final VoidCallback? onOpenServers;
   @override
   State<AutomationPanel> createState() => _AutomationPanelState();
 }
 
 class _AutomationPanelState extends State<AutomationPanel> {
   late AutomationController model;
+  String _section = 'profiles';
+  bool _profileDetail = false,
+      _jobDetail = false,
+      _recipeDetail = false,
+      _planReviewed = false;
+  String? _lastPlanId, _closedPlanId, _lastJobId, _selectedGrantId;
+  bool _configurationDetail = false;
+  final _recipesKey = GlobalKey<AutomationRecipesSectionState>();
   Timer? _expiry;
   ServerController? _recipeConnection;
   bool _openingRecipes = false;
@@ -93,6 +274,12 @@ class _AutomationPanelState extends State<AutomationPanel> {
       );
 
   void _create() {
+    _section =
+        widget.initialSection ??
+        (widget.installationCatalog ? 'catalog' : 'profiles');
+    _lastPlanId = _closedPlanId = _lastJobId = _selectedGrantId = null;
+    _configurationDetail = false;
+    _profileDetail = _jobDetail = _recipeDetail = _planReviewed = false;
     model = AutomationController(
       client: widget.client,
       serverId: widget.serverId,
@@ -118,6 +305,10 @@ class _AutomationPanelState extends State<AutomationPanel> {
       model.dispose();
       _recipeConnection?.dispose();
       _create();
+    }
+    if (oldWidget.initialSection != widget.initialSection &&
+        widget.initialSection != null) {
+      _section = widget.initialSection!;
     }
     _notifyModalContext();
   }
@@ -146,6 +337,18 @@ class _AutomationPanelState extends State<AutomationPanel> {
     if (!mounted) return;
     _presentation.observeOwner(_result(model));
     final planId = model.plan?['id'] as String?;
+    if (planId != null && planId != _lastPlanId) {
+      _lastPlanId = planId;
+      _closedPlanId = null;
+      _section = 'plans';
+      _planReviewed = false;
+    }
+    final jobId = model.job?['id'] as String?;
+    if (jobId != null && jobId != _lastJobId) {
+      _lastJobId = jobId;
+      _section = 'jobs';
+      _jobDetail = true;
+    }
     if (_invalidPlanId != planId) _invalidPlanId = _invalidPlanReason = null;
     if (planId != null &&
         const {
@@ -158,14 +361,24 @@ class _AutomationPanelState extends State<AutomationPanel> {
     }
     setState(() {});
     _notifyModalContext();
-    final expiry = DateTime.tryParse('${model.plan?['expiresAt']}');
-    if (expiry != null && expiry.isAfter(DateTime.now())) {
+    final now = DateTime.now();
+    final deadlines =
+        [
+              model.plan?['expiresAt'],
+              for (final grant in model.grants) grant['expiresAt'],
+            ]
+            .map((value) => DateTime.tryParse('$value'))
+            .whereType<DateTime>()
+            .where((value) => value.isAfter(now))
+            .toList()
+          ..sort();
+    final expiry = deadlines.firstOrNull;
+    if (expiry != null) {
       _expiry = Timer(
-        expiry.difference(DateTime.now()) + const Duration(milliseconds: 1),
+        expiry.difference(now) + const Duration(milliseconds: 1),
         () {
           if (mounted) {
-            setState(() {});
-            _notifyModalContext();
+            _changed();
           }
         },
       );
@@ -231,6 +444,17 @@ class _AutomationPanelState extends State<AutomationPanel> {
 
   Map<String, Object?> parse(String source) => parseAutomationDraft(source);
 
+  Rect? _workspaceBounds() {
+    if (!mounted) return null;
+    final render = context.findRenderObject();
+    if (render is! RenderBox || !render.attached || !render.hasSize)
+      return null;
+    return render.localToGlobal(Offset.zero) & render.size;
+  }
+
+  EdgeInsetsGeometry _workspaceInsets() =>
+      mounted ? DeckPageInsets.of(context) : EdgeInsets.zero;
+
   Future<void> _jsonEditor(
     String title,
     Map<String, Object?> initial,
@@ -238,9 +462,11 @@ class _AutomationPanelState extends State<AutomationPanel> {
     required AutomationUiPhase phase,
     String? purpose,
     String? target,
+    String? clientLabel,
     Map<String, Object?>? contextDetails,
     List<String> targetServerIds = const [],
     bool Function()? contextCurrent,
+    Map<String, Object?> parameterDefinitions = const {},
   }) async {
     final captured = model;
     final serverProfiles = List<ProfileView>.unmodifiable(
@@ -280,6 +506,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
       await showMotionDialog<void>(
         context: context,
         barrierDismissible: true,
+        barrierColor: Colors.transparent,
         builder: (dialog) => ListenableBuilder(
           listenable: Listenable.merge([submission, _modalChanges]),
           builder: (context, _) => StatefulBuilder(
@@ -297,12 +524,35 @@ class _AutomationPanelState extends State<AutomationPanel> {
               }
 
               return AutomationJsonEditorDialog(
+                workspaceBounds: _workspaceBounds,
+                pageInsets: _workspaceInsets,
                 title: title,
+                eyebrow: switch (phase) {
+                  AutomationUiPhase.saveGrant ||
+                  AutomationUiPhase.replaceGrant =>
+                    'Настройки / Рабочее пространство',
+                  _ => 'Задания / Рабочее пространство',
+                },
+                formKind: switch (phase) {
+                  AutomationUiPhase.createPlan =>
+                    AutomationEditorKind.planParameters,
+                  AutomationUiPhase.delegate => AutomationEditorKind.delegation,
+                  _ => AutomationEditorKind.generic,
+                },
                 input: input,
+                parameterDefinitions: parameterDefinitions,
+                submitLabel: switch (phase) {
+                  AutomationUiPhase.createPlan => 'Создать план',
+                  AutomationUiPhase.saveGrant => 'Выдать доступ',
+                  AutomationUiPhase.replaceGrant => 'Изменить права',
+                  AutomationUiPhase.delegate => 'Делегировать версию',
+                  _ => 'Продолжить',
+                },
                 error: submission.error,
                 preview: preview,
                 purpose: purpose,
                 target: target,
+                clientLabel: clientLabel,
                 contextDetails: contextDetails,
                 serverProfiles: serverProfiles,
                 targetServerIds: targetServerIds,
@@ -483,12 +733,15 @@ class _AutomationPanelState extends State<AutomationPanel> {
       await showMotionDialog<void>(
         context: context,
         barrierDismissible: true,
+        barrierColor: Colors.transparent,
         builder: (dialog) => ListenableBuilder(
           listenable: Listenable.merge([submission, _modalChanges]),
           builder: (context, _) => StatefulBuilder(
             builder: (context, update) {
               observe();
               return AutomationProfileEditorDialog(
+                workspaceBounds: _workspaceBounds,
+                pageInsets: _workspaceInsets,
                 existing: submission.currentBasis?.profile ?? existing,
                 baseRevision: baseRevision,
                 name: name,
@@ -677,25 +930,40 @@ class _AutomationPanelState extends State<AutomationPanel> {
 
     _modalObservers.add(observe);
     bool? result;
+    var alternate = false;
+    final endReview = widget.onPlanReview?.call();
     try {
       result = await showMotionDialog<bool>(
         context: context,
         barrierDismissible: true,
+        barrierColor: Colors.transparent,
         builder: (dialog) => ListenableBuilder(
           listenable: _modalChanges,
           builder: (context, _) => AutomationPlanDecisionDialog(
+            workspaceBounds: _workspaceBounds,
+            pageInsets: _workspaceInsets,
             plan: plan,
             serverProfiles: widget.serverProfiles,
             automationProfile: _profileForPlan(plan),
             contextCurrent: current(),
             approve: approve,
             onBack: () => Navigator.pop(dialog, false),
+            onAlternate: () {
+              if (!current()) return;
+              alternate = true;
+              Navigator.pop(dialog, false);
+            },
             onConfirm: () => Navigator.pop(dialog, true),
           ),
         ),
       );
     } finally {
       _modalObservers.remove(observe);
+      endReview?.call();
+    }
+    if (alternate && current()) {
+      await _decision(plan, !approve);
+      return;
     }
     final deadline = DateTime.tryParse('${plan['expiresAt']}');
     if (result == true &&
@@ -757,6 +1025,13 @@ class _AutomationPanelState extends State<AutomationPanel> {
       ),
     );
     if (grant == null || !current()) return;
+    final grantStamp = pretty(grant);
+    bool delegationCurrent() =>
+        current() &&
+        grantCurrent(grant) &&
+        controller.grants.any(
+          (row) => row['id'] == grant['id'] && pretty(row) == grantStamp,
+        );
     final definitions = body['parameters'] as Map<String, Object?>;
     final predicates = <String, Object?>{};
     for (final row in definitions.entries) {
@@ -769,7 +1044,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
             };
     }
     await _jsonEditor(
-      'Делегирование «${grant['label']}» · версия ${selected['revision']}',
+      'Делегирование версии',
       {'lifetimeSeconds': 3600, 'predicates': predicates},
       (value) => controller.createDelegation(
         displayedRevision: selected,
@@ -778,11 +1053,12 @@ class _AutomationPanelState extends State<AutomationPanel> {
         predicates: value['predicates'] as Map<String, Object?>,
       ),
       phase: AutomationUiPhase.delegate,
+      clientLabel: grant['label'] as String,
       purpose: 'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
       target:
           'Ansible-профиль: ${controller.profile?.name ?? 'Название профиля недоступно'} · версия ${selected['revision']}. Доступ клиента до: ${grant['expiresAt']} (UTC).',
       targetServerIds: [if (targetId != null) targetId],
-      contextCurrent: current,
+      contextCurrent: delegationCurrent,
       contextDetails: {
         'profileId': selected['profileId'],
         'revision': selected['revision'],
@@ -802,7 +1078,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
     final stamp = pretty(existing);
     return _jsonEditor(
       existing == null
-          ? 'Выдать ИИ доступ через MCP'
+          ? 'Выдать доступ ИИ'
           : 'Изменить права и перевыпустить доступ',
       {
         'label': existing?['label'] ?? 'ИИ-клиент',
@@ -875,6 +1151,120 @@ class _AutomationPanelState extends State<AutomationPanel> {
       );
   }
 
+  Future<void> _selectAutomationProfile(String id) async {
+    final captured = model;
+    await _present(AutomationUiPhase.version, () => captured.selectProfile(id));
+    if (mounted &&
+        identical(captured, model) &&
+        captured.error == null &&
+        captured.profile?.id == id)
+      setState(() => _profileDetail = true);
+  }
+
+  Future<void> _configureGrant(String id) async {
+    final captured = model;
+    await _present(
+      AutomationUiPhase.configuration,
+      () => captured.configurationForGrant(id),
+    );
+    if (mounted &&
+        identical(captured, model) &&
+        captured.error == null &&
+        captured.launchConfiguration != null)
+      setState(() => _configurationDetail = true);
+  }
+
+  Future<void> _selectVersion() async {
+    final selected = model.profile, revision = model.revision;
+    if (selected == null || revision == null) return;
+    await _jsonEditor(
+      'Версия профиля',
+      {'revision': revision['revision']},
+      (value) =>
+          model.selectProfile(selected.id, version: value['revision'] as int),
+      phase: AutomationUiPhase.version,
+    );
+  }
+
+  Future<void> _selectJob(String id) async {
+    final captured = model;
+    await _present(AutomationUiPhase.job, () => captured.selectJob(id));
+    if (mounted &&
+        identical(captured, model) &&
+        captured.error == null &&
+        captured.job?['id'] == id)
+      setState(() => _jobDetail = true);
+  }
+
+  Future<void> _refreshSection() => switch (_section) {
+    'profiles' => _present(AutomationUiPhase.profiles, model.refreshProfiles),
+    'grants' => _present(AutomationUiPhase.grants, model.refreshGrants),
+    'authorities' => _present(
+      AutomationUiPhase.authorities,
+      model.refreshAuthorities,
+    ),
+    _ => _present(AutomationUiPhase.jobs, model.refreshJobs),
+  };
+
+  Future<void> _openPlan(String id) async {
+    final captured = model;
+    await _present(AutomationUiPhase.plan, () => captured.loadPlan(id));
+    if (mounted &&
+        identical(captured, model) &&
+        captured.error == null &&
+        captured.plan?['id'] == id)
+      setState(() {
+        _closedPlanId = null;
+        _section = 'plans';
+      });
+  }
+
+  Future<void> _editPlanSource(Map<String, Object?> plan) async {
+    final captured = model,
+        revision = captured.revision,
+        profile = captured.profile;
+    if (!captured.canMutate ||
+        revision == null ||
+        profile == null ||
+        profile.archived ||
+        profile.id != plan['profileId'] ||
+        profile.workspaceId != plan['workspaceId'] ||
+        widget.serverId != plan['serverId'] ||
+        revision['profileId'] != plan['profileId'] ||
+        revision['revision'] != plan['profileRevision'] ||
+        revision['digest'] != plan['profileDigest'])
+      return;
+    final parameters =
+        (revision['body'] as Map<String, Object?>)['parameters']
+            as Map<String, Object?>;
+    if (parameters.isEmpty) {
+      await _editProfile(existing: profile);
+      return;
+    }
+    final stamp = pretty(revision), targetId = widget.serverId;
+    await _jsonEditor(
+      'Параметры плана',
+      Map<String, Object?>.of(plan['exactParams'] as Map<String, Object?>),
+      captured.createPlan,
+      phase: AutomationUiPhase.createPlan,
+      parameterDefinitions: parameters,
+      target:
+          'Ansible-профиль: ${profile.name} · версия ${revision['revision']}.',
+      targetServerIds: [if (targetId != null) targetId],
+      contextDetails: {
+        'profileId': plan['profileId'],
+        'revision': plan['profileRevision'],
+        'bodyDigest': plan['profileDigest'],
+        'serverId': targetId,
+      },
+      purpose: 'Изменение создаст новый план. Прежний заблокированный или устаревший план останется неизменным.',
+      contextCurrent: () =>
+          identical(captured, model) &&
+          widget.serverId == targetId &&
+          pretty(captured.revision) == stamp,
+    );
+  }
+
   String message(String code) => automationMessage(code);
 
   @override
@@ -892,27 +1282,123 @@ class _AutomationPanelState extends State<AutomationPanel> {
         deadline.isAfter(DateTime.now());
     final expired = deadline != null && !deadline.isAfter(DateTime.now());
     final actions = AutomationActionAvailability(
-      read: !_openingRecipes && !model.busy && !widget.client.isClosed,
+      read:
+          !_openingRecipes &&
+          !model.busy &&
+          !widget.client.isClosed &&
+          (_section != 'jobs' || widget.serverId != null),
       mutate: !_openingRecipes && model.canMutate,
       select: !model.busy && !_openingRecipes,
     );
+    var jobsTitle = 'Задания';
+    if (_jobDetail && job != null)
+      jobsTitle = job['state'] == 'unknown'
+          ? 'Неизвестный исход задания'
+          : job['cancelRequested'] == true
+          ? 'Остановка задания'
+          : 'Ход задания';
+    final firstJob = model.jobs.firstOrNull?['job'];
+    final openJobId =
+        job?['id'] ??
+        (firstJob is Map<String, Object?> ? firstJob['id'] : null);
+    final screenId = switch (_section) {
+      'catalog' => _recipeDetail ? '17-recipe-detail' : '16-install-catalog',
+      'profiles' =>
+        _profileDetail ? '34-profile-revisions' : '32-automation-profiles',
+      'grants' =>
+        _configurationDetail ? '38-mcp-client-config' : '36-ai-grants',
+      'jobs' =>
+        !_jobDetail
+            ? '27-job-list'
+            : jobsTitle == 'Неизвестный исход задания'
+            ? '29-job-unknown'
+            : jobsTitle == 'Остановка задания'
+            ? '30-job-cancel'
+            : '28-job-detail',
+      'plans' =>
+        expired || invalidPlan
+            ? '94-plan-invalidated'
+            : plan?['status'] == 'blocked'
+            ? '93-protected-effect-blocked'
+            : widget.installationCatalog && !_planReviewed
+            ? '18-install-preflight'
+            : '19-plan-approval',
+      _ => '39-delegations',
+    };
+    final chosenGrant = model.grants
+        .where(
+          (row) =>
+              row['id'] ==
+              (_selectedGrantId ?? model.grants.firstOrNull?['id']),
+        )
+        .firstOrNull;
     return AbsorbPointer(
-      absorbing: _openingRecipes,
-      child: DeckSurface(
-        padding: EdgeInsets.zero,
-        child: ExpansionTile(
-          initiallyExpanded: widget.installationCatalog,
-          title: DeckFocusLabel(
-            child: Text(
-              widget.installationCatalog
-                  ? 'ПО и планы установки'
-                  : widget.serverId == null
-                  ? 'ИИ-доступ и Ansible-профили'
-                  : 'Автоматизация',
-            ),
+      absorbing: false,
+      child: AutomationPageFrame(
+        screenId: screenId,
+        section: _section,
+        catalog: widget.installationCatalog,
+        onSelected: (next) => setState(() => _section = next),
+        actions: [
+          ...automationPageActions(
+            section: _section,
+            availability: actions,
+            onRefresh: () => _refreshSection().ignore(),
+            onCreate: () => _section == 'grants'
+                ? _grantEditor().ignore()
+                : _editProfile().ignore(),
+            onLoadRecipes: () => _loadRecipes().ignore(),
+            onSelectRecipe:
+                model.catalog == null ||
+                    model.catalog!['recipes'] is! List ||
+                    (model.catalog!['recipes'] as List).isEmpty
+                ? null
+                : () => _recipesKey.currentState?.selectFirst(),
+            onEdit: chosenGrant == null || chosenGrant['revokedAt'] != null
+                ? null
+                : () => _grantEditor(existing: chosenGrant).ignore(),
+            onOpenJob: openJobId is String
+                ? () => _selectJob(openJobId).ignore()
+                : null,
+            detail: _section == 'jobs'
+                ? _jobDetail
+                : _section == 'profiles'
+                ? _profileDetail
+                : _section == 'catalog'
+                ? _recipeDetail
+                : _section == 'grants'
+                ? _configurationDetail
+                : false,
           ),
-          childrenPadding: const EdgeInsets.all(BrandSpacing.space16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          if (_section == 'jobs' && !_jobDetail) ...widget.workspaceActions,
+        ],
+        title: switch (_section) {
+          'catalog' => _recipeDetail ? 'Рецепт установки' : 'Каталог установки',
+          'jobs' => jobsTitle,
+          'grants' =>
+            _configurationDetail ? 'Подключение MCP-клиента' : 'Доступ ИИ',
+          'authorities' => 'Согласования и делегирование',
+          'plans' =>
+            plan == null || plan['id'] == _closedPlanId
+                ? 'Планы'
+                : expired || invalidPlan
+                ? 'План требует новой проверки'
+                : plan['status'] == 'blocked'
+                ? 'План заблокирован'
+                : widget.installationCatalog && !_planReviewed
+                ? 'Проверка готовности к установке'
+                : 'Подтверждение плана',
+          _ =>
+            _profileDetail ? 'Версии и сравнение профиля' : 'Ansible-профили',
+        },
+        description: automationPageDescription(screenId),
+        contextBar:
+            widget.contextBarBuilder?.call(
+              model.catalog?['environment'] as String?,
+            ) ??
+            widget.contextBar,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AutomationStatusSection(
               busy: model.busy,
@@ -935,38 +1421,40 @@ class _AutomationPanelState extends State<AutomationPanel> {
               ),
               onStopWaiting: () => model.cancelInterest().ignore(),
             ),
-            AutomationProfileActions(
-              actions: actions,
-              hasServer: widget.serverId != null,
-              installationCatalog: widget.installationCatalog,
-              onRefresh: () => _present(
-                AutomationUiPhase.profiles,
-                model.refreshProfiles,
-              ).ignore(),
-              onCreate: () => _editProfile().ignore(),
-              onLoadRecipes: () => _loadRecipes().ignore(),
-            ),
-            if (model.catalog != null)
+            if (_section == 'catalog' && model.catalog != null)
               AutomationRecipesSection(
+                key: _recipesKey,
                 catalog: model.catalog!,
+                serverId: widget.serverId,
+                serverProfiles: widget.serverProfiles,
+                onSelectionChanged: (value) =>
+                    setState(() => _recipeDetail = value),
                 canMutate: actions.mutate,
                 onCreatePlan: (digest) => _createRecipePlan(digest).ignore(),
               ),
-            AutomationProfilesSection(
-              profiles: model.profiles,
-              loaded: model.profilesLoaded,
-              hasMore: model.profilesCursor != null,
-              selectedId: selected?.id,
-              actions: actions,
-              onSelect: (id) => _present(
-                AutomationUiPhase.version,
-                () => model.selectProfile(id),
-              ).ignore(),
-              onMore: () => _present(
-                AutomationUiPhase.profiles,
-                () => model.refreshProfiles(more: true),
-              ).ignore(),
-              beforeProfiles: AutomationGrantsSection(
+            if (_section == 'profiles' && !_profileDetail)
+              AutomationProfilesSection(
+                onSelectVersion: selected != null && revision != null
+                    ? () => _selectVersion().ignore()
+                    : null,
+                profiles: model.profiles,
+                loaded: model.profilesLoaded,
+                hasMore: model.profilesCursor != null,
+                selectedId: selected?.id,
+                actions: actions,
+                onSelect: (id) => _selectAutomationProfile(id).ignore(),
+                onMore: () => _present(
+                  AutomationUiPhase.profiles,
+                  () => model.refreshProfiles(more: true),
+                ).ignore(),
+              ),
+            if (_section == 'grants')
+              AutomationGrantsSection(
+                onSelectionChanged: (row) =>
+                    setState(() => _selectedGrantId = row['id'] as String),
+                onConfigurationChanged: (value) =>
+                    setState(() => _configurationDetail = value),
+                showHeaderActions: false,
                 serverProfiles: widget.serverProfiles,
                 grants: [
                   for (final row in model.grants)
@@ -983,18 +1471,23 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   model.refreshGrants,
                 ).ignore(),
                 onCreate: () => _grantEditor().ignore(),
-                onConfigure: (id) => _present(
-                  AutomationUiPhase.configuration,
-                  () => model.configurationForGrant(id),
-                ).ignore(),
+                onConfigure: (id) => _configureGrant(id).ignore(),
                 onEdit: (row) => _grantEditor(existing: row).ignore(),
                 onRevoke: (row) => _revokeGrant(row).ignore(),
                 onCopyConfiguration: () => Clipboard.setData(
                   ClipboardData(text: pretty(model.launchConfiguration)),
                 ).ignore(),
               ),
-            ),
-            if (selected != null && revision != null)
+            if (_section == 'profiles' && _profileDetail)
+              TextButton(
+                clipBehavior: Clip.none,
+                onPressed: () => setState(() => _profileDetail = false),
+                child: const Text('К профилям'),
+              ),
+            if (_section == 'profiles' &&
+                _profileDetail &&
+                selected != null &&
+                revision != null)
               AutomationProfileDetailSection(
                 profile: selected,
                 revision: revision,
@@ -1045,6 +1538,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
                     },
                     (value) => captured.createPlan(value),
                     phase: AutomationUiPhase.createPlan,
+                    parameterDefinitions: parameters,
                     purpose: 'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
                     target:
                         'Ansible-профиль: ${selected.name} · версия ${revision['revision']}.',
@@ -1064,9 +1558,27 @@ class _AutomationPanelState extends State<AutomationPanel> {
                 onDelegate: () => _delegate().ignore(),
                 onArchive: () => _archiveProfile(selected).ignore(),
               ),
-            if (plan != null)
+            if (_section == 'plans' &&
+                plan != null &&
+                plan['id'] != _closedPlanId)
               AutomationPlanSection(
                 plan: plan,
+                showPreflight: widget.installationCatalog,
+                showRefresh: false,
+                allowApply: model.approvals.any(
+                  (row) =>
+                      row['planId'] == plan['id'] && row['state'] == 'approved',
+                ),
+                onViewPlan: () => setState(() => _planReviewed = true),
+                onShowAuthorities: () =>
+                    setState(() => _section = 'authorities'),
+                currentServerId: widget.serverId,
+                sourceRevision: model.revision,
+                onEditSource: () => _editPlanSource(plan).ignore(),
+                onClose: () => setState(() {
+                  _closedPlanId = plan['id'] as String;
+                  _section = widget.installationCatalog ? 'catalog' : 'jobs';
+                }),
                 serverProfiles: widget.serverProfiles,
                 automationProfile: _profileForPlan(plan),
                 runnable: runnable,
@@ -1096,9 +1608,22 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   () => model.loadPlan(plan['id'] as String),
                 ).ignore(),
               ),
-            if (widget.serverId != null) ...[
+            if (_section == 'plans' &&
+                (plan == null || plan['id'] == _closedPlanId))
+              const DeckEmptyState(
+                title: 'Нет открытого плана',
+                description:
+                    'Выберите рецепт или версию профиля и создайте план.',
+                icon: 'jobs',
+              ),
+            if (_section == 'jobs') ...[
               AutomationJobsSection(
+                scopeSelector: widget.contextBar,
+                onOpenServers: widget.onOpenServers,
+                showHeaderActions: false,
+                onDetailChanged: (value) => setState(() => _jobDetail = value),
                 serverId: widget.serverId,
+                serverProfiles: widget.serverProfiles,
                 jobs: model.jobs,
                 job: job,
                 events: model.events,
@@ -1119,18 +1644,13 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   AutomationUiPhase.authorities,
                   model.refreshAuthorities,
                 ).ignore(),
-                onSelect: (id) => _present(
-                  AutomationUiPhase.job,
-                  () => model.selectJob(id),
-                ).ignore(),
+                onSelect: (id) => _selectJob(id).ignore(),
                 onMore: () => _present(
                   AutomationUiPhase.jobs,
                   () => model.refreshJobs(more: true),
                 ).ignore(),
-                onShowPlan: () => _present(
-                  AutomationUiPhase.plan,
-                  () => model.loadPlan(job!['immutablePlanId'] as String),
-                ).ignore(),
+                onShowPlan: () =>
+                    _openPlan(job!['immutablePlanId'] as String).ignore(),
                 onCancel: () => _present(
                   AutomationUiPhase.cancelJob,
                   () => model.jobAction(job!['id'] as String, reconcile: false),
@@ -1140,6 +1660,8 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   () => model.jobAction(job!['id'] as String, reconcile: true),
                 ).ignore(),
               ),
+            ],
+            if (_section == 'authorities')
               AutomationAuthoritiesSection(
                 approvals: model.approvals,
                 delegations: model.delegations,
@@ -1147,10 +1669,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
                 hasMoreApprovals: model.approvalsNext != null,
                 hasMoreDelegations: model.delegationsNext != null,
                 actions: actions,
-                onOpenPlan: (id) => _present(
-                  AutomationUiPhase.plan,
-                  () => model.loadPlan(id),
-                ).ignore(),
+                onOpenPlan: (id) => _openPlan(id).ignore(),
                 onRevokeDelegation: (row) => _present(
                   AutomationUiPhase.revokeDelegation,
                   () => model.revokeDelegation(row),
@@ -1164,7 +1683,6 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   () => model.moreAuthorities(approvals: false),
                 ).ignore(),
               ),
-            ],
           ],
         ),
       ),

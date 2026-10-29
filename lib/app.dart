@@ -10,13 +10,9 @@ import 'bootstrap/bootstrap_controller.dart';
 import 'bootstrap/local_api_client.dart';
 import 'bootstrap/trusted_native_bootstrap_host.dart';
 import 'profiles/profile_controller.dart';
-import 'profiles/profile_list.dart';
 import 'profiles/startup_recovery.dart';
-import 'profiles/recovery_view.dart';
-import 'settings/settings_view.dart';
-import 'software/software_panel.dart';
-import 'shell/foundation_shell.dart';
 import 'shell/private_session.dart';
+import 'shell/base_workspace.dart';
 import 'theme/brand_theme.dart';
 import 'theme/motion.dart';
 
@@ -133,13 +129,6 @@ class _FoundationAppState extends State<FoundationApp>
       ? _privateReason
       : controller.reason;
 
-  Widget _privateFeature(String section, Widget child) => KeyedSubtree(
-    // A loss and recovery can happen before the next frame. Retire the old
-    // owner even when that frame already has a current authorized snapshot.
-    key: ValueKey('private-$section-$_privateEpoch'),
-    child: child,
-  );
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -222,43 +211,15 @@ class _FoundationAppState extends State<FoundationApp>
           ),
           home: ListenableBuilder(
             listenable: controller,
-            builder: (context, child) => FoundationShell(
+            builder: (context, child) => BaseWorkspace(
+              privateEpoch: _privateEpoch,
+              profiles: profiles,
+              recovery: recovery,
+              client: controller.client.trustedClient,
               state: _visibleReadiness,
               reason: _visibleReason,
               retryInProgress: controller.retryInProgress,
-              recoveryAction: RecentOperationsButton(recovery: recovery),
               onRetry: () => controller.retry().ignore(),
-              servers: _privateFeature(
-                'servers',
-                RecoveryView(
-                  recovery: recovery,
-                  child: ProfileList(
-                    controller: profiles,
-                    controlClient: controller.client.trustedClient,
-                  ),
-                ),
-              ),
-              settings: _privateFeature(
-                'settings',
-                RecoveryView(
-                  recovery: recovery,
-                  child: SettingsView(controller: profiles),
-                ),
-              ),
-              software: _privateFeature(
-                'software',
-                RecoveryView(
-                  recovery: recovery,
-                  child: SoftwarePanel(
-                    profiles: profiles,
-                    client: controller.client.trustedClient,
-                  ),
-                ),
-              ),
-              targetName: profiles.selected?.name,
-              targetAddress: profiles.selected == null
-                  ? null
-                  : '${profiles.selected!.address}:${profiles.selected!.port}',
             ),
           ),
         ),
