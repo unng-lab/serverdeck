@@ -106,7 +106,8 @@ void main() {
     );
     for (final row in current.values) {
       expect(row[5], contains('T13'));
-      expect(row.last, contains('не проверено заново'));
+      expect(row.last.trim(), isNotEmpty);
+      expect(row.last, contains('(evidence.md)'));
     }
     final delivery = File('specs/design-delivery.md').readAsStringSync();
     final ownership = _mapRows(delivery);

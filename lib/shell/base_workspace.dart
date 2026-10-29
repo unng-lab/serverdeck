@@ -14,6 +14,7 @@ import '../settings/settings_view.dart';
 import '../software/software_panel.dart';
 import '../ui/deck_page.dart';
 import '../ui/deck_icon.dart';
+import '../ui/deck_input_border.dart';
 import '../theme/motion.dart';
 import 'foundation_shell.dart';
 import 'deck_navigation.dart';
@@ -176,7 +177,7 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
     child: MotionDropdown<String>(
       key: ValueKey('workspace-target-${_target?.id}'),
       initialValue: _target?.id,
-      decoration: const InputDecoration(
+      decoration: deckFormDecoration(context).copyWith(
         labelText: 'Сервер',
         helperText: 'Выбор цели не подключает сервер',
       ),
@@ -325,6 +326,7 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
           serverProfiles: widget.profiles.profiles,
           contextBar: _targetSelector(),
           workspaceActions: _jobsActions,
+          onOpenServers: () => _navigate(FoundationSection.servers),
           onPlanReview: _beginPlanReview,
         );
   List<Widget> get _jobsActions => _location.view == DeckView.jobs

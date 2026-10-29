@@ -186,6 +186,7 @@ class AutomationPanel extends StatefulWidget {
     this.contextBarBuilder,
     this.workspaceActions = const [],
     this.onPlanReview,
+    this.onOpenServers,
   });
   final TrustedApiClient client;
   final String? serverId;
@@ -198,6 +199,7 @@ class AutomationPanel extends StatefulWidget {
 
   /// Temporarily presents the plan review in Jobs without changing its owner.
   final VoidCallback Function()? onPlanReview;
+  final VoidCallback? onOpenServers;
   @override
   State<AutomationPanel> createState() => _AutomationPanelState();
 }
@@ -1280,7 +1282,11 @@ class _AutomationPanelState extends State<AutomationPanel> {
         deadline.isAfter(DateTime.now());
     final expired = deadline != null && !deadline.isAfter(DateTime.now());
     final actions = AutomationActionAvailability(
-      read: !_openingRecipes && !model.busy && !widget.client.isClosed,
+      read:
+          !_openingRecipes &&
+          !model.busy &&
+          !widget.client.isClosed &&
+          (_section != 'jobs' || widget.serverId != null),
       mutate: !_openingRecipes && model.canMutate,
       select: !model.busy && !_openingRecipes,
     );
@@ -1610,9 +1616,10 @@ class _AutomationPanelState extends State<AutomationPanel> {
                     'Выберите рецепт или версию профиля и создайте план.',
                 icon: 'jobs',
               ),
-            if (widget.serverId != null && _section == 'jobs') ...[
+            if (_section == 'jobs') ...[
               AutomationJobsSection(
                 scopeSelector: widget.contextBar,
+                onOpenServers: widget.onOpenServers,
                 showHeaderActions: false,
                 onDetailChanged: (value) => setState(() => _jobDetail = value),
                 serverId: widget.serverId,

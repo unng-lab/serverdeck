@@ -2844,6 +2844,7 @@ class AutomationJobsSection extends StatefulWidget {
     this.onDetailChanged,
     this.showHeaderActions = true,
     this.scopeSelector,
+    this.onOpenServers,
   });
   final List<Map<String, Object?>> jobs, events;
   final Map<String, Object?>? job;
@@ -2851,6 +2852,7 @@ class AutomationJobsSection extends StatefulWidget {
   final List<ProfileView> serverProfiles;
   final ValueChanged<bool>? onDetailChanged;
   final Widget? scopeSelector;
+  final VoidCallback? onOpenServers;
   final bool showHeaderActions;
   final bool loaded, hasMore, canCancel, canReconcile;
   final int droppedEvents;
@@ -3272,7 +3274,9 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
                   ),
                 OutlinedButton(
                   clipBehavior: Clip.none,
-                  onPressed: () => setState(() => filters = !filters),
+                  onPressed: widget.serverId == null
+                      ? null
+                      : () => setState(() => filters = !filters),
                   child: const Text('Фильтры'),
                 ),
               ],
@@ -3313,7 +3317,21 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
               ),
             ],
             const SizedBox(height: 18),
-            if (!widget.loaded)
+            if (widget.serverId == null)
+              DeckEmptyState(
+                title: 'Выберите сервер',
+                description: 'Задания доступны в контексте конкретного сервера. Общая история всех серверов пока недоступна. Выберите сервер в области просмотра или добавьте первое подключение.',
+                icon: 'jobs',
+                actions: [
+                  if (widget.onOpenServers != null)
+                    FilledButton(
+                      clipBehavior: Clip.none,
+                      onPressed: widget.onOpenServers,
+                      child: const Text('К серверам'),
+                    ),
+                ],
+              )
+            else if (!widget.loaded)
               const DeckStatus(label: 'Задания ещё не прочитаны')
             else if (rows.isEmpty)
               const DeckEmptyState(

@@ -165,7 +165,7 @@ class MotionDropdown<T> extends StatelessWidget {
       value: selected == null
           ? null
           : _selectedValue(context, selected.child, selected.value),
-      onPressed: onChanged == null
+      onPressed: onChanged == null || !items.any((item) => item.enabled)
           ? null
           : () async {
               final value = await showMotionDialog<T>(

@@ -8,8 +8,9 @@
   language, duplicate reference validators, schema bundles and hash/receipt
   pipeline. Keep design work in Flutter with ordinary unit/widget tests and
   direct comparison with the canonical mockups. Do not recreate that machinery.
-- Do not use Computer Use or desktop UI automation for this work. Show a build
-  through an ordinary executable launch when delivering the application.
+- The user explicitly permitted Computer Use on 2026-10-29 for observing the
+  installed application and its ordinary navigation. This supersedes the earlier
+  prohibition; it does not authorize native/integration test workloads.
 
 ## Current user priority — 2026-10-29
 
@@ -30,7 +31,7 @@
 - Audit test duplication without deleting distinct behavior, privacy, identity,
   concurrency, recovery or accessibility coverage merely to shorten the run.
 - The validation stage remains static/unit/widget only, locally and in CI.
-  No Computer Use, native/integration dispatch, provider work or public Windows
+  No native/integration dispatch, provider work or public Windows
   binaries follows from this order. Existing source-only publication and CI
   gates remain applicable; local intermediate delivery may precede them.
 
