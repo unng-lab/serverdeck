@@ -8,9 +8,10 @@
   language, duplicate reference validators, schema bundles and hash/receipt
   pipeline. Keep design work in Flutter with ordinary unit/widget tests and
   direct comparison with the canonical mockups. Do not recreate that machinery.
-- The user explicitly permitted Computer Use on 2026-10-29 for observing the
-  installed application and its ordinary navigation. This supersedes the earlier
-  prohibition; it does not authorize native/integration test workloads.
+- The user temporarily permitted Computer Use on 2026-10-29, then explicitly
+  suspended it again. Do not use Computer Use or desktop UI automation until
+  the user grants new permission. Ordinary executable launch for delivery
+  remains authorized; this does not authorize native/integration test workloads.
 
 ## Current user priority — 2026-10-29
 
