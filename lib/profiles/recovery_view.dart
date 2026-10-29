@@ -438,10 +438,26 @@ class _RecentOperationsViewState extends State<RecentOperationsView> {
                   DeckActionFlow(
                     controlInset: 0,
                     spacing: 4,
-                    children: const [
-                      DeckPagerButton(reverse: true),
-                      DeckPagerButton(page: 1, selected: true),
-                      DeckPagerButton(),
+                    children: [
+                      Tooltip(
+                        message: 'Предыдущая страница · Нет другой загруженной страницы',
+                        child: MergeSemantics(
+                          child: Semantics(
+                            label: 'Предыдущая страница',
+                            child: const DeckPagerButton(reverse: true),
+                          ),
+                        ),
+                      ),
+                      const DeckPagerButton(page: 1, selected: true),
+                      Tooltip(
+                        message: 'Следующая страница · Нет другой загруженной страницы',
+                        child: MergeSemantics(
+                          child: Semantics(
+                            label: 'Следующая страница',
+                            child: const DeckPagerButton(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],

@@ -1128,15 +1128,22 @@ class _AutomationProfileFieldsState extends State<AutomationProfileFields> {
             OutlinedButton(
               clipBehavior: Clip.none,
               onPressed: widget.enabled && steps.length < 32
-                  ? () => change('steps', [
-                      ...steps,
-                      {
-                        'id': 'step${steps.length + 1}',
-                        'kind': 'config_file',
-                        'resourceId': 'system.motd',
-                        'values': {'text': ''},
-                      },
-                    ])
+                  ? () {
+                      final ids = steps.map((step) => step['id']).toSet();
+                      var suffix = steps.length + 1;
+                      while (ids.contains('step$suffix')) {
+                        suffix++;
+                      }
+                      change('steps', [
+                        ...steps,
+                        {
+                          'id': 'step$suffix',
+                          'kind': 'config_file',
+                          'resourceId': 'system.motd',
+                          'values': {'text': ''},
+                        },
+                      ]);
+                    }
                   : null,
               child: const Text('Добавить шаг'),
             ),

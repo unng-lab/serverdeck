@@ -8,6 +8,7 @@ import 'package:serverdeck/automation/automation_forms.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck/ui/deck_page.dart';
+import 'package:serverdeck_protocol/automation/profile_body.dart';
 
 import '../support/design_automation_fixtures.dart';
 import '../support/design_fonts.dart';
@@ -16,6 +17,94 @@ import '../support/design_host.dart' show mountDesignFixture;
 import 'deck_components_test.dart' show pixels;
 
 void main() {
+  for (final scenario in ['first', 'middle', 'occupied']) {
+    testWidgets('T257 added step ID stays unique $scenario', (tester) async {
+      Map<String, Object?> service(String id, String resource) => {
+        'id': id,
+        'kind': 'service',
+        'resourceId': resource,
+        'state': 'started',
+        'enabled': true,
+      };
+      Map<String, Object?> config(String id) => {
+        'id': id,
+        'kind': 'config_file',
+        'resourceId': 'system.motd',
+        'values': {'text': 'Сохранённый текст'},
+      };
+      final rows = switch (scenario) {
+        'first' => [config('step1'), service('step2', 'postgresql.service')],
+        'middle' => [
+          service('step1', 'postgresql.service'),
+          config('step2'),
+          service('step3', 'clickhouse.service'),
+        ],
+        _ => [
+          service('step1', 'postgresql.service'),
+          service('step3', 'clickhouse.service'),
+        ],
+      };
+      final document = DesignAutomationFixtures.body()..['steps'] = rows;
+      AutomationBody.fromJson(document);
+      final body = TextEditingController(text: jsonEncode(document));
+      var changes = 0;
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: Motion.theme(BrandTheme.dark, true),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AutomationProfileFields(
+                  body: body,
+                  enabled: true,
+                  onChanged: (_) => changes++,
+                  identityFields: const [],
+                  showTabs: false,
+                  selectedSection: 1,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final remove = scenario == 'first'
+            ? 1
+            : scenario == 'middle'
+            ? 2
+            : null;
+        if (remove != null) {
+          final button = find.byTooltip('Удалить шаг $remove');
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+        }
+        final before = jsonDecode(body.text) as Map<String, Object?>;
+        final add = find.widgetWithText(OutlinedButton, 'Добавить шаг');
+        await tester.ensureVisible(add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        final after = jsonDecode(body.text) as Map<String, Object?>;
+        expect(after, {
+          ...before,
+          'steps': [
+            ...before['steps'] as List,
+            {
+              'id': scenario == 'first' ? 'step3' : 'step4',
+              'kind': 'config_file',
+              'resourceId': 'system.motd',
+              'values': {'text': ''},
+            },
+          ],
+        });
+        AutomationBody.fromJson(after);
+        expect(changes, remove == null ? 1 : 2);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        body.dispose();
+      }
+    });
+  }
   for (final id in ['35-plan-parameters', '39-delegations']) {
     testWidgets(
       'T225 readonly context never becomes an outgoing draft field $id',

@@ -83,6 +83,38 @@ void main() {
       expect(find.text('Saved profile'), findsNothing);
       expect(client.reads, 1);
 
+      final semantics = tester.ensureSemantics();
+      try {
+        for (final direction in ['Предыдущая страница', 'Следующая страница']) {
+          final pager = find.byTooltip(
+            '$direction · Нет другой загруженной страницы',
+          );
+          expect(pager, findsOneWidget);
+          await tester.ensureVisible(pager);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getSemantics(find.bySemanticsLabel(direction)),
+            matchesSemantics(
+              label: direction,
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: false,
+            ),
+          );
+          expect(
+            tester
+                .widget<TextButton>(
+                  find.descendant(of: pager, matching: find.byType(TextButton)),
+                )
+                .onPressed,
+            isNull,
+          );
+        }
+      } finally {
+        semantics.dispose();
+      }
+      expect(client.reads, 1);
+
       await tester.ensureVisible(find.text('Обновить список'));
       await tester.tap(find.text('Обновить список'));
       await tester.pump();
