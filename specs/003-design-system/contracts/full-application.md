@@ -52,6 +52,10 @@ Page header сохраняет eyebrow/title/description/header actions, пор�
 
 Phone server/software/job lists используют cards/sections; whole-page/server-list horizontal overflow запрещён. Raw logs/value tables могут иметь отдельный labelled scroll с доступным context. Числа выровнены вправо; table rows не превращаются в отдельно скруглённые pills. Формы растут и прокручиваются над keyboard insets, сохраняя достижимость actions.
 
+### Уточнение пользователя — 2026-10-29: header actions04
+
+На экране04 «Первый запуск» две верхние кнопки «Добавить сервер» и «Настроить ИИ-доступ» должны располагаться в одну строку на широком экране, когда хватает места. Ограничение max-width300 из первоначального атласа для этого конкретного action region отменено явным уточнением пользователя. Действуют natural width двух controls, gap8 и прежний responsive header flow; при нехватке ширины сохраняется адаптивный перенос/phone layout. Остальные страницы не получают глобального изменения max-width. Нижняя пара welcome actions и callbacks не меняются. Сравнение04 учитывает это уточнение наряду с каноническими размерами, а не возвращает отвергнутую пользователем вертикальную desktop пару.
+
 ## FA04 — Типографика, цвета, иконки, controls
 
 Все24 роли каждой темы берутся из tokens JSON, без seed palette и системных defaults. Проверяется фактическая композиция: text≥4.5:1, controls/focus/chart≥3:1. Disabled использует непрозрачные роли. Dark shadow отсутствует; light shadow `0 4 16 rgba(23,35,55,0.10)` применяется только к menus/dialogs.

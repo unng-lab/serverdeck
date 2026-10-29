@@ -80,6 +80,7 @@ void main() {
       : Platform.environment['BASE_DESIGN_CAPTURE_DIR'] ?? '';
   Directory? output;
   var captures = 0;
+  var bottomCaptures = 0;
   setUpAll(() async {
     await loadDesignFonts();
     if (captureDirectory.isNotEmpty) {
@@ -379,7 +380,7 @@ void main() {
                 );
                 expect(editor.title, 'Делегирование версии');
                 expect(editor.clientLabel, isNotNull);
-                expect(find.text('ИИ-клиент'), findsOneWidget);
+                expect(find.text('ИИ-клиент *'), findsOneWidget);
                 expect(find.text(editor.clientLabel!), findsOneWidget);
               }
               final sidebar = tester
@@ -576,6 +577,61 @@ void main() {
                     image.dispose();
                   }
                 });
+                final page = find.byType(DeckPage).first;
+                final scrolls = find.descendant(
+                  of: page,
+                  matching: find.byType(Scrollable),
+                );
+                final scroll = scrolls
+                    .evaluate()
+                    .map(
+                      (element) =>
+                          (element as StatefulElement).state as ScrollableState,
+                    )
+                    .firstWhere(
+                      (state) =>
+                          state.widget.axisDirection == AxisDirection.down,
+                    );
+                if (scroll.position.maxScrollExtent > 1) {
+                  final effects = Map<String, int>.of(
+                    host.harness.counters.values,
+                  );
+                  final writes = host.harness.client.mutations.length;
+                  final reads = host.harness.client.reads.length;
+                  scroll.position.jumpTo(scroll.position.maxScrollExtent);
+                  await tester.pumpAndSettle();
+                  expect(
+                    tester.takeException(),
+                    isNull,
+                    reason: '$caseId bottom viewport',
+                  );
+                  expect(host.harness.counters.values, effects);
+                  expect(host.harness.client.mutations.length, writes);
+                  expect(host.harness.client.reads.length, reads);
+                  await tester.runAsync<void>(() async {
+                    final image = await boundary.toImage(pixelRatio: 1);
+                    try {
+                      final bytes = await image.toByteData(
+                        format: ui.ImageByteFormat.png,
+                      );
+                      if (bytes == null)
+                        throw StateError('Bottom PNG encoding failed.');
+                      final fileName =
+                          '${binding.screenId}-${frame.width.toInt()}x${frame.height.toInt()}-${theme.name}-${(scale * 100).round()}-bottom.png';
+                      await File(paths.join(output!.path, fileName))
+                          .writeAsBytes(
+                            bytes.buffer.asUint8List(
+                              bytes.offsetInBytes,
+                              bytes.lengthInBytes,
+                            ),
+                            flush: true,
+                          );
+                      bottomCaptures++;
+                    } finally {
+                      image.dispose();
+                    }
+                  });
+                }
               }
             } finally {
               FlutterError.onError = originalErrorHandler;
@@ -589,7 +645,7 @@ void main() {
   tearDownAll(() {
     if (output != null)
       stdout.writeln(
-        'Current003.4 candidate PNGs written: $captures. Pixel comparison is not implied.',
+        'Current003.4 candidate PNGs written: $captures primary, $bottomCaptures bottom. Pixel comparison is not implied.',
       );
   });
 }

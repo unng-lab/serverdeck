@@ -308,8 +308,7 @@ class _FoundationShellState extends State<FoundationShell> {
             : MainAxisAlignment.start,
         children: [
           Container(
-            width: 25,
-            height: 25,
+            constraints: const BoxConstraints(minWidth: 25, minHeight: 25),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: deckColors(context)['selected'],

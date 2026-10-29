@@ -823,19 +823,24 @@ class _TwoPanels extends StatelessWidget {
         },
       );
     }
+    final gap = MediaQuery.sizeOf(context).width <= 960 ? 14.0 : 20.0;
     return MediaQuery.sizeOf(context).width > 760 &&
             MediaQuery.textScalerOf(context).scale(14) < 27
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(flex: form ? 506 : 1, child: left),
-              const SizedBox(width: 20),
+              SizedBox(width: gap),
               Expanded(flex: form ? 307 : 1, child: right),
             ],
           )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [left, const SizedBox(height: 20), right],
+            children: [
+              left,
+              SizedBox(height: deckSectionGap(context)),
+              right,
+            ],
           );
   }
 }
@@ -1474,17 +1479,53 @@ class AutomationJsonView extends StatelessWidget {
   );
 }
 
+class _RecordStatus extends StatelessWidget {
+  const _RecordStatus(this.label, {required this.symbol, required this.role});
+  final String label, symbol, role;
+
+  @override
+  Widget build(BuildContext context) => DefaultTextStyle(
+    style: BrandTypography.caption.copyWith(
+      height: 20 / 12,
+      color: deckColors(context)[role],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ExcludeSemantics(
+          child: SizedBox(
+            width: 12,
+            height: 20,
+            child: Center(
+              child: Text(
+                symbol,
+                textScaler: TextScaler.noScaling,
+                style: const TextStyle(fontSize: 13, height: 20 / 13),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Flexible(child: Text(label)),
+      ],
+    ),
+  );
+}
+
 class _ActionButton extends StatelessWidget {
-  const _ActionButton(this.label, this.onPressed);
+  const _ActionButton(this.label, this.onPressed, {this.icon});
 
   final String label;
   final VoidCallback? onPressed;
+  final String? icon;
 
   @override
   Widget build(BuildContext context) => OutlinedButton(
     clipBehavior: Clip.none,
     onPressed: onPressed,
-    child: Text(label),
+    child: icon == null
+        ? Text(label)
+        : DeckButtonLabel(icon: icon!, label: label),
   );
 }
 
@@ -1857,17 +1898,14 @@ class _AutomationProfilesSectionState extends State<AutomationProfilesSection> {
           onSelected: (next) => setState(() => tab = next),
         ),
         const DeckTabsGap(),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SizedBox(
-            width: MediaQuery.sizeOf(context).width <= 520
-                ? double.infinity
-                : null,
-            child: _ActionButton(
+        DeckActions(
+          phoneBasis: 0,
+          children: [
+            _ActionButton(
               'Выбрать версию',
               widget.actions.read ? widget.onSelectVersion : null,
             ),
-          ),
+          ],
         ),
         const SizedBox(height: 18),
         if (!widget.loaded)
@@ -1893,7 +1931,11 @@ class _AutomationProfilesSectionState extends State<AutomationProfilesSection> {
                     style: BrandTypography.log,
                     textAlign: TextAlign.right,
                   ),
-                  Text(row.archived ? 'Архив' : 'Активен'),
+                  _RecordStatus(
+                    row.archived ? 'Архив' : 'Активен',
+                    symbol: row.archived ? '○' : '✓',
+                    role: row.archived ? 'muted' : 'available',
+                  ),
                 ],
             ],
             selected: rows.indexWhere((row) => row.id == widget.selectedId),
@@ -2020,7 +2062,11 @@ class AutomationProfileDetailSection extends StatelessWidget {
               onPressed: actions.read ? onSelectVersion : null,
               child: const Text('Выбрать версию'),
             ),
-            _ActionButton('Проверить версию', actions.read ? onValidate : null),
+            _ActionButton(
+              'Проверить версию',
+              actions.read ? onValidate : null,
+              icon: 'refresh',
+            ),
             if (hasServer && !profile.archived)
               _ActionButton(
                 'Создать план',
@@ -2307,13 +2353,13 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
             tone: DeckTone.warning,
             contextLine: 'Цель: $targetLabel',
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           const DeckNotice(
             title: 'Следующий шаг',
             message: 'Создать новый план и просмотреть актуальные эффекты',
             tone: DeckTone.warning,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           DeckPanel(
             title: 'Параметры и условия',
             child: AutomationFacts(
@@ -2333,7 +2379,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
               },
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           const DeckPanel(
             title: 'Последствия',
             child: AutomationFacts(
@@ -2343,7 +2389,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
               },
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           DeckActions(
             children: [
               FilledButton(
@@ -2392,7 +2438,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                   ? 'Цель: сведения недоступны'
                   : 'Цель: ${target.name} · ${AutomationServerTargets.address(target)}',
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             _TwoPanels(
               left: DeckPanel(
                 title: 'Состав плана и проверки',
@@ -2431,7 +2477,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             DeckActions(
               children: [
                 FilledButton(
@@ -2492,7 +2538,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                   ? 'Цель: сведения недоступны'
                   : 'Цель: ${target.name} · ${AutomationServerTargets.address(target)}',
             ),
-          if (blocked != null) const SizedBox(height: 20),
+          if (blocked != null) SizedBox(height: deckSectionGap(context)),
           if (widget.historical)
             const DeckNotice(
               message: 'Исторический план: запись не является результатом сегодняшней проверки.',
@@ -2508,7 +2554,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                   'Ранее выданное согласие не действует для нового плана.',
               tone: DeckTone.warning,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
           ],
           if (blocked != null) ...[
             const DeckNotice(
@@ -2516,7 +2562,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
               message: 'План заблокирован по причинам, полученным от сервиса. Сведения о конкретном защищённом эффекте не предоставлены.',
               tone: DeckTone.error,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             _TwoPanels(
               left: DeckPanel(
                 title: 'Состав плана и проверки',
@@ -2591,7 +2637,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: deckSectionGap(context)),
                   const DeckPanel(
                     title: 'Последствия и условия',
                     child: Text(
@@ -2601,7 +2647,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             DeckActions(
               children: [
                 const Tooltip(
@@ -2689,7 +2735,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: deckSectionGap(context)),
                   const DeckPanel(
                     title: 'Последствия и условия',
                     child: Text(
@@ -2699,7 +2745,7 @@ class _AutomationPlanSectionState extends State<AutomationPlanSection> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             for (final reason in _rows(p['reasons']))
               Text(_code(reason['code'])),
             if (!targetMatches ||
@@ -2878,6 +2924,23 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
     final contextLine = target == null
         ? 'Сервер: ${widget.serverId ?? 'не выбран'}'
         : '${target.name} · ${AutomationServerTargets.address(target)}';
+    final phoneTimeline = MediaQuery.sizeOf(context).width <= 520;
+    final ordinal = TextPainter(
+      text: TextSpan(
+        text: '8' * widget.events.length.toString().length,
+        style: BrandTypography.caption,
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final minimumMarker = phoneTimeline ? 23.0 : 25.0;
+    final markerSize = [
+      minimumMarker,
+      ordinal.width + 2,
+      ordinal.height + 2,
+    ].reduce((a, b) => a > b ? a : b);
+    final markerColumn = markerSize > 25 ? markerSize : 25.0;
+    ordinal.dispose();
     Widget eventTimeline() => DeckPanel(
       title: 'Ход выполнения',
       padding: EdgeInsets.zero,
@@ -2918,76 +2981,107 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
                     : event['checkResult'] != null
                     ? 'Результат: ${_result(event['checkResult'])}'
                     : _value(event['safeCode']);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 25,
-                        height: 25,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: deckColors(context)[role]),
-                        ),
-                        child: success
-                            ? DeckIcon(
-                                'check',
-                                size: 13,
-                                color: deckColors(context)[role],
-                              )
-                            : Text(
-                                '${i + 1}',
-                                style: BrandTypography.caption.copyWith(
-                                  color: deckColors(context)[role],
+                final phone = MediaQuery.sizeOf(context).width <= 520;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (i + 1 < widget.events.length)
+                      Positioned(
+                        key: ValueKey('job-timeline-line-$i'),
+                        left: (phone ? 14 : 20) + markerSize / 2 - .5,
+                        top: (phone ? 14 : 12) + markerSize - 3,
+                        bottom: -10,
+                        width: 1,
+                        child: ColoredBox(color: deckColors(context)['border']),
+                      ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: phone ? 14 : 20,
+                        vertical: phone ? 14 : 12,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: markerColumn,
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              heightFactor: 1,
+                              child: Container(
+                                key: ValueKey('job-timeline-marker-$i'),
+                                width: markerSize,
+                                height: markerSize,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: deckColors(
+                                    context,
+                                  )[success ? 'selected' : 'raised'],
+                                  border: Border.all(
+                                    color: deckColors(context)[role],
+                                  ),
                                 ),
+                                child: success
+                                    ? DeckIcon(
+                                        'check',
+                                        size: 13,
+                                        color: deckColors(context)[role],
+                                      )
+                                    : Text(
+                                        '${i + 1}',
+                                        style: BrandTypography.caption.copyWith(
+                                          color: deckColors(context)[role],
+                                        ),
+                                      ),
                               ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              title,
-                              style: BrandTypography.table.copyWith(
-                                fontFamily: BrandAssets.semiboldFamily,
-                                fontWeight: BrandTypography.semiboldWeight,
-                                fontVariations:
-                                    BrandTypography.semiboldVariations,
-                              ),
-                            ),
-                            Text(
-                              detail,
-                              style: BrandTypography.caption.copyWith(
-                                color: deckColors(context)['muted'],
-                                height: 20 / 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 70,
-                        child: Tooltip(
-                          message: _time(event['timestamp']),
-                          child: Text(
-                            clock,
-                            style: BrandTypography.log.copyWith(
-                              fontSize: 12,
-                              height: 20 / 12,
-                              color: deckColors(context)['muted'],
                             ),
                           ),
-                        ),
+                          SizedBox(width: phone ? 10 : 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  title,
+                                  style: BrandTypography.table.copyWith(
+                                    fontFamily: BrandAssets.semiboldFamily,
+                                    fontWeight: BrandTypography.semiboldWeight,
+                                    fontVariations:
+                                        BrandTypography.semiboldVariations,
+                                  ),
+                                ),
+                                Text(
+                                  detail,
+                                  style: BrandTypography.caption.copyWith(
+                                    color: deckColors(context)['muted'],
+                                    height: 20 / 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: phone ? 10 : 12),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: phone ? 58 : double.infinity,
+                            ),
+                            child: Tooltip(
+                              message: _time(event['timestamp']),
+                              child: Text(
+                                clock,
+                                textAlign: TextAlign.right,
+                                style: BrandTypography.log.copyWith(
+                                  fontSize: 12,
+                                  height: 20 / 12,
+                                  color: deckColors(context)['muted'],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -3018,14 +3112,14 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
                 : 'Состояние: Остановка запрошена',
             tone: unknown ? DeckTone.unknown : DeckTone.warning,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           if (unknown) ...[
             const DeckNotice(
               title: 'Следующий шаг',
               message: 'Проверить прежнее задание',
               tone: DeckTone.warning,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
           ],
           DeckPanel(
             title: 'Контекст и проверка результата',
@@ -3074,7 +3168,7 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: deckSectionGap(context)),
           DeckActions(
             children: [
               if (unknown) ...[
@@ -3104,7 +3198,7 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
             ],
           ),
           if (eventsVisible) ...[
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             eventTimeline(),
             DeckStatus(
               label:
@@ -3289,22 +3383,24 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
                   : job['cancelRequested'] == true
                   ? 'Остановка задания'
                   : 'Ход задания',
-              state: _jobState(job['state']),
+              state: 'Состояние: ${_jobState(job['state'])}',
               tone: _jobTone(job['state']),
-              contextLine: 'Задание: ${job['id']}',
             ),
-            const SizedBox(height: 20),
-            if (job['state'] == 'unknown')
+            SizedBox(height: deckSectionGap(context)),
+            if (job['state'] == 'unknown') ...[
               const DeckNotice(
                 title: 'Исход не подтверждён',
                 message: 'На сервере могли произойти изменения. Уточните результат перед следующим действием.',
                 tone: DeckTone.unknown,
               ),
-            if (job['cancelRequested'] == true)
+              SizedBox(height: deckSectionGap(context)),
+            ],
+            if (job['cancelRequested'] == true) ...[
               const DeckNotice(
                 message: 'Остановка запрошена. Текущий шаг ещё может завершиться; дождитесь подтверждённого результата.',
               ),
-            const SizedBox(height: 20),
+              SizedBox(height: deckSectionGap(context)),
+            ],
             _TwoPanels(
               left: eventsVisible
                   ? eventTimeline()
@@ -3363,7 +3459,7 @@ class _AutomationJobsSectionState extends State<AutomationJobsSection> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: deckSectionGap(context)),
             DeckStatus(
               label:
                   'Получено событий: ${widget.events.length}. Пропущено в источнике: ${widget.droppedEvents}',
@@ -3732,12 +3828,14 @@ class _AutomationGrantsSectionState extends State<AutomationGrantsSection> {
                               .join(', '),
                   ),
                   Text(_time(grant.value['expiresAt'])),
-                  Text(
+                  _RecordStatus(
                     grant.value['revokedAt'] != null
                         ? 'Отозван'
                         : grant.current
                         ? 'Действует'
                         : 'Истёк',
+                    symbol: grant.value['revokedAt'] != null ? '×' : '○',
+                    role: grant.value['revokedAt'] != null ? 'error' : 'muted',
                   ),
                 ],
             ],
@@ -3836,7 +3934,10 @@ class AutomationMcpConfigurationSection extends StatelessWidget {
             FilledButton(
               clipBehavior: Clip.none,
               onPressed: canRead ? onCopy : null,
-              child: const Text('Скопировать конфигурацию'),
+              child: const DeckButtonLabel(
+                icon: 'copy',
+                label: 'Скопировать конфигурацию',
+              ),
             ),
             _ActionButton('Закрыть', onClose),
           ],
@@ -3850,10 +3951,13 @@ class AutomationMcpConfigurationSection extends StatelessWidget {
   }
 }
 
+enum AutomationEditorKind { generic, planParameters, delegation }
+
 class AutomationJsonEditorDialog extends StatelessWidget {
   const AutomationJsonEditorDialog({
     super.key,
     required this.title,
+    this.eyebrow = 'Задания / Рабочее пространство',
     required this.input,
     required this.onClose,
     required this.onContinue,
@@ -3863,6 +3967,7 @@ class AutomationJsonEditorDialog extends StatelessWidget {
     this.target,
     this.clientLabel,
     this.contextDetails,
+    this.formKind = AutomationEditorKind.generic,
     this.onChanged,
     this.serverProfiles = const [],
     this.targetServerIds = const [],
@@ -3878,7 +3983,8 @@ class AutomationJsonEditorDialog extends StatelessWidget {
     this.pageInsets,
   });
 
-  final String title;
+  final String title, eyebrow;
+  final AutomationEditorKind formKind;
   final TextEditingController input;
   final String? error, purpose, target, clientLabel;
   final Map<String, Object?>? preview, contextDetails;
@@ -3902,142 +4008,223 @@ class AutomationJsonEditorDialog extends StatelessWidget {
   ], serverProfiles);
 
   @override
-  Widget build(BuildContext context) => AutomationFormPageFrame(
-    title: title,
-    asPage: asPage,
-    workspaceBounds: workspaceBounds,
-    pageInsets: pageInsets,
-    helper: _BeforeContinue(purpose: purpose),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // The source hides the decorative aside on compact/phone layouts.
-        // Keep the owner's operation explanation in the actual form.
-        if (purpose != null && MediaQuery.sizeOf(context).width <= 960) ...[
-          Text(
-            purpose!,
-            style: BrandTypography.caption.copyWith(
-              height: 20 / 12,
-              color: deckColors(context)['muted'],
-            ),
-          ),
-          const SizedBox(height: 18),
-        ],
-        if (clientLabel != null)
-          AutomationFormValue(label: 'ИИ-клиент', value: clientLabel!),
-        if (target != null)
-          AutomationFormValue(label: 'Профиль', value: target!),
-        if (!contextCurrent)
-          const DeckNotice(
-            message: _changedTargetMessage,
-            tone: DeckTone.warning,
-          ),
-        if (targetServerIds.isNotEmpty) ...[
-          AutomationFormValue(
-            label: 'Цель',
-            value: targetServerIds
-                .map((id) {
-                  final row = AutomationServerTargets.resolve(
-                    id,
-                    serverProfiles,
-                  );
-                  return row == null
-                      ? 'Сведения о цели недоступны'
-                      : '${row.name} · ${AutomationServerTargets.address(row)}';
-                })
-                .join(', '),
-          ),
-          const SizedBox(height: 20),
-        ],
-        AutomationStructuredDraft(
-          input: input,
-          enabled: !_locked && contextCurrent,
-          onChanged: onChanged,
-          serverProfiles: serverProfiles,
-          parameterDefinitions: parameterDefinitions,
+  Widget build(BuildContext context) {
+    final targetValue = targetServerIds.isEmpty
+        ? 'Сведения о цели недоступны'
+        : targetServerIds
+              .map((id) {
+                final row = AutomationServerTargets.resolve(id, serverProfiles);
+                return row == null
+                    ? 'Сведения о цели недоступны'
+                    : '${row.name} · ${AutomationServerTargets.address(row)}';
+              })
+              .join(', ');
+    String fact(String key) {
+      final value = contextDetails?[key];
+      return value is String || value is num ? '$value' : 'Не предоставлено';
+    }
+
+    final leading = <Widget>[
+      if (formKind == AutomationEditorKind.planParameters) ...[
+        AutomationFormValue(
+          key: const ValueKey('automation-context-target'),
+          label: 'Цель',
+          value: targetValue,
+          required: true,
         ),
-        if (!_jsonObject(input.text) && preview != null)
-          AutomationFacts(
-            values: {
-              if (preview!['scopes'] is List)
-                'Права последнего просмотра': (preview!['scopes'] as List)
-                    .map(_scope)
-                    .join(', '),
-              if (preview!['serverIds'] is List)
-                'Цели последнего просмотра':
-                    _targetIds(preview!['serverIds']).isEmpty
-                    ? 'Без доступа к серверам'
-                    : _targetIds(preview!['serverIds'])
-                          .map((id) {
-                            final row = AutomationServerTargets.resolve(
-                              id,
-                              serverProfiles,
-                            );
-                            return row == null
-                                ? 'Сведения о цели недоступны'
-                                : '${row.name} · ${AutomationServerTargets.address(row)}';
-                          })
-                          .join(', '),
-              if (preview!['lifetimeSeconds'] != null)
-                'Срок последнего просмотра':
-                    '${preview!['lifetimeSeconds']} секунд',
-            },
-          ),
-        const SizedBox(height: 16),
-        _AutomationExpansion(
-          tilePadding: EdgeInsets.zero,
-          initiallyExpanded: !_jsonObject(input.text),
-          title: const Text('JSON · дополнительные сведения'),
-          children: [
-            Semantics(
-              label: 'JSON',
-              child: TextField(
-                controller: input,
-                enabled: !_locked,
-                readOnly: _locked,
-                onChanged: _locked ? null : onChanged,
-                minLines: 8,
-                maxLines: 18,
-                decoration: InputDecoration(
-                  errorText: error,
-                  errorMaxLines: 20,
-                ),
-                style: _locked
-                    ? BrandTypography.log.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      )
-                    : BrandTypography.log,
+        AutomationFormValue(
+          key: const ValueKey('automation-context-profile'),
+          label: 'Профиль',
+          value: target ?? 'Не предоставлено',
+          required: true,
+        ),
+      ],
+      if (formKind == AutomationEditorKind.delegation) ...[
+        AutomationFormValue(
+          key: const ValueKey('automation-context-client'),
+          label: 'ИИ-клиент',
+          value: clientLabel ?? 'Не предоставлено',
+          required: true,
+        ),
+        AutomationFormValue(
+          key: const ValueKey('automation-context-profile'),
+          label: 'Профиль',
+          value: target ?? 'Не предоставлено',
+          required: true,
+        ),
+        AutomationFormValue(label: 'profileId', value: fact('profileId')),
+        AutomationFormValue(label: 'revision', value: fact('revision')),
+        AutomationFormValue(
+          label: 'bodyDigest (SHA-256)',
+          value: fact('bodyDigest'),
+        ),
+        AutomationFormValue(
+          key: const ValueKey('automation-context-target'),
+          label: 'Цель',
+          value: targetValue,
+        ),
+      ],
+    ];
+    final trailing = <Widget>[
+      if (formKind == AutomationEditorKind.planParameters) ...[
+        const AutomationFormValue(
+          label: 'Проверка',
+          value: 'Без записи на сервер',
+        ),
+        const AutomationFormValue(
+          label: 'Следующий шаг',
+          value: 'Получить план с эффектами и проверками',
+        ),
+      ],
+      if (formKind == AutomationEditorKind.delegation)
+        const AutomationFormValue(
+          label: 'Делегирование',
+          value: 'Только указанная ревизия',
+        ),
+    ];
+    return AutomationFormPageFrame(
+      title: title,
+      eyebrow: eyebrow,
+      asPage: asPage,
+      workspaceBounds: workspaceBounds,
+      pageInsets: pageInsets,
+      helper: _BeforeContinue(purpose: purpose),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The source hides the decorative aside on compact/phone layouts.
+          // Keep the owner's operation explanation in the actual form.
+          if (purpose != null && MediaQuery.sizeOf(context).width <= 960) ...[
+            Text(
+              purpose!,
+              style: BrandTypography.caption.copyWith(
+                height: 20 / 12,
+                color: deckColors(context)['muted'],
               ),
             ),
+            const SizedBox(height: 18),
           ],
-        ),
-        if (ownerStatus != null) ...[
-          const SizedBox(height: BrandSpacing.space16),
-          ownerStatus!,
-        ],
-        if (contextDetails != null)
-          AutomationJsonView(
-            title: 'Точная версия и технические детали',
-            value: contextDetails,
+          if (formKind == AutomationEditorKind.generic) ...[
+            if (clientLabel != null)
+              AutomationFormValue(label: 'ИИ-клиент', value: clientLabel!),
+            if (target != null)
+              AutomationFormValue(label: 'Профиль', value: target!),
+            if (targetServerIds.isNotEmpty) ...[
+              AutomationFormValue(
+                label: 'Цель',
+                value: targetServerIds
+                    .map((id) {
+                      final row = AutomationServerTargets.resolve(
+                        id,
+                        serverProfiles,
+                      );
+                      return row == null
+                          ? 'Сведения о цели недоступны'
+                          : '${row.name} · ${AutomationServerTargets.address(row)}';
+                    })
+                    .join(', '),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ],
+          if (!contextCurrent)
+            const DeckNotice(
+              message: _changedTargetMessage,
+              tone: DeckTone.warning,
+            ),
+          AutomationStructuredDraft(
+            key: const ValueKey('automation-structured-draft'),
+            leadingFields: leading,
+            trailingFields: trailing,
+            input: input,
+            enabled: !_locked && contextCurrent,
+            onChanged: onChanged,
+            serverProfiles: serverProfiles,
+            parameterDefinitions: parameterDefinitions,
           ),
+          if (!_jsonObject(input.text) && preview != null)
+            AutomationFacts(
+              values: {
+                if (preview!['scopes'] is List)
+                  'Права последнего просмотра': (preview!['scopes'] as List)
+                      .map(_scope)
+                      .join(', '),
+                if (preview!['serverIds'] is List)
+                  'Цели последнего просмотра':
+                      _targetIds(preview!['serverIds']).isEmpty
+                      ? 'Без доступа к серверам'
+                      : _targetIds(preview!['serverIds'])
+                            .map((id) {
+                              final row = AutomationServerTargets.resolve(
+                                id,
+                                serverProfiles,
+                              );
+                              return row == null
+                                  ? 'Сведения о цели недоступны'
+                                  : '${row.name} · ${AutomationServerTargets.address(row)}';
+                            })
+                            .join(', '),
+                if (preview!['lifetimeSeconds'] != null)
+                  'Срок последнего просмотра':
+                      '${preview!['lifetimeSeconds']} секунд',
+              },
+            ),
+          const SizedBox(height: 16),
+          _AutomationExpansion(
+            tilePadding: EdgeInsets.zero,
+            initiallyExpanded: !_jsonObject(input.text),
+            title: const Text('JSON · дополнительные сведения'),
+            children: [
+              Semantics(
+                label: 'JSON',
+                child: TextField(
+                  controller: input,
+                  enabled: !_locked,
+                  readOnly: _locked,
+                  onChanged: _locked ? null : onChanged,
+                  minLines: 8,
+                  maxLines: 18,
+                  decoration: InputDecoration(
+                    errorText: error,
+                    errorMaxLines: 20,
+                  ),
+                  style: _locked
+                      ? BrandTypography.log.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        )
+                      : BrandTypography.log,
+                ),
+              ),
+            ],
+          ),
+          if (ownerStatus != null) ...[
+            const SizedBox(height: BrandSpacing.space16),
+            ownerStatus!,
+          ],
+          if (contextDetails != null)
+            AutomationJsonView(
+              title: 'Точная версия и технические детали',
+              value: contextDetails,
+            ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          clipBehavior: Clip.none,
+          onPressed:
+              contextCurrent && _targetsAvailable && canContinue && !_locked
+              ? onContinue
+              : null,
+          child: Text(submitLabel),
+        ),
+        OutlinedButton(
+          clipBehavior: Clip.none,
+          onPressed: onClose,
+          child: const Text('Отмена'),
+        ),
       ],
-    ),
-    actions: [
-      FilledButton(
-        clipBehavior: Clip.none,
-        onPressed:
-            contextCurrent && _targetsAvailable && canContinue && !_locked
-            ? onContinue
-            : null,
-        child: Text(submitLabel),
-      ),
-      OutlinedButton(
-        clipBehavior: Clip.none,
-        onPressed: onClose,
-        child: const Text('Отмена'),
-      ),
-    ],
-  );
+    );
+  }
 }
 
 class AutomationProfileEditorDialog extends StatelessWidget {

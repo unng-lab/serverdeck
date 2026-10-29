@@ -135,7 +135,7 @@ class MotionDropdown<T> extends StatelessWidget {
                 Align(
                   alignment: item.alignment,
                   heightFactor: 1,
-                  child: item.child,
+                  child: _selectedValue(context, item.child, item.value),
                 )
               else
                 const SizedBox.shrink(),
@@ -162,7 +162,9 @@ class MotionDropdown<T> extends StatelessWidget {
     return _StaticSelectField(
       decoration: fieldDecoration,
       isExpanded: isExpanded,
-      value: selected?.child,
+      value: selected == null
+          ? null
+          : _selectedValue(context, selected.child, selected.value),
       onPressed: onChanged == null
           ? null
           : () async {
@@ -237,6 +239,16 @@ class MotionDropdown<T> extends StatelessWidget {
             },
     );
   }
+
+  Widget _selectedValue(BuildContext context, Widget value, Object? identity) =>
+      MediaQuery.textScalerOf(context).scale(14) <= 14
+      ? SingleChildScrollView(
+          key: ValueKey(identity),
+          scrollDirection: Axis.horizontal,
+          primary: false,
+          child: value,
+        )
+      : value;
 }
 
 /// Reduced motion changes the popup route, not the closed select composition.

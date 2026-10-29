@@ -11,6 +11,7 @@ import '../theme/motion.dart';
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
 import '../ui/deck_page.dart';
+import '../ui/deck_control_target.dart';
 
 /// Server and recipe records remain owned by the same local service.
 class SoftwarePanel extends StatefulWidget {
@@ -20,6 +21,7 @@ class SoftwarePanel extends StatefulWidget {
     required this.client,
     this.serverId,
     this.onServerSelected,
+    this.onPlanReview,
   }) : assert(serverId == null || onServerSelected != null);
   final ProfileController profiles;
   final TrustedApiClient? client;
@@ -28,6 +30,7 @@ class SoftwarePanel extends StatefulWidget {
   /// A null target may use the saved initial default. Selection stays in RAM.
   final String? serverId;
   final ValueChanged<String>? onServerSelected;
+  final VoidCallback Function()? onPlanReview;
 
   @override
   State<SoftwarePanel> createState() => _SoftwarePanelState();
@@ -158,6 +161,7 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
           serverId: target,
           serverProfiles: profiles,
           installationCatalog: true,
+          onPlanReview: widget.onPlanReview,
           contextBar: selector,
           contextBarBuilder: (environment) => SoftwareServerSelector(
             profiles: profiles,
@@ -219,10 +223,15 @@ class SoftwareServerSelector extends StatelessWidget {
     final selected = profiles.where((row) => row.id == selectedId).firstOrNull;
     return DeckPanel(
       title: 'Область просмотра',
-      trailing: TextButton(
-        clipBehavior: Clip.none,
-        onPressed: onChoose,
-        child: Text(selected == null ? 'Выбрать сервер' : 'Изменить сервер'),
+      trailing: DeckControlTarget(
+        visibleHeight: MediaQuery.textScalerOf(context)
+            .scale(MediaQuery.sizeOf(context).width <= 520 ? 22 : 20),
+        child: TextButton(
+          clipBehavior: Clip.none,
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          onPressed: onChoose,
+          child: Text(selected == null ? 'Выбрать сервер' : 'Изменить сервер'),
+        ),
       ),
       child: AutomationFacts(
         tableContext: true,

@@ -62,6 +62,7 @@ void main() {
               await tester.pumpAndSettle();
               final bounds = tester.getRect(find.byType(ServerFactRows));
               expect(bounds.width, closeTo(frame.width - 40, 1));
+              Rect? previousValue;
               for (final entry in facts.entries) {
                 final row = tester.getRect(
                   find.byKey(ServerFactRowKey(entry.key)),
@@ -89,9 +90,13 @@ void main() {
                   expect(value.right, closeTo(bounds.right, 1));
                 } else {
                   expect(value.left, closeTo(bounds.left, 1));
-                  expect(value.top, greaterThanOrEqualTo(label.bottom));
+                  expect(value.top - label.bottom, closeTo(4, .01));
+                  if (previousValue != null) {
+                    expect(label.top - previousValue.bottom, closeTo(25, .01));
+                  }
                   expect(value.right, lessThanOrEqualTo(bounds.right + 1));
                 }
+                previousValue = value;
               }
               expect(find.text(facts['Сведения']!), findsNothing);
               expect(

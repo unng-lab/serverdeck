@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/automation/automation_sections.dart';
 import 'package:serverdeck/automation/automation_panel.dart';
@@ -8,6 +9,7 @@ import 'package:serverdeck/theme/motion.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../support/design_automation_fixtures.dart';
+import '../support/design_fonts.dart';
 import '../support/design_server_fixtures.dart';
 
 const enabled = AutomationActionAvailability(
@@ -67,6 +69,7 @@ AutomationPlanSection plan({
 AutomationJobsSection jobs({
   String state = 'running',
   int dropped = 0,
+  List<Map<String, Object?>>? events,
   bool canCancel = true,
   VoidCallback onCancel = noop,
   VoidCallback onReconcile = noop,
@@ -76,7 +79,7 @@ AutomationJobsSection jobs({
     {'job': DesignAutomationFixtures.job(state: state)},
   ],
   job: DesignAutomationFixtures.job(state: state),
-  events: DesignAutomationFixtures.events(dropped: dropped),
+  events: events ?? DesignAutomationFixtures.events(dropped: dropped),
   loaded: true,
   hasMore: false,
   droppedEvents: dropped,
@@ -131,6 +134,58 @@ Future<void> tapVisible(WidgetTester tester, String text) async {
 }
 
 void main() {
+  setUpAll(loadDesignFonts);
+  for (final width in [360.0, 1100.0]) {
+    testWidgets('timeline ordinals remain complete at 200% width $width', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final events = List.generate(
+        12,
+        (i) => <String, Object?>{
+          'kind': 'step',
+          'stepId': 'step-${i + 1}',
+          'safeCode': 'running',
+          'timestamp': '2026-10-25T09:00:00Z',
+        },
+      );
+      await tester.pumpWidget(host(jobs(events: events), scale: 2, dark: true));
+      await tester.pumpAndSettle();
+      for (var i = 0; i < events.length; i++) {
+        final marker = find.byKey(ValueKey('job-timeline-marker-$i'));
+        final ordinal = find.descendant(
+          of: marker,
+          matching: find.text('${i + 1}'),
+        );
+        expect(ordinal, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(ordinal);
+        expect(
+          paragraph.size.height,
+          greaterThanOrEqualTo(
+            paragraph.getMinIntrinsicHeight(paragraph.size.width) - .01,
+          ),
+        );
+        for (final box in paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: '${i + 1}'.length),
+        )) {
+          expect(box.right, lessThanOrEqualTo(paragraph.size.width + .01));
+        }
+        final line = find.byKey(ValueKey('job-timeline-line-$i'));
+        if (i + 1 < events.length) {
+          expect(
+            tester.getRect(line).center.dx,
+            closeTo(tester.getRect(marker).center.dx, .01),
+          );
+        } else {
+          expect(line, findsNothing);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     '16 recipe loading stays explicit and pending mutations are disabled',
     (tester) async {
@@ -421,6 +476,23 @@ void main() {
           isNull,
         );
         expect(find.text(revoked ? 'Отозван' : 'Истёк'), findsOneWidget);
+        final stateLabel = find.text(revoked ? 'Отозван' : 'Истёк');
+        final stateRow = find
+            .ancestor(of: stateLabel, matching: find.byType(Row))
+            .first;
+        expect(
+          find.descendant(
+            of: stateRow,
+            matching: find.text(revoked ? '×' : '○'),
+          ),
+          findsOneWidget,
+        );
+        final colors = Theme.of(tester.element(stateLabel))
+            .extension<BrandColors>()!;
+        expect(
+          DefaultTextStyle.of(tester.element(stateLabel)).style.color,
+          colors[revoked ? 'error' : 'muted'],
+        );
         if (revoked) {
           expect(
             tester.widget<OutlinedButton>(button('Отозвать')).onPressed,

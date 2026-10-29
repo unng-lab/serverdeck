@@ -51,6 +51,118 @@ Future<List<Color>> pixels(
 }
 
 void main() {
+  for (final width in [1100.0, 800.0, 390.0, 360.0]) {
+    for (final dark in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('T219 source notice layout $width $dark $scale', (
+          tester,
+        ) async {
+          tester.view.physicalSize = Size(width, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          var calls = 0;
+          final boundary = GlobalKey();
+          const message = 'Полная причина с идентичностью операции и цели.';
+          const next = 'Проверьте исходное состояние перед продолжением.';
+          await tester.pumpWidget(
+            host(
+              RepaintBoundary(
+                key: boundary,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: DeckNotice(
+                    title: 'Причина',
+                    message: message,
+                    nextStep: next,
+                    tone: DeckTone.error,
+                    actions: [
+                      OutlinedButton(
+                        onPressed: () => calls++,
+                        child: const Text('Подробнее'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              theme: dark ? BrandTheme.dark : BrandTheme.light,
+              scale: scale,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final notice = find.byType(DeckNotice);
+          final container = find
+              .descendant(of: notice, matching: find.byType(Container))
+              .first;
+          final decoration =
+              tester.widget<Container>(container).decoration! as BoxDecoration;
+          final border = decoration.border! as Border;
+          final colors = dark ? BrandColors.dark : BrandColors.light;
+          for (final side in [
+            border.left,
+            border.top,
+            border.right,
+            border.bottom,
+          ]) {
+            expect(side.width, 1);
+            expect(side.color, colors['border']);
+          }
+          expect(decoration.borderRadius, BorderRadius.circular(8));
+          final box = tester.getRect(container);
+          final origin = tester.getTopLeft(find.byKey(boundary));
+          final actualPaint = await pixels(tester, boundary, [
+            Offset(box.left + 1.5, box.center.dy) - origin,
+            Offset(box.left + 3.5, box.center.dy) - origin,
+            Offset(box.center.dx, box.top + .2) - origin,
+            Offset(box.right - .2, box.center.dy) - origin,
+            Offset(box.center.dx, box.bottom - .2) - origin,
+          ]);
+          expect(actualPaint, [
+            colors['error'],
+            colors['surface'],
+            colors['border'],
+            colors['border'],
+            colors['border'],
+          ]);
+          final icon = find.descendant(
+            of: notice,
+            matching: find.byType(DeckIcon),
+          );
+          expect(tester.widget<DeckIcon>(icon).name, 'close');
+          final iconBox = tester.getRect(icon);
+          final heading = tester.getRect(find.text('Причина'));
+          final phone = width <= 520;
+          expect(iconBox.size, Size.square(phone ? 18 : 17));
+          expect(iconBox.left - box.left, phone ? 15 : 18);
+          expect(iconBox.top - box.top, phone ? 16 : 15);
+          expect(heading.left - iconBox.right, 10);
+          expect(
+            tester.getRect(find.text(message)).top - heading.bottom,
+            closeTo(3, .01),
+          );
+          expect(tester.widget<Text>(find.text(message)).style!.fontSize, 12);
+          expect(
+            tester.widget<Text>(find.text(message)).style!.color,
+            colors['muted'],
+          );
+          expect(tester.widget<Text>(find.text(next)).style!.fontSize, 12);
+          expect(find.text(message), findsOneWidget);
+          expect(find.text(next), findsOneWidget);
+          expect(calls, 0);
+          final action = find.widgetWithText(OutlinedButton, 'Подробнее');
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(calls, 1);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
+  }
+
   testWidgets('surface keeps expansion ink above its painted background', (
     tester,
   ) async {

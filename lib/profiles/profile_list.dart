@@ -668,11 +668,12 @@ class _ProfileListState extends State<ProfileList> {
       ),
     );
     final state = Wrap(
-      spacing: 10,
+      spacing: MediaQuery.sizeOf(context).width <= 520 ? 8 : 10,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         DeckStatus(
+          compact: true,
           label: status,
           tone: observation?.attention == true
               ? DeckTone.warning
@@ -682,12 +683,19 @@ class _ProfileListState extends State<ProfileList> {
         ),
         for (final tag in profile.tags)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 5),
             decoration: BoxDecoration(
-              color: deckColors(context)['raised'],
+              border: Border.all(color: deckColors(context)['border']),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text(tag, style: BrandTypography.caption),
+            child: Text(
+              tag,
+              style: BrandTypography.log.copyWith(
+                fontSize: 12,
+                height: 18 / 12,
+                color: deckColors(context)['muted'],
+              ),
+            ),
           ),
       ],
     );
@@ -700,13 +708,12 @@ class _ProfileListState extends State<ProfileList> {
               'SSH',
             ].whereType<String>().join(' · '),
       style: BrandTypography.caption.copyWith(
+        height: 20 / 12,
         color: deckColors(context)['muted'],
       ),
     );
-    final actions = Wrap(
+    final actions = DeckActions(
       key: cardKeys.actions,
-      spacing: 8,
-      runSpacing: 8,
       children: [
         FilledButton(
           clipBehavior: Clip.none,
@@ -724,7 +731,11 @@ class _ProfileListState extends State<ProfileList> {
       key: ValueKey(profile.id),
       selected: observation?.connected == true,
       padding: EdgeInsets.all(
-        MediaQuery.sizeOf(context).width <= 520 ? 16 : 20,
+        MediaQuery.sizeOf(context).width <= 520
+            ? 16
+            : MediaQuery.sizeOf(context).width <= 1060
+            ? 18
+            : 20,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -735,9 +746,14 @@ class _ProfileListState extends State<ProfileList> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               identity,
-              const SizedBox(height: 12),
-              state,
-              const SizedBox(height: 8),
+              SizedBox(height: compact && !phone ? 16 : 12),
+              Padding(
+                padding: EdgeInsets.only(
+                  left: MediaQuery.sizeOf(context).width <= 520 ? 48 : 0,
+                ),
+                child: state,
+              ),
+              SizedBox(height: compact ? (phone ? 12 : 16) : 8),
               systemText,
               if (!compact) ...[const SizedBox(height: 18), actions],
             ],
@@ -748,9 +764,9 @@ class _ProfileListState extends State<ProfileList> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 info,
-                const SizedBox(height: 16),
+                SizedBox(height: phone ? 18 : 16),
                 metrics,
-                const SizedBox(height: 16),
+                SizedBox(height: phone ? 14 : 16),
                 actions,
               ],
             );
@@ -758,9 +774,11 @@ class _ProfileListState extends State<ProfileList> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(child: info),
-              const SizedBox(width: 20),
               SizedBox(
-                width: constraints.maxWidth < 720 ? 270 : 300,
+                width: MediaQuery.sizeOf(context).width <= 1060 ? 16 : 20,
+              ),
+              SizedBox(
+                width: MediaQuery.sizeOf(context).width <= 1060 ? 270 : 300,
                 child: metrics,
               ),
             ],
@@ -806,13 +824,16 @@ class _ProfileListState extends State<ProfileList> {
                     Text(
                       entries[i].$1,
                       style: BrandTypography.caption.copyWith(
+                        height: 20 / 12,
                         color: deckColors(context)['muted'],
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       entries[i].$2 is num ? '${entries[i].$2} %' : '—',
                       style: BrandTypography.caption.copyWith(
                         fontFamily: BrandAssets.monoFont,
+                        height: 20 / 12,
                       ),
                     ),
                     const SizedBox(height: 7),
@@ -829,20 +850,21 @@ class _ProfileListState extends State<ProfileList> {
                             envelope?['quality'] == 'stale',
                       )
                     else
-                      Container(
-                        height: 25,
-                        alignment: Alignment.centerLeft,
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: deckColors(context)['border'],
-                            ),
-                          ),
+                      CustomPaint(
+                        painter: _MetricPlaceholderBorder(
+                          deckColors(context)['border'],
                         ),
-                        child: Text(
-                          'Нет данных',
-                          style: BrandTypography.caption.copyWith(
-                            color: deckColors(context)['muted'],
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 25),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.only(bottom: 1),
+                          child: Text(
+                            'Нет данных',
+                            textAlign: TextAlign.center,
+                            style: BrandTypography.caption.copyWith(
+                              height: 18 / 12,
+                              color: deckColors(context)['muted'],
+                            ),
                           ),
                         ),
                       ),
@@ -852,12 +874,13 @@ class _ProfileListState extends State<ProfileList> {
             ],
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Text(
           envelope == null
               ? 'Измерения появятся после подключения'
               : 'Источник: ${envelope['source'] ?? 'Неизвестно'} · Наблюдение: ${envelope['observedAt'] ?? 'Нет данных'} · Получено: ${envelope['receivedAt'] ?? 'Нет данных'} · Качество: ${envelope['quality'] ?? 'Неизвестно'}${envelope['stale'] == true ? ' · Устарело' : ''}',
           style: BrandTypography.caption.copyWith(
+            height: 18 / 12,
             color: deckColors(context)['muted'],
           ),
         ),
@@ -878,6 +901,7 @@ class _ProfileListState extends State<ProfileList> {
 
   Widget _welcome(BuildContext context) => DeckPage(
     title: 'Первый запуск',
+    actionsMaxWidth: double.infinity,
     eyebrow: 'Серверы / РАБОЧЕЕ ПРОСТРАНСТВО',
     description: 'Ваше локальное рабочее пространство готово к работе',
     actions: [
@@ -944,24 +968,15 @@ class _ProfileListState extends State<ProfileList> {
             ),
           ),
           const SizedBox(height: 24),
-          if (MediaQuery.sizeOf(context).width <= 520)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _add(showIcon: false),
-                const SizedBox(height: 8),
-                _aiButton('Настроить ИИ-доступ'),
-              ],
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          LayoutBuilder(
+            builder: (context, bounds) => DeckActions(
+              phoneBasis: bounds.maxWidth,
               children: [
                 _add(showIcon: false),
                 _aiButton('Настроить ИИ-доступ'),
               ],
             ),
+          ),
           const SizedBox(height: 40),
           const Divider(height: 1),
           const SizedBox(height: 24),
@@ -1099,3 +1114,26 @@ String _address(ProfileView profile) => profile.address.contains(':')
 
 num? _validPercent(Object? value) =>
     value is num && value.isFinite && value >= 0 && value <= 100 ? value : null;
+
+class _MetricPlaceholderBorder extends CustomPainter {
+  const _MetricPlaceholderBorder(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 6) {
+      final end = x + 3 < size.width ? x + 3 : size.width;
+      canvas.drawLine(
+        Offset(x, size.height - .5),
+        Offset(end, size.height - .5),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MetricPlaceholderBorder oldDelegate) =>
+      oldDelegate.color != color;
+}

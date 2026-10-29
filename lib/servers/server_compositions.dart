@@ -60,16 +60,28 @@ class ServerPageFrame extends StatelessWidget {
               if (showIdentity)
                 Row(
                   children: [
-                    DeckSurface(
-                      padding: EdgeInsets.all(
-                        MediaQuery.sizeOf(context).width <= 520 ? 10 : 12,
+                    Container(
+                      width: MediaQuery.sizeOf(context).width <= 520 ? 42 : 48,
+                      height: MediaQuery.sizeOf(context).width <= 520 ? 42 : 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: deckColors(context)['surface'],
+                        border: Border.all(
+                          color: deckColors(context)['border'],
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          MediaQuery.sizeOf(context).width <= 520 ? 10 : 12,
+                        ),
                       ),
                       child: DeckIcon(
                         'server',
-                        size: MediaQuery.sizeOf(context).width <= 520 ? 20 : 24,
+                        size: MediaQuery.sizeOf(context).width <= 520 ? 23 : 26,
+                        color: deckColors(context)['accent'],
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    SizedBox(
+                      width: MediaQuery.sizeOf(context).width <= 520 ? 10 : 14,
+                    ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,14 +91,15 @@ class ServerPageFrame extends StatelessWidget {
                             style: BrandTypography.log.copyWith(
                               fontSize: 20,
                               height: 28 / 20,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
+                          const SizedBox(height: 3),
                           Text(
-                            '${profile.address}:${profile.port}${profile.tags.isEmpty ? '' : ' · ${profile.tags.join(' · ')}'}',
+                            '${profile.address.contains(':') ? '[${profile.address}]' : profile.address}:${profile.port}${profile.tags.isEmpty ? '' : ' · ${profile.tags.join(' · ')}'}',
                             style: BrandTypography.log.copyWith(
                               fontSize: 12,
-                              height: 18 / 12,
+                              height: 20 / 12,
                               color: deckColors(context)['muted'],
                             ),
                           ),
@@ -94,7 +107,11 @@ class ServerPageFrame extends StatelessWidget {
                       ),
                     ),
                     if (identityStatus != null) ...[
-                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: MediaQuery.sizeOf(context).width <= 520
+                            ? 10
+                            : 14,
+                      ),
                       ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: MediaQuery.sizeOf(context).width * .35,
@@ -104,6 +121,8 @@ class ServerPageFrame extends StatelessWidget {
                     ],
                   ],
                 ),
+              if (showIdentity && MediaQuery.sizeOf(context).width > 520)
+                const SizedBox(height: 4),
             ],
           ),
     child: Column(
@@ -221,7 +240,7 @@ class ServerFactRows extends StatelessWidget {
             ? math.min(available, math.max(110.0, available * 7 / 27))
             : available * 10 / 23;
         Widget cell(int flex, Widget child) => phone
-            ? Flexible(flex: flex, fit: FlexFit.loose, child: child)
+            ? child
             : flex == 10
             ? SizedBox(width: labelWidth, child: child)
             : Expanded(child: child);
@@ -231,68 +250,73 @@ class ServerFactRows extends StatelessWidget {
             for (final entry in facts.entries)
               KeyedSubtree(
                 key: ServerFactRowKey(entry.key),
-                child: IntrinsicHeight(
-                  child: Flex(
-                    direction: phone ? Axis.vertical : Axis.horizontal,
-                    mainAxisSize: phone ? MainAxisSize.min : MainAxisSize.max,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      cell(
-                        10,
-                        Container(
-                          padding: phone
-                              ? EdgeInsets.only(
-                                  top: entry.key == facts.keys.first ? 0 : 12,
-                                )
-                              : const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: phone || entry.key == facts.keys.last
-                                  ? BorderSide.none
-                                  : BorderSide(color: colors['border']),
-                            ),
-                          ),
-                          child: Text(
-                            entry.key,
-                            style: BrandTypography.caption.copyWith(
-                              height: 20 / 12,
-                              color: colors['muted'],
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: phone ? 0 : 12),
-                      cell(
-                        13,
-                        Container(
-                          padding: phone
-                              ? EdgeInsets.only(
-                                  top: 4,
-                                  bottom: entry.key == facts.keys.last ? 0 : 12,
-                                )
-                              : const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: entry.key == facts.keys.last
-                                  ? BorderSide.none
-                                  : BorderSide(color: colors['border']),
-                            ),
-                          ),
-                          child:
-                              valueWidgets[entry.key] ??
-                              SelectableText(
-                                entry.value,
-                                style:
-                                    valueStyles[entry.key] ??
-                                    BrandTypography.log.copyWith(
-                                      fontSize: phone ? 13 : 12,
-                                      height: phone ? 22 / 13 : 20 / 12,
-                                    ),
+                child: Builder(
+                  builder: (context) {
+                    final row = Flex(
+                      direction: phone ? Axis.vertical : Axis.horizontal,
+                      mainAxisSize: phone ? MainAxisSize.min : MainAxisSize.max,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        cell(
+                          10,
+                          Container(
+                            padding: phone
+                                ? EdgeInsets.only(
+                                    top: entry.key == facts.keys.first ? 0 : 12,
+                                  )
+                                : const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: phone || entry.key == facts.keys.last
+                                    ? BorderSide.none
+                                    : BorderSide(color: colors['border']),
                               ),
+                            ),
+                            child: Text(
+                              entry.key,
+                              style: BrandTypography.caption.copyWith(
+                                height: 20 / 12,
+                                color: colors['muted'],
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        SizedBox(width: phone ? 0 : 12),
+                        cell(
+                          13,
+                          Container(
+                            padding: phone
+                                ? EdgeInsets.only(
+                                    top: 4,
+                                    bottom: entry.key == facts.keys.last
+                                        ? 0
+                                        : 12,
+                                  )
+                                : const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: entry.key == facts.keys.last
+                                    ? BorderSide.none
+                                    : BorderSide(color: colors['border']),
+                              ),
+                            ),
+                            child:
+                                valueWidgets[entry.key] ??
+                                SelectableText(
+                                  entry.value,
+                                  style:
+                                      valueStyles[entry.key] ??
+                                      BrandTypography.log.copyWith(
+                                        fontSize: phone ? 13 : 12,
+                                        height: phone ? 22 / 13 : 20 / 12,
+                                      ),
+                                ),
+                          ),
+                        ),
+                      ],
+                    );
+                    return phone ? row : IntrinsicHeight(child: row);
+                  },
                 ),
               ),
           ],
@@ -308,11 +332,12 @@ class ServerPlanDialog extends StatelessWidget {
     required this.title,
     required this.child,
     this.asPage = false,
+    this.description = 'Сведения, наблюдения и доступные действия',
     this.eyebrow = 'Серверы / Рабочее пространство',
     this.workspaceBounds,
     this.pageInsets,
   });
-  final String title;
+  final String title, description;
   final Widget child;
   final bool asPage;
   final String eyebrow;
@@ -323,7 +348,7 @@ class ServerPlanDialog extends StatelessWidget {
     final page = DeckPage(
       title: title,
       eyebrow: eyebrow,
-      description: 'Сведения, наблюдения и доступные действия',
+      description: description,
       child: child,
     );
     return asPage
@@ -387,14 +412,14 @@ class ServerReviewBody extends StatelessWidget {
         child: ServerFactRows(facts: facts, valueStyles: factStyles),
       ),
       if (consequences.isNotEmpty) ...[
-        const SizedBox(height: 20),
+        SizedBox(height: deckSectionGap(context)),
         DeckPanel(
           title: 'Последствия',
           child: ServerFactRows(facts: consequences),
         ),
       ],
-      const SizedBox(height: 20),
-      Wrap(spacing: 8, runSpacing: 8, children: actions),
+      SizedBox(height: deckSectionGap(context)),
+      DeckActions(children: actions),
     ],
   );
 }
@@ -469,7 +494,7 @@ class ServerStatusBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: deckSectionGap(context)),
         DeckPanel(
           title: 'Состояние и следующие шаги',
           child: Column(
@@ -480,8 +505,8 @@ class ServerStatusBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        Wrap(spacing: 8, runSpacing: 8, children: actions),
+        SizedBox(height: deckSectionGap(context)),
+        DeckActions(children: actions),
       ],
     );
   }
@@ -499,11 +524,18 @@ class ServerResourceCards extends StatelessWidget {
     final rows = (state?['history'] as List? ?? const [])
         .whereType<Map<String, Object?>>()
         .toList();
-    String? percent(Object? value) => value is num ? '$value %' : null;
-    String? volume(Map<String, Object?>? part) {
+    ({String? main, String unit, String spoken}) percent(Object? value) =>
+        value is num
+        ? (main: '$value', unit: '%', spoken: '$value %')
+        : (main: null, unit: '', spoken: '—');
+    ({String? main, String unit, String spoken}) volume(
+      Map<String, Object?>? part,
+    ) {
       if (part?['usedBytes'] case final num used) {
-        if (part?['totalBytes'] case final num total)
-          return '${_gib(used)} / ${_gib(total)} ГБ';
+        if (part?['totalBytes'] case final num total) {
+          final main = _gib(used), unit = '/ ${_gib(total)} ГБ';
+          return (main: main, unit: unit, spoken: '$main $unit');
+        }
       }
       return percent(part?['usedPercent']);
     }
@@ -574,17 +606,50 @@ class ServerResourceCards extends StatelessWidget {
                             ],
                           ),
                           SizedBox(height: phone ? 6 : 10),
-                          Text(
-                            card.value ?? '—',
-                            style: BrandTypography.log.copyWith(
-                              fontSize: 26,
-                              height: 34 / 26,
+                          Text.rich(
+                            TextSpan(
+                              text: card.value.main ?? '—',
+                              children: [
+                                if (card.value.main != null &&
+                                    card.value.unit.isNotEmpty) ...[
+                                  const WidgetSpan(child: SizedBox(width: 4)),
+                                  TextSpan(
+                                    text: card.value.unit,
+                                    style: BrandTypography.body.copyWith(
+                                      fontSize: 12,
+                                      height: 20 / 12,
+                                      letterSpacing: 0,
+                                      color: deckColors(context)['muted'],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            semanticsLabel: card.value.spoken,
+                            style: BrandTypography.body.copyWith(
+                              fontFamily: BrandAssets.semiboldFamily,
+                              fontWeight: BrandTypography.semiboldWeight,
+                              fontVariations:
+                                  BrandTypography.semiboldVariations,
+                              fontSize:
+                                  phone ||
+                                      MediaQuery.sizeOf(context).width > 960
+                                  ? 26
+                                  : 24,
+                              height: phone
+                                  ? 34 / 26
+                                  : 32 /
+                                        (MediaQuery.sizeOf(context).width > 960
+                                            ? 26
+                                            : 24),
                               letterSpacing: -1,
                             ),
                           ),
                           if (!phone) const SizedBox(height: 2),
                           Text(
-                            card.value == null ? 'Не получено' : card.detail,
+                            card.value.main == null
+                                ? 'Не получено'
+                                : card.detail,
                             style: BrandTypography.caption.copyWith(
                               height: 18 / 12,
                               color: deckColors(context)['muted'],

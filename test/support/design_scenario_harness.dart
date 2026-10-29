@@ -573,6 +573,7 @@ class DesignScenarioHarness {
       'Параметры плана',
       const {'greeting': 'Привет'},
       asPage: true,
+      formKind: AutomationEditorKind.planParameters,
       purpose: 'Проверьте параметры для выбранной версии. Продолжение создаст план; запуск потребует отдельного подтверждения.',
       target: 'Ansible-профиль: Приветствие сервера · версия 2.',
       parameterDefinitions:
@@ -600,6 +601,7 @@ class DesignScenarioHarness {
         'lifetimeSeconds': 28800,
       },
       asPage: true,
+      eyebrow: 'Настройки / Рабочее пространство',
       purpose: 'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.',
     ),
     '38-mcp-client-config' => currentAutomationPage(
@@ -619,6 +621,7 @@ class DesignScenarioHarness {
         },
       },
       asPage: true,
+      formKind: AutomationEditorKind.delegation,
       clientLabel: DesignAutomationFixtures.grant()['label'] as String,
       purpose: 'Разрешить запуск только этой неизменной версии в заданных границах параметров. Новые версии потребуют отдельного делегирования.',
       target:
@@ -687,7 +690,7 @@ class DesignScenarioHarness {
         ? 'Журнал сервера'
         : 'Обзор сервера',
     description: changedKey
-        ? 'Сведения, наблюдения и доступные действия'
+        ? 'Состояние и следующие доступные действия'
         : logs
         ? 'События выбранного сервера в хронологическом порядке'
         : 'Система, ресурсы и программное обеспечение ${trustProfile.name}',
@@ -955,6 +958,8 @@ class DesignScenarioHarness {
     String title,
     Map<String, Object?> input, {
     bool asPage = false,
+    AutomationEditorKind formKind = AutomationEditorKind.generic,
+    String eyebrow = 'Задания / Рабочее пространство',
     String? purpose,
     String? target,
     String? clientLabel,
@@ -965,6 +970,8 @@ class DesignScenarioHarness {
       jsonInput.text = const JsonEncoder.withIndent('  ').convert(input);
     return AutomationJsonEditorDialog(
       asPage: asPage,
+      formKind: formKind,
+      eyebrow: eyebrow,
       submitLabel: title == 'Параметры плана'
           ? 'Создать план'
           : input.containsKey('scopes')

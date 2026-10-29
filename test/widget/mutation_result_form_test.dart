@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/bootstrap/local_api_client.dart';
 import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/profiles/profile_controller.dart';
 import 'package:serverdeck/profiles/profile_delete.dart';
 import 'package:serverdeck/profiles/profile_form.dart';
+import 'package:serverdeck/profiles/mutation_controller.dart';
+import 'package:serverdeck/profiles/mutation_status.dart';
 import 'package:serverdeck/settings/settings_form.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck_protocol/models.dart';
@@ -44,6 +47,40 @@ void main() {
     await bootstrap.close();
     await client.events.close();
     await client.readErrors.close();
+  });
+
+  testWidgets('idle standalone review keeps independent close and Escape', (
+    tester,
+  ) async {
+    final controller = MutationController(model: model);
+    var closes = 0, reloads = 0;
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: BrandTheme.light,
+          home: Scaffold(
+            body: MutationReviewPage(
+              controller: controller,
+              onReload: () => reloads++,
+              onClose: () => closes++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(FilledButton), findsNothing);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Закрыть'));
+      await tester.pump();
+      expect(closes, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(closes, 2);
+      expect(reloads, 0);
+      expect(client.sent, isEmpty);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    }
   });
 
   String save(_Form form) => switch (form) {
@@ -141,7 +178,7 @@ void main() {
       expect(checkbox.value, false);
       expect(checkbox.onChanged, isNull);
     } else {
-      expect(find.text('Saved profile'), findsOneWidget);
+      expect(find.textContaining('Saved profile'), findsOneWidget);
     }
     expect(
       tester

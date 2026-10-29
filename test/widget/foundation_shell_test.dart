@@ -68,6 +68,24 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          if (size.width > 520) {
+            final badge = find.text('LW');
+            final label = tester.widget<Text>(badge);
+            final text = TextPainter(
+              text: TextSpan(text: label.data, style: label.style),
+              textDirection: TextDirection.ltr,
+              textScaler: TextScaler.linear(scale),
+            )..layout();
+            expect(
+              tester.getSize(badge).width,
+              greaterThanOrEqualTo(text.width - .01),
+            );
+            expect(
+              tester.getSize(badge).height,
+              greaterThanOrEqualTo(text.height - .01),
+            );
+            text.dispose();
+          }
           final sidebar = tester.getRect(
             find.byKey(const ValueKey('foundation-sidebar')),
           );

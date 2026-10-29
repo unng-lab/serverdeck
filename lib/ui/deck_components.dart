@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/brand_assets.dart';
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
 import 'deck_icon.dart';
@@ -360,14 +361,24 @@ class DeckStatus extends StatelessWidget {
     required this.label,
     this.tone = DeckTone.neutral,
     this.pending = false,
+    this.compact = false,
   });
   final String label;
   final DeckTone tone;
   final bool pending;
+  final bool compact;
   @override
   Widget build(BuildContext context) {
     final effective = pending ? DeckTone.running : tone;
     final color = _colors(context)[_role(effective)];
+    final lineHeight = MediaQuery.sizeOf(context).width <= 520 ? 20.0 : 18.0;
+    final symbol = switch (effective) {
+      DeckTone.available || DeckTone.success => '●',
+      DeckTone.warning || DeckTone.error => '!',
+      DeckTone.unavailable => '×',
+      DeckTone.running => '◷',
+      DeckTone.neutral || DeckTone.unknown => '○',
+    };
     return Semantics(
       liveRegion: pending,
       child: Row(
@@ -376,9 +387,21 @@ class DeckStatus extends StatelessWidget {
         children: [
           ExcludeSemantics(
             child: SizedBox(
-              width: BrandGeometry.iconSize,
-              height: BrandGeometry.iconSize,
-              child: pending && !MediaQuery.disableAnimationsOf(context)
+              width: compact ? 12 : BrandGeometry.iconSize,
+              height: compact ? lineHeight : BrandGeometry.iconSize,
+              child: compact
+                  ? Center(
+                      child: Text(
+                        symbol,
+                        textScaler: TextScaler.noScaling,
+                        style: BrandTypography.caption.copyWith(
+                          fontSize: 13,
+                          height: lineHeight / 13,
+                          color: color,
+                        ),
+                      ),
+                    )
+                  : pending && !MediaQuery.disableAnimationsOf(context)
                   ? CircularProgressIndicator(strokeWidth: 2, color: color)
                   : DeckIcon(
                       _symbol(effective),
@@ -387,11 +410,16 @@ class DeckStatus extends StatelessWidget {
                     ),
             ),
           ),
-          const SizedBox(width: BrandSpacing.space8),
+          SizedBox(width: compact ? 5 : BrandSpacing.space8),
           Flexible(
             child: Text(
               label,
-              style: BrandTypography.body.copyWith(color: color),
+              style: compact
+                  ? BrandTypography.caption.copyWith(
+                      color: color,
+                      height: lineHeight / 12,
+                    )
+                  : BrandTypography.body.copyWith(color: color),
             ),
           ),
         ],
@@ -415,28 +443,97 @@ class DeckNotice extends StatelessWidget {
   final DeckTone tone;
   final List<Widget> actions;
   @override
-  Widget build(BuildContext context) => DeckSurface(
-    error: tone == DeckTone.error,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DeckStatus(label: title ?? message, tone: tone),
-        if (title != null) ...[
-          const SizedBox(height: BrandSpacing.space8),
-          Text(message),
+  Widget build(BuildContext context) {
+    final colors = _colors(context);
+    final phone = MediaQuery.sizeOf(context).width <= 520;
+    final color = colors[_role(tone)];
+    final line = phone ? 22.0 : 20.0;
+    final heading = BrandTypography.body.copyWith(
+      fontSize: 13,
+      height: line / 13,
+      color: colors['text'],
+    );
+    final titleStyle = heading.copyWith(
+      fontFamily: BrandAssets.semiboldFamily,
+      fontWeight: BrandTypography.semiboldWeight,
+      fontVariations: BrandTypography.semiboldVariations,
+    );
+    final secondary = BrandTypography.caption.copyWith(
+      fontSize: 12,
+      height: 20 / 12,
+      color: colors['muted'],
+    );
+    final icon = switch (tone) {
+      DeckTone.error || DeckTone.unavailable => 'close',
+      DeckTone.warning => 'warning',
+      DeckTone.success || DeckTone.available => 'check',
+      _ => 'info',
+    };
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: colors['surface'],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colors['border']),
+            ),
+            // The separate stripe supplies the remaining two left-border pixels.
+            padding: EdgeInsets.fromLTRB(
+              phone ? 14 : 17,
+              phone ? 14 : 13,
+              phone ? 12 : 15,
+              phone ? 14 : 13,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: ExcludeSemantics(
+                    child: DeckIcon(icon, size: phone ? 18 : 17, color: color),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title ?? message,
+                        style: title == null ? heading : titleStyle,
+                      ),
+                      if (title != null) ...[
+                        const SizedBox(height: 3),
+                        Text(message, style: secondary),
+                      ],
+                      if (nextStep != null) ...[
+                        const SizedBox(height: 3),
+                        Text(nextStep!, style: secondary),
+                      ],
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: BrandSpacing.space12),
+                        DeckActions(children: actions),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            child: ColoredBox(color: color),
+          ),
         ],
-        if (nextStep != null) ...[
-          const SizedBox(height: BrandSpacing.space8),
-          Text(nextStep!),
-        ],
-        if (actions.isNotEmpty) ...[
-          const SizedBox(height: BrandSpacing.space12),
-          DeckActions(children: actions),
-        ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class DeckKeyValue extends StatelessWidget {

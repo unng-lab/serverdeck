@@ -115,7 +115,8 @@ class DesignFixtureHost {
         number == 85)
       return FoundationSection.settings;
     if (number == 22 || number == 23) return FoundationSection.logs;
-    if (number >= 16 && number <= 19) return FoundationSection.software;
+    if (number >= 16 && number <= 18) return FoundationSection.software;
+    if (number == 19) return FoundationSection.jobs;
     if (number >= 27 && number <= 39 || number == 93 || number == 94)
       return FoundationSection.jobs;
     return FoundationSection.servers;

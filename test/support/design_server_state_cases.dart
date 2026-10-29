@@ -313,29 +313,49 @@ void _status(String text, DeckTone tone, {Finder? within}) {
   final status = find.byWidgetPredicate(
     (widget) =>
         widget is DeckStatus &&
-        widget.label.contains(text) &&
-        widget.tone == tone,
+            widget.label.contains(text) &&
+            widget.tone == tone ||
+        widget is DeckNotice &&
+            (widget.title?.contains(text) == true ||
+                widget.message.contains(text)) &&
+            widget.tone == tone,
   );
   final matching = within == null
       ? status
       : find.descendant(of: within, matching: status);
   expect(matching, findsWidgets);
-  final icon = switch (tone) {
+  final statusIcon = switch (tone) {
     DeckTone.available || DeckTone.success => 'check',
     DeckTone.unavailable => 'close',
     DeckTone.unknown || DeckTone.neutral => 'info',
     DeckTone.warning || DeckTone.error => 'warning',
     DeckTone.running => 'clock',
   };
-  expect(
-    find.descendant(
-      of: matching,
-      matching: find.byWidgetPredicate(
-        (widget) => widget is DeckIcon && widget.name == icon,
+  for (final element in matching.evaluate()) {
+    final notice = element.widget is DeckNotice;
+    final icon = notice
+        ? switch (tone) {
+            DeckTone.error || DeckTone.unavailable => 'close',
+            DeckTone.warning => 'warning',
+            DeckTone.success || DeckTone.available => 'check',
+            _ => 'info',
+          }
+        : statusIcon;
+    final owner = find.byWidget(element.widget);
+    expect(
+      find.descendant(
+        of: owner,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is DeckIcon && widget.name == icon,
+        ),
       ),
-    ),
-    findsWidgets,
-  );
+      findsWidgets,
+    );
+    expect(
+      find.descendant(of: owner, matching: find.textContaining(text)),
+      findsWidgets,
+    );
+  }
 }
 
 void _resourceValues(List<String> expected) {
@@ -350,7 +370,15 @@ void _resourceValues(List<String> expected) {
         .ancestor(of: label, matching: find.byType(DeckSurface))
         .first;
     expect(
-      find.descendant(of: card, matching: find.text(expected[i])),
+      find.descendant(
+        of: card,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              (widget.data == expected[i] ||
+                  widget.semanticsLabel == expected[i]),
+        ),
+      ),
       findsOneWidget,
     );
   }

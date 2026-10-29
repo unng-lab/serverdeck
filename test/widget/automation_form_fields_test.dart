@@ -11,9 +11,118 @@ import 'package:serverdeck/ui/deck_page.dart';
 
 import '../support/design_automation_fixtures.dart';
 import '../support/design_fonts.dart';
+import '../support/base_design_bindings.dart';
+import '../support/design_host.dart' show mountDesignFixture;
 import 'deck_components_test.dart' show pixels;
 
 void main() {
+  for (final id in ['35-plan-parameters', '39-delegations']) {
+    testWidgets(
+      'T225 readonly context never becomes an outgoing draft field $id',
+      (tester) async {
+        final host = await mountDesignFixture(
+          tester,
+          currentBaseBindings.singleWhere((entry) => entry.screenId == id),
+          frame: const Size(1100, 800),
+          theme: ThemeMode.dark,
+          textScale: 1,
+          currentBase: true,
+        );
+        try {
+          final label = id == '35-plan-parameters'
+              ? 'greeting'
+              : 'Срок, секунд';
+          final field = find.byWidgetPredicate(
+            (w) =>
+                w is TextField && w.key == ValueKey('automation-field-$label'),
+          );
+          await tester.ensureVisible(field);
+          await tester.enterText(
+            field,
+            id == '35-plan-parameters' ? 'Изменённый текст' : '1200',
+          );
+          await tester.pumpAndSettle();
+          final draft = jsonDecode(host.harness.jsonInput.text) as Map;
+          if (id == '35-plan-parameters') {
+            expect(draft, {'greeting': 'Изменённый текст'});
+          } else {
+            expect(draft.keys.toSet(), {'lifetimeSeconds', 'predicates'});
+            expect(draft['lifetimeSeconds'], 1200);
+            expect((draft['predicates'] as Map)['greeting'], {
+              'type': 'enum',
+              'values': ['Привет'],
+            });
+          }
+          expect(draft.containsKey('profileId'), isFalse);
+          expect(draft.containsKey('bodyDigest'), isFalse);
+          expect(host.harness.counters.values, isEmpty);
+          final continueAction = find.widgetWithText(
+            FilledButton,
+            id == '35-plan-parameters' ? 'Создать план' : 'Делегировать версию',
+          );
+          await tester.ensureVisible(continueAction);
+          await tester.tap(continueAction);
+          await tester.pumpAndSettle();
+          expect(host.harness.counters.values['continueEditor'], 1);
+          expect(jsonDecode(host.harness.jsonInput.text), draft);
+          const malformed = '{ "unexpected": [';
+          host.harness.jsonInput.text = malformed;
+          await tester.pumpAndSettle();
+          expect(host.harness.jsonInput.text, malformed);
+          final context = find.byKey(
+            const ValueKey('automation-context-profile'),
+          );
+          expect(context, findsOneWidget);
+          expect(
+            tester
+                .widget<TextField>(
+                  find.descendant(
+                    of: context,
+                    matching: find.byType(TextField),
+                  ),
+                )
+                .readOnly,
+            isTrue,
+          );
+          final fixedContext = tester
+              .widgetList<AutomationFormValue>(find.byType(AutomationFormValue))
+              .map((field) => (label: field.label, value: field.value))
+              .toList();
+          const grantShaped =
+              '{"scopes":[],"serverIds":[],"lifetimeSeconds":900,"label":"x"}';
+          host.harness.jsonInput.text = grantShaped;
+          await tester.pumpAndSettle();
+          expect(host.harness.jsonInput.text, grantShaped);
+          for (final field in fixedContext) {
+            final retained = find.byWidgetPredicate(
+              (widget) =>
+                  widget is AutomationFormValue &&
+                  widget.label == field.label &&
+                  widget.value == field.value,
+            );
+            expect(retained, findsOneWidget);
+            expect(
+              tester
+                  .widget<TextField>(
+                    find.descendant(
+                      of: retained,
+                      matching: find.byType(TextField),
+                    ),
+                  )
+                  .readOnly,
+              isTrue,
+            );
+          }
+          expect(host.harness.counters.values['continueEditor'], 1);
+          expect(host.harness.client.mutations, isEmpty);
+          expect(tester.takeException(), isNull);
+        } finally {
+          await host.close(tester);
+        }
+      },
+    );
+  }
+
   setUpAll(loadDesignFonts);
   for (final scale in [1.0, 2.0]) {
     testWidgets(

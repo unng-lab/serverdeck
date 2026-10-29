@@ -479,7 +479,7 @@ class _ServerPanelState extends State<ServerPanel> {
         eyebrow:
             '${_section == ServerPanelSection.logs ? 'Журналы' : 'Серверы'} / Рабочее пространство',
         description: changedKey
-            ? 'Сведения, наблюдения и доступные действия'
+            ? 'Состояние и следующие доступные действия'
             : _section == ServerPanelSection.logs
             ? 'События выбранного сервера в хронологическом порядке'
             : 'Система, ресурсы и программное обеспечение ${profile.name}',

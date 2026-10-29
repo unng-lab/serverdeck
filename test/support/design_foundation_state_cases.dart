@@ -237,7 +237,7 @@ void _expectDraft(WidgetTester tester, _Form form) {
       isFalse,
     );
   } else {
-    expect(_dialogText('Saved profile'), findsOneWidget);
+    expect(_dialogText('Saved profile · 192.0.2.1:22'), findsOneWidget);
   }
 }
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/profiles/profile_form.dart';
@@ -9,6 +10,9 @@ import 'package:serverdeck/automation/automation_forms.dart';
 import 'package:serverdeck/servers/server_sections.dart';
 import 'package:serverdeck/settings/settings_form.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
+import 'package:serverdeck/theme/brand_assets.dart';
+import 'package:serverdeck/software/software_panel.dart';
+import 'package:serverdeck/ui/deck_icon.dart';
 import 'package:serverdeck/ui/deck_components.dart';
 import 'package:serverdeck/ui/deck_page.dart';
 import 'package:serverdeck/servers/server_compositions.dart';
@@ -21,6 +25,130 @@ void _text(String value) =>
     expect(find.text(value), findsWidgets, reason: value);
 void _contains(String value) =>
     expect(find.textContaining(value), findsWidgets, reason: value);
+
+void _recordStatus(
+  WidgetTester tester,
+  String label,
+  String symbol,
+  String role,
+) {
+  final text = find.text(label).first;
+  final row = find.ancestor(of: text, matching: find.byType(Row)).first;
+  final marker = find.descendant(of: row, matching: find.text(symbol));
+  expect(marker, findsOneWidget);
+  expect(tester.widget<Text>(marker).style!.fontSize, 13);
+  expect(tester.widget<Text>(marker).style!.height, 20 / 13);
+  final context = tester.element(text);
+  expect(DefaultTextStyle.of(context).style.color, deckColors(context)[role]);
+}
+
+void _fullParagraph(WidgetTester tester, Finder finder) {
+  final paragraph = tester.renderObject<RenderParagraph>(finder);
+  // Selection boxes include font overhang; intrinsic height detects lost lines.
+  expect(
+    paragraph.size.height,
+    greaterThanOrEqualTo(
+      paragraph.getMinIntrinsicHeight(paragraph.size.width) - .01,
+    ),
+  );
+  for (final box in paragraph.getBoxesForSelection(
+    TextSelection(
+      baseOffset: 0,
+      extentOffset: paragraph.text.toPlainText().length,
+    ),
+  )) {
+    expect(box.left, greaterThanOrEqualTo(-.01));
+    expect(box.right, lessThanOrEqualTo(paragraph.size.width + .01));
+  }
+}
+
+void _profileMetricsGeometry(WidgetTester tester, DesignFixtureHost host) {
+  final card = find.byKey(ValueKey(host.harness.initialProfile.id));
+  Finder inside(Finder f) => find.descendant(of: card, matching: f);
+  final cpu = inside(find.text('CPU'));
+  final grid = find.ancestor(of: cpu, matching: find.byType(Row)).first;
+  final metrics = find.ancestor(of: grid, matching: find.byType(Column)).first;
+  final identity = inside(find.byType(IntrinsicHeight)).first;
+  final status = inside(find.byType(DeckStatus)).first;
+  final state = find.ancestor(of: status, matching: find.byType(Wrap)).first;
+  final system = inside(find.text('Профиль сохранён · Нет данных о системе'));
+  final timestamp = inside(find.text('Измерения появятся после подключения'));
+  final actions = inside(find.byType(DeckActions)).first;
+  final context = tester.element(card);
+  final width = MediaQuery.sizeOf(context).width;
+  final phone = width <= 520;
+  final compact =
+      width <= 760 || MediaQuery.textScalerOf(context).scale(14) >= 28;
+  final systemStyle = tester.widget<Text>(system).style!;
+  expect(systemStyle.fontSize, 12);
+  expect(systemStyle.height, 20 / 12);
+  expect(tester.widget<Text>(timestamp).style!.height, 18 / 12);
+  expect(
+    tester.getRect(timestamp).top - tester.getRect(grid).bottom,
+    closeTo(14, .01),
+  );
+  expect(
+    tester.getRect(state).top - tester.getRect(identity).bottom,
+    closeTo(compact && !phone ? 16 : 12, .01),
+  );
+  expect(
+    tester.getRect(system).top - tester.getRect(state).bottom,
+    closeTo(compact ? (phone ? 12 : 16) : 8, .01),
+  );
+  if (compact) {
+    expect(
+      tester.getRect(metrics).top - tester.getRect(system).bottom,
+      closeTo(phone ? 18 : 16, .01),
+    );
+    expect(
+      tester.getRect(actions).top - tester.getRect(metrics).bottom,
+      closeTo(phone ? 14 : 16, .01),
+    );
+  } else {
+    final info = find
+        .ancestor(of: identity, matching: find.byType(Column))
+        .first;
+    expect(
+      tester.getRect(metrics).width,
+      closeTo(width <= 1060 ? 270 : 300, .01),
+    );
+    expect(
+      tester.getRect(metrics).left - tester.getRect(info).right,
+      closeTo(width <= 1060 ? 16 : 20, .01),
+    );
+  }
+  for (final label in ['CPU', 'RAM', 'Диск /']) {
+    final title = inside(find.text(label));
+    final column = find
+        .ancestor(of: title, matching: find.byType(Column))
+        .first;
+    final texts = tester
+        .widgetList<Text>(
+          find.descendant(of: column, matching: find.byType(Text)),
+        )
+        .toList();
+    expect(texts[0].style!.height, 20 / 12);
+    expect(texts[1].style!.height, 20 / 12);
+    expect(texts[1].style!.fontFamily, BrandAssets.monoFont);
+    expect(
+      tester.getRect(find.byWidget(texts[1])).top -
+          tester.getRect(title).bottom,
+      closeTo(4, .01),
+    );
+    final placeholder = find.descendant(
+      of: column,
+      matching: find.text('Нет данных'),
+    );
+    expect(tester.widget<Text>(placeholder).style!.height, 18 / 12);
+    expect(tester.widget<Text>(placeholder).textAlign, TextAlign.center);
+    final box = find
+        .ancestor(of: placeholder, matching: find.byType(Container))
+        .first;
+    expect(tester.widget<Container>(box).alignment, Alignment.center);
+    expect(tester.getRect(box).height, greaterThanOrEqualTo(25));
+    _fullParagraph(tester, placeholder);
+  }
+}
 
 void _draftField(WidgetTester tester, String label, String value) {
   final field = find.byWidgetPredicate(
@@ -39,6 +167,43 @@ void _formValue(WidgetTester tester, String label, String value) {
   );
   expect(field, findsOneWidget, reason: label);
   expect(tester.widget<AutomationFormValue>(field).value, value);
+}
+
+void _contextPair(WidgetTester tester, String firstLabel, String secondLabel) {
+  Finder field(String label) => find.byWidgetPredicate(
+    (w) => w is AutomationFormValue && w.label == label,
+  );
+  final first = field(firstLabel), second = field(secondLabel);
+  final a = tester.getRect(first), b = tester.getRect(second);
+  final context = tester.element(first);
+  final two =
+      MediaQuery.sizeOf(context).width > 520 &&
+      MediaQuery.textScalerOf(context).scale(14) < 27;
+  if (two) {
+    expect(a.top, closeTo(b.top, .01));
+    expect(b.left - a.right, closeTo(14, .01));
+    expect(a.width, closeTo(b.width, .01));
+  } else {
+    expect(b.top, greaterThan(a.bottom));
+    expect(a.left, closeTo(b.left, .01));
+  }
+  for (final target in [first, second]) {
+    expect(
+      find.descendant(
+        of: target,
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.isRequired == true,
+        ),
+      ),
+      findsOneWidget,
+    );
+    final input = tester.widget<TextField>(
+      find.descendant(of: target, matching: find.byType(TextField)),
+    );
+    expect(input.readOnly, isTrue);
+    expect(input.onChanged, isNull);
+    expect(input.onSubmitted, isNull);
+  }
 }
 
 Future<Map<String, Object?>> _readonlyPayload(
@@ -120,7 +285,51 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Добавить сервер');
       _text('Настроить ИИ-доступ');
       expect(h.profiles.profiles, isEmpty);
+      final headerAdd = find.widgetWithText(OutlinedButton, 'Добавить сервер');
+      final headerAi = find
+          .widgetWithText(OutlinedButton, 'Настроить ИИ-доступ')
+          .first;
+      if (MediaQuery.sizeOf(tester.element(headerAdd)).width > 960 &&
+          MediaQuery.textScalerOf(tester.element(headerAdd)).scale(13) == 13) {
+        expect(
+          tester.getRect(headerAdd).top,
+          closeTo(tester.getRect(headerAi).top, .01),
+        );
+        expect(
+          tester.getRect(headerAi).left,
+          greaterThan(tester.getRect(headerAdd).left),
+        );
+      }
+      final welcomeAdd = find.widgetWithText(FilledButton, 'Добавить сервер');
+      final welcomeAi = find
+          .widgetWithText(OutlinedButton, 'Настроить ИИ-доступ')
+          .last;
+      final welcomeParagraph = tester.getRect(
+        find.text(
+          'Добавьте первое подключение, чтобы видеть состояние системы, ресурсы и программное обеспечение.',
+        ),
+      );
+      final nativeAdd = tester.getRect(welcomeAdd),
+          nativeAi = tester.getRect(welcomeAi);
+      final phoneWelcome =
+          MediaQuery.sizeOf(tester.element(welcomeAdd)).width <= 520;
+      final welcomeInset = phoneWelcome ? 0.0 : 4.0;
+      expect(nativeAdd.height, greaterThanOrEqualTo(44));
+      expect(nativeAi.height, greaterThanOrEqualTo(44));
+      expect(
+        nativeAdd.left + welcomeInset,
+        closeTo(welcomeParagraph.left, .01),
+      );
+      expect(
+        nativeAdd.top + welcomeInset - welcomeParagraph.bottom,
+        closeTo(24, .01),
+      );
+      if (phoneWelcome) {
+        expect(nativeAi.left, closeTo(nativeAdd.left, .01));
+        expect(nativeAi.width, closeTo(nativeAdd.width, .01));
+      }
     case '05-server-list':
+      _profileMetricsGeometry(tester, host);
       _text('Серверы');
       _text(h.initialProfile.name);
       _text('${h.initialProfile.address}:22');
@@ -139,7 +348,107 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
         isFalse,
         reason: 'No matching connection observation may be inferred from local selection',
       );
+      final cardFinder = find.byKey(ValueKey(h.initialProfile.id));
+      final card = tester.widget<DeckSurface>(cardFinder);
+      final width =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final padding = width <= 520
+          ? 16.0
+          : width <= 1060
+          ? 18.0
+          : 20.0;
+      expect(card.padding, EdgeInsets.all(padding));
+      final cardRect = tester.getRect(cardFinder);
+      final state = find
+          .descendant(of: cardFinder, matching: find.byType(DeckStatus))
+          .first;
+      expect(
+        tester.getRect(state).left - cardRect.left,
+        closeTo(padding + 1 + (width <= 520 ? 48 : 0), .01),
+      );
+      final statusLabel = find.descendant(
+        of: state,
+        matching: find.text('Состояние подключения не получено'),
+      );
+      final statusStyle = tester.widget<Text>(statusLabel).style!;
+      expect(statusStyle.fontSize, 12);
+      expect(statusStyle.height, (width <= 520 ? 20 : 18) / 12);
+      final statusSymbol = find.descendant(of: state, matching: find.text('○'));
+      expect(tester.widget<Text>(statusSymbol).style!.fontSize, 13);
+      for (final placeholder
+          in find
+              .descendant(of: cardFinder, matching: find.text('Нет данных'))
+              .evaluate()) {
+        _fullParagraph(tester, find.byWidget(placeholder.widget));
+      }
+      final open = tester.getRect(
+        find.widgetWithText(FilledButton, 'Открыть сервер'),
+      );
+      expect(
+        open.left + (width <= 520 ? 0 : 4) - cardRect.left,
+        closeTo(padding + 1, .01),
+      );
+      for (final tag in h.initialProfile.tags) {
+        final tagFinder = find.descendant(
+          of: cardFinder,
+          matching: find.text(tag),
+        );
+        final style = tester.widget<Text>(tagFinder).style!;
+        expect(style.fontFamily, BrandAssets.monoFont);
+        expect(style.fontSize, 12);
+        expect(style.height, 18 / 12);
+        final tagBox = tester.widget<Container>(
+          find.ancestor(of: tagFinder, matching: find.byType(Container)).first,
+        );
+        expect(tagBox.padding, const EdgeInsets.symmetric(horizontal: 5));
+        final decoration = tagBox.decoration! as BoxDecoration;
+        expect(decoration.color, isNull);
+        expect((decoration.border! as Border).top.width, 1);
+      }
     case '06-server-overview':
+      final identity = tester.widget<ServerPageFrame>(
+        find.byType(ServerPageFrame),
+      );
+      final name = find.text(identity.profile.name);
+      final nameStyle = tester.widget<Text>(name).style!;
+      expect(nameStyle.fontFamily, BrandAssets.monoFont);
+      expect(nameStyle.fontWeight, FontWeight.w400);
+      expect(nameStyle.fontSize, 20);
+      expect(nameStyle.height, 28 / 20);
+      final phoneIdentity =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio <= 520;
+      final emblem = find.byWidgetPredicate(
+        (w) =>
+            w is DeckIcon &&
+            w.name == 'server' &&
+            w.size == (phoneIdentity ? 23 : 26),
+      );
+      expect(emblem, findsOneWidget);
+      expect(
+        tester.getSize(
+          find.ancestor(of: emblem, matching: find.byType(Container)).first,
+        ),
+        Size.square(phoneIdentity ? 42 : 48),
+      );
+      expect(
+        tester.widget<DeckIcon>(emblem).color,
+        deckColors(tester.element(emblem))['accent'],
+      );
+      final emblemBox = find
+          .ancestor(of: emblem, matching: find.byType(Container))
+          .first;
+      expect(
+        tester.getRect(name).left - tester.getRect(emblemBox).right,
+        closeTo(phoneIdentity ? 10 : 14, .01),
+      );
+      final identityRow = find
+          .ancestor(of: emblem, matching: find.byType(Row))
+          .first;
+      expect(
+        tester.getRect(find.byType(DeckTabs)).top -
+            tester.getRect(identityRow).bottom,
+        closeTo(phoneIdentity ? 16 : 20, .01),
+      );
       _text('Обзор сервера');
       _text('Сведения о сервере');
       _text('Процессор');
@@ -187,12 +496,30 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Сохранить существующий');
     case '09-profile-delete':
       _text('Удаление локального профиля');
-      _text(h.initialProfile.name);
-      _text('${h.initialProfile.address}:22');
+      _text('${h.initialProfile.name} · ${h.initialProfile.address}:22');
+      _text('Параметры и условия');
+      _text('Последствия');
+      _text('Проверьте цель, последствия и условия выбранного действия');
       _text('Удаляется локальный профиль; сервер не меняется');
       _text('Удалить профиль');
       expect(find.byType(CheckboxListTile), findsOneWidget);
+      final deletionPanels = find.byType(DeckPanel);
+      expect(deletionPanels, findsNWidgets(2));
+      final parameters = tester.getRect(deletionPanels.at(0));
+      final consequences = tester.getRect(deletionPanels.at(1));
+      expect(consequences.left, closeTo(parameters.left, .01));
+      expect(consequences.width, closeTo(parameters.width, .01));
+      expect(
+        consequences.top - parameters.bottom,
+        closeTo(
+          tester.view.physicalSize.width / tester.view.devicePixelRatio <= 520
+              ? 16
+              : 20,
+          .01,
+        ),
+      );
     case '10-host-trust':
+      _text('Проверьте цель, последствия и условия выбранного действия');
       _text('Подтверждение SSH-ключа');
       _text('Сверьте отпечаток с ключом вашего сервера');
       _text('Параметры и условия');
@@ -212,6 +539,7 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
         isNotNull,
       );
     case '11-host-key-changed':
+      _text('Состояние и следующие доступные действия');
       _text('SSH-ключ изменился');
       _text('Ключ сервера отличается от сохранённого');
       _text(DesignServerFixtures.key.fingerprint);
@@ -244,10 +572,25 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
         isEmpty,
       );
     case '13-mutation-conflict':
+      _text('Состояние и следующие доступные действия');
       _text(
         'Настройки изменены другим окном. Введённые данные сохранены в форме',
       );
       _text('Перечитать настройки');
+      final reload = find.widgetWithText(FilledButton, 'Перечитать настройки');
+      final close = find.widgetWithText(OutlinedButton, 'Закрыть');
+      expect(reload, findsOneWidget);
+      final flow = find
+          .ancestor(of: reload, matching: find.byType(DeckActions))
+          .first;
+      expect(find.descendant(of: flow, matching: close), findsOneWidget);
+      if (MediaQuery.sizeOf(tester.element(reload)).width >= 800 &&
+          MediaQuery.textScalerOf(tester.element(reload)).scale(13) == 13) {
+        expect(
+          tester.getRect(reload).top,
+          closeTo(tester.getRect(close).top, .01),
+        );
+      }
       _contains('Перечитайте данные и проверьте изменения');
       final status = tester.widget<ServerStatusBody>(
         find.byType(ServerStatusBody),
@@ -257,6 +600,40 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(status.facts['Состояние'], 'Конфликт ревизии');
       expect(find.text('Повторить тот же запрос'), findsNothing);
     case '16-install-catalog':
+      final scope = find.descendant(
+        of: find.byType(SoftwareServerSelector),
+        matching: find.text('Область просмотра'),
+      );
+      final scopeHeader = find
+          .ancestor(
+            of: scope,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is Container &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration! as BoxDecoration).border != null,
+            ),
+          )
+          .first;
+      final viewport =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final textScale =
+          MediaQuery.textScalerOf(tester.element(scope)).scale(14) / 14;
+      if (textScale == 1) {
+        expect(
+          tester.getSize(scopeHeader).height,
+          closeTo(viewport <= 520 ? 51 : 53, .01),
+        );
+        if (viewport == 800) {
+          final page = tester.widget<DeckPage>(find.byType(DeckPage));
+          final first = tester.getRect(find.byWidget(page.actions[0]));
+          final second = tester.getRect(find.byWidget(page.actions[1]));
+          final description = tester.getRect(find.text(page.description!));
+          expect(first.top, closeTo(second.top, .01));
+          expect(first.top + 4 - description.bottom, closeTo(14, .01));
+          expect(first.left + 4, closeTo(92, .01));
+        }
+      }
       _text('Сервер для установки');
       _text(
         '${h.automationServerProfile.name} · ${h.automationServerProfile.address}:${h.automationServerProfile.port}',
@@ -391,6 +768,69 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Ход выполнения');
       _text('Контекст задания');
       _text('План задания');
+      _text('Состояние: Выполняется');
+      final jobPanels = find.descendant(
+        of: find.byType(AutomationJobsSection),
+        matching: find.byType(DeckPanel),
+      );
+      final heroPanel = tester.getRect(jobPanels.at(0));
+      final timelinePanel = tester.getRect(jobPanels.at(1));
+      final frameWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final largeText =
+          MediaQuery.textScalerOf(tester.element(jobPanels.first)).scale(14) >=
+          27;
+      expect(
+        timelinePanel.top - heroPanel.bottom,
+        closeTo(frameWidth <= 520 ? 16 : 20, .01),
+      );
+      final contextPanel = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('Контекст задания'),
+              matching: find.byType(DeckPanel),
+            )
+            .first,
+      );
+      if (frameWidth > 760 && !largeText) {
+        expect(
+          contextPanel.left - timelinePanel.right,
+          closeTo(frameWidth <= 960 ? 14 : 20, .01),
+        );
+      } else {
+        expect(
+          contextPanel.top - timelinePanel.bottom,
+          closeTo(frameWidth <= 520 ? 16 : 20, .01),
+        );
+      }
+      final jobs = tester.widget<AutomationJobsSection>(
+        find.byType(AutomationJobsSection),
+      );
+      for (var i = 0; i < jobs.events.length; i++) {
+        final marker = find.byKey(ValueKey('job-timeline-marker-$i'));
+        final size = tester.getSize(marker);
+        expect(size.width, greaterThanOrEqualTo(frameWidth <= 520 ? 23 : 25));
+        expect(size.height, size.width);
+        final ordinal = find.descendant(
+          of: marker,
+          matching: find.byType(Text),
+        );
+        if (ordinal.evaluate().isNotEmpty) _fullParagraph(tester, ordinal);
+        final decoration =
+            tester.widget<Container>(marker).decoration! as BoxDecoration;
+        expect(
+          decoration.color,
+          deckColors(
+            tester.element(marker),
+          )[jobs.events[i]['checkResult'] == 'passed' ? 'selected' : 'raised'],
+        );
+        final line = find.byKey(ValueKey('job-timeline-line-$i'));
+        expect(
+          line,
+          i + 1 < jobs.events.length ? findsOneWidget : findsNothing,
+        );
+        if (i + 1 < jobs.events.length) expect(tester.getSize(line).width, 1);
+      }
     case '29-job-unknown':
       _text('Исход не подтверждён');
       _text('Возможны неподтверждённые изменения');
@@ -407,6 +847,18 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(find.text('Остановить после текущего шага'), findsNothing);
       expect(find.text('Откатить изменения'), findsNothing);
     case '31-recent-operations':
+      for (final label in [
+        'Область',
+        'Лимит',
+        'Цель',
+        'Время UTC',
+        'Результат',
+        'Состояние',
+        'Теги',
+      ]) {
+        _text(label);
+      }
+      _text('Все окна рабочего пространства');
       _text('Недавние подтверждённые операции');
       _contains('До 20 последних подтверждённых записей');
       _text('Изменение настроек подтверждено');
@@ -421,6 +873,7 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text(DesignServerFixtures.observedAt);
       _text('Обновить список');
     case '32-automation-profiles':
+      _recordStatus(tester, 'Активен', '✓', 'available');
       _text(DesignAutomationFixtures.profile().name);
       _text('2');
       _text('Активные');
@@ -445,6 +898,21 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Проверить без сохранения');
       expect(h.body.text, contains('system.motd'));
     case '34-profile-revisions':
+      final versionAction = find.widgetWithText(
+        OutlinedButton,
+        'Проверить версию',
+      );
+      expect(
+        tester
+            .widget<DeckButtonLabel>(
+              find.descendant(
+                of: versionAction,
+                matching: find.byType(DeckButtonLabel),
+              ),
+            )
+            .icon,
+        'refresh',
+      );
       _text('Приветствие сервера · версия 2');
       _text('Сравнение версий 1 и 2');
       _text('/parameters/greeting/default');
@@ -464,6 +932,13 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Сравнить версии');
       _text('Для новой версии потребуется отдельное согласие');
     case '35-plan-parameters':
+      _contextPair(tester, 'Цель', 'Профиль');
+      _formValue(tester, 'Проверка', 'Без записи на сервер');
+      _formValue(
+        tester,
+        'Следующий шаг',
+        'Получить план с эффектами и проверками',
+      );
       _text('Параметры плана');
       _text('Ansible-профиль: Приветствие сервера · версия 2.');
       _formValue(
@@ -492,6 +967,7 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       );
       expect(context['serverId'], DesignAutomationFixtures.serverId);
     case '36-ai-grants':
+      _recordStatus(tester, 'Действует', '○', 'muted');
       _text('Доступ ИИ рабочего пространства');
       _text('Действует');
       _text('Истёкший grant');
@@ -503,6 +979,7 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('2026-10-25T17:00:00.000Z (UTC)');
       _text('Отозвать');
     case '37-ai-grant-form':
+      _text('НАСТРОЙКИ / РАБОЧЕЕ ПРОСТРАНСТВО');
       _text('Выдать доступ ИИ');
       _text(
         'Выдайте только необходимые права на перечисленные серверы. Сохранение выдаст доступ клиенту ИИ на указанный срок.',
@@ -527,6 +1004,21 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _draftField(tester, 'Срок, секунд', '28800');
       _text('Выдать доступ');
     case '38-mcp-client-config':
+      final copyAction = find.widgetWithText(
+        FilledButton,
+        'Скопировать конфигурацию',
+      );
+      expect(
+        tester
+            .widget<DeckButtonLabel>(
+              find.descendant(
+                of: copyAction,
+                matching: find.byType(DeckButtonLabel),
+              ),
+            )
+            .icon,
+        'copy',
+      );
       _text('Подключение MCP-клиента');
       _text('Сведения');
       _text('Точные значения');
@@ -551,6 +1043,15 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
         expectDesignVisible(tester, content);
       }
     case '39-delegations':
+      _contextPair(tester, 'ИИ-клиент', 'Профиль');
+      _formValue(tester, 'profileId', DesignAutomationFixtures.profileId);
+      _formValue(tester, 'revision', '2');
+      _formValue(
+        tester,
+        'bodyDigest (SHA-256)',
+        DesignAutomationFixtures.revision()['digest'] as String,
+      );
+      _formValue(tester, 'Делегирование', 'Только указанная ревизия');
       _text('Делегирование версии');
       _formValue(
         tester,
@@ -586,6 +1087,7 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       expect(context['serverId'], DesignAutomationFixtures.serverId);
       expect(context['grantId'], DesignAutomationFixtures.grantId);
     case '40-executor-binding':
+      _text('Проверьте цель, последствия и условия выбранного действия');
       _text('Подготовка исполнителя');
       _text('Параметры и условия');
       _text('Последствия');
@@ -705,10 +1207,48 @@ Future<void> _assertOrigin(WidgetTester tester, DesignFixtureHost host) async {
       _text('Параметры и условия');
       _text('Последствия');
       _text('Создать новый план');
+      final invalidNotice = find.byWidgetPredicate(
+        (w) => w is DeckNotice && w.title == 'Следующий шаг',
+      );
+      final invalidHero = tester.getRect(find.byType(DeckPanel).first);
+      final noticeRect = tester.getRect(invalidNotice);
+      final conditionsRect = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('Параметры и условия'),
+              matching: find.byType(DeckPanel),
+            )
+            .first,
+      );
+      final invalidGap =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio <= 520
+          ? 16.0
+          : 20.0;
+      expect(noticeRect.top - invalidHero.bottom, closeTo(invalidGap, .01));
+      expect(conditionsRect.top - noticeRect.bottom, closeTo(invalidGap, .01));
       expect(find.text('Запустить'), findsNothing);
       expect(find.text('Подтвердить план'), findsNothing);
     default:
       fail('Missing baseline acceptance for ${host.binding.screenId}');
+  }
+  if (const {
+    '01-startup',
+    '02-service-unavailable',
+    '03-storage-blocked',
+    '10-host-trust',
+    '11-host-key-changed',
+    '13-mutation-conflict',
+    '40-executor-binding',
+  }.contains(host.binding.screenId)) {
+    final panels = find.byType(DeckPanel);
+    final gap =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio <= 520
+        ? 16.0
+        : 20.0;
+    expect(
+      tester.getRect(panels.at(1)).top - tester.getRect(panels.first).bottom,
+      closeTo(gap, .01),
+    );
   }
   // All origins use at least one meaningful Deck component in their own body.
   expect(
@@ -945,6 +1485,34 @@ Future<void> _assertAction(WidgetTester tester, DesignFixtureHost host) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(loadDesignFonts);
+  final cardBinding = currentBaseBindings.singleWhere(
+    (b) => b.screenId == '05-server-list',
+  );
+  for (final width in [760.0, 761.0, 1000.0, 1061.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('profile card source boundaries $width scale $scale', (
+        tester,
+      ) async {
+        final host = await mountDesignFixture(
+          tester,
+          cardBinding,
+          frame: Size(width, 800),
+          theme: ThemeMode.dark,
+          textScale: scale,
+          currentBase: true,
+        );
+        try {
+          _profileMetricsGeometry(tester, host);
+          expect(tester.takeException(), isNull);
+          expect(host.harness.counters.values, isEmpty);
+          expect(host.harness.client.mutations, isEmpty);
+        } finally {
+          await host.close(tester);
+        }
+      });
+    }
+  }
+
   for (final binding in currentBaseBindings) {
     for (final frame in currentBaseFrames) {
       for (final theme in currentBaseThemes) {

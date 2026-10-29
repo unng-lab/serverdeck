@@ -13,7 +13,9 @@
 
 ## Current user priority — 2026-10-29
 
-- The intermediate003 release candidate is `0.3.0-preview.1+12`. Earlier
+- The intermediate003 visual-correction candidate is `0.3.0-preview.3+14`.
+  Prior private `0.3.0-preview.2+13` installations remain preserved. The
+  released/installed `0.3.0-preview.1+12` remains preserved. Earlier
   `0.2.1+11` installations are preserved historical progress builds. Its normal
   local build/install precedes the final full test run by explicit user order.
 

@@ -48,6 +48,56 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
   DeckLocation? _recentCaller;
   DeckLocation get _location => _navigation.value;
   FoundationSection get _section => _location.section;
+  Object? _planReviewToken;
+  DeckLocation? _planReviewOrigin;
+  int? _planReviewEpoch;
+  String? _planReviewServerId;
+  void _clearPlanReview() {
+    _planReviewToken = null;
+    _planReviewOrigin = null;
+    _planReviewEpoch = null;
+    _planReviewServerId = null;
+  }
+
+  void _retireChangedPlanReview() {
+    if (_planReviewToken != null &&
+        (!identical(_planReviewOrigin, _location) ||
+            _planReviewServerId != _target?.id)) {
+      _clearPlanReview();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _navigation.addListener(_retireChangedPlanReview);
+    widget.profiles.addListener(_retireChangedPlanReview);
+  }
+
+  FoundationSection get _visualSection =>
+      _planReviewToken != null &&
+          identical(_planReviewOrigin, _location) &&
+          _planReviewEpoch == widget.privateEpoch &&
+          _planReviewServerId == _target?.id &&
+          widget.state == ReadinessState.ready
+      ? FoundationSection.jobs
+      : _section;
+
+  VoidCallback _beginPlanReview() {
+    if (!mounted || widget.state != ReadinessState.ready) return () {};
+    final token = Object();
+    setState(() {
+      _planReviewToken = token;
+      _planReviewOrigin = _location;
+      _planReviewEpoch = widget.privateEpoch;
+      _planReviewServerId = _target?.id;
+    });
+    return () {
+      if (!mounted || !identical(_planReviewToken, token)) return;
+      setState(_clearPlanReview);
+    };
+  }
+
   String? get _serverId => _location.serverId;
   ServerPanelSection _serverSection = ServerPanelSection.overview;
   String get _automationSection => switch (_location.view) {
@@ -57,6 +107,8 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
   };
   @override
   void dispose() {
+    widget.profiles.removeListener(_retireChangedPlanReview);
+    _navigation.removeListener(_retireChangedPlanReview);
     _navigation.dispose();
     super.dispose();
   }
@@ -69,6 +121,16 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
   @override
   void didUpdateWidget(covariant BaseWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.profiles, widget.profiles)) {
+      oldWidget.profiles.removeListener(_retireChangedPlanReview);
+      widget.profiles.addListener(_retireChangedPlanReview);
+      _clearPlanReview();
+    }
+    if (widget.state != ReadinessState.ready ||
+        oldWidget.privateEpoch != widget.privateEpoch ||
+        !identical(oldWidget.client, widget.client)) {
+      _clearPlanReview();
+    }
     if (oldWidget.privateEpoch != widget.privateEpoch ||
         !identical(oldWidget.client, widget.client)) {
       _serverKey = UniqueKey();
@@ -220,6 +282,7 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
       key: key,
       profiles: profiles,
       client: client,
+      onPlanReview: _beginPlanReview,
       serverId: location.serverId,
       onServerSelected: (id) {
         if (!mounted ||
@@ -262,6 +325,7 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
           serverProfiles: widget.profiles.profiles,
           contextBar: _targetSelector(),
           workspaceActions: _jobsActions,
+          onPlanReview: _beginPlanReview,
         );
   List<Widget> get _jobsActions => _location.view == DeckView.jobs
       ? [
@@ -334,7 +398,7 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
       reason: widget.reason,
       retryInProgress: widget.retryInProgress,
       onRetry: widget.onRetry,
-      section: _section,
+      section: _visualSection,
       onSectionSelected: _navigate,
       recoveryAction: RecentOperationsButton(
         recovery: widget.recovery,
@@ -373,11 +437,11 @@ class _BaseWorkspaceState extends State<BaseWorkspace> {
           ],
         ),
       ),
-      contentBuilder: (context, section) => KeyedSubtree(
+      contentBuilder: (context, _) => KeyedSubtree(
         key: ValueKey('workspace-private-${widget.privateEpoch}'),
         child: RecoveryView(
           recovery: widget.recovery,
-          child: _content(context, section),
+          child: _content(context, _section),
         ),
       ),
     ),

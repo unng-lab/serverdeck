@@ -174,6 +174,8 @@ class AutomationStructuredDraft extends StatefulWidget {
     required this.onChanged,
     this.serverProfiles = const [],
     this.parameterDefinitions = const {},
+    this.leadingFields = const [],
+    this.trailingFields = const [],
   });
 
   final TextEditingController input;
@@ -181,6 +183,7 @@ class AutomationStructuredDraft extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final List<ProfileView> serverProfiles;
   final Map<String, Object?> parameterDefinitions;
+  final List<Widget> leadingFields, trailingFields;
 
   @override
   State<AutomationStructuredDraft> createState() =>
@@ -234,8 +237,26 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
   ) => ValueListenableBuilder<TextEditingValue>(
     valueListenable: input,
     builder: (context, _, _) {
+      Widget withContext(Widget child) =>
+          widget.leadingFields.isEmpty && widget.trailingFields.isEmpty
+          ? child
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.leadingFields.isNotEmpty) ...[
+                  AutomationFormGrid(children: widget.leadingFields),
+                  const SizedBox(height: 18),
+                ],
+                child,
+                if (widget.trailingFields.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  AutomationFormGrid(children: widget.trailingFields),
+                ],
+              ],
+            );
+      Widget shapeError(String field) => withContext(_DraftShapeError(field));
       final value = _decode(input.text);
-      if (value == null) return const SizedBox.shrink();
+      if (value == null) return withContext(const SizedBox.shrink());
       final controller = input, epoch = _sourceEpoch;
       void change(String key, Object? next) {
         if (!mounted ||
@@ -258,16 +279,16 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
 
       if (value.containsKey('scopes') || value.containsKey('serverIds')) {
         for (final field in ['scopes', 'serverIds']) {
-          if (!_stringListShape(value[field])) return _DraftShapeError(field);
+          if (!_stringListShape(value[field])) return shapeError(field);
         }
         // A partial draft can still describe its exact targets. Missing fields
         // stay blank here; the unchanged save owner requires the complete body.
         if (value.containsKey('label') && value['label'] is! String) {
-          return const _DraftShapeError('label');
+          return shapeError('label');
         }
         if (value.containsKey('lifetimeSeconds') &&
             !_numberDraftShape(value['lifetimeSeconds'])) {
-          return const _DraftShapeError('lifetimeSeconds');
+          return shapeError('lifetimeSeconds');
         }
         final scopes = (value['scopes'] as List).cast<String>().toSet();
         final targets = (value['serverIds'] as List).cast<String>().toSet();
@@ -279,94 +300,96 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
           'plan': 'Создание планов',
           'apply': 'Запуск заданий',
         };
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (value.containsKey('lifetimeSeconds') &&
-                value['lifetimeSeconds'] is! int)
-              const _DraftShapeError('lifetimeSeconds', editable: true),
-            AutomationFormGrid(
-              children: [
-                AutomationValueField(
-                  label: 'Клиент',
-                  required: true,
-                  value: value['label'],
-                  enabled: enabled,
-                  onChanged: (next) => change('label', next),
-                ),
-                AutomationDraftSelectionField(
-                  label: 'Цели',
-                  enabled: enabled,
-                  selected: targets,
-                  options: {
-                    for (final row in serverProfiles)
-                      row.id:
-                          '${row.name} · ${row.address.contains(':') ? '[${row.address}]' : row.address}:${row.port}',
-                  },
-                  current: () => input.text == source,
-                  onChanged: (next) => change('serverIds', next.toList()),
-                ),
-                AutomationDraftSelectionField(
-                  label: 'Права',
-                  enabled: enabled,
-                  selected: scopes.difference({'apply'}),
-                  options: {
-                    for (final entry in scopeNames.entries)
-                      if (entry.key != 'apply') entry.key: entry.value,
-                  },
-                  current: () => input.text == source,
-                  onChanged: (next) => change('scopes', [
-                    ...next,
-                    if (scopes.contains('apply')) 'apply',
-                  ]),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Применение', style: BrandTypography.button),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        scopes.contains('apply') ? 'Включено' : 'Выключено',
+        return withContext(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (value.containsKey('lifetimeSeconds') &&
+                  value['lifetimeSeconds'] is! int)
+                const _DraftShapeError('lifetimeSeconds', editable: true),
+              AutomationFormGrid(
+                children: [
+                  AutomationValueField(
+                    label: 'Клиент',
+                    required: true,
+                    value: value['label'],
+                    enabled: enabled,
+                    onChanged: (next) => change('label', next),
+                  ),
+                  AutomationDraftSelectionField(
+                    label: 'Цели',
+                    enabled: enabled,
+                    selected: targets,
+                    options: {
+                      for (final row in serverProfiles)
+                        row.id:
+                            '${row.name} · ${row.address.contains(':') ? '[${row.address}]' : row.address}:${row.port}',
+                    },
+                    current: () => input.text == source,
+                    onChanged: (next) => change('serverIds', next.toList()),
+                  ),
+                  AutomationDraftSelectionField(
+                    label: 'Права',
+                    enabled: enabled,
+                    selected: scopes.difference({'apply'}),
+                    options: {
+                      for (final entry in scopeNames.entries)
+                        if (entry.key != 'apply') entry.key: entry.value,
+                    },
+                    current: () => input.text == source,
+                    onChanged: (next) => change('scopes', [
+                      ...next,
+                      if (scopes.contains('apply')) 'apply',
+                    ]),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Применение', style: BrandTypography.button),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          scopes.contains('apply') ? 'Включено' : 'Выключено',
+                        ),
+                        value: scopes.contains('apply'),
+                        onChanged: enabled
+                            ? (next) {
+                                final result = {...scopes};
+                                next
+                                    ? result.add('apply')
+                                    : result.remove('apply');
+                                change('scopes', result.toList());
+                              }
+                            : null,
                       ),
-                      value: scopes.contains('apply'),
-                      onChanged: enabled
-                          ? (next) {
-                              final result = {...scopes};
-                              next
-                                  ? result.add('apply')
-                                  : result.remove('apply');
-                              change('scopes', result.toList());
-                            }
-                          : null,
-                    ),
-                  ],
-                ),
-                AutomationValueField(
-                  label: 'Срок, секунд',
-                  value: value['lifetimeSeconds'],
-                  enabled: enabled,
-                  numeric: true,
-                  required: true,
-                  onChanged: (next) => change('lifetimeSeconds', next),
-                ),
-                const AutomationFormValue(
-                  label: 'Политика',
-                  value: 'Отдельный grant для каждого клиента',
-                ),
-              ],
-            ),
-          ],
+                    ],
+                  ),
+                  AutomationValueField(
+                    label: 'Срок, секунд',
+                    value: value['lifetimeSeconds'],
+                    enabled: enabled,
+                    numeric: true,
+                    required: true,
+                    onChanged: (next) => change('lifetimeSeconds', next),
+                  ),
+                  const AutomationFormValue(
+                    label: 'Политика',
+                    value: 'Отдельный grant для каждого клиента',
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       }
       if (value.containsKey('predicates')) {
         final predicates = value['predicates'];
         if (predicates is! Map<String, Object?>) {
-          return const _DraftShapeError('predicates');
+          return shapeError('predicates');
         }
         if (value.containsKey('lifetimeSeconds') &&
             !_numberDraftShape(value['lifetimeSeconds'])) {
-          return const _DraftShapeError('lifetimeSeconds');
+          return shapeError('lifetimeSeconds');
         }
         final lifetime = value['lifetimeSeconds'];
         String? semanticError =
@@ -378,25 +401,35 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
             entry.value,
             'predicates.${entry.key}',
           );
-          if (error != null) return _DraftShapeError(error);
+          if (error != null) return shapeError(error);
           semanticError ??= _constraintShapeError(
             entry.value,
             'predicates.${entry.key}',
           );
         }
+        final lifetimeField = AutomationValueField(
+          label: 'Срок, секунд',
+          value: value['lifetimeSeconds'],
+          enabled: enabled,
+          numeric: true,
+          required: true,
+          onChanged: (next) => change('lifetimeSeconds', next),
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (semanticError != null)
               _DraftShapeError(semanticError, editable: true),
-            AutomationValueField(
-              label: 'Срок, секунд',
-              value: value['lifetimeSeconds'],
-              enabled: enabled,
-              numeric: true,
-              required: true,
-              onChanged: (next) => change('lifetimeSeconds', next),
-            ),
+            if (widget.leadingFields.isEmpty && widget.trailingFields.isEmpty)
+              lifetimeField
+            else
+              AutomationFormGrid(
+                children: [
+                  ...widget.leadingFields,
+                  lifetimeField,
+                  ...widget.trailingFields,
+                ],
+              ),
             const SizedBox(height: 20),
             for (final entry in predicates.entries)
               Padding(
@@ -424,7 +457,7 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
             definition,
             'parameters.${entry.key}',
           );
-          if (error != null) return _DraftShapeError(error);
+          if (error != null) return shapeError(error);
           semanticError ??= _parameterShapeError(
             definition,
             'parameters.${entry.key}',
@@ -433,7 +466,7 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
         if (entry.value is! String &&
             entry.value is! int &&
             entry.value is! bool) {
-          return _DraftShapeError(entry.key);
+          return shapeError(entry.key);
         }
       }
       return Column(
@@ -443,6 +476,7 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
             _DraftShapeError(semanticError, editable: true),
           AutomationFormGrid(
             children: [
+              ...widget.leadingFields,
               for (final entry in value.entries)
                 SizedBox(
                   width: 280,
@@ -460,6 +494,7 @@ class _AutomationStructuredDraftState extends State<AutomationStructuredDraft> {
                     onChanged: (next) => change(entry.key, next),
                   ),
                 ),
+              ...widget.trailingFields,
             ],
           ),
         ],
@@ -546,11 +581,14 @@ class AutomationFormValue extends StatelessWidget {
     super.key,
     required this.label,
     required this.value,
+    this.required = false,
   });
   final String label, value;
+  final bool required;
   @override
   Widget build(BuildContext context) => AutomationLabeledField(
     label: label,
+    required: required,
     child: DeckReadonlyInput(value: value),
   );
 }

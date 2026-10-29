@@ -55,8 +55,8 @@ void main() {
     });
     await show(tester);
     expect(client.sent, isEmpty);
-    expect(find.text('Saved profile'), findsOneWidget);
-    expect(find.text('192.0.2.1:22'), findsOneWidget);
+    expect(find.textContaining('Saved profile'), findsOneWidget);
+    expect(find.textContaining('192.0.2.1:22'), findsOneWidget);
     expect(
       find.text('Удаляется локальный профиль; сервер не меняется'),
       findsOneWidget,
@@ -101,8 +101,8 @@ void main() {
       expect(identical(client.sent.single, client.queried.single), isTrue);
       bootstrap.show(ReadinessState.unavailable);
       await tester.pumpAndSettle();
-      expect(find.text('Saved profile'), findsNothing);
-      expect(find.text('192.0.2.1:22'), findsNothing);
+      expect(find.textContaining('Saved profile'), findsNothing);
+      expect(find.textContaining('192.0.2.1:22'), findsNothing);
       expect(client.sent, hasLength(1));
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -130,8 +130,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Saved profile'), findsOneWidget);
-    expect(find.text('Changed by another window'), findsNothing);
+    expect(find.textContaining('Saved profile'), findsOneWidget);
+    expect(find.textContaining('Changed by another window'), findsNothing);
     await tester.ensureVisible(find.text('Цель и последствия проверены'));
     await tester.tap(find.text('Цель и последствия проверены'));
     await tester.pumpAndSettle();
@@ -142,7 +142,7 @@ void main() {
     await tester.ensureVisible(find.text('Перечитать профиль'));
     await tester.tap(find.text('Перечитать профиль'));
     await tester.pumpAndSettle();
-    expect(find.text('Changed by another window'), findsOneWidget);
+    expect(find.textContaining('Changed by another window'), findsOneWidget);
     expect(client.sent, hasLength(1));
     expect(
       tester

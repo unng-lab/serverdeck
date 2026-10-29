@@ -185,6 +185,7 @@ class AutomationPanel extends StatefulWidget {
     this.contextBar,
     this.contextBarBuilder,
     this.workspaceActions = const [],
+    this.onPlanReview,
   });
   final TrustedApiClient client;
   final String? serverId;
@@ -194,6 +195,9 @@ class AutomationPanel extends StatefulWidget {
   final Widget? contextBar;
   final Widget Function(String? environment)? contextBarBuilder;
   final List<Widget> workspaceActions;
+
+  /// Temporarily presents the plan review in Jobs without changing its owner.
+  final VoidCallback Function()? onPlanReview;
   @override
   State<AutomationPanel> createState() => _AutomationPanelState();
 }
@@ -521,6 +525,18 @@ class _AutomationPanelState extends State<AutomationPanel> {
                 workspaceBounds: _workspaceBounds,
                 pageInsets: _workspaceInsets,
                 title: title,
+                eyebrow: switch (phase) {
+                  AutomationUiPhase.saveGrant ||
+                  AutomationUiPhase.replaceGrant =>
+                    'Настройки / Рабочее пространство',
+                  _ => 'Задания / Рабочее пространство',
+                },
+                formKind: switch (phase) {
+                  AutomationUiPhase.createPlan =>
+                    AutomationEditorKind.planParameters,
+                  AutomationUiPhase.delegate => AutomationEditorKind.delegation,
+                  _ => AutomationEditorKind.generic,
+                },
                 input: input,
                 parameterDefinitions: parameterDefinitions,
                 submitLabel: switch (phase) {
@@ -913,6 +929,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
     _modalObservers.add(observe);
     bool? result;
     var alternate = false;
+    final endReview = widget.onPlanReview?.call();
     try {
       result = await showMotionDialog<bool>(
         context: context,
@@ -940,6 +957,7 @@ class _AutomationPanelState extends State<AutomationPanel> {
       );
     } finally {
       _modalObservers.remove(observe);
+      endReview?.call();
     }
     if (alternate && current()) {
       await _decision(plan, !approve);

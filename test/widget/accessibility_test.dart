@@ -229,7 +229,10 @@ void main() {
                     true,
                   );
                 if (form == _Form.delete)
-                  expect(find.text('Changed externally'), findsOneWidget);
+                  expect(
+                    find.textContaining('Changed externally'),
+                    findsOneWidget,
+                  );
               } else {
                 await action('Проверить результат');
                 expect(client.queried, hasLength(1));
@@ -241,7 +244,7 @@ void main() {
                 bootstrap.show(ReadinessState.unavailable);
                 await tester.pumpAndSettle();
                 expect(find.text('RAM draft'), findsNothing);
-                expect(find.text('Changed externally'), findsNothing);
+                expect(find.textContaining('Changed externally'), findsNothing);
                 final close = find.widgetWithText(OutlinedButton, 'Закрыть');
                 await tester.ensureVisible(close);
                 await tester.pumpAndSettle();

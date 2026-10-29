@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serverdeck_protocol/models.dart' hide ReadinessView;
 
+import '../servers/server_compositions.dart';
 import '../shell/readiness_view.dart';
 import '../shell/error_view.dart';
 import '../theme/brand_tokens.dart';
@@ -145,17 +146,20 @@ class _ProfileDeleteState extends State<ProfileDelete> {
             asPage: widget.asPage,
             showHelper: false,
             plan: ready,
-            planNotice: const DeckNotice(
-              title: 'Удаление локальных данных',
-              message: 'Удаляется локальный профиль; сервер не меняется',
-              nextStep:
-                  'Проверьте цель и последствия. Назад сохраняет профиль.',
-              tone: DeckTone.warning,
-            ),
             actionReview: ready
                 ? CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Цель и последствия проверены'),
+                    subtitle: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Удаляется локальный профиль; сервер не меняется'),
+                        Text(
+                          'Проверьте цель и последствия. Назад сохраняет профиль.',
+                        ),
+                      ],
+                    ),
                     value: _confirmed,
                     onChanged:
                         idle && !_reloading && !_readingError && !_missing
@@ -167,22 +171,21 @@ class _ProfileDeleteState extends State<ProfileDelete> {
                         : null,
                   )
                 : null,
-            description: 'Проверьте цель и последствия перед удалением локальных данных.',
+            description:
+                'Проверьте цель, последствия и условия выбранного действия',
             title: ready
                 ? 'Удаление локального профиля'
                 : 'Локальное пространство недоступно',
             target: ready
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      DeckKeyValue(label: 'Профиль', value: target.name),
-                      DeckKeyValue(
-                        label: 'Адрес SSH',
-                        value: target.address.contains(':')
-                            ? '[${target.address}]:${target.port}'
-                            : '${target.address}:${target.port}',
-                      ),
-                    ],
+                ? ServerFactRows(
+                    facts: {
+                      'Цель':
+                          '${target.name} · ${target.address.contains(':') ? '[${target.address}]' : target.address}:${target.port}',
+                      'Будет удалено':
+                          'Локальный профиль, ссылки и сохранённые наблюдения',
+                      'На сервере': 'Изменений нет',
+                      'Проверка': 'Локальная служба проверит активные и неподтверждённые операции перед удалением',
+                    },
                   )
                 : null,
             actions: [
@@ -231,28 +234,15 @@ class _ProfileDeleteState extends State<ProfileDelete> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const DeckPanel(
-                        title: 'Цель и последствия',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            DeckKeyValue(
-                              label: '01 · Будет удалено',
-                              value: 'Локальный профиль, ссылки и сохранённые наблюдения',
-                            ),
-                            SizedBox(height: 16),
-                            DeckKeyValue(
-                              label: '02 · На сервере',
-                              value: 'Изменений нет',
-                            ),
-                            SizedBox(height: 16),
-                            DeckKeyValue(
-                              label: '03 · Проверка',
-                              value: 'Локальная служба проверит активные и неподтверждённые операции перед удалением',
-                            ),
-                          ],
+                        title: 'Последствия',
+                        child: ServerFactRows(
+                          facts: {
+                            'Будет удалено': 'Локальный профиль, ссылки и сохранённые наблюдения',
+                            'На сервере': 'Изменений нет',
+                            'Проверка': 'Локальная служба проверит активные и неподтверждённые операции перед удалением',
+                          },
                         ),
                       ),
-                      const SizedBox(height: 20),
                       if (widget.model.error case final code?) ...[
                         const SizedBox(height: BrandSpacing.space16),
                         ReadErrorView(

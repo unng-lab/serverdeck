@@ -2,12 +2,142 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/servers/server_compositions.dart';
 import 'package:serverdeck/servers/server_sections.dart';
+import 'package:serverdeck/theme/brand_assets.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 
 import '../support/design_host.dart' show loadDesignFonts;
 import '../support/design_server_fixtures.dart';
 
 void main() {
+  for (final width in [
+    1100.0,
+    800.0,
+    390.0,
+    360.0,
+    960.0,
+    961.0,
+    520.0,
+    521.0,
+  ]) {
+    for (final dark in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('T226 resource value faces and units $width $dark $scale', (
+          tester,
+        ) async {
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          for (final mode in ['percent', 'bytes', 'unknown']) {
+            final value = <String, Object?>{
+              'cpuPercent': 25,
+              'memory': <String, Object?>{'usedPercent': 50},
+              'rootDisk': <String, Object?>{'usedPercent': 75},
+            };
+            if (mode == 'bytes') {
+              (value['memory'] as Map<String, Object?>).addAll(
+                <String, Object?>{
+                  'usedBytes': 8 * 1073741824,
+                  'totalBytes': 16 * 1073741824,
+                },
+              );
+            }
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: dark ? BrandTheme.dark : BrandTheme.light,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!,
+                ),
+                home: Scaffold(
+                  body: SingleChildScrollView(
+                    child: ServerResourceCards(
+                      state: mode == 'unknown'
+                          ? null
+                          : {
+                              'metrics': {'value': value},
+                              'history': <Object?>[],
+                            },
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final metrics = find.byWidgetPredicate(
+              (w) =>
+                  w is Text && w.textSpan != null && w.semanticsLabel != null,
+            );
+            expect(metrics, findsNWidgets(3));
+            for (final element in metrics.evaluate()) {
+              final text = element.widget as Text;
+              final size = width <= 520 || width > 960 ? 26.0 : 24.0;
+              final line = width <= 520 ? 34.0 : 32.0;
+              expect(text.style!.fontFamily, BrandAssets.semiboldFamily);
+              expect(text.style!.fontWeight, BrandTypography.semiboldWeight);
+              expect(
+                text.style!.fontVariations,
+                BrandTypography.semiboldVariations,
+              );
+              expect(text.style!.fontSize, size);
+              expect(text.style!.height, closeTo(line / size, .0001));
+              final span = text.textSpan! as TextSpan;
+              if (mode == 'unknown') {
+                expect(text.semanticsLabel, '—');
+                expect(span.children, isEmpty);
+              } else {
+                final unit = span.children!.last as TextSpan;
+                expect(unit.style!.fontFamily, BrandTypography.body.fontFamily);
+                expect(unit.style!.fontWeight, FontWeight.w400);
+                expect(unit.style!.fontSize, 12);
+                expect(unit.style!.height, closeTo(20 / 12, .0001));
+                expect(unit.style!.letterSpacing, 0);
+                expect(
+                  unit.style!.color,
+                  (dark ? BrandColors.dark : BrandColors.light)['muted'],
+                );
+                final gap = find.descendant(
+                  of: find.byWidget(text),
+                  matching: find.byWidgetPredicate(
+                    (w) => w is SizedBox && w.width == 4,
+                  ),
+                );
+                expect(gap, findsOneWidget);
+                expect(tester.getSize(gap).width, 4);
+              }
+            }
+            if (mode != 'unknown') {
+              expect(
+                find.byWidgetPredicate(
+                  (w) => w is Text && w.semanticsLabel == '25 %',
+                ),
+                findsOneWidget,
+              );
+              expect(
+                find.byWidgetPredicate(
+                  (w) => w is Text && w.semanticsLabel == '75 %',
+                ),
+                findsOneWidget,
+              );
+              expect(
+                find.byWidgetPredicate(
+                  (w) =>
+                      w is Text &&
+                      w.semanticsLabel ==
+                          (mode == 'bytes' ? '8,0 / 16,0 ГБ' : '50 %'),
+                ),
+                findsOneWidget,
+              );
+            }
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
+  }
+
   setUpAll(loadDesignFonts);
   for (final height in [166.0, 35.0]) {
     for (final field in [

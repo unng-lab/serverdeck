@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../theme/brand_assets.dart';
 import '../theme/brand_theme.dart';
@@ -8,6 +9,9 @@ import 'deck_control_target.dart';
 
 BrandColors deckColors(BuildContext context) =>
     Theme.of(context).extension<BrandColors>()!;
+
+double deckSectionGap(BuildContext context) =>
+    MediaQuery.sizeOf(context).width <= 520 ? 16 : 20;
 
 /// Read-only presentation insets belong to page scroll content, not its viewport.
 class DeckPageInsets extends InheritedWidget {
@@ -36,12 +40,14 @@ class DeckPage extends StatelessWidget {
     this.eyebrow,
     this.contextBar,
     this.actions = const [],
+    this.actionsMaxWidth = 300,
     required this.child,
   });
   final String title;
   final String? description, eyebrow;
   final Widget? contextBar;
   final List<Widget> actions;
+  final double actionsMaxWidth;
   final Widget child;
 
   @override
@@ -57,7 +63,6 @@ class DeckPage extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final phone = MediaQuery.sizeOf(context).width <= 520;
-                  final desktop = MediaQuery.sizeOf(context).width > 1060;
                   final heading = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -107,39 +112,12 @@ class DeckPage extends StatelessWidget {
                     controlInset: phone ? 0 : 4,
                     children: actions,
                   );
-                  return MediaQuery.sizeOf(context).width > 700
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: heading),
-                            if (actions.isNotEmpty) ...[
-                              const SizedBox(width: 16),
-                              DeckHitOverflow(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: DeckHitOverflow(
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth: desktop
-                                            ? 300
-                                            : constraints.maxWidth - 266,
-                                      ),
-                                      child: IntrinsicWidth(child: buttons),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            heading,
-                            SizedBox(height: phone ? 14 : 12),
-                            if (actions.isNotEmpty) buttons,
-                          ],
-                        );
+                  return _PageHeader(
+                    viewportWidth: MediaQuery.sizeOf(context).width,
+                    actionsMaxWidth: actionsMaxWidth,
+                    heading: heading,
+                    actions: buttons,
+                  );
                 },
               ),
             ),
@@ -171,6 +149,125 @@ class _DeckContentStorageState extends State<_DeckContentStorage> {
   @override
   Widget build(BuildContext context) =>
       PageStorage(bucket: _bucket, child: widget.builder(_actionsKey));
+}
+
+/// The two native children implement the source's wrapping flex header. Layout
+/// measures the actual controls; labels and callbacks remain in their widgets.
+class _PageHeader extends MultiChildRenderObjectWidget {
+  _PageHeader({
+    required this.viewportWidth,
+    required this.actionsMaxWidth,
+    required Widget heading,
+    required Widget actions,
+  }) : super(children: [heading, actions]);
+  final double viewportWidth;
+  final double actionsMaxWidth;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderPageHeader(viewportWidth, actionsMaxWidth);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderPageHeader renderObject,
+  ) {
+    if (renderObject.viewportWidth != viewportWidth ||
+        renderObject.actionsMaxWidth != actionsMaxWidth) {
+      renderObject.viewportWidth = viewportWidth;
+      renderObject.actionsMaxWidth = actionsMaxWidth;
+      renderObject.markNeedsLayout();
+    }
+  }
+}
+
+class _PageHeaderData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderPageHeader extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _PageHeaderData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _PageHeaderData> {
+  _RenderPageHeader(this.viewportWidth, this.actionsMaxWidth);
+  double viewportWidth;
+  double actionsMaxWidth;
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _PageHeaderData) {
+      child.parentData = _PageHeaderData();
+    }
+  }
+
+  Size _layout(BoxConstraints constraints, {required bool dry}) {
+    final heading = firstChild!, actions = lastChild!;
+    final width = constraints.maxWidth;
+    final gap = viewportWidth <= 520
+        ? 14.0
+        : viewportWidth <= 960
+        ? 12.0
+        : 16.0;
+    Size measure(RenderBox child, BoxConstraints limits) {
+      if (dry) return child.getDryLayout(limits);
+      child.layout(limits, parentUsesSize: true);
+      return child.size;
+    }
+
+    final actionLimit = viewportWidth > 960 && width > actionsMaxWidth
+        ? actionsMaxWidth
+        : width;
+    final preferred = actions.getMaxIntrinsicWidth(double.infinity);
+    final actionWidth = viewportWidth <= 700
+        ? width
+        : preferred < actionLimit
+        ? preferred
+        : actionLimit;
+    final actionSize = measure(
+      actions,
+      BoxConstraints.tightFor(width: actionWidth),
+    );
+    final inline = viewportWidth > 700 && 250 + gap + actionSize.width <= width;
+    final headingSize = measure(
+      heading,
+      BoxConstraints.tightFor(
+        width: inline ? width - actionSize.width - gap : width,
+      ),
+    );
+    final actionTop =
+        (inline ? 0.0 : headingSize.height + gap) +
+        (viewportWidth > 700 ? 2.0 : 0.0);
+    if (!dry) {
+      (heading.parentData! as ContainerBoxParentData<RenderBox>).offset =
+          Offset.zero;
+      (actions.parentData! as ContainerBoxParentData<RenderBox>).offset =
+          Offset(inline ? width - actionSize.width : 0, actionTop);
+    }
+    final bottom = actionTop + actionSize.height;
+    return constraints.constrain(
+      Size(width, headingSize.height > bottom ? headingSize.height : bottom),
+    );
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) =>
+      _layout(constraints, dry: true);
+
+  @override
+  void performLayout() => size = _layout(constraints, dry: false);
+
+  @override
+  void paint(PaintingContext context, Offset offset) =>
+      defaultPaint(context, offset);
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      defaultHitTestChildren(result, position: position);
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    if (!hitTestChildren(result, position: position)) return false;
+    result.add(BoxHitTestEntry(this, position));
+    return true;
+  }
 }
 
 class DeckPanel extends StatelessWidget {
@@ -212,39 +309,43 @@ class DeckPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: colors['border'])),
                 ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title!,
-                          style: BrandTypography.body.copyWith(
-                            fontFamily: BrandAssets.semiboldFamily,
-                            fontWeight: BrandTypography.semiboldWeight,
-                            fontVariations: BrandTypography.semiboldVariations,
-                            height: phone ? 22 / 14 : 20 / 14,
-                          ),
-                        ),
-                        if (description != null) ...[
-                          const SizedBox(height: 3),
+                child: DeckHitOverflow(
+                  outset: 12,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            description!,
-                            style: BrandTypography.caption.copyWith(
-                              height: phone ? 20 / 12 : 18 / 12,
-                              color: colors['muted'],
+                            title!,
+                            style: BrandTypography.body.copyWith(
+                              fontFamily: BrandAssets.semiboldFamily,
+                              fontWeight: BrandTypography.semiboldWeight,
+                              fontVariations:
+                                  BrandTypography.semiboldVariations,
+                              height: phone ? 22 / 14 : 20 / 14,
                             ),
                           ),
+                          if (description != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              description!,
+                              style: BrandTypography.caption.copyWith(
+                                height: phone ? 20 / 12 : 18 / 12,
+                                color: colors['muted'],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    if (trailing != null) trailing!,
-                  ],
+                      ),
+                      if (trailing != null) trailing!,
+                    ],
+                  ),
                 ),
               ),
             Padding(

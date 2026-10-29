@@ -384,7 +384,7 @@ void main() {
               // The canonical two-column value may exceed one viewport at200%.
               // Both ends remain reachable in the dialog's page scroll.
               if (rect.height <= size.height - 80) {
-                expect(rect.top, greaterThanOrEqualTo(0));
+                expect(rect.top, greaterThanOrEqualTo(-1e-9));
                 expect(rect.bottom, lessThanOrEqualTo(size.height));
               } else {
                 expect(

@@ -265,73 +265,34 @@ class ProfileEditorFrame extends StatelessWidget {
       ),
     );
     if (plan) {
-      final left = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          child,
-          if (target != null) ...[
-            const SizedBox(height: 20),
-            DeckPanel(title: 'Полные сведения', child: target!),
-          ],
-        ],
-      );
-      final next = DeckPanel(
-        title: 'Следующее действие',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Убедитесь, что выбран правильный объект и последствия понятны.',
-            ),
-            const SizedBox(height: 16),
-            if (actionReview != null)
-              Material(type: MaterialType.transparency, child: actionReview!),
-            const SizedBox(height: 16),
-            for (final action in actions) ...[
-              action,
-              const SizedBox(height: 8),
-            ],
-          ],
-        ),
-      );
-      final columns = LayoutBuilder(
-        builder: (context, constraints) {
-          final wide =
-              MediaQuery.sizeOf(context).width > 760 &&
-              MediaQuery.textScalerOf(context).scale(14) < 22;
-          final available = constraints.maxWidth - (wide ? 20 : 0);
-          return Flex(
-            direction: wide ? Axis.horizontal : Axis.vertical,
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: wide ? available * 165 / 265 : available,
-                child: left,
-              ),
-              SizedBox(width: wide ? 20 : 0, height: wide ? 0 : 20),
-              SizedBox(
-                width: wide ? available * 100 / 265 : available,
-                child: next,
-              ),
-            ],
-          );
-        },
-      );
       final body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (planNotice != null) ...[planNotice!, const SizedBox(height: 20)],
-          columns,
+          if (planNotice != null) ...[
+            planNotice!,
+            SizedBox(height: deckSectionGap(context)),
+          ],
+          if (target != null) ...[
+            DeckPanel(title: 'Параметры и условия', child: target!),
+            SizedBox(height: deckSectionGap(context)),
+          ],
+          child,
+          SizedBox(height: deckSectionGap(context)),
+          if (actionReview != null) ...[
+            Material(type: MaterialType.transparency, child: actionReview!),
+            const SizedBox(height: 12),
+          ],
+          DeckActions(children: actions),
         ],
       );
-      if (asPage)
+      if (asPage) {
         return DeckPage(
           title: title,
           description: description,
           eyebrow: 'Серверы / РАБОЧЕЕ ПРОСТРАНСТВО',
           child: body,
         );
+      }
       return DeckDialogLayout(title: title, maxWidth: 1000, child: body);
     }
     final helper = DeckPanel(

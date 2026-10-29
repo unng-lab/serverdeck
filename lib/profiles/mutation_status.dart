@@ -21,6 +21,7 @@ class MutationStatus extends StatelessWidget {
     this.onReadCommitted,
     this.asPage = false,
   }) : _reviewBody = false,
+       _onClose = null,
        _targetCaption = null;
 
   const MutationStatus.review({
@@ -32,8 +33,10 @@ class MutationStatus extends StatelessWidget {
     this.reloading = false,
     this.readPending = false,
     this.onReadCommitted,
+    VoidCallback? onClose,
     String? targetCaption,
   }) : _targetCaption = targetCaption,
+       _onClose = onClose,
        asPage = true,
        _reviewBody = true;
   final MutationController controller;
@@ -43,6 +46,7 @@ class MutationStatus extends StatelessWidget {
   final bool settings;
   final bool _reviewBody;
   final String? _targetCaption;
+  final VoidCallback? _onClose;
   final bool reloading;
   final bool readPending;
   final VoidCallback? onReadCommitted;
@@ -57,7 +61,11 @@ class MutationStatus extends StatelessWidget {
       );
     }
     final state = controller.state;
-    if (state == MutationPresentation.idle) return const SizedBox.shrink();
+    if (state == MutationPresentation.idle) {
+      return _reviewBody && _onClose != null
+          ? DeckActions(children: [_closeAction()])
+          : const SizedBox.shrink();
+    }
     final label = switch (state) {
       MutationPresentation.submitting => deleting ? 'Удаление' : 'Сохранение',
       MutationPresentation.unknown =>
@@ -190,7 +198,10 @@ class MutationStatus extends StatelessWidget {
                     ),
                 ],
               ),
-              actions: _reviewActions(state),
+              actions: [
+                ..._reviewActions(state),
+                if (_onClose != null) _closeAction(),
+              ],
             ),
           ],
         ),
@@ -372,44 +383,71 @@ class MutationStatus extends StatelessWidget {
     _ => 'Сохранение требует проверки',
   };
 
-  List<Widget> _reviewActions(MutationPresentation state) => [
-    if (!controller.busy && !reloading) ...[
+  List<Widget> _reviewActions(MutationPresentation state) {
+    final actions = <Widget>[];
+    void add(String label, VoidCallback? callback) {
+      actions.add(_action(label, callback, primary: actions.isEmpty));
+    }
+
+    if (!controller.busy && !reloading) {
       if ({
         MutationPresentation.unknown,
         MutationPresentation.waiting,
         MutationPresentation.retryAllowed,
-      }.contains(state))
-        _action('Проверить результат', () => controller.checkResult().ignore()),
-      if (state == MutationPresentation.retryAllowed)
-        _action('Повторить тот же запрос', () => controller.retry().ignore()),
-      if (state == MutationPresentation.committed)
-        _action(
+      }.contains(state)) {
+        add('Проверить результат', () => controller.checkResult().ignore());
+      }
+      if (state == MutationPresentation.retryAllowed) {
+        add('Повторить тот же запрос', () => controller.retry().ignore());
+      }
+      if (state == MutationPresentation.committed) {
+        add(
           'Перечитать состояние',
           readPending
               ? null
               : onReadCommitted ?? () => controller.refreshCommitted().ignore(),
-        ),
-      if (state == MutationPresentation.conflict)
-        _action(
+        );
+      }
+      if (state == MutationPresentation.conflict) {
+        add(
           settings ? 'Перечитать настройки' : 'Перечитать профиль',
           readPending ? null : onReload,
-        ),
-      if (state == MutationPresentation.failed)
-        _action(
+        );
+      }
+      if (state == MutationPresentation.failed) {
+        add(
           deleting ? 'Вернуться к подтверждению' : 'Исправить ввод',
           controller.reset,
-        ),
-    ],
-  ];
+        );
+      }
+    }
+    return actions;
+  }
 
-  Widget _action(String label, VoidCallback? action) => OutlinedButton(
+  Widget _closeAction() => OutlinedButton(
+    key: const ValueKey('mutation-review-close'),
     clipBehavior: Clip.none,
-    style: OutlinedButton.styleFrom(
-      minimumSize: Size(asPage ? 44 : 48, asPage ? 44 : 48),
-    ),
-    onPressed: action,
-    child: Text(label),
+    autofocus: true,
+    onPressed: _onClose,
+    child: const Text('Закрыть'),
   );
+
+  Widget _action(String label, VoidCallback? action, {bool primary = false}) {
+    final minimum = Size(asPage ? 44 : 48, asPage ? 44 : 48);
+    return primary
+        ? FilledButton(
+            clipBehavior: Clip.none,
+            style: FilledButton.styleFrom(minimumSize: minimum),
+            onPressed: action,
+            child: Text(label),
+          )
+        : OutlinedButton(
+            clipBehavior: Clip.none,
+            style: OutlinedButton.styleFrom(minimumSize: minimum),
+            onPressed: action,
+            child: Text(label),
+          );
+  }
 }
 
 class _CloseMutationReview extends Intent {
@@ -452,7 +490,8 @@ class MutationReviewPage extends StatelessWidget {
       },
       child: DeckPage(
         title: 'Сохранение требует проверки',
-        eyebrow: 'Локальное пространство / Рабочее пространство',
+        eyebrow: '${settings ? 'Настройки' : 'Серверы'} / Рабочее пространство',
+        description: 'Состояние и следующие доступные действия',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -464,20 +503,9 @@ class MutationReviewPage extends StatelessWidget {
               reloading: reloading,
               readPending: readPending,
               onReadCommitted: onReadCommitted,
+              onClose: onClose,
               targetCaption: targetCaption,
             ),
-            if (onClose != null) ...[
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton(
-                  clipBehavior: Clip.none,
-                  autofocus: true,
-                  onPressed: onClose,
-                  child: const Text('Закрыть'),
-                ),
-              ),
-            ],
           ],
         ),
       ),

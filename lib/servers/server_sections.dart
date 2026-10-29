@@ -1756,23 +1756,17 @@ class ServerLogRecordDialog extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          SizedBox(height: deckSectionGap(context)),
+          DeckActions(
             children: [
               FilledButton(
                 clipBehavior: Clip.none,
                 onPressed: () => Clipboard.setData(
                   ClipboardData(text: '${record['message']}'),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DeckIcon('copy'),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Скопировать запись')),
-                  ],
+                child: const DeckButtonLabel(
+                  icon: 'copy',
+                  label: 'Скопировать запись',
                 ),
               ),
               OutlinedButton(
@@ -2144,6 +2138,7 @@ class _ServerTrustConfirmationState extends State<ServerTrustConfirmation> {
         : _profile.address;
     return ServerPlanDialog(
       title: 'Подтверждение SSH-ключа',
+      description: 'Проверьте цель, последствия и условия выбранного действия',
       asPage: widget.asPage,
       workspaceBounds: widget.workspaceBounds,
       pageInsets: widget.pageInsets,
@@ -2336,6 +2331,7 @@ class _ServerExecutorConfirmationState
         : _profile.address;
     return ServerPlanDialog(
       title: 'Подготовка исполнителя',
+      description: 'Проверьте цель, последствия и условия выбранного действия',
       asPage: widget.asPage,
       workspaceBounds: widget.workspaceBounds,
       pageInsets: widget.pageInsets,
