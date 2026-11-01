@@ -37,7 +37,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "_WIN32_WINNT=0x0A00")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE delayimp)
 target_link_options(${BINARY_NAME} PRIVATE "/DELAYLOAD:flutter_windows.dll")
-target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" "shell32.lib" "comctl32.lib")
+# The Windows SDK exposes CompareObjectHandles through the OneCore import lib.
+target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" "shell32.lib" "comctl32.lib" "OneCore.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

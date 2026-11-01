@@ -192,38 +192,26 @@ class _ProfileFormState extends State<ProfileForm> {
     String field,
     String label,
     bool enabled,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      // Floating InputDecorator labels elide long instructions at200%. Keep
-      // the whole label visible and associate it with the same keyed input.
-      ExcludeSemantics(
-        child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+  ) => DeckFieldFrame(
+    label: label,
+    child: SubmitOnEnter(
+      enabled: enabled && field != 'tags',
+      child: TextFormField(
+        key: ValueKey('profile-$field'),
+        controller: controller,
+        enabled: enabled,
+        style: Theme.of(context).textTheme.bodyLarge,
+        autofocus: field == 'name',
+        onFieldSubmitted: field == 'tags' ? null : (_) => _save().ignore(),
+        decoration: const InputDecoration(),
+        validator: (value) => _validate(field, value),
+        minLines: field == 'tags' ? 2 : 1,
+        maxLines: field == 'tags' ? 4 : 1,
+        textInputAction: field == 'tags'
+            ? TextInputAction.newline
+            : TextInputAction.done,
       ),
-      const SizedBox(height: BrandSpacing.space8),
-      Semantics(
-        label: label,
-        child: SubmitOnEnter(
-          enabled: enabled && field != 'tags',
-          child: TextFormField(
-            key: ValueKey('profile-$field'),
-            controller: controller,
-            enabled: enabled,
-            // Keep the canonical opaque body style while the draft is locked.
-            style: Theme.of(context).textTheme.bodyLarge,
-            autofocus: field == 'name',
-            onFieldSubmitted: field == 'tags' ? null : (_) => _save().ignore(),
-            decoration: const InputDecoration(),
-            validator: (value) => _validate(field, value),
-            minLines: field == 'tags' ? 2 : 1,
-            maxLines: field == 'tags' ? 4 : 1,
-            textInputAction: field == 'tags'
-                ? TextInputAction.newline
-                : TextInputAction.done,
-          ),
-        ),
-      ),
-    ],
+    ),
   );
 
   @override

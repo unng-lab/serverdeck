@@ -393,8 +393,7 @@ class _PlanSummary extends StatelessWidget {
   final List<ProfileView> serverProfiles;
   final AutomationProfileRecord? automationProfile;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => DeckPlanSummary.content(
     children: [
       AutomationServerTargets(
         serverIds: [if (plan['serverId'] is String) plan['serverId'] as String],
@@ -533,12 +532,14 @@ class AutomationJsonView extends StatelessWidget {
   final Object? value;
 
   @override
-  Widget build(BuildContext context) => ExpansionTile(
-    title: DeckFocusLabel(child: Text(title)),
+  Widget build(BuildContext context) => DeckExpander(
+    title: Text(title),
     tilePadding: EdgeInsets.zero,
     childrenPadding: const EdgeInsets.all(BrandSpacing.space12),
     expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [SelectableText(_pretty(value), style: BrandTypography.log)],
+    children: [
+      DeckCode(label: 'Содержимое', text: _pretty(value), allowCopy: false),
+    ],
   );
 }
 
@@ -550,7 +551,7 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      OutlinedButton(onPressed: onPressed, child: Text(label));
+      DeckButton(onPressed: onPressed, child: Text(label));
 }
 
 class AutomationStatusSection extends StatelessWidget {
@@ -941,15 +942,27 @@ class AutomationProfileDetailSection extends StatelessWidget {
                 children: [
                   if (_rows(_object(comparison!['result'])['changes']).isEmpty)
                     const Text('Изменений в полученном сравнении нет'),
-                  for (final change in _rows(
-                    _object(comparison!['result'])['changes'],
-                  ))
-                    DeckKeyValue(
-                      label: _value(change['path']),
-                      value:
-                          'Было: ${_value(change['before'])}\nСтало: ${_value(change['after'])}',
-                      selectable: true,
-                    ),
+                  DeckDiff(
+                    entries: [
+                      for (final change in _rows(
+                        _object(comparison!['result'])['changes'],
+                      ))
+                        DeckDifference(
+                          label: _value(change['path']),
+                          before: change.containsKey('before')
+                              ? _value(change['before'])
+                              : null,
+                          after: change.containsKey('after')
+                              ? _value(change['after'])
+                              : null,
+                          change: !change.containsKey('before')
+                              ? DeckChange.added
+                              : !change.containsKey('after')
+                              ? DeckChange.removed
+                              : DeckChange.changed,
+                        ),
+                    ],
+                  ),
                   if (_object(comparison!['result'])['truncated'] == true)
                     const DeckStatus(
                       label: 'Сравнение неполное: часть изменений не получена',
@@ -1196,36 +1209,42 @@ class AutomationJobsSection extends StatelessWidget {
               message: 'Заданий на этом сервере пока нет',
               tone: DeckTone.neutral,
             ),
-          for (final row in jobs)
-            Builder(
-              builder: (context) {
-                final entry = _object(row['job']);
-                return DeckSurface(
-                  enabled: actions.select,
-                  selected: job?['id'] == entry['id'],
-                  onTap: () => onSelect(entry['id'] as String),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (jobs.isNotEmpty)
+            DeckCollection<Map<String, Object?>>(
+              rows: jobs.map((row) => _object(row['job'])).toList(),
+              idOf: (row) => row['id'] as String,
+              selectedIds: {if (job?['id'] case final String id) id},
+              columns: [
+                DeckColumn(
+                  id: 'state',
+                  label: 'Состояние',
+                  value: (row) => _jobState(row['state']),
+                  builder: (context, row) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DeckStatus(
-                        label: _jobState(entry['state']),
-                        tone: _jobTone(entry['state']),
+                        label: _jobState(row['state']),
+                        tone: _jobTone(row['state']),
                       ),
-                      ..._jobObservationFields(jobObservations[entry['id']]),
-                      DeckKeyValue(
-                        label: 'Задание',
-                        value: _value(entry['id']),
-                        selectable: true,
-                      ),
-                      if (entry['updatedAt'] != null)
-                        DeckKeyValue(
-                          label: 'Обновлено',
-                          value: _time(entry['updatedAt']),
-                        ),
+                      ..._jobObservationFields(jobObservations[row['id']]),
                     ],
                   ),
-                );
-              },
+                ),
+                DeckColumn(
+                  id: 'id',
+                  label: 'Задание',
+                  value: (row) => _value(row['id']),
+                ),
+                DeckColumn(
+                  id: 'updated',
+                  label: 'Обновлено',
+                  value: (row) =>
+                      row['updatedAt'] == null ? null : _time(row['updatedAt']),
+                ),
+              ],
+              onOpen: actions.select
+                  ? (row) => onSelect(row['id'] as String)
+                  : null,
             ),
           if (hasMore)
             _ActionButton('Ещё задания', actions.read ? onMore : null),

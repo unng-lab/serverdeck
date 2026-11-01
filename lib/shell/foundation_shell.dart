@@ -389,55 +389,23 @@ class _FoundationShellState extends State<FoundationShell> {
             Expanded(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: contentPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ConstrainedBox(
-                      key: const ValueKey('foundation-page-context'),
-                      constraints: BoxConstraints(
-                        maxHeight: constraints.maxHeight * .35,
-                      ),
-                      child: DeckBoundedTextView(
-                        text: name != null && address != null
-                            ? '$name · $address'
-                            : null,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                        ),
-                        leading: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                _section.label,
-                                key: const ValueKey('foundation-page-title'),
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            if (ready) ...[
-                              const SizedBox(height: 8),
-                              const DeckStatus(
-                                label: 'Локальная служба готова',
-                                tone: DeckTone.available,
-                              ),
-                              if (name != null && address != null) ...[
-                                const SizedBox(height: 8),
-                              ],
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Focus(
-                        key: const ValueKey('foundation-feature-slot'),
-                        focusNode: _featureFocus,
-                        canRequestFocus: false,
-                        child: _content(),
-                      ),
-                    ),
-                  ],
+                child: DeckPageBody(
+                  title: _section.label,
+                  titleKey: const ValueKey('foundation-page-title'),
+                  contextKey: const ValueKey('foundation-page-context'),
+                  featureKey: const ValueKey('foundation-feature-slot'),
+                  contextHeight: constraints.maxHeight * .35,
+                  target: name != null && address != null
+                      ? '$name · $address'
+                      : null,
+                  status: ready
+                      ? const DeckStatus(
+                          label: 'Локальная служба готова',
+                          tone: DeckTone.available,
+                        )
+                      : null,
+                  focusNode: _featureFocus,
+                  child: _content(),
                 ),
               ),
             ),

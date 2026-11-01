@@ -1,5 +1,15 @@
 # Quickstart: проверка003
 
+## Текущие команды 003.4
+
+Основа — Flutter Material 3 / BrandTheme / Deck; [компоненты и подключение](../../docs/design/components/README.md). `flutter run -d windows -t tool/component_catalog.dart` запускает отдельный каталог без движка. Для диагностического программного рендера в среде без подходящего GPU одновременно передаются `--no-enable-impeller --enable-software-rendering`; один software flag несовместим с Impeller.
+
+Исходники текущего атласа находятся в `docs/design/source/`; собрать — `python tools/build-design-atlas.py`. Проверить references/токены/реестр — `tools/check-design-references.ps1` или `python tools/validate-design.py --json`. Проверить все HTML-композиции — `node tools/test-design-components.cjs`. Flutter regression suite — `flutter test test/widget/components`; полный gate — format/analyze/test и lychee по AGENTS.md.
+
+HTML interactions отдельно проверяет `node tools/test-component-interactions.cjs`: независимые server/job fixtures, sort/null/selection/filter, validation/recovery, JSON copy, дата, consent и меню с клавиатуры. Это проверка автономного дизайна, не native-клиента. После изменения реестра синхронизировать карточки через `python tools/generate-component-metadata.py` и `dart format tool/component_catalog/names.dart`.
+
+Полная отдельная съёмка production-компонентов: `flutter test test/widget/components/capture_test.dart --dart-define=COMPONENT_CAPTURE_DIR=.local/design-003/003.4/<новый-каталог>`. Используется новый непустой подпуть этапа; существующее evidence не перезаписывается. Runner загружает bundled Noto, проверяет все объявленные в реестре состояния × обе темы × четыре frames × 100%/200%, пишет PNG и manifest. Обычный запуск тестов не создаёт файлов. Scope — synthetic presentation, без реальных серверов и native authority. Исторические инструкции ниже относятся к 003.1–003.3; отсутствие старого test/capture tooling в текущем checkout не заменяется вымышленным выполнением этих команд.
+
 Это воспроизводимый validation guide [плана](plan.md), а не отчёт о выполненных проверках. Fixture helpers/tests, отмеченные ниже как новые, создаются задачами реализации. Запускать из корня репозитория; пользовательские профили/серверы не нужны.
 
 ## Prerequisites

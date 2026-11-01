@@ -722,13 +722,7 @@ class ServerLogRecordDialog extends StatelessWidget {
           ),
         ],
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 240),
-        child: DeckBoundedTextView(
-          text: '${record['message']}',
-          style: BrandTypography.log,
-        ),
-      ),
+      child: DeckLogMessage(message: '${record['message']}', height: 240),
       actions: [TextButton(onPressed: onClose, child: const Text('Закрыть'))],
     );
   }
