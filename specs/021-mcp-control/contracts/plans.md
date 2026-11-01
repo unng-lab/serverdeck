@@ -1,5 +1,12 @@
 # Immutable plans and resource observations v1
 
+**Область приложений2026-11-01**: [действующее уточнение](../../006-software-installation/contracts/application-scope.md).
+PostgreSQL/ClickHouse IDs, enum и SQL ниже описывают конкретные APT/DB-рецепты
+и их fixtures, не глобальный каталог приложений. Новый recipe descriptor
+не принимается существующим AST автоматически и не получает MCP delegation.
+Расширение закрытой схемы требует
+явной версии/codec/валидации, arbitrary product string не разрешает исполнение.
+
 ## Direct capsule2: действующий compiled program
 
 Новые SSH-планы используют [direct contract](../../001-service-foundation/contracts/direct-ssh.md),

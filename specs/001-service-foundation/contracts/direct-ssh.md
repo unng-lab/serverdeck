@@ -92,7 +92,8 @@ caller не выбирает пути, shell, аргументы системн�
 Публичные MCP tools/input schemas/scopes сохраняются.
 
 AST format1 и его поддержанные `service`, `config_file`, `install_recipe` шаги
-сохраняются. Сервисные ресурсы: postgresql@16-main.service и
+сохраняются как конкретная ограниченная схема, не глобальный каталог приложений.
+Сервисные ресурсы первых DB-рецептов: postgresql@16-main.service и
 clickhouse-server.service; конфигурационные ресурсы: /etc/motd,
 /etc/postgresql/16/main/conf.d/serverdeck.conf и
 /etc/clickhouse-server/config.d/serverdeck.xml. Renderer задаёт exact bytes;
@@ -147,7 +148,12 @@ host reservation/эффектом. Расхождение — PLAN_STALE/TRUST_C
 
 ## 5. Установка и конфигурация
 
-006 сохраняет две программы: PostgreSQL16 и ClickHouse. Каталог предлагает
+006 устанавливает приложения через поддержанные способы и рецепты.
+[Область приложений](../../006-software-installation/contracts/application-scope.md)
+имеет приоритет над прежним ограничением двумя программами. Дальнейшие APT/DB
+правила относятся к первым конкретным рецептам PostgreSQL16/ClickHouse.
+Другой поддержанный способ использует собственную схему и postchecks;
+эта поправка не добавляет новый способ исполнения. APT-каталог предлагает
 конкретные версии из уже настроенных APT sources, не `latest`. Отсутствующий
 репозиторий/ключ/актуальный signed index даёт недоступность с инструкцией
 администратору; read/plan не добавляют ключи/sources, не запускают apt update.
@@ -427,7 +433,8 @@ lines с LF, первая строка `SDSSH1`, вторая — kind; дале
   immutable record guard lifecycle, не разрешение на overwrite foreign policy.
 - `terminal`: workspaceId, jobId, attemptId, planDigest, hostId, bootIdHash,
   state(succeeded/failed/cancelled), checksDigest.
-- `resource`: hostId, resourceId, product(postgresql16/clickhouse), exact version,
+- `resource` (DB-specific record, не общий реестр приложений): hostId, resourceId,
+  product(postgresql16/clickhouse), exact version,
   recipeDigest, registryDigest, compilerDigest, installAttemptId, installStepId,
   installStepDigest, lastConfigAttemptId, lastConfigStepId, unitParentDigest,
   managedFileDigest. ResourceId входит в fixed5-name catalog; DB records не

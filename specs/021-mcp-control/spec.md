@@ -1,5 +1,9 @@
 # Feature Specification: MCP и делегируемые профили автоматизации
 
+**Область приложений2026-11-01**: ServerDeck устанавливает приложения
+по совместимым способам и рецептам; PostgreSQL/ClickHouse — первые APT-примеры
+и тестовые цели, не закрытый каталог продукта. [Действующая граница](../006-software-installation/contracts/application-scope.md).
+
 ## Поправка 2026-11-01 — прямое SSH-выполнение
 
 Для исполнения действуют [FR-SSH-001–015 и AC-SSH-01–11](../001-service-foundation/spec.md)

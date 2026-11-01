@@ -1,5 +1,9 @@
 # Трассировка сервиса и его расширений
 
+**Область приложений2026-11-01**: ServerDeck устанавливает приложения
+по совместимым способам и рецептам; PostgreSQL/ClickHouse — первые APT-примеры
+и тестовые цели, не закрытый каталог продукта. [Действующая граница](006-software-installation/contracts/application-scope.md).
+
 **Direct SSH amendment 2026-11-01**: [действующий контракт](001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
 
 **Уточнение2026-10-30, без обратной совместимости**: действующий
@@ -314,3 +318,9 @@ Native/integration/manual/SSH/container gates не запускаются в т�
 static/unit/widget, без заявления native/platform qualification. [Matrix](001-service-foundation/contracts/embedded-platforms.md)
 отделяет первый Windows этап от будущих Linux/macOS/mobile/Web. Backend не обязательный.
 003 и его поставка не меняются этой подготовкой; прежняя история задач сохраняется.
+
+## Уточнение общей установки приложений2026-11-01
+
+FR-006-APP-01–03 → [область приложений](006-software-installation/contracts/application-scope.md) →
+[Plan006](006-software-installation/plan.md), T026–T028 → AC-APP-01–04.
+Конкретные DB recipes проверяются отдельно и не ограничивают продуктовый каталог.

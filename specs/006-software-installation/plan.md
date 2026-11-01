@@ -1,20 +1,33 @@
 # План006 — чистая установка напрямую по SSH
 
+## Область приложений
+
+[FR-006-APP-01–03 / AC-APP-01–04](contracts/application-scope.md) имеют приоритет
+над ограничением каталогом двух БД. APT DB-specific enum/ресурсы остаются только
+в схемах конкретных рецептов, не являются глобальным enum приложений.
+Каталог проверяет совместимость и наличие зарегистрированного рецепта;
+имя продукта используется для отображения. Новый рецепт подключается через
+те же catalog/compiler/job owners с собственной проверенной схемой/ресурсами/
+postchecks, без обхода текущих decoder/authority gates. Новый способ установки
+требует своего контракта до реализации и не входит в эту документальную поправку.
+T026–T028 связывают уточнение с приёмкой существующей APT-ветки T001–T008.
+Готовность независимого способа не требует квалификации обеих БД.
+
 **Дата**: 2026-11-01. [Спецификация](spec.md), [общий план001](../001-service-foundation/plan.md),
 [контракт](../001-service-foundation/contracts/direct-ssh.md), [задачи](tasks.md).
 
-## Summary и Technical Context
+## Summary и Technical Context APT-ветки
 
-Flutter/Dart engine компилирует supported recipes PostgreSQL16/ClickHouse в
+Flutter/Dart engine компилирует поддержанные рецепты приложений в
 ограниченные direct SSH-команды. Используются существующие dartssh2/crypto/Isar
 и host stock tools; server executor, Python/Ansible и standalone installer удаляются.
 Target Ubuntu24.04 amd64/systemd, root/noninteractive sudo, APT metadata/sources
 заранее подготовлены администратором. Отдельный backend не нужен.
 
-## Ответственность и решения
+## Ответственность и решения APT-ветки
 
-006 владеет recipe descriptor, installation prechecks/effects/postchecks и обоими
-продуктами. 001 владеет transport/locking/receipts/recovery;021 — MCP/grants/AST.
+006 владеет recipe descriptor и installation prechecks/effects/postchecks.
+PostgreSQL16/ClickHouse — первые конкретные APT-рецепты. 001 владеет transport/locking/receipts/recovery;021 — MCP/grants/AST.
 Нового хранилища, очереди, SSH pool или пути UI→SSH не создаётся.
 
 В engine `remote/direct_ssh_catalog.dart` каталог строится read-only из exact
@@ -43,10 +56,10 @@ initial settings и bounds заданы общим контрактом. Postgre
 ClickHouse — совпадающих exact vendor versions server/client/common-static и
 SSE4.2. Пакеты должны принадлежать supported recipe shape; неподтверждённый
 candidate показывается недоступным, а не квалифицированным только по наличию в APT.
-Factual checks обязательны для обеих программ. Unit fixtures доказывают код
+Factual checks обязательны для выбранного рецепта; SQL — для DB-примеров. Unit fixtures доказывают код
 выбора/проверки, а не квалификацию реального пакета или release.
 
-## Этапы и зависимости
+## Этапы и зависимости APT-ветки
 
 1. Catalog/descriptor/preflight: после typed transport и direct identity001.
 2. Install/native-lock gate/config/SQL checks: после host reservation/step001.
@@ -56,7 +69,9 @@ Factual checks обязательны для обеих программ. Unit f
 
 Применяются все8принципов4.4.0 без исключений. Static/unit only; commands,
 fake byte port, compiler, exact pins, signing/lock failures, SQL/settings,
-NetBird/neighbor preservation и lost ACK обеих программ проверяются раздельно.
+NetBird/neighbor preservation и lost ACK проверяются по выбранному рецепту;
+обе DB fixtures сохраняются для первых APT-рецептов; независимый поддержанный
+способ проверяется отдельно по своему контракту.
 Full checks/links/independent review — по001. Реальный SSH/APT/systemd не запускать.
 
 ## UI-компоненты и приёмка (003.4)

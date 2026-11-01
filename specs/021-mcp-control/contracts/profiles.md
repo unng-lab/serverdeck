@@ -1,5 +1,12 @@
 # Authorable profiles v1
 
+**Область приложений2026-11-01**: [действующее уточнение](../../006-software-installation/contracts/application-scope.md).
+PostgreSQL/ClickHouse IDs, enum и SQL ниже описывают конкретные APT/DB-рецепты
+и их fixtures, не глобальный каталог приложений. Новый recipe descriptor
+не принимается существующим AST автоматически и не получает MCP delegation.
+Расширение закрытой схемы требует
+явной версии/codec/валидации, arbitrary product string не разрешает исполнение.
+
 **Direct SSH amendment 2026-11-01**: [действующий контракт](../../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
 
 **Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).

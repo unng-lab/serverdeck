@@ -1,5 +1,10 @@
 # Задачи006 — переход на прямой SSH
 
+**Уточнение области приложений2026-11-01**: [FR-006-APP-01–03 / AC-APP-01–04](contracts/application-scope.md).
+T001–T008 используют PostgreSQL16/ClickHouse как первые конкретные APT-рецепты
+и fixtures, а не закрытый каталог продукта. Их DB-specific checks не применяются
+к другим приложениям. История и номера задач сохраняются.
+
 **Дата**: 2026-11-01. [План](plan.md), [спецификация](spec.md),
 [общие задачи001](../001-service-foundation/tasks.md).
 Новые задачи не объявляют старые рецепты или реальные установки принятыми.
@@ -31,8 +36,8 @@ T001 → T002 → T003 → T004 → T005 → T006 → T007 → T008.
 Основной controller/transport/host state machine001 — обязательная зависимость,
 не дублирующая реализация. Независимые unit data tables обоих продуктов могут
 проверяться параллельно в одном suite; одни source files меняются последовательно.
-MVP — read-only каталог/blocked reasons без изменения сервера; выпуск всей
-поправки требует обоих продуктов, проверки failure paths и completed review.
+MVP — read-only каталог/blocked reasons без изменения сервера; выпуск конкретного способа установки требует его normal/failure checks и
+completed review; обе БД не являются общим gate независимых рецептов.
 
 ## UI-компоненты и приёмка (003.4)
 
@@ -43,3 +48,9 @@ MVP — read-only каталог/blocked reasons без изменения се�
 - [ ] T024 Проверить предметные normal/failure/boundary пути и применимые UI gates 003; записать commands/scope/evidence и N/A, пройти обязательный independent review/fix loop. При unit-only gate UI/native evidence оставить явно pending до отдельной квалификации. После T023; AC-UI-006-02,03.
 
 - [x] T025 Уточнить UI-поправку 006 по send/result proof: disconnect до возможной отправки не означает unknown, после possible send без correlated result — unknown, доказанный terminal сохраняется. Три случая закреплены в AC-UI-006-02; actual UI assertions остаются будущей T024. Исправление [review round1](../003-design-system/reviews/2026-11-01-feature-ui-adoption-round1.md), без изменения direct-SSH контракта.
+
+## Общая установка приложений — уточнение2026-11-01
+
+- [x] T026 Убрать product-name ограничения из общих FR/AC/плана/контрактов и трассировки; закрепить product-specific DB schemas как конкретные рецепты и fixtures. FR-006-APP-01–03 → `contracts/application-scope.md` → AC-APP-01–04. Это только изменение документов, без заявления о runtime acceptance.
+- [ ] T027 Расширить unit cases T001/T004 в `packages/serverdeck_engine/test/remote/direct_ssh_catalog_test.dart` и `direct_ssh_install_test.dart`: admission по совместимости/зарегистрированному descriptor, отображение имени из данных рецепта, отдельные pins/ресурсы экземпляров, unsupported recipe до write; обязательный DB SQL failure не даёт success. Общий pipeline не содержит product-name whitelist вне конкретных adapter/schema. Зависит от T002/T003/T006; FR-006-APP-01–03, AC-APP-01–04. PostgreSQL16/ClickHouse остаются первыми конкретными fixtures.
+- [ ] T028 Проверить по T027 catalog/compiler/install/registry путь в рамках T001–T008: специальные проверки принадлежат конкретному recipe, identity и closed schemas не обходятся ради нового имени. Пройти mandatory checks и независимое review/fix loop, записать реальные evidence без заявления native qualification. Зависит от T007/T027; FR-006-APP-01–03, AC-APP-01–04.

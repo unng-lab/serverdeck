@@ -1,5 +1,10 @@
 # Feature Specification: Регистрация существующего ПО
 
+**Область приложений2026-11-01**: [общая граница](../006-software-installation/contracts/application-scope.md).
+PostgreSQL/ClickHouse ниже — первые конкретные inspection adapters и тестовые
+сценарии, не продуктовый whitelist. Unknown adapter не даёт автоматической
+регистрации. Собственные Plan/Tasks007 по-прежнему обязательны до реализации.
+
 **Direct SSH amendment 2026-11-01**: [действующий контракт](../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
 
 **Feature**: `007-software-adoption`
@@ -93,10 +98,10 @@
 ### Functional Requirements
 
 - **FR-048**: Регистрация читает существующую установку и сохраняет локальную связь. Остановленная служба не запускается ради проверки; недостаток доказательств объясняется отдельно.
-- **FR-007-LOCAL-01**: Исходная регистрация поддерживает package-managed PostgreSQL 18 с одним стандартным main cluster, local port 5432; ClickHouse 25.6+ с local port 9000 и стандартным data directory; Ubuntu 24.04 amd64/systemd. Actual patch version сохраняется без принудительного совпадения с fresh-install pin.
+- **FR-007-LOCAL-01**: Регистрация приложений определяется поддержанным inspection adapter и согласованными доказательствами package/binary/service/version, без whitelist названий. Первые конкретные сценарии реализации и приёмки: package-managed PostgreSQL 16 с одним стандартным main cluster, local port 5432; ClickHouse 25.6+ с local port 9000 и стандартным data directory; Ubuntu 24.04 amd64/systemd. Actual patch version сохраняется без принудительного совпадения с fresh-install pin.
 - **FR-007-LOCAL-02**: Inspection использует ограниченные read actions и уже подтверждённый SSH-доступ. Installer/helper не требуется; установка, изменение прав, запуск остановленной службы и repair запрещены. SQL metadata read может породить обычные server logs.
 - **FR-007-LOCAL-03**: Доказательства package/binary/service должны согласоваться. Running service требует подтверждённой SQL server version; stopped допускает регистрацию как stopped с SQL skipped. Denied SQL не превращается в здоровое состояние.
-- **FR-007-LOCAL-04**: Несколько PostgreSQL clusters, неоднозначный экземпляр, custom endpoint либо incomplete package state отклонены с причиной. Система не выбирает первый подходящий экземпляр.
+- **FR-007-LOCAL-04**: Неоднозначный экземпляр, endpoint вне контракта выбранного adapter либо incomplete package state отклонены с причиной. В первом PostgreSQL-примере несколько clusters не поддержаны. Система не выбирает первый подходящий экземпляр.
 - **FR-007-LOCAL-05**: Review действует пять минут, привязан к connection fields, fingerprint, credential revision и installation identity. Перед save повторяется inspection, сравнение и атомарное создание связи.
 - **FR-007-LOCAL-06**: Одна связь на profile/program, повтор review confirmation идемпотентен. Active/unknown physical-host writer либо конкурентное изменение доступа блокируют регистрацию.
 - **FR-007-LOCAL-07**: Registry хранится независимо от inventory; failure recheck сохраняет original identity/error. Инвентарь stale после пяти минут; старое состояние не подменяет current health.
