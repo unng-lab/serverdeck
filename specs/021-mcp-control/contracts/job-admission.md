@@ -1,5 +1,11 @@
 # Native durable job admission — 021
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 Extends [records](records.md), [plans](plans.md),
 [automation authority](automation-authority.md) and [executor](executor.md).
 
@@ -163,3 +169,31 @@ Owner plan/job routes, desired/drift read projections, UI activation and qualifi
 installation recipe/runtime completion remain required functionality. The new
 driver and these metadata services still require final native/remote/integration
 checks and independent review after the whole feature is implemented.
+
+
+## Bounded control continuation after readback — T391
+
+A stable cancel/reconcile ACK remains durable intent only. After new mutation or
+verified replay, the service registers its private current-actor continuation
+under the same local control metadata mutex. There is no lost boolean _drive
+refusal while an older driver physically drains: one completion wakeup activates
+the pending current ticket only after positive native/session cleanup.
+
+Each explicit control invocation has its original30s monotonic budget, including
+queue/drain wait, and can coalesce/replace a pending same-kind ticket. An explicit
+same-ID retry may create fresh currently authorized observation interest; it does
+not change the permanent receipt or apply/attempt identity. Polling does not.
+Before root dispatch, revalidate current actor/receipt/target/enrollment/deadline.
+If a prior observer ended unknown, existing publishTrustedJobProgress/CAS may
+rearm reconciling/outcome null for the already accepted explicit intent, with no
+new receipt or execution authority. This does not change pure receipt readback
+into a new admission or weaken transaction-entry checks for mutations.
+
+Cancel and reconcile retain separate actors. Cancel delivers the canonical stop
+intent and at most one status, preserving unknown/reconciling until explicit
+stopped reconciliation where required by the graph. Reconcile cannot send stop
+or step authority and ends unknown when proof remains incomplete. Suspend/close
+retires pending work without implicit root actions; resume/reopen restores none.
+See001 embedded-engine's Accepted job control handoff for mutex/slot bounds,
+coalescing/fairness, physical ownership and concrete acceptance. All prior
+T386/T390 correlation, terminal/check/sequence/CAS requirements continue to apply.

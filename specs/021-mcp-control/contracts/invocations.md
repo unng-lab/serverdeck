@@ -1,5 +1,11 @@
 # Native MCP invocation composition — 021 API1.1
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Protocol](mcp.md), [handshake](handshake.md), [plan](../plan.md), [tasks](../tasks.md).
 
 ## Ownership and authority

@@ -1,5 +1,11 @@
 # MCP / Local API extension contract — 021 v1
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Spec](../spec.md), [model](../data-model.md), [profiles](profiles.md), [executor](executor.md).
 
 ## Stdio wire
@@ -91,3 +97,28 @@ Owner delegations.create accepts `profileRevisions:[{profileId:UUID,revision:int
 Owner grants.create/replace validates mode: scopes=[] or [author] requires serverIds=[] and permits empty workspace. Any read/logs/plan/apply scope requires1..250 unique existing server IDs and stated scope dependencies. An author-only client can initialize/list its author tools and create/validate/update/archive profiles before any server exists; servers_list/state/logs/plan/apply denied. No server-target wildcard default.
 
 Wire identity detail: string ID length1..100 is measured in Unicode codepoints. Incoming IDs and outgoing correlation IDs/observed text are preserved verbatim, including canonically equivalent but byte-distinct Unicode. Foundation NFC canonical encoding is used for input/plan digests, not external JSON-RPC serialization. JSON wire rejects unpaired surrogates/non-finite numbers; response encoding respects8MiB and emits one newline-delimited JSON message (embedded text LF escaped). Discovery annotations are hints only, never authorization; remote/untrusted data is conservatively open-world.
+
+
+## Local runtime job observation in successful read data — T384
+
+jobs_get returns its existing job/plan plus observation; each jobs_list item
+retains job/serverId and gains observation. The format3 envelope, generic data
+object schema, all tool names/inputs, durable job document and mutation results
+are unchanged. jobs_events remains durable events only. Exact observation fields:
+`{generation,attemptId,state,lastSequence,observedAt}`; state is
+attached|detached|stale; lastSequence and observedAt are both nullable until a
+verified root status. IDs, UTCms, int64 and lifecycle rules are in the existing
+embedded-host and001 embedded-engine contracts. Same origin/scope/target read
+checks precede projection. There is no caller-supplied observation, new method,
+authority field, optional old-result fallback or observer-triggered mutation.
+
+
+### Cancellation result category — T395
+
+The shared closed business-result allowlist includes CANCELLED for local response
+interest cancellation, as required by [owner automation](owner-automation.md).
+Its retained owner envelope uses boundary local and retry none. This fixed category
+is not remote terminal evidence and never means jobs.cancel, receipt rollback,
+replay permission or stopped children. No arbitrary diagnostic code/text or new
+wire shape/version is accepted. MCP notification cancellation still drops interest
+without synthesizing a remote job outcome.

@@ -6,6 +6,57 @@ import 'codec.dart';
 import 'executor.dart';
 import 'validation.dart';
 
+const executorJobStates = {
+  'queued',
+  'waiting',
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'cancelled-partial',
+  'unknown',
+};
+
+/// Existing reconcile response only; this DTO proves no stopped child or actor.
+final class ExecutorReconcileResult {
+  ExecutorReconcileResult._(
+    this.attemptId,
+    this.state,
+    this.childrenStopped,
+    this.sequence,
+  );
+  factory ExecutorReconcileResult.capture(
+    Map<String, Object?> value, {
+    required String attemptId,
+  }) {
+    final copy = StrictCodec().decode(
+      StrictCodec().encode(value, maxBytes: 4096),
+      maxBytes: 4096,
+    );
+    requireFields(copy, {'attemptId', 'state', 'childrenStopped', 'sequence'});
+    if (copy['attemptId'] != requireUuid(attemptId) ||
+        !executorJobStates.contains(copy['state']) ||
+        copy['childrenStopped'] is! bool)
+      _bad();
+    final sequence = _integer(copy['sequence'], 9223372036854775807);
+    return ExecutorReconcileResult._(
+      attemptId,
+      copy['state'] as String,
+      copy['childrenStopped'] as bool,
+      sequence,
+    );
+  }
+  final String attemptId, state;
+  final bool childrenStopped;
+  final int sequence;
+  Map<String, Object?> toJson() => {
+    'attemptId': attemptId,
+    'state': state,
+    'childrenStopped': childrenStopped,
+    'sequence': sequence,
+  };
+}
+
 /// Structural response capture only. The driver must obtain it from its actual
 /// enrolled root session and check native/current target before publication.
 final class ExecutorJobStatus {
@@ -32,17 +83,7 @@ final class ExecutorJobStatus {
     });
     if (copy['attemptId'] != requireUuid(attemptId)) _bad();
     final state = copy['state'];
-    if (!const {
-      'queued',
-      'waiting',
-      'running',
-      'succeeded',
-      'failed',
-      'cancelled',
-      'cancelled-partial',
-      'unknown',
-    }.contains(state))
-      _bad();
+    if (!executorJobStates.contains(state)) _bad();
     final doc = plan.toJson();
     final effects = (doc['effects'] as List).cast<Map<String, Object?>>();
     final checks = (doc['checks'] as List).cast<Map<String, Object?>>();

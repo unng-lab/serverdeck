@@ -1,6 +1,10 @@
 # Quickstart: обычная проверка и поставка 003.4
 
-Сначала завершить реальный Flutter UI 37 базовых сценариев по [плану](plan.md) и [визуальному контракту](contracts/full-application.md). Остальные 61 экран остаются в [программе 98](../design-delivery.md) у своих функциональных пакетов.
+> Примечание source-preview0.4: ссылки на удалённые fixtures/tools сохранены как
+> permalinks опубликованного commit0.3.0-preview.1. Это исторические свидетельства,
+> а не текущие runtime/test inputs или новая визуальная/native приёмка.
+
+Сначала завершить реальный Flutter UI 37 базовых сценариев по [плану](plan.md) и [визуальному контракту](contracts/full-application.md). Остальные 61 экран остаются в [программе 98](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/specs/design-delivery.md) у своих функциональных пакетов.
 
 Не нужны custom reference readers, JSON binding language, второй валидатор, corpus/schema bundle, source adapter или receipt graph. Обычные widgets используют реальные owners/callbacks; тесты подменяют только внешние зависимости.
 

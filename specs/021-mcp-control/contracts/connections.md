@@ -1,5 +1,11 @@
 # Shared trusted connections — 021
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [MCP](mcp.md), [trust](host-trust.md),
 [transport](ssh-transport.md), [composition](trusted-services.md),
 [foundation acceptance](../../001-service-foundation/spec.md).

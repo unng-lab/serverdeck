@@ -11,6 +11,11 @@ import 'lifecycle.dart';
 /// again before returning data. Cancellation drops read/response interest only;
 /// admitted durable mutations survive this session and remain queryable.
 abstract interface class McpGateway {
+  bool get isClosed;
+  Future<void> get retired;
+
+  /// Fixed protocol responses still require a live application binding.
+  McpInvocation protect(Map<String, Object?> value);
   McpInvocation start(String method, Map<String, Object?> params);
   Future<void> close();
 }
@@ -51,49 +56,17 @@ final class McpServer {
     required Future<void> Function(List<int>) write,
     required McpGateway gateway,
     void Function(String)? diagnostic,
-  }) : this._(
-         input,
-         write,
-         gateway,
-         diagnostic,
-         const Duration(seconds: 30),
-         const Duration(seconds: 5),
-         const Duration(seconds: 35),
-       );
-
-  /// Internal test seam only; no runtime configuration/CLI timeout overrides.
-  McpServer.forTesting({
-    required Stream<List<int>> input,
-    required Future<void> Function(List<int>) write,
-    required McpGateway gateway,
-    void Function(String)? diagnostic,
-    required Duration initializationTimeout,
-    required Duration writeTimeout,
-    required Duration callTimeout,
-  }) : this._(
-         input,
-         write,
-         gateway,
-         diagnostic,
-         initializationTimeout,
-         writeTimeout,
-         callTimeout,
-       );
-
-  McpServer._(
-    this._input,
-    this._write,
-    this._gateway,
-    this._diagnostic,
-    this._initializationTimeout,
-    this._writeTimeout,
-    this._callTimeout,
-  );
+  }) : _input = input,
+       _write = write,
+       _gateway = gateway,
+       _diagnostic = diagnostic;
   final Stream<List<int>> _input;
   final Future<void> Function(List<int>) _write;
   final McpGateway _gateway;
   final void Function(String)? _diagnostic;
-  final Duration _initializationTimeout, _writeTimeout, _callTimeout;
+  final Duration _initializationTimeout = const Duration(seconds: 30);
+  final Duration _writeTimeout = const Duration(seconds: 5);
+  final Duration _callTimeout = const Duration(seconds: 35);
   final _lifecycle = McpLifecycle();
   final _line = Uint8List(mcpMaxRequestBytes);
   final _pending = <Object, _Pending>{};
@@ -108,6 +81,8 @@ final class McpServer {
   Future<int> run() async {
     if (_started) throw StateError('ALREADY_STARTED');
     _started = true;
+    _gateway.retired.then<void>((_) => _stop(2)).ignore();
+    if (_gateway.isClosed) _stop(2);
     final iterator = StreamIterator(_input);
     final initialization = Timer(_initializationTimeout, () {
       _lifecycle.expireInitialization();
@@ -117,7 +92,7 @@ final class McpServer {
       }
     });
     unawaited(_read(iterator));
-    final code = await _done.future;
+    var code = await _done.future;
     initialization.cancel();
     // Detach transport/read interests promptly, including never-completing
     // adapters. Closing a gateway must never cancel an admitted durable job.
@@ -131,16 +106,13 @@ final class McpServer {
       await Future.wait(cancellation).timeout(_writeTimeout);
     } catch (_) {
       _report('CLOSE_FAILED');
+      code = 2;
     }
     return code;
   }
 
   Future<void> _safeClose() async {
-    try {
-      await _gateway.close();
-    } catch (_) {
-      _report('CLOSE_FAILED');
-    }
+    await _gateway.close();
   }
 
   Future<void> _read(StreamIterator<List<int>> iterator) async {
@@ -310,7 +282,7 @@ final class McpServer {
     McpInvocation? publication,
     Map<String, Object?> Function(ErrorCode)? publicationFailure,
   }) async {
-    if (_closed) return;
+    if (_closed || _gateway.isClosed) return;
     if (_queuedWrites >= 32) {
       _report('WRITE_QUEUE_LIMIT');
       _stop(2);
@@ -327,7 +299,8 @@ final class McpServer {
     _queuedWrites++;
     final write = _writeTail
         .then((_) async {
-          if (_closed || (current != null && !current())) return;
+          if (_closed || _gateway.isClosed || (current != null && !current()))
+            return;
           final clock = Stopwatch()..start();
           Duration remaining() {
             final left = _writeTimeout - clock.elapsed;
@@ -350,13 +323,17 @@ final class McpServer {
           try {
             var output = bytes;
             try {
+              publication ??= _gateway.protect(message);
               if (publication != null) {
                 guard = Future<void>.sync(
-                  () => publication.beforePublish?.call(),
+                  () => publication!.beforePublish?.call(),
                 );
                 await guard.timeout(remaining());
-                if (_closed || (current != null && !current())) return;
-                publication.validatePublication?.call();
+                if (_closed ||
+                    _gateway.isClosed ||
+                    (current != null && !current()))
+                  return;
+                publication!.validatePublication?.call();
               }
             } on TimeoutException {
               rethrow;
@@ -364,9 +341,36 @@ final class McpServer {
               final code = error is McpGatewayFailure
                   ? error.code
                   : ErrorCode.internal;
-              output = encodeMcpMessage(publicationFailure!(code));
+              if (_gateway.isClosed) {
+                _stop(2);
+                return;
+              }
+              final fallback =
+                  publicationFailure?.call(code) ??
+                  const McpProtocolException(-32603).response(message['id']);
+              output = encodeMcpMessage(fallback);
+              // No stdout was issued. Release the denied publication only
+              // after its actual guard settles, before acquiring the same gate
+              // for a fixed fallback. A timeout retains old cleanup in finally.
+              if (guard != null) {
+                await guard
+                    .then<void>((_) {}, onError: (Object _) {})
+                    .timeout(remaining());
+              }
+              await cleanup().timeout(remaining());
+              final fixed = _gateway.protect(fallback);
+              publication = fixed;
+              release = null;
+              guard = Future<void>.sync(() => fixed.beforePublish?.call());
+              await guard.timeout(remaining());
+              if (_closed ||
+                  _gateway.isClosed ||
+                  (current != null && !current()))
+                return;
+              fixed.validatePublication?.call();
             }
-            if (_closed || (current != null && !current())) return;
+            if (_closed || _gateway.isClosed || (current != null && !current()))
+              return;
             final budget = remaining();
             // No await between the last authority/identity check and issuance.
             issuedWrite = Future<void>.sync(() => _write([...output, 10]));

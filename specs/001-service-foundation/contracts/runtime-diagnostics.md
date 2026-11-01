@@ -1,5 +1,11 @@
 # UI runtime diagnostics — T230 / T231
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-engine.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [tasks](../tasks.md), [UI](ui-validation.md). Source: Constitution III, FR-123, FR-SVC-016, SC-SVC-004. This contract closes F230's missing runtime design; implementation and acceptance remain T231.
 
 ## Ownership and scope

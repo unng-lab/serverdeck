@@ -1,33 +1,29 @@
 import 'dart:async';
+import 'dart:developer' show Timeline;
 
 import 'package:flutter/foundation.dart';
+import 'package:serverdeck_engine/hosting/worker_controller.dart';
 import 'package:serverdeck_protocol/models.dart';
 
-import 'local_api_client.dart';
+import 'engine_client.dart';
 
-/// Owns startup timing and presentation; platform callbacks own verified launch.
+/// Presents the one worker's startup/readiness. Retry never replaces the worker
+/// or replays a mutation; only a new bound window attachment may be requested.
 class BootstrapController extends ChangeNotifier {
   BootstrapController({
     required this.client,
-    required Future<void> Function() prepare,
-    required Future<void> Function() ensureService,
-    Future<void> Function()? recoverService,
-    Duration Function()? elapsed,
-    Future<void> Function(Duration)? delay,
+    required Future<WorkerStatus> Function() start,
+    int Function()? nowMicros,
     ScheduleDeadline? schedule,
-  }) : _prepare = prepare,
-       _ensureService = ensureService,
-       _recoverService = recoverService,
-       _delay = delay ?? Future<void>.delayed,
+  }) : _start = start,
+       _now = nowMicros ?? (() => Timeline.now),
        _schedule = schedule ?? _timer {
-    _elapsed = elapsed ?? () => _watch.elapsed;
     _connectionStates = client.states.listen((state) {
       if (!_disposed &&
-          state == ClientConnectionState.disconnected &&
-          _state == ReadinessState.ready) {
+          !_workspaceBusy &&
+          state == ClientConnectionState.disconnected) {
         client.stopPolling();
         _show(ReadinessState.unavailable, ErrorCode.serviceUnavailable);
-        retry().ignore();
       }
     });
     _snapshotErrors = client.snapshotErrors.listen((code) {
@@ -35,7 +31,9 @@ class BootstrapController extends ChangeNotifier {
       final state = switch (code) {
         ErrorCode.storageBlocked => ReadinessState.storageBlocked,
         ErrorCode.incompatible => ReadinessState.incompatible,
-        ErrorCode.notReady => ReadinessState.unavailable,
+        ErrorCode.notReady ||
+        ErrorCode.serviceUnavailable ||
+        ErrorCode.unauthorized => ReadinessState.unavailable,
         _ => null,
       };
       if (state != null) {
@@ -44,62 +42,33 @@ class BootstrapController extends ChangeNotifier {
       }
     });
   }
-
-  final LocalApiClient client;
-  final Future<void> Function() _prepare, _ensureService;
-  final Future<void> Function()? _recoverService;
+  final EngineApiClient client;
+  final Future<WorkerStatus> Function() _start;
+  final int Function() _now;
+  final ScheduleDeadline _schedule;
   late final StreamSubscription<ClientConnectionState> _connectionStates;
   late final StreamSubscription<ErrorCode> _snapshotErrors;
-  final Future<void> Function(Duration) _delay;
-  final ScheduleDeadline _schedule;
-  final _watch = Stopwatch()..start();
-  late final Duration Function() _elapsed;
   Future<void>? _attempt;
-  bool _disposed = false;
-  int _notifications = 0;
-  bool _notifierDisposed = false;
+  bool _disposed = false, _notifierDisposed = false;
+  int _notifications = 0, _readinessEpoch = 0;
   ReadinessState _state = ReadinessState.unavailable;
-  int _readinessEpoch = 0;
   ErrorCode? _reason;
   String? _workspaceId;
+  bool _workspaceBusy = false;
+  bool get workspaceBusy => _workspaceBusy;
   ReadinessState get state => _state;
-
-  /// Changes before notifying listeners, including nested readiness cycles.
   int get readinessEpoch => _readinessEpoch;
   ErrorCode? get reason => _reason;
   String? get workspaceId => _workspaceId;
   bool get retryInProgress => _attempt != null;
-
-  static CancelDeadline _timer(Duration duration, void Function() action) {
-    final timer = Timer(duration, action);
+  static CancelDeadline _timer(Duration d, void Function() action) {
+    final timer = Timer(d, action);
     return timer.cancel;
-  }
-
-  Future<void> retry() {
-    if (_disposed) return Future.value();
-    if (_attempt != null) return _attempt!;
-    final completed = Completer<void>();
-    _attempt = completed.future;
-    _run()
-        .then(
-          (_) {
-            _attempt = null;
-            completed.complete();
-            _notify();
-          },
-          onError: (Object error, StackTrace stack) {
-            _attempt = null;
-            completed.completeError(error, stack);
-            _notify();
-          },
-        )
-        .ignore();
-    return completed.future;
   }
 
   void _show(ReadinessState state, ErrorCode? reason, [String? workspace]) {
     if (_disposed) return;
-    if (state != _state) _readinessEpoch++;
+    if (_state != state) _readinessEpoch++;
     _state = state;
     _reason = reason;
     _workspaceId = state == ReadinessState.ready ? workspace : null;
@@ -113,87 +82,105 @@ class BootstrapController extends ChangeNotifier {
       notifyListeners();
     } finally {
       _notifications--;
-      if (_disposed && _notifications == 0) _disposeNotifier();
+      if (_disposed && _notifications == 0 && !_notifierDisposed) {
+        _notifierDisposed = true;
+        super.dispose();
+      }
     }
   }
 
-  void _disposeNotifier() {
-    if (_notifierDisposed) return;
-    _notifierDisposed = true;
-    super.dispose();
+  Future<void> retry() {
+    if (_disposed || _workspaceBusy) return Future.value();
+    if (_attempt != null) return _attempt!;
+    final done = Completer<void>();
+    _attempt = done.future;
+    _run().then<void>(
+      (_) {
+        _attempt = null;
+        done.complete();
+        _notify();
+      },
+      onError: (Object error, StackTrace _) {
+        _attempt = null;
+        done.completeError(error);
+        _notify();
+      },
+    );
+    return done.future;
   }
 
   Future<void> _run() async {
-    final deadline = _elapsed() + const Duration(seconds: 30);
+    final end = _now() + 30000000;
     var expired = false;
     final cancel = _schedule(const Duration(seconds: 30), () {
-      if (_disposed) return;
       expired = true;
-      client.stopPolling();
-      _show(ReadinessState.unavailable, ErrorCode.timeout);
-    });
-    bool live() => !_disposed && !expired && _elapsed() < deadline;
-    Future<void> wait(Duration duration) async {
-      final remaining = deadline - _elapsed();
-      if (remaining > Duration.zero) {
-        await _delay(duration < remaining ? duration : remaining);
+      if (!_disposed) {
+        client.stopPolling();
+        _show(ReadinessState.unavailable, ErrorCode.timeout);
       }
+    });
+    bool live() {
+      if (_disposed) return false;
+      if (expired || _now() >= end) {
+        client.stopPolling();
+        _show(ReadinessState.unavailable, ErrorCode.timeout);
+        return false;
+      }
+      return true;
+    }
+
+    Duration remaining() {
+      final micros = end - _now();
+      if (micros <= 0) throw const EngineApiException(ErrorCode.timeout);
+      return Duration(microseconds: micros);
     }
 
     client.stopPolling();
     _show(ReadinessState.starting, null);
     try {
+      final status = await _start().timeout(remaining());
       if (!live()) return;
-      await _prepare();
-      if (!live()) {
-        _show(ReadinessState.unavailable, ErrorCode.timeout);
+      if (status.phase == 'busy') {
+        _workspaceBusy = true;
+        _show(ReadinessState.storageBlocked, ErrorCode.storageBlocked);
         return;
       }
-      await _ensureService();
-      var backoff = const Duration(milliseconds: 100);
-      while (live()) {
-        try {
-          await client.connect();
-          if (!live()) break;
-          final response = await client.read(ApiMethod.readinessGet);
-          if (!live()) break;
-          final value = response.result;
-          final wireState = value['state'] as String;
-          final state = wireState == 'storage-blocked'
+      if (status.phase != 'ready') {
+        final reason =
+            ErrorCode.values
+                .where((c) => c.wireName == status.reason)
+                .firstOrNull ??
+            ErrorCode.serviceUnavailable;
+        _show(
+          reason == ErrorCode.storageBlocked
               ? ReadinessState.storageBlocked
-              : ReadinessState.values.byName(wireState);
-          final code = value['reason'];
-          final reason = code == null
-              ? null
-              : ErrorCode.values.firstWhere((e) => e.wireName == code);
-          _show(state, reason, value['workspaceId'] as String?);
-          if (state == ReadinessState.ready) {
-            if (live()) client.startPolling();
-            return;
-          }
-          if (state == ReadinessState.storageBlocked ||
-              state == ReadinessState.incompatible ||
-              state == ReadinessState.unavailable)
-            return;
-          await wait(const Duration(milliseconds: 250));
-        } on LocalApiException catch (error) {
-          if (error.code != ErrorCode.serviceUnavailable &&
-              error.code != ErrorCode.timeout)
-            rethrow;
-          if (live()) await _recoverService?.call();
-          await wait(backoff);
-          backoff = Duration(
-            milliseconds: (backoff.inMilliseconds * 2).clamp(100, 1000),
-          );
-        }
-      }
-      if (!_disposed) _show(ReadinessState.unavailable, ErrorCode.timeout);
-    } on Object catch (error) {
-      if (expired || _elapsed() >= deadline) {
-        _show(ReadinessState.unavailable, ErrorCode.timeout);
+              : reason == ErrorCode.incompatible
+              ? ReadinessState.incompatible
+              : ReadinessState.unavailable,
+          reason,
+        );
         return;
       }
-      final code = error is LocalApiException
+      await client.connect().timeout(remaining());
+      if (!live()) return;
+      final response = await client
+          .read(ApiMethod.readinessGet)
+          .timeout(remaining());
+      if (!live()) return;
+      final value = response.result;
+      final state = value['state'] == 'storage-blocked'
+          ? ReadinessState.storageBlocked
+          : ReadinessState.values.byName(value['state'] as String);
+      final reason = ErrorCode.values
+          .where((c) => c.wireName == value['reason'])
+          .firstOrNull;
+      _show(state, reason, value['workspaceId'] as String?);
+      if (live() && state == ReadinessState.ready) client.startPolling();
+    } catch (error) {
+      if (_disposed) return;
+      final code = expired || _now() >= end || error is TimeoutException
+          ? ErrorCode.timeout
+          : error is EngineApiException
           ? error.code
           : ErrorCode.serviceUnavailable;
       _show(
@@ -210,8 +197,7 @@ class BootstrapController extends ChangeNotifier {
   }
 
   Future<void> close() async {
-    if (!_disposed) dispose();
-    await _attempt;
+    dispose();
     await client.close();
   }
 
@@ -222,7 +208,6 @@ class BootstrapController extends ChangeNotifier {
     _connectionStates.cancel().ignore();
     _snapshotErrors.cancel().ignore();
     client.stopPolling();
-    _watch.stop();
     if (_notifications == 0) {
       _notifierDisposed = true;
       super.dispose();

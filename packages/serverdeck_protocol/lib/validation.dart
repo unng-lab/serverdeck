@@ -1,8 +1,5 @@
 import 'dart:convert';
 
-import 'errors.dart';
-import 'models.dart';
-
 final _uuid = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
 );
@@ -136,21 +133,6 @@ void validateRequestEnvelope(Map<String, Object?> value) {
   requireNonce(value['sessionId']);
 }
 
-void validateResponseEnvelope(Map<String, Object?> value) {
-  requireFields(value, {'v', 'id', 'generation'}, {'result', 'error'});
-  requireUuid(value['id']);
-  requireUuid(value['generation']);
-  if (value['v'] is! int ||
-      value['v'] != 1 ||
-      value.containsKey('result') == value.containsKey('error') ||
-      (value['result'] ?? value['error']) is! Map<String, Object?>) {
-    throw const FormatException('VALIDATION');
-  }
-  if (value.containsKey('error')) {
-    validateError(value['error'] as Map<String, Object?>);
-  }
-}
-
 /// Canonical, unpadded base64url encoding of exactly 256 bits.
 void requireNonce(Object? value) {
   if (value is! String || !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(value)) {
@@ -159,25 +141,6 @@ void requireNonce(Object? value) {
   final bytes = base64Url.decode('$value=');
   if (bytes.length != 32 ||
       base64Url.encode(bytes).replaceAll('=', '') != value) {
-    throw const FormatException('VALIDATION');
-  }
-}
-
-void validateError(Map<String, Object?> value) {
-  requireFields(value, {'code', 'boundary', 'retry'}, {'field'});
-  final codes = ErrorCode.values.where((e) => e.wireName == value['code']);
-  if (codes.isEmpty || value['boundary'] != 'local') {
-    throw const FormatException('VALIDATION');
-  }
-  final code = codes.single;
-  final field = value['field'];
-  if (value.containsKey('field') &&
-      (code != ErrorCode.validation ||
-          field is! String ||
-          !LocalError.fields.contains(field))) {
-    throw const FormatException('VALIDATION');
-  }
-  if (value['retry'] != LocalError(code).toJson()['retry']) {
     throw const FormatException('VALIDATION');
   }
 }

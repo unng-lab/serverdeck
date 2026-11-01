@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $FoundationRoot = Split-Path $PSScriptRoot -Parent
+. "$PSScriptRoot/current-packages.ps1"
 $FoundationSdk = Join-Path $FoundationRoot '.local/sdk/3.47.7/flutter'
 if ($env:SERVERDECK_FLUTTER_ROOT) { $FoundationSdk = $env:SERVERDECK_FLUTTER_ROOT }
 $FoundationSdk = [IO.Path]::GetFullPath($FoundationSdk)

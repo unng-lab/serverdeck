@@ -1,60 +1,27 @@
 # Implementation Plan: MCP и Ansible
 
-## Current unit-widget stage (2026-10-27)
+**Последнее указание пользователя — unit only**: все прежние собственные тесты,
+fixtures и harness удаляются; пишутся только unit-тесты под эту задачу. Дизайн,
+widget/visual/integration/native/реальные SSH/container проверки сейчас не выполняются.
+Исторические результаты ниже остаются историей, не текущим gate. Изменение не
+разрешает потерять функции, данные, права или проверки целевого поведения в новых units.
 
-The explicit user decision and Constitution4.0.0/VII select **unit/widget and
-static checks both locally and in automatic push/PR CI** for PR3/source-only
-MIT preview `0.2.0-preview.1+9`. The authoritative scope, exact-source merge
-gate and excluded workloads are recorded in
-[003 current-stage plan](../003-design-system/plan.md#unit-widget-stage-2026-10-27);
-[current commands](quickstart.md#current-unit-widget-commands) take precedence
-over earlier unconditional native/full-cold instructions below for this stage.
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](../001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
 
-T204–T212 source is implemented. Root unit/widget/static, pure protocol and pure
-accepted-peer scheduler results are recorded separately in
-[003 evidence](../003-design-system/evidence.md#current-unit-widget-evidence-2026-10-27).
-The completed R3 summary covers only its40frozen source files/incremental
-implementation; it does not review this new policy/workflow/documentation.
-New [T213](tasks.md#current-unit-widget-stage-2026-10-27) records current-stage
-local acceptance after its own checks and fresh independent review. Original
-T204–T212 task lines and markers remain historical/full-acceptance scope;
-**T207 full-native acceptance remains uncompleted**.
-
-Product FR/AC, native3/16-RPC bounds,1024tickets, original deadlines, guards,
-failure/recovery oracles and component responsibilities do not change.
-Full affected channel72, Windows176, grant66 and other native acceptance
-requirements in [native-control](contracts/native-control.md) remain future
-qualification. Earlier focused Terminal2/Observer8 passes are scoped evidence;
-ChannelFull stopped after8passes/0failures is incomplete, not a full native pass.
-No native/FFI/Isar/DPAPI/service/process/pipe/integration/real-SSH/container/cold
-test run is permitted now without another user instruction. Existing full
-native CI jobs remain a future explicit manual profile; not-selected/skipped
-does not mean passed. Full001/021/005, native distribution/signing and
-production readiness remain open. The earlier no-amendment statement describes
-the original plan; the current verification governance is adopted4.0.0/VII.
+**Поправка 2026-10-30**: [основа001](../001-service-foundation/spec.md)
+заменяет обязательный locald встроенным engine. [Adoption/return](../001-service-foundation/contracts/embedded-migration.md)
+сохраняет нынешний ServerDeckNext; hard cutover исключает только сервис до него.
+[MCP app host](../021-mcp-control/contracts/embedded-host.md) заменяет autolaunch/identity,
+сохраняя tools/grants. Scope проверок — static/unit/widget без native claims.
 
 **Feature**: 021-mcp-control | **Date**: 2026-10-21 | **Spec**: [spec.md](spec.md)
 **Status**: Design review3 completed with no findings; ready for staged implementation. Implement started; runtime/acceptance not complete.
 
 ## Summary
-
-The scoped T204–T207 correction implements
-[accepted-peer native control coordination](contracts/native-control.md) in the
-existing locald API layer. One bounded pure scheduler per private accepted-peer
-binding shares only preissue fresh-proof cohorts and serializes distinct native
-metadata; physical completion remains separate from logical timeout. Existing
-session/request scopes detach queued tickets, the sealed first-open exception
-remains distinct, and channel close retains its original drain/disconnect
-barrier. No backend, protocol, native quota, storage or package dependency changes
-are needed. Existing decisions/history below remain; this correction requires
-its own completed readiness and implementation review before acceptance.
-T212 adds only write-admission accounting in the shared epoch native peer and
-sealed failed-open permit: both channels record the original ordinary/terminal
-deadline only after command admission, so first-RPC terminal close drains while
-pre-admission refusal preserves the preceding write budget. Additive observation
-does not change callback-null writes, native3,16-RPC bounds, protocol, schemas,
-release prerequisites or physical ownership. Its contract/task amendment needs
-fresh readiness review before implementation and fresh checks/review afterward.
 
 Persisted remote trust requires explicit schema3 and owner-only challenge/confirmation under the [host trust contract](contracts/host-trust.md). Schema2 components remain exact historical/prototype readers; remote startup uses a separate format3/API1.1/schema3 bundle after protected migration and all service gates, with no implicit trust-table fallback.
 
@@ -106,7 +73,7 @@ Delegation is explicit owner consent to declared targets/effects within exact di
 - packages/serverdeck_windows/lib/: bridge verified image role, existing pipe identity/OS custody.
 - executor/{serverdeck_executor/,tests/,packaging/,requirements.lock}: root-owned Linux bridge/supervisor/compiler, protocol/locks/receipts/Ansible.
 - lib/{automation/,access/,servers/}: UI grants/revisions/approval/jobs/state/logs, existing shell integration.
-- tools/{build-mcp.ps1,test-mcp.ps1,test-mcp-vm.ps1}: build/validation only owned synthetic fixtures.
+- tools/{run-serverdeck.ps1,test-unit.ps1}: single-executable source build and RAM-only validation; no standalone MCP build or native fixtures.
 
 ## Boundaries and contracts
 
@@ -177,3 +144,43 @@ the existing immutable preflight runtimeVersion, while observed values preserve
 verbatim Unicode on wire and in retained evidence. Enrollment metadata is a
 protected HMAC-bound sidecar, never a replacement for current native/grant/target
 or per-step plan/delegation authority.
+
+
+## Текущая проверка
+
+Только новые unit tests текущей задачи и обязательные format/analyze/review.
+`./tools/test-unit.ps1` запускает весь текущий root/package scope. Прежний
+>80% gate отменён; не восстанавливать coverage pipeline или старые fixtures.
+
+## История: отменённый MVP unit verification
+
+Весь остаток этого раздела superseded последним указанием пользователя.
+Сохранён для истории; команды/границы/метрики не являются текущим gate.
+
+The 2026-10-23 user instruction supersedes historical integration acceptance
+plans for these MVP tasks. Preserve existing integration tests as optional
+historical tooling; do not run them, remove them to improve a percentage, or use
+their hits toward unit coverage. Unit tests run through an explicit reviewed
+selection, without real OS process/pipe/credential stores, external network,
+real Isar databases or Docker. Pure validation, state machines, serializers,
+policy decisions and mocked I/O failures are in scope.
+
+Measure statement/line execution for every authored runtime source in app lib/,
+packages/serverdeck_{protocol,windows,locald,mcp}/{lib,bin}/ and Python
+executor/serverdeck_executor/. Dart generated *.g.dart and non-runtime tooling,
+third-party libraries and test code are outside the denominator. Collect fresh
+unit-only Dart VM and Python coverage, merge overlapping source-line hits once,
+and require covered*5 > executable*4. Publish per-module denominators/hits and
+total; a missing or stale report, missing runtime file or empty denominator fails
+closed. An unloaded file must contribute its actual executable lines with zero
+hits, or explicitly fail completeness until instrumentation supplies that census.
+Do not round80% up or average module percentages. No coverage-ignore annotations
+or new production authority bypasses may be added to meet the threshold.
+
+Record selected tests, source fingerprints and collection commands with results.
+Add useful unit cases for public behavior and failure boundaries; if isolation
+needs a production change, retain existing authority and typed-service contracts.
+Run mandatory format/analyze/root Flutter checks as applicable. Isolated widget
+component tests with mocked services contribute to unit coverage; full application
+journeys and native/service interactions do not. Independent review checks both
+test behavior and the denominator/selection before reporting the gate passed.

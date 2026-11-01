@@ -1,5 +1,11 @@
 # Shared format3 control services — 021
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Host trust](host-trust.md), [owner foundation](owner-foundation.md),
 [owner grants](owner-grants.md), [catalog](profile-catalog.md),
 [handshake](handshake.md), [channel](operational-channel.md),

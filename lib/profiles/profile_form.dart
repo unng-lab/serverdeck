@@ -1,25 +1,20 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:serverdeck_protocol/models.dart' hide ReadinessView;
+import 'package:serverdeck_protocol/models.dart';
 import 'package:serverdeck_protocol/profile_validation.dart';
 import 'package:serverdeck_windows/profile_input.dart';
 
-import '../bootstrap/local_api_client.dart';
+import '../bootstrap/engine_client.dart';
 import '../shell/readiness_view.dart';
 import '../shell/error_view.dart';
 import '../shell/form_keyboard.dart';
 import '../theme/brand_tokens.dart';
-import '../theme/brand_assets.dart';
-import '../theme/brand_theme.dart';
 import '../ui/deck_components.dart';
-import '../ui/deck_control_target.dart';
-import '../ui/deck_input_border.dart';
 import 'credential_input.dart';
 import 'mutation_controller.dart';
 import 'mutation_status.dart';
 import 'profile_controller.dart';
-import 'profile_presentation.dart';
 
 Map<String, Object?> buildProfileInput({
   required String name,
@@ -42,18 +37,9 @@ Map<String, Object?> buildProfileInput({
 }
 
 class ProfileForm extends StatefulWidget {
-  const ProfileForm({
-    super.key,
-    required this.model,
-    this.initial,
-    this.asPage = false,
-    this.onClose,
-    this.credentialOnly = false,
-  });
+  const ProfileForm({super.key, required this.model, this.initial});
   final ProfileController model;
   final ProfileView? initial;
-  final bool asPage, credentialOnly;
-  final VoidCallback? onClose;
   @override
   State<ProfileForm> createState() => _ProfileFormState();
 }
@@ -69,7 +55,6 @@ class _ProfileFormState extends State<ProfileForm> {
   late final MutationController mutation;
   late final String id;
   String? revision, inputError;
-  ProfileView? _targetProfile;
   bool _reloading = false;
   bool _readingError = false;
 
@@ -82,7 +67,6 @@ class _ProfileFormState extends State<ProfileForm> {
   }
 
   void _populate(ProfileView? profile) {
-    _targetProfile = profile;
     _name.text = profile?.name ?? '';
     _address.text = profile?.address ?? '';
     _port.text = '${profile?.port ?? 22}';
@@ -177,11 +161,7 @@ class _ProfileFormState extends State<ProfileForm> {
 
   void _close() {
     _credential.currentState?.clear();
-    if (widget.onClose != null) {
-      widget.onClose!();
-    } else {
-      Navigator.of(context).maybePop();
-    }
+    Navigator.of(context).maybePop();
   }
 
   String? _validate(String field, String? value) {
@@ -212,139 +192,39 @@ class _ProfileFormState extends State<ProfileForm> {
     String field,
     String label,
     bool enabled,
-  ) => DeckHitOverflow(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Floating InputDecorator labels elide long instructions at200%. Keep
-        // the whole label visible and associate it with the same keyed input.
-        ExcludeSemantics(
-          child: widget.asPage
-              ? ProfileFieldLabel(label: label, required: field != 'tags')
-              : Text(label, style: Theme.of(context).textTheme.bodyLarge),
-        ),
-        SizedBox(height: widget.asPage ? 7 : BrandSpacing.space8),
-        DeckControlTarget(
-          visibleHeight: widget.asPage && MediaQuery.sizeOf(context).width > 520
-              ? 42
-              : 44,
-          child: Semantics(
-            label: label,
-            isRequired: field != 'tags',
-            child: SubmitOnEnter(
-              enabled: enabled && field != 'tags',
-              child: TextFormField(
-                key: ValueKey('profile-$field'),
-                controller: controller,
-                enabled: enabled,
-                // Keep the canonical opaque body style while the draft is locked.
-                style: widget.asPage
-                    ? deckFormTextStyle(context)
-                    : Theme.of(context).textTheme.bodyLarge,
-                autofocus: field == 'name',
-                onFieldSubmitted: field == 'tags'
-                    ? null
-                    : (_) => _save().ignore(),
-                decoration: widget.asPage
-                    ? deckFormDecoration(context)
-                    : const InputDecoration(),
-                validator: (value) => _validate(field, value),
-                minLines: field == 'tags' && !widget.asPage ? 2 : 1,
-                maxLines: field == 'tags' ? 4 : 1,
-                textInputAction: field == 'tags'
-                    ? TextInputAction.newline
-                    : TextInputAction.done,
-              ),
-            ),
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      // Floating InputDecorator labels elide long instructions at200%. Keep
+      // the whole label visible and associate it with the same keyed input.
+      ExcludeSemantics(
+        child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+      ),
+      const SizedBox(height: BrandSpacing.space8),
+      Semantics(
+        label: label,
+        child: SubmitOnEnter(
+          enabled: enabled && field != 'tags',
+          child: TextFormField(
+            key: ValueKey('profile-$field'),
+            controller: controller,
+            enabled: enabled,
+            // Keep the canonical opaque body style while the draft is locked.
+            style: Theme.of(context).textTheme.bodyLarge,
+            autofocus: field == 'name',
+            onFieldSubmitted: field == 'tags' ? null : (_) => _save().ignore(),
+            decoration: const InputDecoration(),
+            validator: (value) => _validate(field, value),
+            minLines: field == 'tags' ? 2 : 1,
+            maxLines: field == 'tags' ? 4 : 1,
+            textInputAction: field == 'tags'
+                ? TextInputAction.newline
+                : TextInputAction.done,
           ),
         ),
-        if (widget.asPage && (field == 'address' || field == 'port')) ...[
-          const SizedBox(height: 6),
-          Text(
-            field == 'address'
-                ? 'IP-адрес или доменное имя сервера'
-                : 'Стандартный порт SSH — 22',
-            style: BrandTypography.caption.copyWith(
-              height: MediaQuery.sizeOf(context).width <= 520
-                  ? 20 / 12
-                  : 18 / 12,
-              color: Theme.of(context).extension<BrandColors>()!['muted'],
-            ),
-          ),
-        ],
-      ],
-    ),
+      ),
+    ],
   );
-
-  String? get _capturedTargetCaption {
-    final target = _targetProfile;
-    if (target == null) return null;
-    final address = target.address.contains(':')
-        ? '[${target.address}]'
-        : target.address;
-    return '${target.name} · $address:${target.port}';
-  }
-
-  Widget _targetField() {
-    return DeckHitOverflow(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const ProfileFieldLabel(label: 'Сервер', required: true),
-          const SizedBox(height: 7),
-          DeckControlTarget(
-            visibleHeight: MediaQuery.sizeOf(context).width <= 520 ? 44 : 42,
-            child: Semantics(
-              label: 'Сервер',
-              readOnly: true,
-              child: DeckReadonlyInput(
-                key: const ValueKey('profile-target'),
-                value: _capturedTargetCaption!,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _profileFields(bool editable) {
-    final editPage = widget.asPage && widget.initial != null;
-    final access = CredentialInput(
-      key: _credential,
-      compact: true,
-      choiceLabel: editPage ? 'Доступ' : 'Способ доступа',
-      readReadyEpoch: () => widget.model.bootstrap.state == ReadinessState.ready
-          ? widget.model.bootstrap.readinessEpoch
-          : null,
-      onSubmit: () => _save().ignore(),
-      onPickingChanged: (_) {
-        if (mounted) setState(() {});
-      },
-      creating: revision == null,
-      enabled: editable,
-    );
-    return [
-      if (editPage) _targetField(),
-      _field(_name, 'name', 'Название', editable),
-      _field(
-        _address,
-        'address',
-        widget.asPage ? 'Адрес' : 'Адрес (IP или имя домена)',
-        editable,
-      ),
-      _field(_port, 'port', 'Порт SSH', editable),
-      _field(_user, 'user', 'Пользователь SSH', editable),
-      if (editPage) access,
-      _field(
-        _tags,
-        'tags',
-        widget.asPage ? 'Метки' : 'Метки (одна на строку)',
-        editable,
-      ),
-      if (!editPage) access,
-    ];
-  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -361,10 +241,7 @@ class _ProfileFormState extends State<ProfileForm> {
           !_readingError &&
           mutation.state == MutationPresentation.idle;
       final close = OutlinedButton(
-        clipBehavior: Clip.none,
-        style: OutlinedButton.styleFrom(
-          minimumSize: Size(widget.asPage ? 44 : 48, widget.asPage ? 44 : 48),
-        ),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
         onPressed: _close,
         child: Text(
           !ready || mutation.state != MutationPresentation.idle
@@ -372,91 +249,32 @@ class _ProfileFormState extends State<ProfileForm> {
               : 'Отмена',
         ),
       );
-      final saveLabel = widget.initial == null
-          ? 'Сохранить без подключения'
-          : widget.credentialOnly
-          ? 'Сохранить доступ'
-          : 'Сохранить';
-      final save =
-          editable &&
-              widget.model.loaded &&
-              _credential.currentState?.picking != true
-          ? () => _save().ignore()
-          : null;
-      final actions = <Widget>[
-        if (ready && widget.initial == null)
-          const Tooltip(
-            message: 'Сохранение с подключением будет доступно в пакете 004. Сейчас сохраните профиль без подключения.',
-            child: FilledButton(
-              clipBehavior: Clip.none,
-              onPressed: null,
-              child: Text('Сохранить и подключить'),
-            ),
-          ),
-        if (ready)
-          if (widget.credentialOnly)
-            OutlinedButton(
-              clipBehavior: Clip.none,
-              style: OutlinedButton.styleFrom(
-                minimumSize: Size(
-                  widget.asPage ? 44 : 48,
-                  widget.asPage ? 44 : 48,
-                ),
-              ),
-              onPressed: save,
-              child: Text(saveLabel),
-            )
-          else
-            FilledButton(
-              clipBehavior: Clip.none,
-              style: FilledButton.styleFrom(
-                minimumSize: Size(
-                  widget.asPage ? 44 : 48,
-                  widget.asPage ? 44 : 48,
-                ),
-              ),
-              onPressed: save,
-              child: Text(saveLabel),
-            ),
-        close,
-      ];
-      final form = FormKeyboard(
+      return FormKeyboard(
         onSubmit: () => _save().ignore(),
         onClose: _close,
-        child: ProfileEditorFrame(
-          asPage: widget.asPage,
-          description: widget.credentialOnly
-              ? 'Укажите параметры и проверьте их перед продолжением'
-              : widget.initial != null
-              ? 'Измените параметры сохранённого подключения'
-              : 'Укажите адрес и доступ для подключения по SSH',
+        child: DeckDialogLayout(
           title: !ready
               ? 'Локальное пространство недоступно'
               : widget.initial == null
-              ? 'Добавление сервера'
-              : widget.credentialOnly
-              ? 'Настройка доступа'
+              ? 'Новый профиль'
               : 'Редактирование профиля',
-          target:
-              ready &&
-                  widget.initial != null &&
-                  !widget.credentialOnly &&
-                  !widget.asPage
+          target: ready && widget.initial != null
               ? DeckKeyValue(
                   label: 'Цель изменения',
                   value: '${_name.text} · ${_address.text}:${_port.text}',
                 )
               : null,
-          actions: actions,
-          footer: widget.credentialOnly && ready
-              ? Builder(
-                  builder: (_) =>
-                      _credential.currentState?.pageActionBar(
-                        trailing: actions,
-                      ) ??
-                      DeckFormActions(children: actions),
-                )
-              : null,
+          actions: [
+            if (ready)
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: editable && widget.model.loaded
+                    ? () => _save().ignore()
+                    : null,
+                child: const Text('Сохранить'),
+              ),
+            close,
+          ],
           // Removing the form disposes its credential editors and retires any
           // native picker. Ordinary theme/size changes keep this same subtree.
           child: !ready
@@ -472,63 +290,42 @@ class _ProfileFormState extends State<ProfileForm> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Параметры подключения',
-                        style: BrandTypography.body.copyWith(
-                          height: 22 / 14,
-                          fontFamily: BrandAssets.semiboldFamily,
-                          fontWeight: BrandTypography.semiboldWeight,
-                          fontVariations: BrandTypography.semiboldVariations,
-                        ),
+                      DeckFormSection(
+                        title: 'Параметры профиля',
+                        description: 'Сохранение меняет локальный профиль. Подключение к серверу выполняется отдельно.',
+                        children: [_field(_name, 'name', 'Название', editable)],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Укажите адрес сервера и способ доступа.',
-                        style: BrandTypography.caption.copyWith(
-                          height: 20 / 12,
-                          color: Theme.of(context)
-                              .extension<BrandColors>()!['muted'],
-                        ),
+                      const SizedBox(height: BrandSpacing.space24),
+                      DeckFormSection(
+                        title: 'Подключение по SSH',
+                        children: [
+                          _field(
+                            _address,
+                            'address',
+                            'Адрес (IP или имя домена)',
+                            editable,
+                          ),
+                          _field(_port, 'port', 'Порт SSH', editable),
+                          _field(_user, 'user', 'Пользователь SSH', editable),
+                          _field(
+                            _tags,
+                            'tags',
+                            'Метки (одна на строку)',
+                            editable,
+                          ),
+                        ],
                       ),
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).width <= 520
-                            ? 20
-                            : 18,
+                      const SizedBox(height: BrandSpacing.space24),
+                      CredentialInput(
+                        key: _credential,
+                        readReadyEpoch: () =>
+                            widget.model.bootstrap.state == ReadinessState.ready
+                            ? widget.model.bootstrap.readinessEpoch
+                            : null,
+                        onSubmit: () => _save().ignore(),
+                        creating: revision == null,
+                        enabled: editable,
                       ),
-                      if (widget.credentialOnly)
-                        CredentialInput(
-                          key: _credential,
-                          compact: true,
-                          inlinePageActions: false,
-                          pageTarget:
-                              '${_name.text} · ${_address.text.contains(':') ? '[${_address.text}]' : _address.text}:${_port.text}',
-                          readReadyEpoch: () =>
-                              widget.model.bootstrap.state ==
-                                  ReadinessState.ready
-                              ? widget.model.bootstrap.readinessEpoch
-                              : null,
-                          onSubmit: () => _save().ignore(),
-                          onPickingChanged: (_) {
-                            if (mounted) setState(() {});
-                          },
-                          onPresentationChanged: () {
-                            if (mounted) setState(() {});
-                          },
-                          creating: revision == null,
-                          enabled: editable,
-                        )
-                      else
-                        ProfileFieldGrid(children: _profileFields(editable)),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Существующий секрет не возвращается в форму. Хранение защищено ОС текущего пользователя.',
-                      ),
-                      if (widget.initial == null) ...[
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Сохранить и подключить: будет доступно в пакете 004. Сохранение без подключения доступно сейчас.',
-                        ),
-                      ],
                       if (widget.model.error case final code?) ...[
                         const SizedBox(height: BrandSpacing.space16),
                         ReadErrorView(
@@ -551,11 +348,9 @@ class _ProfileFormState extends State<ProfileForm> {
                         const SizedBox(height: BrandSpacing.space16),
                         DeckNotice(message: inputError!, tone: DeckTone.error),
                       ],
-                      if (!widget.asPage &&
-                          mutation.state != MutationPresentation.idle) ...[
+                      if (mutation.state != MutationPresentation.idle) ...[
                         const SizedBox(height: BrandSpacing.space16),
                         MutationStatus(
-                          asPage: widget.asPage,
                           controller: mutation,
                           reloading: _reloading,
                           readPending: _readingError,
@@ -570,23 +365,6 @@ class _ProfileFormState extends State<ProfileForm> {
                     ],
                   ),
                 ),
-        ),
-      );
-      return MutationPresentationSwitch(
-        enabled: widget.asPage,
-        showReview:
-            widget.asPage &&
-            ready &&
-            mutation.state != MutationPresentation.idle,
-        form: form,
-        review: MutationReviewPage(
-          controller: mutation,
-          targetCaption: _capturedTargetCaption,
-          reloading: _reloading,
-          readPending: _readingError,
-          onReadCommitted: _readCommitted,
-          onReload: () => _reload().ignore(),
-          onClose: _close,
         ),
       );
     },

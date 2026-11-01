@@ -3,11 +3,6 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
-abstract interface class UserProtection {
-  Future<List<int>> protect(List<int> cleartext, List<int> entropy);
-  Future<List<int>> unprotect(List<int> ciphertext, List<int> entropy);
-}
-
 final _advapi = DynamicLibrary.open('advapi32.dll');
 final _kernel = DynamicLibrary.open('kernel32.dll');
 final _processId = _kernel
@@ -91,7 +86,7 @@ String processUserSid(HANDLE process) {
 String currentUserSid() => processUserSid(GetCurrentProcess());
 
 /// Must stay on the pipe worker that owns its native handle.
-class RetainedProcessIdentity {
+final class RetainedProcessIdentity {
   RetainedProcessIdentity._(
     this.handle,
     this.pid,
@@ -119,7 +114,9 @@ class RetainedProcessIdentity {
       identity.revalidate();
       return identity;
     } catch (_) {
-      CloseHandle(opened.value);
+      if (!CloseHandle(opened.value).value) {
+        throw StateError('PHYSICAL_CLOSE_UNCONFIRMED');
+      }
       rethrow;
     }
   }
@@ -127,6 +124,7 @@ class RetainedProcessIdentity {
   final int pid;
   final String sid, imagePath, creationTime;
   bool _closed = false;
+  bool _closeSucceeded = false;
   void revalidate() {
     if (_closed) {
       throw StateError('IDENTITY_UNAVAILABLE');
@@ -146,11 +144,12 @@ class RetainedProcessIdentity {
     }
   }
 
-  void close() {
+  bool close() {
     if (!_closed) {
       _closed = true;
-      CloseHandle(handle);
+      _closeSucceeded = CloseHandle(handle).value;
     }
+    return _closeSucceeded;
   }
 
   static String _image(HANDLE handle) {

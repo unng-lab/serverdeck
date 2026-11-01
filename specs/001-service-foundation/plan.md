@@ -1,5 +1,23 @@
 # Implementation Plan: 001.1 — Исполняемый сервис и защищённые профили
 
+**Последнее указание пользователя — unit only**: все прежние собственные тесты,
+fixtures и harness удаляются; пишутся только unit-тесты под эту задачу. Дизайн,
+widget/visual/integration/native/реальные SSH/container проверки сейчас не выполняются.
+Исторические результаты ниже остаются историей, не текущим gate. Изменение не
+разрешает потерять функции, данные, права или проверки целевого поведения в новых units.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
+**Действующая поправка 2026-10-30**: [engine](contracts/embedded-engine.md),
+[adoption/return](contracts/embedded-migration.md), [platforms](contracts/embedded-platforms.md).
+Встроенный engine заменяет отдельный locald; реализация T253–T272. Прежние
+hosting/native acceptance решения ниже — исторический контекст, не разрешение
+на daemon/запрещённые проверки. Новая feature-спецификация не создаётся.
+
 **Feature**: `001-service-foundation` | **Stage**: `001.1` | **Date**: 2026-10-10
 **Git branch**: `feature/brandbook-design` (существующий checkout, ветка не создавалась).
 **Spec Kit context**: `001-service-foundation`, разрешён через `.specify/feature.json`, не имя Git-ветки.
@@ -103,7 +121,7 @@ packages/serverdeck_locald/lib/{bootstrap/,api/,storage/,profiles/,credentials/}
 packages/serverdeck_locald/test/
 test/{contract/,widget/,security/}
 integration_test/foundation_test.dart
-tools/{run-foundation.ps1,build-locald.ps1,test-foundation-native.ps1}
+tools/{run-serverdeck.ps1,embedded-bundle.ps1,test-unit.ps1}
 .github/workflows/foundation.yml
 docs/brandbook/  # существующий вход, не переписывается
 assets/brand/   # существующие assets
@@ -221,3 +239,237 @@ Constitution VIII and T045/T207 require resolved native dependency/license cover
 ## Extension021 — 2026-10-21
 
 [Plan021](../021-mcp-control/plan.md) и [Tasks021](../021-mcp-control/tasks.md) добавляют MCP роль, API1.1, schema2 preservation migration и необходимую реализацию чтений/jobs. Этот Plan остаётся историческим/действующим scope001.1, его completed evidence не квалифицирует расширение. При запуске Spec Kit001 явно выбирать feature_directory001; текущий feature context указывает021. Не включать мост автоматизации в owner UI capabilities по умолчанию.
+
+
+## Действующий план поправки: встроенный движок
+
+**Feature**: [spec.md](spec.md) | **Date**: 2026-10-30 | **Constitution**: 4.3.0
+**Git context**: существующая feature/mcp-control, грязный checkout; ветка не переключалась.
+По прямому указанию пользователя меняется прежняя 001, новый feature не создаётся.
+
+### Summary
+
+Извлечь рабочую логику locald в serverdeck_engine, убрать UI→daemon IPC,
+сохранить защищённый IPC для необязательного stdio MCP. Один процесс приложения;
+один engine worker isolate владеет Host/store/runtime; Flutter UI использует внутренний Dart-port gateway. Блокирующая FFI/hash/file work не выполняется в UI isolate. Второго store/engine нет.
+Windows bundle format4 со storage schema3 первым, остальные платформы позже.
+
+### Technical Context
+
+- Flutter/Dart: текущий SDK >=3.13.5 <4, зависимости/lock сохраняются.
+- isar_community3.3.2 с override third_party/isar_community, generated records и
+  ABI сохраняются; native library поставляется с app.
+- dartssh2 4.1.0, cryptography2.9.0: существующий transport pool вне браузера.
+  Pin4.1.0 совпадает с engine pubspec и root/engine lockfiles; upgrade не требуется.
+- Windows: win32 6.4.0/ffi2.2.0, DPAPI/SID/ACL, mutex/pipes, retained process
+  identity и verified bundle. Это реальные blockers portability.
+- Удалённый Python/systemd executor021 остаётся отдельным компонентом на цели,
+  нужен только уже требующим его функциям. Это не daemon клиента; wire не меняется.
+- Разрешены static/unit/widget; runtime release/platform qualification не установлены.
+- Лимиты, interfaces и версии: [engine](contracts/embedded-engine.md), [MCP/jobs](../021-mcp-control/contracts/embedded-host.md).
+
+### Constitution Check
+
+I/III/V/VII: 4.3.0 меняет обязательный daemon и уточняет сохранение текущего ServerDeckNext.
+Flutter/Dart/Isar, OS protection, trust и отсутствие backend сохраняются.
+VII: только static/unit/widget; не выдавать их за native acceptance. VI: цепочка
+FR→contract→task→AC в [tasks](tasks.md). VIII: runtime/notices/bundle обязательны,
+релиз не разрешён. После design: все Windows решения в контрактах; будущие
+платформы отделены и не блокируют extraction/Windows.
+
+### Project Structure and Ownership
+
+| Место | Ответственность и перенос |
+| --- | --- |
+| packages/serverdeck_engine/lib/ | Чистый Dart: profiles/automation/remote/mcp/storage из locald, public engine.dart |
+| packages/serverdeck_engine/lib/platform/ports.dart | Lease/vault/files/runtime/verified identity/clock и runtime-owned authority |
+| packages/serverdeck_engine/lib/hosting/ | engine_host.dart, lifecycle.dart, in_process_gateway.dart, capability_snapshot.dart |
+| packages/serverdeck_windows/lib/ | Windows ports, DPAPI/SID/ACL/mutex/pipes; app image вместо locald.exe |
+| lib/bootstrap/ | EmbeddedEngineHost/EngineGateway вместо обязательного NativeBootstrapHost IPC; сохранить DTO/controllers |
+| lib/platform/ и lib/shell/ | tray/menu и widget lifecycle без БД/SSH/доменной логики |
+| packages/serverdeck_mcp/ | прежние stdio/tool schemas, connection-only bootstrap в режиме --mcp-stdio |
+| packages/serverdeck_locald/ | удаляется целиком после переноса используемой логики; никаких re-export/compatibility оболочек |
+| packages/serverdeck_platform_{linux,macos,android,ios}/ | последующие платформенные поставки, не fallback текущего Windows этапа |
+| executor/ | без нового протокола, unknown сохраняется |
+
+### Phases and Delivery
+
+1. **001.E1 Extraction**: ports, reuse services, unit parity, in-process gateway.
+   Старый root/entry удаляются; переходная оболочка и два runtime запрещены.
+2. **001.E2 Windows adoption**: app host/tray/ownership, schema3 adoption,
+   MCP app IPC, bundle/prerequisites/return instructions и разрешённые checks.
+   Не менять/устанавливать поставку003 и не публиковать релиз.
+3. **001.E3 Portability boundary**: capability contracts/fakes принимаются здесь;
+   реальные Linux/macOS/mobile adapters — отдельные последующие поставки по
+   [matrix](contracts/embedded-platforms.md). Заглушка не означает поддержку платформы.
+
+### Reuse and Change Boundaries
+
+TrustedControlServices.create требует native publication gate; нельзя подставить
+true. HostAuthority создаётся только настоящим host под lease; OwnerSession —
+через UI binding, MCP session — после verified IPC proof+grant. Отделить services
+от pipe authentication с сохранением gate ordering и revocation fences.
+
+StateStore/Workspace/KeyCustody привязаны к SID/Windows; перенести interfaces,
+сохранив Windows blob encoding/entropy. Смена процесса не требует schema4.
+Поддерживаемый source и return заданы [migration](contracts/embedded-migration.md).
+
+Отклонены: обязательный locald (против решения пользователя), отдельная MCP БД
+(два источника истины), обязательное облако, wholesale rewrite и Web TCP fallback.
+
+### Validation and Limits
+
+[Quickstart](quickstart.md) задаёт команды и сценарии. Native app/DPAPI/Isar/tray
+и реальные remote faults не проверяются здесь. Готовность спецификации к реализации
+не равна readiness выпуска. Изменения только в документах; implementation Tasks
+не отмечать выполненными на основании текущего аудита.
+
+### Дополнение того же плана: один binary и полноценный tray
+
+Отдельного mcp.exe нет. packages/serverdeck_mcp остаётся библиотекой, entry
+включается в serverdeck.exe через mode dispatch до runApp. Windows runner в stdio
+mode создаёт headless Flutter engine и сохраняет inherited std handles, без
+console attach/window/tray. MCP role не следует из image/argv: общий app image
+на внешнем endpoint даёт только MCP grant-auth path; owner остаётся внутренним.
+Контракт и tests T274/T275 дополняют T265/T268/T271 и существующий tray T259.
+Tray menu перечислен в embedded-engine contract; это управление существующим
+app/sections/status/exit, без новых remote операций. Native runner/tray behaviour
+не запускать для проверки в текущем scope. Static/unit/widget evidence не заменяет
+реальную OS acceptance. Новая feature-спецификация не создаётся.
+
+### Artifact verification как prerequisite Windows extraction
+
+Manifest4/app identity часть T265 готовится вместе с T255/T256 до создания Host:
+иначе native runtime port зависел бы от прежнего locald role. Это shared foundation,
+не досрочное включение IPC. Полные discovery/handshake/MCP host изменения T265,
+bridge T266 и publication gate по-прежнему следуют после доверенного T257.
+Native DLL инициализирует только composition root до первого обращения к store,
+с verified format4 bundle и proof именно текущего процесса из ТОГО ЖЕ bundle.
+Нет downgrade/fallback к format3; old loader удаляется в T276 до финальной приёмки.
+Native DLL process lifetime не равен lifetime DB handle: adapter не владеет DB/lease.
+Готовность OS runtime не выводится из unit parser/static evidence.
+
+
+### Обязательная Windows worker/UI граница
+
+Windows root создаёт ровно один engine worker isolate на workspace в том же
+процессе. Только его private entry создаёт EngineHost/platform ports/store/vault/
+retained runtime identities/publication gate и owner capabilities. Root сохраняет
+их там до physical drain. Native pipe/mutex workers остаются subordinate I/O
+workers, не вторым domain engine/store. Flutter isolate владеет presentation,
+tray/window lifetime и внутренним gateway proxy, не открывает storage/SSH и не
+вызывает native bundle revalidation/hash. Future.sync не считается offload.
+
+Порядок trusted bootstrap, UI binding, bounds/deadlines и CloseBlocked worker
+protocol закреплён в [engine contract](contracts/embedded-engine.md#engine-worker-and-ui-proxy-composition).
+Это обязательный prerequisite T258/T261/T265/T274/T275, не новая feature и не
+внешний owner IPC. Root/controller/private gateway реализованы в engine hosting,
+Windows composition и DesktopEngineHost. Их текущие bounded startup/shutdown,
+publication, suspend/resume, owner retirement и fresh binding проверены static/
+RAM units и независимыми component/aggregate reviews (T321, T324/T331).
+Это не квалификация настоящего isolate/OS IPC/FFI/UI/runtime: native adapters,
+доставка power events и release prerequisites требуют отдельной платформенной
+проверки, которая в текущем разрешённом scope не выполняется.
+### T323 storage dependency refinement — 2026-10-31
+
+The actual24-tool mutation matrix requires the real StateStore, not scripted
+repository responses. Apply the fixed transactional persistence port in the
+[existing engine contract](contracts/embedded-engine.md#t323t369t373--transactional-storage-dependency-2026-10-31).
+Production remains Isar/schema3; only test/support supplies RAM storage. Common
+open/custody/semantic checks, one writer, CAS, receipts, publication and unknown
+outcomes stay in StateStore. Creation, native runtime proof and protected files
+retain their current responsibilities. No new feature, domain facade, runtime
+mode, dependency pin or persisted entity is introduced.
+
+Sequence: T369 design review → T370 port/Isar adapter → T371 StateStore extraction
+→ T372 actual-store RAM evidence → T373 actual24-tool matrix → aggregate T323.
+The applicable Constitution I–VII checks remain satisfied by one engine/writer,
+private authority, unchanged target data, bounded queues, explicit contracts and
+the required full checks/review loop. RAM tests do not qualify native execution
+or release readiness. T324/T325/T331 and remaining final audit tasks retain their
+own acceptance. Do not close an implementation task based on this plan amendment.
+
+
+### T324/T331 local observation and recovery refinement — T384
+
+Implement the existing LocalJobObservation requirement through the existing
+engine and existing format3 successful-result data. The detailed normative
+contract is in contracts/embedded-engine.md, section Local job observation and
+recovery. No new feature, executable, transport, method, protocol version,
+persistent collection or schema4. AutomationJobRecord, stable mutation ACKs,
+request IDs and executor requests/responses stay unchanged.
+
+Components: protocol automation/job_observation.dart supplies the closed public
+observation DTO; engine automation/job_observations.dart owns bounded runtime
+samples and opaque callback bindings; TrustedJobService/jobs.dart records only
+verified current-session status and projects observations beside jobs; existing
+control-services factory supplies its existing read EngineClock. Flutter's
+AutomationController captures observations separately from job/outcome and the
+existing jobs section displays the independent observation state. No widget or
+design tests are introduced; controller/model/domain acceptance is RAM unit only.
+
+Dependencies/order: T384 specification readiness review, then T385 runtime model
+and projections, T386 terminal reconciliation fencing, T387 actual recovery and
+occupancy matrix, T388 controller projection and functional display. T324/T331
+remain open until aggregate checks and completed independent code review. One
+writer, private authority, no permission restoration, schema3 preservation,
+bounded memory, no new pins/prerequisites and no native qualification satisfy
+the applicable Constitution I–VII gates. This amendment records decisions, not
+implementation or readiness evidence for code.
+
+
+T390 implementation refinement: automation/job_progress.dart owns the existing
+TrustedJobService driver's data-only read/CAS retry loop. Production callbacks
+read the same guarded snapshot and call StateStore.publishTrustedJobProgress
+with expected durable sequence; no alternate writer or domain-success adapter.
+The originating driver mode comes only from the private actual driver, and its
+mode/phase predicate is re-evaluated on every read and CAS retry. The existing
+native/session/target/root proof remains outside this metadata helper. RAM race
+units use that same loop and actual StateStore with commit/read latches, not
+invented tool ACKs. This refines T386 publication safety; T389 handoff readiness
+and T387/T388/T324/T331 acceptance remain separately open.
+
+
+### T389 control handoff refinement — T391
+
+The existing boolean _drive refusal while a prior driver remains charged cannot
+fulfil an accepted control by itself. Add automation/job_controls.dart as the
+TrustedJobService-owned bounded control coordinator. It owns only serialization,
+private pending tickets, deadline/timer bookkeeping and pump correlation; jobs.dart
+still owns actual actor proof, store mutations and Root/SSH driver dispatch.
+No new service, executable, wire, persistent entity or permission producer.
+
+Use one workspace-local FIFO control metadata mutex, shared by cancel/reconcile
+admission+registration and by activation/expiry cleanup. Do not hold it while
+waiting for an old driver's physical drain or while a new driver performs root
+I/O. Existing apply admission remains immediate and HOST_BUSY, never queued.
+Retain at most one pending cancel and one pending reconcile per nonterminal job,
+with one coalesced pump and one earliest-deadline timer per service. Components,
+ordering, original30s invocation budget, scope and lifecycle are normative in
+contracts/embedded-engine.md, section Accepted job control handoff.
+
+T391 is specification readiness for T392 implementation and T393 actual RAM
+handoff matrix, completing the T389 slice of T387. T386/T390 terminal/CAS gates
+are retained. T387's other recovery/occupancy cases, T388 controller/display and
+T324/T331 aggregate acceptance remain separate. Existing EngineClock and standard
+Timer/time-scheduling adapter suffice; no new package pin, runtime prerequisite,
+public setting, schema migration or compatibility path. Constitution I–VII
+remain satisfied by one engine/writer, private authority, bounded resources and
+explicit physical quiescence. Design readiness is not implementation evidence.
+
+
+### T329 current-source plan reconciliation — 2026-10-31
+
+Embedded implementation uses the existing exact dartssh2 4.1.0 pin, confirmed in
+engine pubspec and both root/engine lockfiles. No dependency resolution or upgrade
+is required by this correction. Current constitution version4.3.0 is unrelated to this pin.
+
+Engine worker Root/controller/gateway, Windows desktop composition, same-worker
+power lifecycle and current capability projection exist in the source. T321 and
+T324/T331 are accepted in their static/RAM scope; T325 separately proves complete
+nonempty target-schema3 retention through actual loaders and declared RAM ports.
+The earlier foundation plan sections and completed task history remain historical;
+the embedded change and current contracts take precedence over their locald model.
+Remaining legacy cleanup T327, current user/developer docs T328 and final whole-
+feature Analyze/Converge/evidence T330 remain open. Component acceptance does not
+establish native/platform/build/install/release readiness or whole-goal completion.

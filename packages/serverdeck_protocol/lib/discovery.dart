@@ -10,7 +10,7 @@ class DiscoveryNamespace {
   DiscoveryNamespace._(this.hash);
   final String hash;
   static Future<DiscoveryNamespace> forOwner(String sid) async {
-    if (!RegExp(r'^S-1-\d+(?:-\d+)+$').hasMatch(sid))
+    if (sid.length > 4096 || !RegExp(r'^S-1-\d+(?:-\d+)+$').hasMatch(sid))
       throw StateError('STORAGE_BLOCKED');
     final digest = await Sha256().hash(utf8.encode('${sid}default'));
     return DiscoveryNamespace._(
@@ -19,8 +19,12 @@ class DiscoveryNamespace {
   }
 
   String get mutexName => 'Global\\ServerDeckNext.v1.$hash';
+  static const fileName = 'embedded-v1.discovery';
   List<String> get pipeNames => List.unmodifiable(
-    List.generate(8, (slot) => '\\\\.\\pipe\\ServerDeckNext.v1.$hash.$slot'),
+    List.generate(
+      8,
+      (slot) => '\\\\.\\pipe\\ServerDeckNext.embedded-v1.$hash.$slot',
+    ),
   );
 }
 
@@ -37,7 +41,7 @@ class DiscoveryDescriptor {
   final String _ownerSid, buildId, generation;
   String get ownerSid => _ownerSid;
   final int serverPid;
-  final String? workspaceId;
+  final String workspaceId;
   final List<String> pipeNames;
   final Uint8List _token;
   bool _closed = false;
@@ -58,23 +62,25 @@ class DiscoveryDescriptor {
     required String ownerSid,
     required String buildId,
     required int serverPid,
+    required String generation,
+    required String workspaceId,
   }) async {
     if (!_build.hasMatch(buildId) || serverPid < 1 || serverPid > 0xffffffff)
       throw StateError('INCOMPATIBLE');
+    try {
+      requireUuid(generation);
+      requireUuid(workspaceId);
+    } catch (_) {
+      throw StateError('STORAGE_BLOCKED');
+    }
     final namespace = await DiscoveryNamespace.forOwner(ownerSid);
     final random = Random.secure();
-    final id = List.generate(16, (_) => random.nextInt(256));
-    id[6] = (id[6] & 15) | 64;
-    id[8] = (id[8] & 63) | 128;
-    final hex = id.map((v) => v.toRadixString(16).padLeft(2, '0')).join();
-    final generation =
-        '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
     return DiscoveryDescriptor._(
       ownerSid,
       buildId,
       serverPid,
       generation,
-      null,
+      workspaceId,
       namespace.pipeNames,
       List.generate(32, (_) => random.nextInt(256)),
     );
@@ -83,10 +89,11 @@ class DiscoveryDescriptor {
   List<int> encode() {
     _open();
     return StrictCodec().encode({
-      'format': 1,
+      'format': 2,
+      'hostKind': 'application',
       'product': 'serverdeck-next',
       'apiMajor': 1,
-      'apiMinor': 0,
+      'apiMinor': 1,
       'workspaceSlot': 'default',
       'workspaceId': workspaceId,
       'generation': generation,
@@ -105,8 +112,23 @@ class DiscoveryDescriptor {
     Uint8List? token;
     try {
       final value = StrictCodec().decode(bytes, maxBytes: 8192);
+      // Classify incompatible transports before closed-field validation: a
+      // former format1 lacks hostKind and must never become a fallback path.
+      for (final version in {
+        'format': 2,
+        'apiMajor': 1,
+        'apiMinor': 1,
+      }.entries) {
+        if (value[version.key] is! int || value[version.key] != version.value)
+          throw StateError('INCOMPATIBLE');
+      }
+      if (value['hostKind'] != 'application') throw StateError('INCOMPATIBLE');
+      if (value['buildId'] != expectedBuildId ||
+          !_build.hasMatch(expectedBuildId))
+        throw StateError('INCOMPATIBLE');
       requireFields(value, {
         'format',
+        'hostKind',
         'product',
         'apiMajor',
         'apiMinor',
@@ -118,19 +140,8 @@ class DiscoveryDescriptor {
         'serverPid',
         'pipeNames',
       });
-      for (final version in {
-        'format': 1,
-        'apiMajor': 1,
-        'apiMinor': 0,
-      }.entries) {
-        if (value[version.key] is! int || value[version.key] != version.value)
-          throw StateError('INCOMPATIBLE');
-      }
-      if (value['buildId'] != expectedBuildId ||
-          !_build.hasMatch(expectedBuildId))
-        throw StateError('INCOMPATIBLE');
       requireUuid(value['generation']);
-      if (value['workspaceId'] != null) requireUuid(value['workspaceId']);
+      requireUuid(value['workspaceId']);
       final pid = value['serverPid'], encoded = value['bootstrapToken'];
       if (value['product'] != 'serverdeck-next' ||
           value['workspaceSlot'] != 'default' ||
@@ -158,7 +169,7 @@ class DiscoveryDescriptor {
         expectedBuildId,
         pid,
         value['generation'] as String,
-        value['workspaceId'] as String?,
+        value['workspaceId'] as String,
         namespace.pipeNames,
         token,
       );
@@ -168,26 +179,6 @@ class DiscoveryDescriptor {
     } finally {
       token?.fillRange(0, token.length, 0);
     }
-  }
-
-  DiscoveryDescriptor withWorkspace(String id) {
-    _open();
-    try {
-      requireUuid(id);
-    } catch (_) {
-      throw StateError('STORAGE_BLOCKED');
-    }
-    if (workspaceId != null && workspaceId != id)
-      throw StateError('STORAGE_BLOCKED');
-    return DiscoveryDescriptor._(
-      _ownerSid,
-      buildId,
-      serverPid,
-      generation,
-      id,
-      pipeNames,
-      _token,
-    );
   }
 
   void close() {

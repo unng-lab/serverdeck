@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/models.dart';
 
-import '../bootstrap/local_api_client.dart';
+import '../bootstrap/engine_client.dart';
 import 'profile_controller.dart';
 
 class RecoveredCommit {
@@ -151,7 +151,7 @@ class StartupRecovery extends ChangeNotifier {
       if (!live()) return;
       _receipts = const [];
       _received = false;
-      _error = error is LocalApiException
+      _error = error is EngineApiException
           ? error.code
           : error is FormatException
           ? ErrorCode.incompatible

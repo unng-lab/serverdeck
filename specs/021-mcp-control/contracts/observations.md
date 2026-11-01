@@ -1,5 +1,11 @@
 # Shared remote observations
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [tasks](../tasks.md), [connections](connections.md),
 [MCP](mcp.md), [observability](../../009-observability/spec.md),
 [managed resources](plans.md).

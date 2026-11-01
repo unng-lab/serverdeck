@@ -1,89 +1,41 @@
-# Production format3 startup
+# Production embedded startup
 
-The production locald entry uses `TrustedLocaldEnvironment` and
-`TrustedLocaldBootstrap`. It verifies the installed format3 bundle, retained
-locald image and native runtime before touching workspace files. It owns the
-canonical mutex, eight trusted pipe slots, protected discovery and
-[trusted workspace](trusted-workspace.md) for the whole generation.
+Действующая поправка существующих001/021: [embedded host](embedded-host.md) и
+[основа](../../001-service-foundation/contracts/embedded-engine.md).
+Этот раздел заменяет прежний locald/cold-launch startup; старые binary entries,
+owner IPC probes и discovery fallback не являются действующими требованиями.
+Целевые schema3/format3 wire/credentials/trust/jobs сохраняются без migration.
 
-Discovery is published before workspace initialization so authenticated clients
-can observe starting/recovering/blocked readiness. Its format1 container is not
-an API-version negotiation: the actual native bootstrap requires same-build
-API1.1, format3 role proof and schema3 typed responses. No old bootstrap fallback
-is permitted. After storage opens, discovery gains the actual workspace ID.
+App получает genuine bundle4, retained current-process identity, SID и private
+writer lease, выполняет schema3 preflight/recovery и только затем публикует
+Ready-generation MCP endpoints с protected descriptor2 embedded-v1. Единственный
+store/writer находится в private app worker; owner capability не выдаётся через
+role/CLI/IPC. Bootstrap failure сохраняет ownership до физического cleanup;
+CloseBlocked не освобождает lease. Полный порядок и resource bounds определены
+embedded contracts; metadata не заменяет retained PID/creation/image proof.
 
-The first eligible native peer binds the actual locald publication gate and
-`TrustedSessions`. A locald contender is permitted only the ownership probe; it
-cannot initialize owner/MCP services or poison an eligible connection's binding.
-The format3 native worker can identify another verified same-bundle locald for
-this probe only; native2 keeps its existing refusal. Before any service/session
-binding, the winner sends the exact framed object
-`{"serverdeckOwnerProbeV1":"<verified-build-id>"}` and drains that output within
-five seconds. The contender independently verifies the native locald peer and
-reads this exact single-field object within both its original 30-second startup
-budget and a five-second probe budget. Only an exact same-build value succeeds.
-No bootstrap token, workspace contents, role grant or RPC session is issued.
-Drain keeps the pipe alive until the contender has read the response; the
-normal physical disconnect/reuse barrier follows. Failed, silent or malformed
-probes never count as a live owner or extend either deadline.
-The deferred API admits readiness/session lifecycle while storage starts; domain
-routes activate only after actual shared-service composition and job recovery.
-Only the activated composition can publish ready features. The verified bundle
-and its optional verified executor descriptor are passed directly to that
-composition; absence of the descriptor never implies executable job support.
+Same-executable --mcp-stdio проверяется до UI/COM/tray/Host. Native carrier
+изолирует SDK logs и передаёт только исходные inherited stdio bytes; private
+channel readiness5s предшествует connection-only bootstrap. Коннектор проверяет
+живое Ready/MCP app, bundle/current peer, discovery/proof, затем optional grant.
+Отсутствующее app не запускается: это локальная ошибка подключения, не ответ
+сервиса. Grantless доступ также требует живого app; catalog пуст, calls запрещены.
+После proof/effect нет reconnect/replay. Внешний MCP wire и каталог021 сохраняются.
 
-The original process startup deadline is 30 seconds. First authentication and
-bootstrap completion are both required within it. Session expiry and the
-existing two-second empty-session grace use actual registry state; no keeper
-session is fabricated. Shutdown stops admission, waits for actual startup,
-binding, activation and mutation drains, then closes storage, pipes, discovery,
-keys and finally the mutex. Unconfirmed storage close or reservation prevents
-early mutex release. A constructed channel owns its physical disconnect barrier;
-the serving loop must not disconnect its slot twice.
-If workspace startup fails after discovery publication, authenticated diagnostic
-readiness remains available. The first startup failure is retained through
-normal last-session shutdown and all physical cleanup. After cleanup the
-production entry reports its fixed failure code and exits1; closing a diagnostic
-session must not turn an unsuccessful workspace open into a successful exit0.
-The unauthenticated startup watchdog still closes the service within its original
-budget, but its later TIMEOUT does not replace an already known startup failure.
-An actual physical-cleanup failure takes precedence and remains STORAGE_BLOCKED;
-the first startup code is reported only after cleanup has succeeded.
+Физический write ACK, publication fencing, trusted peer и close/owned-exit
+ограничения — в [gateway](gateway.md) и embedded-host. App в трее продолжает
+обслуживать MCP, explicit Exit закрывает admission и выполняет общий drain10s.
+Незавершённые remote jobs не объявляются отменёнными из-за потери наблюдения.
 
-The normal Flutter entry uses `TrustedNativeBootstrapHost` and the explicit
-`LocalApiClient.trusted` constructor. This constructor accepts only a genuine
-`TrustedApiClient` plus its authenticated generation; it does not route native
-traffic through the old handshake or turn schema3 results into legacy DTOs.
-Snapshot consistency, ordered trust counters, immutable mutation IDs, receipt
-recovery, polling epochs and stale-generation rejection remain enforced. The
-same actual client is borrowed by server and automation panels. Disposing these
-panels does not close the shared session.
+`tools/run-serverdeck.ps1` разрешает root+четыре package lockfiles и выполняет
+только Flutter Windows build; engine generator заменяет прежний locald generator.
+Manifest4/API1.1/schema3 связывает serverdeck.exe/libisar.dll и сгенерированный
+executor-release.json. Runtime/data/assets/fonts/native notices остаются рядом.
+Нет отдельного mcp.exe/locald.exe, build aliases или app-root/owner flags.
+Наличие старых exe в layout останавливает build entry, без удаления старой
+установки/данных или завершения процессов. Native input/approval/source guards
+сохранены; stale approvals не становятся актуальными после смены source.
 
-The MCP entry accepts exactly `--app-root <absolute path> --grant-id <UUID>` or
-no arguments. A configured bridge verifies its own fixed MCP image, uses the
-same protected discovery and may launch one verified matching locald contender.
-Startup has one 30-second budget; unavailable pipe slots may be tried, but an
-authenticated-session/grant failure is terminal. The narrow
-`readinessBeforeGrant` API serializes typed readiness before ordinary RPC claim;
-it cannot overlap grant proof or ordinary RPC. It supplies the authenticated
-workspace ID for protected per-grant DPAPI custody. The bridge proves the grant
-before `LocalMcpGateway.connectTrusted` claims the actual RPC session and native
-publication gate. The gateway retains the existing cancellation, current-grant
-publication and physical drain rules. No arguments exposes only unconfigured
-protocol negotiation; configured failure never selects that mode.
-
-An optional MCP cold launch uses CREATE_BREAKAWAY_FROM_JOB with the existing
-hidden/Unicode process flags. It may not inherit a host Job Object that can kill
-the shared daemon when one client closes. If host policy refuses breakaway,
-startup reports the fixed PREREQUISITE_UNAVAILABLE code; the owner starts the
-normal UI/locald independently before connecting that host. There is no retry
-without the flag and no unrequested broker/task/shell workaround. Existing
-independently started locald connections require no breakaway operation.
-
-`tools/run-serverdeck.ps1` assembles the normal Flutter binary, locald, MCP,
-selected native DLL/notices and generated executor descriptor. It publishes a
-format3/API1.1/schema3 manifest binding all five artifact hashes and all five
-dependency lockfiles. `run-foundation.ps1` delegates ordinary builds to it;
-historical acceptance targets remain explicit and must be updated/qualified in
-the deferred final checks. Neither source activation nor selected analysis
-establishes installed-runtime, native-release or full-feature acceptance.
+Проверки текущей задачи — static и RAM units; native/CRT/loader/Win32 I/O,
+установленная команда, realFS/Isar/SSH/процессы/UI/design, build/install/deploy
+не квалифицированы. Исторические evidence не закрывают новые acceptance gates.

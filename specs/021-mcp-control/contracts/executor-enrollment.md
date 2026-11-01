@@ -1,5 +1,11 @@
 # Owner-confirmed executor enrollment
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Executor](executor.md), [connections](connections.md), [observations](observations.md),
 [tasks](../tasks.md), [plan](../plan.md).
 
@@ -24,9 +30,11 @@ This file contains no credential or grant secret and grants no authority by its
 presence. It is owner-only, read through retained protected Windows file APIs,
 bound to workspaceId/receiptKeyId and HMAC authenticated by the existing receipt
 key with purpose executor-enrollments-v1. Envelope is exactly `{document,mac}`;
-document is exactly `{format:2,workspaceId,receiptKeyId,records,receipts}`. The old
-format1 `{format:1,workspaceId,receiptKeyId,records}` remains readable with an empty
-receipt set; the first new mutation publishes format2 atomically. Records are
+document is exactly `{format:2,workspaceId,receiptKeyId,records,receipts}`. Only this
+outer format is supported. Format1/unknown sidecars are refused without writes,
+conversion, reset or an empty-receipt fallback. Inner `ExecutorEnrollment.format:1`
+and the existing HMAC purpose strings remain the exact target payload/binding,
+not support for a schema1 workspace. Records are
 unique by server, sorted on write, maximum250; receipts are unique by requestId,
 sorted on write, maximum10000 and retained for the workspace lifetime. The whole
 file is bounded64MiB; reaching either capacity refuses a new mutation before
@@ -36,19 +44,25 @@ Missing file means no executor enrolled. Stored old target facts are not silentl
 rebased to a new target. Workspace migration/backup must preserve this file and
 its custody binding; copying it to another workspace never enrolls that workspace.
 
-The production migrator keeps the active directory and replaces only registered
-database/manifest files. Under its unchanged writer lease it captures protected
-executor-enrollments.json bytes (or absence) before either upgrade step and
-requires identical digest/absence after both, before ordinary store open.
-Unsafe custody blocks migration. Sidecar HMAC/semantic validation remains the
-executor store boundary; migration never recreates, drops or converts the file.
+There is no upgrade/rollback/import path. Direct target-schema3 opening preserves
+this sidecar and its custody binding; unsupported/corrupt sidecars are not rewritten.
+There is no user-facing backup/restore API. Copying or restoring a DB alone is not
+a supported workspace restore. An operator copying a workspace must retain its
+entire protected directory, including receipt-key.dpapi, workspace identity,
+client credential custody and this sidecar. No arbitrary export path or credential
+tool is exposed by MCP.
 
-The existing original.isar migration copy is an internal DB recovery artifact,
-not a standalone workspace backup. There is no user-facing backup/restore API.
-An operator copying a workspace must retain its entire protected directory,
-including receipt-key.dpapi, workspace identity, client credential custody and
-this sidecar. Restoring only a DB is not a supported workspace restore. No new
-arbitrary export path or credential tool is exposed by MCP.
+The engine `storage/executor_enrollments.dart` owns the format2 parser, HMAC/replay
+and atomic publication/readback. It uses ProtectedFiles/WorkspaceLease/custody ports;
+the StateStore composition retains the single shared32 writer tail and propagates
+storage poison to the host. The primitive additionally refuses overlapping physical
+operations with NOT_READY; it never starts a second queue/writer, closes a lease or
+creates a missing sidecar on read. Captured mutation objects are immutable and
+bound to their issuing repository; they do not grant owner or target authority.
+The owner adapter still retains current native proof/target fence through the
+actual operation. Readiness/owner/key/path/lease is checked across async file work.
+An uncertain replacement/readback closes admission and requires restart to
+re-authenticate actual committed bytes; it never retries the enrollment effect.
 
 StateStore queues protected read/write operations with its existing writer tail
 and shared32 admission budget, verifies HMAC and exact readback after atomic

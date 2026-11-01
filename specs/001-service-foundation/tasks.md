@@ -1,5 +1,20 @@
 # Tasks: 001.1 — Исполняемый сервис и защищённые профили
 
+**Последнее указание пользователя — unit only**: все прежние собственные тесты,
+fixtures и harness удаляются; пишутся только unit-тесты под эту задачу. Дизайн,
+widget/visual/integration/native/реальные SSH/container проверки сейчас не выполняются.
+Исторические результаты ниже остаются историей, не текущим gate. Изменение не
+разрешает потерять функции, данные, права или проверки целевого поведения в новых units.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
+**Текущая работа 2026-10-30**: T253–T272 в конце файла. История T001–T252
+сохраняется; старые Scope/Status/native gates описывают состояние до embedded-поправки.
+
 **Input**: [Spec](spec.md), [Plan](plan.md), [research](research.md), [data model](data-model.md), [Local API](contracts/local-api.md), [runtime/storage](contracts/runtime-storage.md), [UI](contracts/ui-validation.md), [quickstart](quickstart.md).
 **Scope**: только 001.1. US1 соответствует User Story 1 спецификации «Запустить собственное рабочее пространство», Priority P1. US2 (SSH) и US3 (job coordinator/recovery) не реализуются; базовые bootstrap/storage crash-сценарии AC 001.1 уже входят сюда. Нет backend, реальных серверных операций, installer/updater или импорта старого приложения.
 **Status**: Implement 001.1 продолжается. Setup/Foundation и внутренние storage/custody/models/CRUD/coordinator приняты в отмеченных ниже задачах. Production locald выполняет owner bootstrap, handshake, readiness и Local API через настоящий named pipe; compiled console fixture подтвердил открытие/reopen, contender, watchdog и lease. T026–T028 приняты по совокупной unit/native/compiled evidence и завершённому независимому compiled_auth_owner_readiness_review; T030/T135–T140 приняты после независимого local_api_client_heartbeat_fixed_review без замечаний; T031/T142/T145 приняты после clean native_ui_bootstrap_review; attempt controller T141/T143 принят после clean bootstrap_attempt_disposal_fixed_review. UI оболочки, профилей/credentials/settings и mutation recovery реализованы и проверены в принятых scoped increments T147–T175. Из исходных aggregate задач завершены T033–T037, T041/T042, T045–T047 и T049; T038–T040, T043–T044, T048 и T050 остаются открытыми. Полная сквозная native/manual/CI приёмка и готовность всего001.1 к merge не установлены. Фактический scope и ограничения: [evidence](../../docs/development/foundation-verification.md).
@@ -788,3 +803,4230 @@ T252 prerequisite-copy review correction: trim ending directory separators on bo
 T244/T245/T252 hosted closure: run [38635056439](https://github.com/unng-lab/serverdeck/actions/runs/38635056439) on reviewed60d8d3d completed cold source build/current qualification and artifact upload successfully. Final validated hosted proof binds source81a3c6fcb695ff7768fbe0d01772ffaa5174606b8ee68eae45f770df1badf6d4, manifestee48d19a0d361fc2bde137767a0fc4dcbb71445d051184077cce222ab8f777cc and receiptf718a2326bc69c25b3c3af59e0de661a0cccd274d5ec97a46f8ab2f31013ed30. It proves root/three-package suites, Debug/Release,14available phases and separate compiled runtimeDiagnostics through the final receipt validator, not merely started-phase JSON. Current closure changes only docs/evidence/tasks, not the qualified source inputs. Proof/API metadata and limits: [journal](../../docs/development/foundation-verification.md#hosted-compatibility-2026-10-15). The first prerequisite-copy review P2 was fixed, controlled tests passed and fresh prerequisite_complete_bundle_fixed_review completed with0findings. Fresh closure review follows mandatory links/diff checks. Overall job failure is the unchanged Acceptance remains incomplete barrier; all full/manual/Windows11/exact-denied gates and T208 dependency remainOPEN. No activation/distribution/PR/release/merge. Private hosted receipt/logs were not downloaded; public proof identifies runner-validated hashes without claiming independent local rehash of those private files.
 
 T244/T245/T252 closed after completed fresh readonly hosted_automatic_closure_review:0findings/ready scoped automatic closure. Reviewer independently queried actual terminal run38635056439, byte-compared retained/downloaded safe proof, inspected requirement/contract/source/validator chain and unchanged full/manual barriers. Actual lychee543OK/0errors and diffcheck0; no private receipt/log rehash or full001.1 readiness claim. Historical completed tasks retained; T208 dependency and all remaining specified gates remainOPEN.
+
+
+## Поправка 2026-10-30: встроенный движок в существующей основе
+
+История T001–T252 сохраняется. Следующие задачи не выполнены. Старые открытые
+native/integration/manual gates не запускать в текущем scope, не отмечать пройденными;
+они не критерий выполнения этой поправки. Прошлая приёмка не переносится на engine.
+Работать в согласованной кодовой базе, не менять worktree/процессы/установку003.
+
+### Setup and foundational phase
+
+- [x] T253 Зафиксировать разрешённые full static/unit/widget suites и отделить native cases по фактическим side effects в tools/test-unit.ps1, packages/*/test/ и .github/workflows/unit.yml, сохранив старые tests без skip-as-success; запретить native/integration/SSH/container/manual dispatch в scope поправки (FR-SVC-EMB-12/13).
+- [x] T254 Вынести нейтральные platform ports и opaque host authority в packages/serverdeck_engine/lib/platform/ports.dart и lib/hosting/authority.dart: lease только после native close, vault locked/denied/corrupt не missing, owner capability не сериализуется (FR-SVC-EMB-02/03/05).
+- [x] T255 Перенести profiles/credentials/storage/remote/automation/mcp из packages/serverdeck_locald/lib/ в packages/serverdeck_engine/lib/ с прежними validation/CAS/schema3/limits и без Flutter/Windows imports; прежний root удалён, без переходной оболочки (FR-SVC-EMB-02/12).
+- [x] T256 Реализовать Windows ports в packages/serverdeck_windows/lib/engine_platform.dart, отделить UserProtection interface и store runtime от Windows imports в engine, сохранить SID/DPAPI entropy/ACL/mutex/retained identity и pinned Isar ABI (FR-SVC-EMB-03/05).
+
+### US1 — одно приложение, lifecycle и ownership
+
+Goal: app владеет engine; independent tests AC-SVC-EMB-01/02/03 через fakes/widgets.
+
+- [x] T257 [US1] Реализовать EngineHost/EngineGateway в packages/serverdeck_engine/lib/hosting/engine_host.dart и in_process_gateway.dart: один store/writer, Ready после recovery, 64 pending/session и 256 суммарно с RESOURCE_LIMIT; сохранить прежние более строгие limits (FR-SVC-EMB-01/02/03).
+- [x] T258 [US1] Перевести lib/bootstrap/ и lib/app.dart на host-owned owner gateway, сохранить DTO/controllers/readiness/CAS/receipt outcomes и presentation003; UI не открывает Isar/SSH, IPC owner token наружу отсутствует (FR-SVC-EMB-01/02). Обязателен один trusted engine worker и private Dart-port gateway по embedded-engine#engine-worker-and-ui-proxy-composition: никаких blocking native/hash calls в Flutter isolate, shared Timeline deadlines и physical settlement/close ack; lib/bootstrap/engine_worker.dart и engine_gateway.dart.
+- [x] T259 [US1] Реализовать tray/menu lifecycle и fallback «Выйти»/«Остаться» в lib/platform/desktop_lifecycle.dart и lib/shell/; close окна сохраняет app/MCP, explicit exit закрывает admission сразу, drain10s, CloseBlocked удерживает lease, suspend/resume меняет fence (FR-SVC-EMB-04/09).
+- [x] T260 [US1] Реализовать общий sampler/target fence и secondary-instance activation-only в packages/serverdeck_engine/lib/remote/observations.dart и hosting/instance_owner.dart; один sampler на существующую profile/revision binding и readKind, один writer на remote host, old responses/revoked rights не публикуются (FR-SVC-EMB-03/09).
+- [x] T261 [US1] Добавить unit parity/ownership/late-response/close-failure tests в packages/serverdeck_engine/test/ и unit lifecycle/bootstrap tests в test/embedded_host_test.dart, включая tray absent, два окна/два MCP/second process, startup30s, два SSH transports и прежние лимиты (SC-SVC-EMB-01, AC-SVC-EMB-01/02/03). Включить RAM worker/channel/clock tests для trusted binding, mailbox stop barrier, original deadlines/queued-timeout capacity, late reply/close ack и lost-worker CloseBlocked без нового worker/store; native/UI/design тесты запрещены.
+
+### US2 — целевые данные без compatibility
+
+Goal: нынешние данные не теряются; independent tests AC-SVC-EMB-04/05/06.
+
+- [x] T262 [US2] Реализовать adoption без schema bump в packages/serverdeck_engine/lib/storage/workspace.dart: тот же default path/mutex, schema3 preflight, только exact schema3, без legacy upgrade, busy/wrong owner/unknown schema/vault failure без reset/kill/параллельного writer (FR-SVC-EMB-05/06).
+- [x] T263 [US2] Добавить synthetic record-family/blobs/IDs/revisions/grants/enrollment/history roundtrip и fault tests в packages/serverdeck_engine/test/storage/adoption_test.dart; runtime sessions/одноразовые permits не воскресают, CloseBlocked не освобождает lease (SC-SVC-EMB-02, AC-SVC-EMB-04/05).
+- [x] T264 [US2] Описать и отобразить target-schema3-only, INCOMPATIBLE/writer-busy в docs/development/embedded-engine-storage.md и lib/shell/recovery_view.dart; без snapshot overwrite/downmigration и удаления старых данных (AC-SVC-EMB-06, FR-SVC-EMB-06).
+
+### US3 — MCP и remote jobs
+
+Goal: parity tools/rights и честный outcome; independent tests AC-SVC-EMB-07/08/09.
+
+- [x] T265 [US3] Изменить packages/serverdeck_windows/lib/mcp_build_bundle.dart, discovery.dart и engine IPC host на verified app identity, новый embedded-v1 discovery descriptor без изменения closed-field format3 handshake; сохранить retained peer/ACL/challenge/proof/publication gate (FR-SVC-EMB-07/09).
+- [x] T266 [US3] Перевести packages/serverdeck_mcp/lib/src/bootstrap.dart и local_gateway.dart на connection-only app bridge, absent app SERVICE_UNAVAILABLE≤5s, без autolaunch/reconnect после proof/effect; сохранить grants/custody/tool catalog021 (FR-SVC-EMB-07).
+- [x] T267 [US3] Сохранить intent-before-submit и recovery неизвестных remote attempts в packages/serverdeck_engine/lib/automation/jobs.dart и job_session.dart; observer overlay attached/detached/stale не schema4; lost ACK/missing remote attempt не освобождают occupancy и не replay apply (FR-SVC-EMB-08/09).
+- [x] T268 [US3] Добавить full unit permission/tool parity suite в packages/serverdeck_mcp/test/embedded_gateway_test.dart и packages/serverdeck_engine/test/automation/observer_recovery_test.dart: expired/revoked grants, owner forgery, target fence, lost ACK, restart, missing attempt, duplicate terminal и явный reconcile/cancel (SC-SVC-EMB-03/04, AC-SVC-EMB-07/08/09).
+
+### US4 — переносимая граница, без ложного platform support
+
+Goal: capabilities соответствуют реальности; independent tests AC-SVC-EMB-10/11/12.
+
+- [x] T269 [US4] Реализовать EngineCapabilities/fake lifecycle-vault adapters и import-boundary unit checks в packages/serverdeck_engine/lib/hosting/capability_snapshot.dart и test/platform_contract_test.dart: engine без Flutter/Windows, не-Windows без транзитивного Windows FFI, mobile foregroundOnly, Web directSsh=false (FR-SVC-EMB-10/11, SC-SVC-EMB-05).
+- [x] T270 [US4] Обновить platform status/prerequisites и future adapter handoff в README.md и docs/development/platform-capabilities.md по embedded-platforms contract, без реализации/деплоя backend, без объявления Linux/macOS/mobile поддержанными; это граница для отдельных последующих поставок (AC-SVC-EMB-10/11/12).
+
+### Cross-cutting completion
+
+- [x] T271 Обновить production/dev bundle manifests и startup scripts в tools/ и .github/workflows/ для app+Isar+встроенный MCP без locald, сохранив pinned runtime/notices/prerequisites и exact app peer identity; не устанавливать/не публиковать сборку и не запускать native dispatch (FR-SVC-EMB-01/12/13).
+- [x] T272 Выполнить применимые format/analyze/full unit/link checks по quickstart, затем независимый read-only review/fix loop AGENTS.md; записать команды/scope/exit codes/непроверенные native сценарии в docs/development/embedded-engine-verification.md; не переносить старые галочки в новую приёмку (FR-SVC-EMB-12/13).
+
+### Dependencies, parallel work and implementation strategy
+
+T253→T254→T255→T256→T257. US1 T258–T260 после T257; T261 после всех US1 changes.
+US2 T262 после T256/257, T263→T264; US3 T265→T266 после T257 и доверенного host,
+T267 после T262, T268 после T265–T267. US4 T269 после T254/255, T270 после T269.
+T271 после US1–US3, T272 после всех. MVP: extraction+Windows US1/US2/US3;
+US4 фиксирует portability boundary, реальные другие OS не входят в этот MVP.
+Не менять reviewed files во время review. Открытая параллельная работа003 не часть
+этой очереди; перед implementation брать актуальную согласованную базу без её сброса.
+Параллельно после общих prerequisites допустимы US1 widget tests и US2 synthetic
+fixtures в разных файлах; US3 bridge tests и US4 capability docs. Production shared
+files изменять последовательно; [P] не назначен задачам с общими dependencies.
+
+### Traceability действующей поправки
+
+| Requirements | Решение/контракт | Tasks | Acceptance |
+| --- | --- | --- | --- |
+| FR-SVC-EMB-01/02 | plan ownership; embedded-engine | T254–T258,T271 | AC-SVC-EMB-01/10, SC-SVC-EMB-01 |
+| FR-SVC-EMB-03 | embedded-engine ownership/limits | T256/257/260/261 | AC-SVC-EMB-01/03 |
+| FR-SVC-EMB-04 | embedded-engine lifecycle | T259/261 | AC-SVC-EMB-02/03 |
+| FR-SVC-EMB-05/06 | embedded-migration, data-model | T262–T264 | AC-SVC-EMB-04/05/06, SC-SVC-EMB-02 |
+| FR-SVC-EMB-07 | 021 embedded-host MCP | T265/266/268 | AC-SVC-EMB-07, SC-SVC-EMB-03 |
+| FR-SVC-EMB-08/09 | 021 embedded-host jobs, engine event fence | T260/267/268 | AC-SVC-EMB-08/09, SC-SVC-EMB-04 |
+| FR-SVC-EMB-10/11 | embedded-platforms | T269/270 | AC-SVC-EMB-10/11/12, SC-SVC-EMB-05 |
+| FR-SVC-EMB-12/13 | plan phases, quickstart | T253/271/272 | все перечисленные AC, scope evidence |
+
+### Исправление независимого ревью 2026-10-30
+
+Первое completed review выявило P2: новый общий watch не имел topic/cursor/buffer
+контракта. Решение — удалить новый streaming API, сохранить прежние typed methods,
+bounded operation handles и polling. История задач не меняется; добавлена регрессия:
+
+- [x] T273 Реализовать/проверить parity существующих typed snapshot/poll2s и observations start/status/cancel в packages/serverdeck_engine/test/hosting/gateway_parity_test.dart и lib/bootstrap/engine_gateway.dart, без общего watch/topic stream; использовать прежние DTO/operation/cursor bounds, cancellation interest не cancel remote job (FR-SVC-EMB-02/03/09, AC-SVC-EMB-01/08/09).
+
+T273 зависит от T257/T258/T260, выполняется до T261/T268/T272. Дополняет traceability
+FR-SVC-EMB-02/03/09. Всего в embedded-поправке21 открытая implementation задача;
+US1 получает дополнительную T273. Это спецификационное исправление, тест не выполнен.
+
+### Уточнение пользователя: один executable и полноценный tray
+
+- [x] T274 Реализовать dispatch serverdeck.exe --mcp-stdio --grant-id UUID в lib/main.dart, packages/serverdeck_mcp/lib/entry.dart и windows/runner/main.cpp: headless engine/унаследованный stdio, без окна/tray/store/owner authority; перенести прежний bin entry без отдельного mcp.exe; unit argument/dispatch/EOF/ownership tests в test/entry_mode_test.dart (FR-SVC-EMB-01/07, AC-SVC-EMB-13).
+- [x] T275 Реализовать и проверить полное tray menu «Открыть ServerDeck»/«Серверы»/«Настройки»/readiness/MCP count/«Выход» в lib/platform/desktop_lifecycle.dart и test/tray_menu_test.dart; keyboard/mouse callbacks, restore existing window, no second host, safe status, unavailable tray fallback и общий shutdown (FR-SVC-EMB-04, AC-SVC-EMB-14).
+
+T274 зависит от T257/T265/T266 и выполняется до T271. T275 дополняет T259 и
+выполняется до T261. Manifest4 исключает ОБА mcp.exe/locald.exe; app identity
+одинакова в UI/MCP mode, поэтому только внутренний owner capability и MCP-only
+IPC endpoint определяют полномочия. T265/T268 обязаны проверять невозможность
+owner IPC из того же image. Всего23 implementation задачи T253–T275.
+
+### Удаление всей заменённой архитектуры в этом же scope
+
+- [x] T276 Удалить packages/serverdeck_locald и standalone packages/serverdeck_mcp/bin после переноса используемой логики; удалить старые lib/bootstrap IPC clients, неиспользуемые protocol/Windows legacy parsers/entry/verifiers/schema1/2 upgrade/rollback helpers, их tests/fixtures/build scripts/workflows. Обновить root и package manifests/locks, docs текущего запуска, test fixtures/imports и test/security/component_boundary_test.dart на единственный engine/MCP mode. Не оставлять re-export/deprecated/fallback facades; сохранить и перепривязать проверки действующих функций, прав, trust и unknown recovery (FR-SVC-EMB-14/15, AC-SVC-EMB-15).
+
+T276 обязателен после T255–T275 и до финальной T272/review. Никакой отдельной
+будущей cleanup-задачи: без удаления старой архитектуры вся поправка не завершена.
+T262/T263/T264 теперь проверяют только exact schema3/отказ legacy без записи;
+previous migration/return acceptance заменён прямым уточнением пользователя.
+Всего24 открытые задачи T253–T276, новые требования14/15 покрыты T262–264/T276/T272.
+
+### T253: проверенное основание реализации — 2026-10-30
+
+T253 закрыта только в scope разрешённых full suites и split native case. Перенос
+MCP custody и target manifest — частичный прогресс T254/T255/T262, не закрытие
+этих задач. Checked source и результаты в
+[implementation evidence](../../docs/development/embedded-engine-verification.md).
+Завершённый independent `engine_foundation_code_review`:0 findings; допускает
+продолжение реализации, не утверждает готовность всего engine/app/release.
+
+### Указание пользователя: заменить весь прежний набор тестов
+
+- [x] T277 Удалить все прежние собственные test/fixtures/harness и старый coverage/design test pipeline из main checkout; оставить только новые unit tests этой задачи в root/test и packages/serverdeck_engine/test и других целевых пакетах по мере переноса. Переписать tools/test-unit.ps1 и .github/workflows/unit.yml на полные текущие unit suites без design/widget/native/disposable fixtures. Обновить ссылки/инструкции и проверить, что старые результаты не выданы за текущую приёмку. Не менять чужой003 worktree и vendored third_party; generated ignored caches не являются test source. Нормальное поведение/отказы/границы новой архитектуры должны проверяться новыми units (FR-SVC-EMB-12/13/15).
+
+T277 выполняется сейчас и обязателен до финальной T272. Ранее закрытая T253 сохраняет
+историю своей редакции, но старый scope7448/coverage больше не текущая политика.
+T261/T268/T273/T274/T275 реализуются только как unit tests, без widget/design suites.
+
+### Независимое review unit reset / authority — 2026-10-30
+
+- [x] T278 Исправить три подтверждённых замечания unit_reset_authority_review: поздний физический отказ runtime proof необратимо закрывает authority/gate и все owner capabilities после логического timeout (unit с двумя owners и восстановлением provider); удалить оставшийся собственный checkpoint/environment/MCP client harness и исключить из source snapshot; пометить прежний coverage gate021/T213 superseded без ложного completion. Полный текущий unit/static/link run и fresh independent review обязательны перед закрытием T277/T278. T254–T276 этим не закрываются.
+
+- [x] T279 Исправить подтверждённый P2 unit_reset_authority_review_2: bindOwner учитывает монотонный срок от начала до публикации capability, включая синхронно затянувшийся provider и задержанный timer; elapsed>=5s возвращает TIMEOUT без новой owner session. Unit с управляемыми часами на точной границе5s и после неё; прежний owner остаётся доступен, повторное открытие не наследует просроченную выдачу. Полный unit/static/link run и fresh independent review.
+
+
+T277/T278/T279 завершены после полного unit/static/link run и completed independent
+`unit_reset_authority_review_3`:0 findings, scoped increment готов для продолжения.
+Фактический scope: root2 + engine18 units, format0changes, Flutter/all-package
+analysis без ошибок; lychee1462total1461OK0errors1excluded. Hosted/native/build
+не запускались. Ignored generated caches не являются test source; их удаление
+ранее отклонено автоматической проверкой. T254–T276 остаются открытыми; готовность
+всего embedded app/release не установлена.
+
+
+### T254 и перенос pure domain T255 — 2026-10-30
+
+T254 закрыта в границах нейтральных ports/opaque HostAuthority после completed
+unit_reset_authority_review_3 и полного unit/static/link run. Windows adapters
+(T256), production Host (T257) и вся T255 этим не закрыты.
+
+Частичный T255: исходники automation/compiler, profile_diff, job_session,
+profiles/validation и remote/observations, ssh_transport, ssh_reads, ssh_executor
+перемещены из locald/lib в engine/lib. Старые файлы удалены, re-export/facade нет;
+все потребители импортируют engine напрямую. DartSSH2 pinned4.1.0 теперь dependency
+engine, прежняя прямая locald dependency удалена. Поведение/лимиты переносимого
+transport сохранены:2 shared slots, connect15s, read30s,4 channels/transport,
+physical completion отдельно от logical cancellation. Новые units этой задачи
+проверяют reservation/drain, typed endpoint/journal filters, compiler baseline/
+qualification отказ, immutable snapshots, bounded deterministic diff и CAS input.
+Реальные SSH/native/process/UI операции не запускаются. Storage/auth/services
+остаются работой T255 и последующих задач; целиком T255 пока не закрыта.
+
+Completed independent `portable_domain_extraction_review`, fork_turns=none,
+read-only:0 findings; данный перенос готов для продолжения T255, не закрывает её.
+Reviewer сравнил все8 файлов с git HEAD (только4 комментария изменены),9 consumers
+(imports/formatting only), manifests/locks,8 новых unit cases и контрактную цепочку.
+Фактический full unit/static/link/locked-dependency scope зафиксирован в
+[implementation evidence](../../docs/development/embedded-engine-verification.md).
+T255 и последующие implementation задачи остаются открытыми.
+
+### T255: target-only models и graph — 2026-10-30
+
+Ещё8 файлов перенесены из locald/lib в engine/lib: storage/{models,host_trust_models},
+automation/{snapshot,configuration,authority_commands,job_commands,plan_commands,
+profile_commands}. Старые source paths удалены, re-export/facade нет. Engine model
+имеет только schema3 factory/empty, trust-aware receipt/profile parsing; прежние
+schema1 factory и trusted-selector удалены. Graph loader принимает HostTrustState,
+plans только schema3, schema2 load/selector отсутствует. IDs/blobs/revisions/
+reference/history limits сохраняются. Команды остаются captured intent, не authority.
+
+Текущие consumers перепривязаны напрямую. Оставшиеся старые native loaders в locald
+больше не получают старый engine parser: их foundation также проходит строгий3
+model/trust gate. Они подлежат удалению с остальной legacy архитектурой T276;
+сам native/store opener и Windows custody ещё не перенесены. Физический отказ
+до writable open и сохранность всех record families относятся к T262/T263, ими
+не объявляется этот логический increment.
+
+Добавлены7 units target foundation/trust/grant graph +2 command boundary units.
+Synthetic RAM-only data, без Isar/DPAPI/SSH/process/widget/design. T255 остаётся
+открытой; готовность всего app/release не установлена. Mandatory full checks и
+completed independent review необходимы до завершения increment.
+
+Completed independent `schema3_domain_extraction_review`, fork_turns=none,
+read-only:0 findings; проверенный increment готов для продолжения T255. Reviewer
+сравнил8 sources с HEAD,21 consumer и9 новых units/contract chain. Strict3 models
+и graph сохранили прежнюю schema3 семантику; старые parser branches не доступны.
+Full checks: root2+engine35passed, format325/0changes, Flutter/allpackage analysis
+noissues; lychee1463total1462OK0errors1excluded. Native/store/tray/release не
+проверены, T255/T262/T263/T276 остаются открытыми.
+
+### T255: custody и подготовка mutations — 2026-10-30
+
+Ещё6 sources перенесены из locald/lib в engine/lib: storage/{key_custody,
+credential_validation}, credentials/provider, profiles/{service,settings_service,
+host_trust}. Старые files удалены, re-export/facade нет. У custody удалены schema1
+manifest helpers, единственный create/verifyWorkspaceManifest — exact3. Wrapper/
+credential payload format1, entropy и HMAC не меняются: это целевые schema3 данные,
+не поддержка старого workspace. OS-user gate остаётся обязанностью provider и
+проверки owner SID у workspace, строка SID сама не создаёт native proof.
+
+У ProfileService один prepare(HostTrustState,...) и PreparedMutation с trust map;
+legacy prepare/schema1 и trusted selector удалены, внутренняя подготовка использует
+private record. Coordinator/consumers импортируют engine напрямую. Остальные старые
+coordinator/store/bootstrap modes ещё подлежат удалению T276; T255 не закрыта.
+
+Новые7 pure units проверяют reopened receipt HMAC/canonicalization/close, credential
+entropy/ID bindings, owner gate, manifest3 refusal, buffers cleanup, keep/replace/
+remove, trust confirm/cosmetic/connection invalidation, settings CAS/delete и vault
+failure без нового состояния. MemoryProtection — RAM-only token stub, без OS/
+encryption claims. Receipt addition в unit setup не доказывает transaction/authority.
+Mandatory full checks и completed independent review требуются до завершения increment.
+
+Completed independent `custody_preparation_extraction_review`, fork_turns=none,
+read-only:0 findings; текущий custody/preparation increment готов для продолжения
+T255. Reviewer сравнил6sources сHEAD,12consumers,7units и target coordinator chain;
+подтвердил сохранение bytes/entropy/HMAC/zeroing и прежней schema3 mutation semantics.
+Fullchecks44units(root2+engine42), format326/0changes, Flutter/allpackageanalysis
+noissues; lychee1463total1462OK0errors1excluded. Native/Isar/DPAPI/SSH/UI/build/CI
+не запускались; T255/T256/T262/T263/T276 остаются открытыми.
+
+### T255/T256/T265: shared bundle4 foundation — 2026-10-30
+
+В рамках prerequisite Windows extraction (до полного T257/IPC T265) добавлены:
+EmbeddedBuildManifest exact4/schema3 с closedfields/16KiB/immutable hashes и только
+serverdeck.exe/libisar.dll/optional executor-release.json; EmbeddedBuildBundle с
+actualartifact hashing/retained application peer без filename role, same-exe MCP
+config, sticky refusal и private verified executor binding. RetainedProcessIdentity
+сделан final, чтобы внешний Dart implementation не мог подменить native identity.
+VerifiedExecutorRelease вынесен в engine port; прежнее public Windows определение
+удалено без re-export,4consumers импортируют neutral contract напрямую.
+
+WindowsNativeStoreRuntime в engine_platform.dart реализует initialize/revalidate
+pinned Isar3.3.2/downloadfalse, требует именно current-process proof ТОГО ЖЕ bundle,
+rejects testOnly, сохраняет sticky loading/failure/identity. Не открывает DB, не
+закрывает lease, DLL живёт до process exit. Реальная DLL не загружалась для проверки;
+другие Windows ports/новый Host/MCP IPC ещё не реализованы. Existing standalone
+runtime остаётся pending T276, новая сборка ещё не переключена на manifest4.
+
+Добавлены7 новых protocol units manifest4 (exact files/version/types/bounds,
+immutability, Unicode/safe errors/testOnly); native verifier/runtime проверяются
+статически и независимым review, не actual OS acceptance. T255/T256/T265/T271/T276
+не закрываются этим foundation increment. Locks/Windows Isar runtime dependency
+обновлены на тот же repository-owned ABI. Полный unit/static/link/locked dependency
+run и completed independent review обязательны до завершения increment.
+
+Completed independent `embedded_bundle_runtime_foundation_review`, fork_turns=none,
+read-only:0 findings; текущий foundation/Windows contracts готовы для продолжения
+T255/T256/T257/T265. Reviewer проверил source/Isar initialization API/4consumers/
+locks/7units/contractchain и логи51units, static/links/lockeddeps. Реальные native
+проверки не выполнял. T255/T256/T265/T271/T276 остаются открытыми; cutover, Host/IPC,
+packaging и actual DLL/runtime readiness этим increment не установлены.
+
+### T255/T256: storage ports и MCP credential artifacts — 2026-10-30
+
+Добавлены WindowsProtectedFiles (canonical paths/ACL/no reparses/atomic retained
+rename), WindowsWorkspaceLease (тот же namespace/genuine worker/acquire attempt) и
+Windows vault factory с ManagedVault. Neutral ProtectedFiles дополнен kind/size/
+one-level streamed children и replace flag. Vault disposal прекращает intake сразу,
+ждёт physical return и wipes late output; mutable caller-owned buffers обязательны.
+MutexLease sealed/мониторит exit, старые wrong-thread native test hooks и два relay
+удалены; прочие legacy production hooks остаются работой T276.
+
+McpCredentialFiles перемещён из Windows в engine/credentials без facade; IO только
+через ProtectedFiles. Сохранены fixed layout, bindings/blob/lookup, read-onlybridge,
+stage-before-publish, atomic pending→rename→readback, recovery/refusal и пределы
+4096files/4096dirs/32MiB/128KiBheadroom. Windows MCP file-probe source удалён.
+Четыре native construction sites inject WindowsProtectedFiles; все imports/type
+consumers обновлены напрямую. Engine path1.9.1 direct dependency, locks обновлены.
+
+Новые8units: managed vault physicaldrain/latewipe/ownerloss/status/reentrantclose;
+MCP artifact stage/read-only/publish/revoke/idempotency/atomicfailure/inertpending/
+recovery/space/inventory/owner/quota. Providers RAM-only, без FS/DPAPI/Isar/SSH/UI.
+T255/T256/T262/T265/T276 не закрыты: полный store/auth/VerifiedRuntime+gate/Host
+ещё не перенесены. Mandatory full checks/links/lockeddeps и independentreview
+increment необходимы, native/platform qualification не заявляется.
+
+### Исправление storage_ports_artifacts_review
+
+- [x] T280 Исправить подтверждённый P2: MutexLease теряет isHeld непосредственно на native worker onExit, независимо от ожидания cleanup status/timeout5s. Cleanup result остаётся отдельной ответственностью close/CloseBlocked; publication gate отвергает уже потерянную acquisition и poison-ит generation при потере активного worker. Добавить unit consumer-level проверки отзыва owners при observed writer loss без освобождения cleanup ownership. Полный unit/static/link run и fresh independent review обязательны; native delivery этим unit не объявляется проверенной.
+
+
+T280 завершена после fullunit/static/link run и completed independent
+`storage_ports_artifacts_review_2`:0 findings. Reviewer подтвердил непосредственный
+onExit→isHeld=false независимо от cleanup status, gate loss handling и preserved
+artifact semantics/consumer wiring. Фактический scope60units(root2/engine51/protocol7),
+format332/0changes, analysisroot+5packages noissues, lychee1463total1462OK0errors1excluded.
+Native/platform/Host/tray/IPC qualification не установлена. T255/T256/T262/T265/T276
+по-прежнему открыты; главная цель не завершена.
+
+
+### T255/T262: target3 native metadata extraction — 2026-10-30
+
+В engine/storage перемещены records/automation_records/host_trust_records с тремя
+неизменёнными generated parts, native_registry/native_schema/native_close/native_failure.
+Старые source paths удалены, consumers используют прямые engine imports без facade.
+Единственный полный workspaceSchemas содержит16коллекций; WorkspaceRecords.fromState
+сохраняет target3 row payloads и IDs. Удалены schema1/2 registry recognizers, selectors
+и record constructors. Structural preflight распознаёт только target3 pinned MDBX.
+Это проверка каталога/_info/геометрии, НЕ semantic row proof до writable open.
+T255/T262/T263/T276 остаются открытыми: legacy store/migration controllers ещё
+подлежат удалению, native repository и startup cutover не завершены.
+
+Добавлены8units на literal metadata и synthetic in-memory pages: target registry,
+отказ prior subsets, closed property/index/field semantics, corruption precedence,
+immutable input, malformed geometry/unsupported format, incomplete meta, reused
+catalogue nodes, schema3 singleton rows. Ни DB/FFI/OS/SSH/widget/design, ни build
+не запускались. Полные unit/static/link checks и independent review требуются
+для приёмки этого increment; результаты фиксируются ниже после выполнения.
+
+
+Target3 metadata increment проверен: tools/test-unit.ps1 exit0
+(.local/embedded-native-schema-full.log): format333files0changes, analyze root и
+всех5packages noissues, root2+engine59+protocol7=68units passed. Windows/locald/MCP
+тестов нет, test pass им не приписан. Первый полный run выявил только unused import,
+он удалён, затем весь runner повторён успешно. Lychee exit0:1463total1462OK0errors
+1excluded (.local/embedded-native-schema-links.log); root+5packages locked offline
+pubget exit0 (.local/embedded-native-schema-locked-deps.log). Generated parts byte
+unchanged против source inventory и HEAD, scoped diffcheck exit0.
+Completed independent read-only native_schema_extraction_review:0findings,
+перенос готов для продолжения T255/T262. Semantic preflight/native repository,
+Host/tray/MCP cutover и удаление всех legacy controllers остаются незавершёнными.
+Общая цель не завершена; native/platform/release readiness не заявляется.
+
+
+### T255/T262/T276: schema3 row capture and upgrade-controller deletion
+
+В engine добавлены workspace_rows/isar_rows/workspace_snapshot: sole schema3,
+borrowed coherent16collection read, bounded count+read equality, fixed active/empty
+creation paths, protected-files/lease ports, graph/custody/artifact validation и
+committed lookup recovery. StoredRow хранит прежние IDs и exact payloads без migration
+alias. Все consumers переведены на прямой engine API и IsarRowSource. Bootstrap/store/
+discovery используют WorkspaceLease/WindowsWorkspaceLease; native abandoned metadata
+сохранено на Windows adapter, engine не использует его как доказательство integrity.
+
+Удалены четыре неиспользуемых runtime source: workspace_migration,
+trusted_source_preflight, migration_journal и прежний combined trusted_snapshot;
+source2/upgrade-target/preflight/digest branches не перенесены в engine. Удалены
+ссылки на reservation несуществующего controller. Legacy foundation parser/helpers
+и старые store modes ещё остаются работой T276, не объявляются очищенными целиком.
+T255/T256/T257/T262/T263/T276 не закрыты; startup read-only semantic preflight ещё
+обязателен и не заменяется loader уже открытого source с lookup recovery.
+
+Новые7units используют RAM-only Files/Protection/RowSource/Lease и target3fixture
+нынешней задачи: coherent capture all16, exact IDs/payloads/trust/grant history,
+count bounds/incomplete view, singleton/duplicates/schema refusal, invalid rows
+каждой из10automation families, writer/owner/custody failures без publication,
+empty-stage/path/file gates. Общие данные и RAM doubles вынесены из двух новых
+unit suites в test/support без старого harness, native/FS/SSH/UI или design tests.
+Полный unit/static/link run и completed independent review обязательны ниже.
+
+
+Row capture increment завершил проверки: tools/test-unit.ps1 exit0
+(.local/embedded-row-source-checked.log), format335files0changes, root и все5packages
+analyze noissues; root2+engine66+protocol7=75units passed. Для locald/MCP/Windows
+tests отсутствуют и test pass не приписан. Первые полные прогоны нашли ошибки
+consumer wiring/types/imports и typo в новом test getter; исправлены, targeted7
+прошли, затем полный runner прошёл заново. Lychee exit0:1463total1462OK0errors
+1excluded (.local/embedded-row-source-links.log); scoped git diffcheck exit0.
+Новых dependencies нет. Completed independent read-only
+workspace_snapshot_extraction_review:0findings, increment готов для продолжения
+storage extraction. Native/DB/FS/DPAPI/mutex/SSH/UI/build/install не запускались.
+T255/T256/T257/T262/T263/T276 и общая цель остаются открытыми; полный native
+semantic preflight перед writable open и Host/cutover/tray ещё обязательны.
+
+
+### T255/T276: single schema3 store and foundation queue
+
+StateStore имеет единственный open/snapshot/commitFoundation/MCP-grant/profile-write
+путь schema3; _AutomationFormat и оба nullable snapshot selectors удалены. Workspace
+содержит только прежний target3 open/create; удалены schema1 creation/read-key/
+commit, schema2 open/views/commit branches, foundation_snapshot/migration_rows/
+operational_foundation_writes, неиспользуемый legacy bootstrap и initialization probe.
+Сохранён live-job foundation identity fence. Старый LocaldEnvironment удалён,
+LocaldArguments пока обслуживает единственный фактический format3 standalone entry.
+Из старого native runtime удалены format1/2 loaders и verifier re-export.
+
+MutationCoordinator имеет один schema3 constructor и trust queue; отдельный subclass,
+legacy/operational modes и mode flags удалены. Все consumers прямо используют
+новые имена без alias/facade. Сохранены custody proof, shared32 admission, HMAC
+idempotency, receipt lifetime, native target/gate ownership и claim finish paths.
+Typed native adapters/старые router classes пока остаются работой Host/cutover/T276,
+не объявляются удалёнными целиком и не являются новым in-process owner interface.
+
+Из native writer в engine/storage/row_plan.dart перенесён pure планировщик
+retainRowIdentities: exact bytes при semantic equality, IDs обновляемых rows,
+выделение после maximum входного snapshot, int64 overflow с отказом до commit, immutable
+sorted result. Caller по-прежнему обязан проверить CAS/graph/custody и выполнить
+native transaction/readback; row plan не выдаёт authority и не делает commit.
+Четыре новых unit cases проверяют эти invariants, singleton IDs и corrupt/duplicate
+raw inputs без DB/Windows/FS/UI. Engine extraction/native readonly semantic preflight
+и полная реализация Host ещё не завершены; T255/T256/T257/T262/T263/T276 открыты.
+
+Executor enrollment record.format1 и целевой sidecar.format2 — отдельные документы,
+не schema1 workspace. Существующий sidecar.format1 read fallback замечен и остаётся
+обязательным удалением/contract update T276; отсутствие legacy целиком не заявляется.
+Mandatory full unit/static/link run и independent review increment фиксируются ниже.
+
+
+### Исправление single_schema_store_review
+
+Completed read-only review нашёл1P2: новый текст обещал глобальный never-reuse
+nativeIDs, тогда как прежний schema3 planner использует maximum входного snapshot.
+Исправлена область гарантии: surviving rows сохраняют IDs; новые получают ID выше
+maximum до этого плана, включая удаляемые им строки; после предшествующего удаления
+ID может встретиться вновь. NativeIDs не business identity/API references.
+Это correction documentation overclaim, не изменение прежнего allocation и не
+основание для нового persisted counter/schema bump. Код и4unit cases не менялись.
+Остальных подтверждённых findings в completed review не найдено. Full checks и
+fresh independent review обязательны перед принятием increment.
+
+
+- [x] T281 Закрыть подтверждённый P2 single_schema_store_review: ограничить новый контракт/evidence nativeID allocation maximum входного snapshot (с удаляемыми этим планом rows), сохранить IDs surviving entities и int64 exhaustion refusal; не обещать lifetime never-reuse/новый persisted counter. Повторить applicable checks и completed fresh independent review всего increment; это не закрывает T255/T262/T276.
+
+
+T281 завершена после повторного full runner tools/test-unit.ps1 exit0
+(.local/target-only-store-review-fix.log): format332files0changes, root+5packages
+analyze noissues, root2+engine70+protocol7=79units passed. Для locald/MCP/Windows
+tests отсутствуют и test pass не заявлен. Lychee exit0:1463total1462OK0errors
+1excluded (.local/target-only-store-review-fix-links.log); scoped diffcheck exit0.
+Completed fresh independent read-only single_schema_store_review_2:0findings,
+все42позиции текущего increment проверены; прежний P2 documentation overclaim закрыт.
+Код allocation не изменён ради нового требования. Native/runtime/read-onlysemantic
+preflight/полныйHost/tray/IPC/release acceptance не установлены. T255/T256/T257/
+T262/T263/T276 и общая цель всё ещё открыты; отдельная новая feature не создавалась.
+
+
+### T255/T276: executor sidecar engine port, exact outer format2
+
+ExecutorEnrollmentStore в engine/storage/executor_enrollments.dart владеет
+neutral parser/HMAC/replay/atomic publish/readback через ProtectedFiles,
+WorkspaceLease и KeyCustody. Native StateStore содержит один lazily bound instance,
+прямые calls через прежний shared32 writer tail; та же queue используется jobs
+startup/progress, без alias или второй очереди. Структурированный capsule captures
+UUID/method/input/digest и привязан к issuer; это не owner/target authority.
+Actual owner adapter по-прежнему удерживает native gate/proof до physical completion.
+
+Удалён outer sidecar.format1 read fallback: принимается только exact format2 с
+обязательными receipts. Неподдержанный/foreign/corrupt файл остаётся нетронутым,
+ошибка STORAGE_BLOCKED, без conversion/reset/missing fallback. Inner enrollment
+record.format1, purpose executor-enrollments-v1 и mutation-v1 HMAC bytes/bindings
+не менялись: это собственные форматы целевого payload, не schema1 workspace.
+Existing target-format2 bindings/receipts/IDs/digests/createdAt сохраняются;
+replay после revoke возвращает historical ACK без восстановления binding/effect.
+Существующая запись T178 о readable format1 описывает прежнюю реализацию и больше
+не является действующим требованием. Контракт021 executor-enrollment изменён на месте,
+obsolete production-migrator/original.isar clauses удалены, новой feature нет.
+
+Read-only absent read не создаёт файл. Missing/unsafe parents, lost owner/lease,
+closed key, malformed/cross-workspace metadata и uncertain replacement/readback
+закрывают admission и propagates poison к StateStore; lease не освобождается.
+NOT_READY при overlapping physical operation не снимается caller timeout, пока
+actual work не завершён. При лимите250records/10000receipts/64MiB нет eviction,
+existing receipt replay разрешён, новый effect не публикуется.
+
+7новых RAM-only unit cases: confirm/no-change/revoke/restart/stable ACK, immutable
+issuer-bound capsule, schema/field refusal unchanged bytes, MAC/key/workspace/
+duplicate corruption, capacity/replay, pre/post-commit/readback faults, owner/lease/
+path/closed-key loss и timed-out physical read occupancy. Без FS/native/SSH/UI/design.
+Native store/Host/MCP/tray cutover/semantic preflight ещё не завершены;
+T255/T256/T257/T262/T263/T276 и общая цель остаются открытыми. Применимые full checks
+и independent review этого increment фиксируются после фактического выполнения.
+
+
+Executor enrollment port прошёл full tools/test-unit.ps1 exit0
+(.local/executor-enrollment-port-checked.log): format334files0changes, analyze root
+и всех5packages noissues, root2+engine77+protocol7=86units passed. Locald/MCP/Windows
+tests отсутствуют и test pass не приписан. Первый full run нашёл wiring issues
+sharedqueue/extensionfield, исправлены; следующий full выявил неверное fixture
+подписания double2.0 строгим signer, заменено rawJSON для негативного теста.
+После targeted7passed весь runner повторён успешно. Lychee exit0:1463total1462OK
+0errors1excluded (.local/executor-enrollment-port-links.log); exactscopeddiffcheckexit0.
+Completed independent read-only executor_enrollment_port_review:0findings;
+перенос готов для продолжения T255/T276. Вендор/foreign003 не менялись,
+native/FS/DPAPI/mutex/Isar/SSH/UI/Host/tray/IPC/build/install не запускались.
+Открытые T255/T256/T257/T262/T263/T276 и общая цель этим не закрыты.
+
+
+### T255/T256/T276: repository and workspace move into engine
+
+15используемых sources перенесены из locald в engine: StateStore/Workspace,
+workspace_creation/foundation_writes, все automation/grant/write/read parts,
+executor_metadata_writes и mcp/grants. Старые paths удалены, consumers импортируют
+реализацию напрямую. Engine не импортирует Windows/locald/dart:ffi/dart:io.
+Storage получает ProtectedFiles/WorkspaceLease/NativeStoreRuntime; fixed default
+layout, schema3/format3, 16generatedcollections, transaction flags, shared32tail,
+CAS/HMAC/receipts/nativeIDs/opaque credential bindings сохранены.
+
+Native core initialize/revalidate и filesystem операции проходят через существующие
+порты. Проверки current owner/slot/root/lease повторяются вокруг async границ.
+Native writeTxn и последующий snapshot/readback имеют до/после runtime revalidation;
+ошибка после возможного commit блокирует admission, не превращается в ложный
+RESOURCE_LIMIT/rollback proof. Close не требует здорового runtime и удерживает
+reservation при неподтверждённом native close. Creation inventory streamed/bounded4,
+не listSync; существующий stage получает exact native structural preflight до open.
+Это НЕ semantic preflight всех rows до writable open: T262/T263 ещё обязательны.
+
+Удалены standalone locald bin, TrustedLocaldBootstrap/entry/LocaldArguments/native
+runtime loaders, discovery wrapper/publisher, old idle/grace lifecycle и grant
+native test hook/probe. Никакой временный format3 NativeStoreRuntime adapter или
+facade не добавлен. Остались legacy native typed services/router/Windows helpers
+и UI bootstrap clients/build scripts — их удаление и новый in-process Host/MCP/tray
+ещё впереди в этом же scope. Текущий UI ещё не подключён к engine; запуск приложения
+после удаления старого entry не заявляется работоспособным до нового Host/cutover.
+
+Locald больше не объявляет directIsar/generator/build_runner, их runtime/dev
+ответственность принадлежит engine; offline resolver обновил только locald lock.
+Новые6unit cases используют RAM Files/Protection/Lease и stub NativeStoreRuntime;
+единственный затронутый Isar API — чистая VM getInstance map. Isar.open/core/DLL/
+FS/Windows/DPAPI/SSH/UI не запускались. Проверены preopen runtime failure, retained
+reservation при caller timeout/physical pending init, second writer refusal,
+unsupported schema/malformed bytes unchanged, owner/slot/lease/path refusal без
+keyreset, legacy residue и inert fresh stage при pre-native runtime failure.
+Ни positive native adoption, ни полный writer/lifecycle, ни T255/T256/T257/T262/
+T263/T276, ни общая цель этим не объявляются выполненными. Full checks/review ниже.
+
+
+Repository port завершил full tools/test-unit.ps1 exit0
+(.local/native-store-port-full.log): format325files0changes, root+5packages analyze
+noissues, root2+engine83+protocol7=92units passed. Locald/MCP/Windows tests отсутствуют,
+test pass не приписан. Первый fullrun нашёл unused runtime field; поле привязано
+к actual native write/readback proof, весь runner повторён успешно. Lychee exit0:
+1463total1462OK0errors1excluded (.local/native-store-port-links.log); root+5packages
+locked offline pubget exit0 (.local/native-store-port-locked-deps.log); scoped
+Gitdiffcheckexit0. Три generated parts побайтово неизменны поSHA256 inventory.
+Completed independent read-only native_store_port_review:0findings, все60позиций
+scope проверены; reviewer дополнительно сам пересчитал3generatedSHA. Перенос готов
+для продолжения T255/T256/T276. Positive native open/adoption, полная semantic
+preflight до writable open, новыйHost/UI/MCP/tray/cutover не проверены/не завершены.
+Текущий UI после удаления old entry не объявляется запускаемым. Все названные
+открытые задачи и главная цель остаются активными, новой feature нет.
+
+
+### T262: native byte semantic preflight implementation
+
+NativeWorkspaceRows читает exact schema3 pinned MDBX/Isar rows из bounded bytes:
+integer IDs, string object offsets/UTF8, branch/overflow/counters/page ownership,
+unique entityId hash index, GC/free-list bounds/disjointness. Public metadata-only
+wrapper удалён, нет fallback старого schema/native layout. Pure Dart xxh3:1.2.0
+добавлен как direct runtime dependency для существующего native index encoding.
+Native/recipe archives SHA256 подтверждены, 11прочитанных Rust/C files побайтово
+сверены с pinned zip entries; build/vendor sources не изменены и не запускались.
+
+preflightWorkspace проводит полный graph/custody/MCP artifact и executor sidecar
+read-only gate ДО Isar.open. После open inspectWorkspaceSnapshot+exact row comparison
+предшествуют lookup recovery. Existing creation stage проверяется byte/initial graph
+до native open и сравнивается после; freshly absent workspace создаётся как прежде.
+Основной readWorkspaceSnapshot после mutations по-прежнему выполняет committed
+lookup recovery; новый inspect entry всегда read-only, никакой role/mode от wire.
+
+Новые12units покрывают bounded binary extraction/immutable16families, raw ID/bytes
+readback и delayedlookup, numeric branch IDs и independent literal hello XXH3vector,
+overflow и malformed pointers/UTF8, hash/id/index mismatch/reusedpage, GC overlap/
+range/count, ambiguous equal meta/out-of-range txn, logical badrows beforepublish,
+optional/unsupported sidecar и safe provider errors. Literal registry fixture
+вынесен из нынешнего native_schema unit suite, не восстановлены прежние тесты.
+Все fixtures построены в RAM без native writer/DB/FS/SSH/UI/design.
+T262/T263 не закрыты: окончательная Host composition/whole-family positive/fault
+acceptance ещё нужны; actual native qualification не выполняется по scope.
+Full unit/static/link/locked-deps checks и completed independent review ниже.
+
+
+### Confirmed readonly meta review fixes
+
+- [x] T282 Исправить подтверждённый P2 native_semantic_preflight_review: exact pinned steady signature UINT64_MAX вместо допуска любого sign кроме0/1; исправить fixtures и добавить отрицательные signature cases.
+- [x] T283 Исправить подтверждённый P2 native_semantic_preflight_review: проверить pinned x64 lower/upper/now geometry до native open без native normalization/fallback; исправить fixtures и добавить range/order/next-vs-now refusal с нулевыми writes.
+- [x] T284 Исправить подтверждённый P2 native_semantic_preflight_review: отказаться от equal complete positive transaction IDs даже при одинаковых trees согласно normal native meta clash; fixtures distinct txn3/4/5 с page/tree modified3; добавить sameview clash case. Для T282–T284 повторить full applicable checks и completed fresh independent review.
+
+Первый независимый read-only review выявил3P2; исходные104passing RAM units
+повторяли ошибочные meta допущения и не доказывали native validity. Исправления
+реализованы с3новыми units (15cases в native_semantic_preflight suite); финальные
+checks и свежий review фиксируются после завершения. T262/T263 остаются открыты.
+
+
+- [x] T285 Закрыть подтверждённый P2 native_semantic_meta_fix_review: передавать pinned transaction ancestry limits для tree root, branch child и leaf overflow до native open;3новых RAM regressions проверяют отказ при parent3/page4/meta5, unchanged input bytes и нулевые protected writes. Повторить full checks и fresh independent review.
+
+Второй completed review подтвердил fixes T282–T284 и выявил1новый P2: общий
+предел selectedtxn не заменяет root/tree/parent front. Исправлена передача front
+по pinned page-get/tree-search/cursor; обратная совместимость не добавлена.
+
+
+- [x] T286 Закрыть подтверждённый P2 native_semantic_ancestry_review: committed branch минимум2nodes и чётный upper у branch/leaf согласно pinned page-get;3RAM regressions single-child branch/odd leaf upper/odd branch upper через preflight с unchanged bytes/нулевыми writes. Повторить full checks и fresh completed independent review.
+
+Третий completed review подтвердил T282–T285 и выявил1P2 с2page invariants;
+110passing units не доказывали отказ этих malformed pages. Исправления и3новых
+RAM cases реализованы; проверки и новый completed review ещё обязательны.
+
+
+- [x] T287 Закрыть подтверждённый P2 native_semantic_page_review: GC N_BIG dsize>4 согласно FREE_DBI minimum; inline empty PNL4 остаётся допустимым. Добавить RAM preflight regression с unchanged bytes/no writes, повторить checks и fresh review.
+- [x] T288 Закрыть подтверждённый P2 native_semantic_page_review: принять GC overwrite extent с1reserve page сверх minimum без ослабления range/uniqueness/counters/free-list overlap; positive RAM fixture и отрицательные truncated/outofrange/overlap/extrareserve cases. Повторить full checks и completed fresh independent review.
+
+Четвёртый completed review:2P2 GC min overflow и ошибочный refusal допустимого
+GC reserve. T282–T286 подтверждены;113units предшествовали этим fixes. Реализованы
+GC-specific bounds без смены layout. Новые6RAM cases: inlineempty vs malformed
+overflow4; valid8196byte PNL/2048freepages с1spare;4extent faults. Первый targeted
+run обнаружил чрезмерно padded synthetic GC value при слишком малом snapshot;
+fixture исправлен на2048реальных RAM freepages в рамках64MiB и прежнего value cap,
+производственный cap не ослаблен. Полный targeted suite27cases завершён успешно.
+
+
+### Completed readonly semantic gate review loop
+
+После всех fixes tools/test-unit.ps1 exit0 (.local/native-semantic-gc-full.log):
+format329files0changes, Flutter root и5packages analysis clean; root2+engine110+
+protocol7=119units passed. Для locald/MCP/Windows test pass не заявлен. Lychee
+exit0 (.local/native-semantic-gc-links.log):1463total1462OK0errors1excluded. Root+
+5packages lockedoffline --enforce-lockfile pubget exit0 для неизменённых dependency
+locks; scopedgitdiffcheckexit0.3generatedschema parts SHA256 не изменились.
+
+Completed fresh independent read-only native_semantic_gc_review:0findings,
+bounded increment готов для продолжения T262/T263. Reviewer проверил весь scoped
+reader/open/snapshot/creation flow, fixtures/tests, dependencies и контракт по
+pinned source; fixes T282–T288 подтверждены. История предыдущих3+1+1+2P2 сохранена.
+Все обязательные findings данного increment закрыты; T262/T263/Host/UI/MCP/tray
+cutover и общая цель остаются открытыми. Native/FS/DPAPI/SSH/UI/build qualification
+не запускалась;119RAM units не объявляются доказательством native compatibility.
+
+
+### T255/T256/T257: target publication ordering port
+
+TargetChanges и opaque TargetChangeLease/ReconciledTargetChangeLease реализованы
+в engine/hosting/target_changes.dart вместо прежнего locald part. Старый файл
+удалён без facade. Native Windows gate/acquisition/lease напрямую реализуют
+нейтральные ports; registry callbacks остаются у actual session owner и не выдают
+permissions. Обновлены actual consumers/retirement logic; obsolete registry
+native observation hook удалён. Shared16 physical charge, own-acquisition settled
+вместо global polling, sticky failure, authority-effect/lease close drain сохраняют
+ownership до физического завершения. Native/store lease не освобождается здесь.
+
+10новых RAM-only units покрывают normal/reconciled retirement, immutable affected
+IDs, shared16 limit afterlogicaltimeout, independent cleanup handles, timelyerror
+с physical drain, close duringeffect/release, observerfail, lateacquiredeadline,
+retirement/releasefailure. Нет Windows/native/FS/UI/design/integration tests.
+T255/T256/T257/T260/T276 и общая цель ещё открыты: old sessions/native peer/server
+classes, Host/UI/MCP/traycutover остаются обязательными. Checks/review ниже.
+
+
+Target ordering port checks completed: tools/test-unit.ps1 exit0
+(.local/target-fence-port-full.log), format330files0changes, root+5analysis clean,
+root2+engine120+protocol7=129units passed. Locald/MCP/Windows tests отсутствуют,
+pass не заявлен. Lychee exit0 (.local/target-fence-port-links.log):1463total1462OK
+0errors1excluded; scopedgitdiffcheckexit0. Completed independent read-only
+target_fence_port_review:0findings, перенос готов для продолжения T255/T256/T257.
+Reviewer сопоставил весь scope с preincrement snapshot и проверил контрактную
+цепочку, actual callback policy, cleanup/admission/limits. Открытые T255/T256/T257/
+T260/T276 и общая цель не закрываются; новый Host/session/MCP/traycutover обязателен.
+Native/platform/release qualification не выполнялась, runnable UI не заявлен.
+
+
+### T255/T276: remove retired local API branches
+
+Удалены10obsoletefiles: api/auth/channel/diagnostics/sessions/server,
+api/operational_server/operational_channel/owner_foundation, owner_service_probe
+и storage/migration_probe. Из сохранившихся частей удалены Operational handshake/
+sessions/context/authority/openfailure/owner adapters, schema2 catalog/router/tool
+entries и private factories, способные связывать прежние native generations.
+26existing sources затронуты, net1952lines removed; никаких facade/aliases/new
+format fallback не добавлено. Текущий native target branch и его protocol DTO
+версии сохраняются, это не изменение DB schema или grant/HMAC binding.
+
+Compile-time hooks старых native test harnesses удалены; старые tests/fixtures
+не восстановлены. Новые source-text mirror tests не добавлялись: это удаление
+неиспользуемых ветвей, полноценные units текущей задачи сохранены. Firstfullrun
+нашёл unused errors import в удалённом branch context, import удалён. Repeatfull
+runner exit0 .local/session-prune-full.log: format320/0changes, root+5analyses
+clean; root2+engine120+protocol7=129units passed. Native runtime test pass не заявлен.
+Review сравнивает со .local/session-cutover-before.json и exact26file inventory
+.local/session-prune-review-files.json. Links/independent review ещё обязательны.
+T255/T256/T257/T258/T265/T266/T276 и общая цель остаются открытыми: portable owner
+capability/session/Host и app/MCP/tray ещё нужны, runnable UI не заявляется.
+
+
+Completed retired_session_branches_review (independent/read-only):0findings,
+удаление готово для продолжения T255/T276. Reviewer сопоставил все26исходников
+с preincrement snapshot, import graph/roots и target composition. Подтверждены
+сохранность target native3 proof/HMAC/grant/admission/limits/lateguards, отсутствие
+forwarding facade/fallback, неизменные DTO версии. Applicable checks: full runner
+exit0 format320/0changes, root+5analysis clean,129units; links exit0 1463total/
+1462OK/0errors/1excluded; scopeddiffcheckexit0. T255/T276 и общая цель не закрыты:
+portable sessions/owner/Host/UI/MCP/tray и remaining Windows/bootstrap/build
+paths ещё обязательны. Нет native/platform/release acceptance или runnable UI claim.
+
+
+### T255/T256/T257/T265/T276: portable sessions and actual service extraction
+
+40remaining source files moved directly locald/lib→engine/lib (map in
+.local/engine-sessions-moves.json); old source paths have no facades or exports.
+EngineSessions/OwnerSession bind real HostAuthority capabilities, external handshake
+and string admission are MCP-only. Owner wire dispatch removed from MCP server.
+Host runtime+peer owner/root/build are checked across proof awaits; physical proof
+observers preserve16pending charge and close drain after interest completion.
+Existing8total/4MCP/60s/5s limits and all custody/CAS/job/observer/target services
+remain; package imports are platform-neutral. Windows EmbeddedBuildBundle directly
+implements VerifiedAppConfiguration; VerifiedMcpChannel native adapter remains open.
+
+9new RAM-only units cover owner capability/string forgery, foreign authority and
+duplicate registry, pending/repeated owner detach,16physical charges and close,
+lease expiry, MCP HMAC/token capture, forged owner handshake, changed peer identity,
+4MCP/8total caps. Full .local/engine-sessions-unit-full.log exit0: format322/0changes,
+root+5analysis clean, root2+engine129+protocol7=138units passed. Earlier source-port
+fullruns found unused _begin and handshake import; removed and fullrerun succeeded.
+Native/platform/native-store/UI/FS/SSH/build qualification not performed.
+
+An attempted guarded recursive removal of the now-source-empty locald package
+and generated caches was rejected by automatic approval review: blocked by policy.
+It was not retried via another mechanism. Old package configuration/cache cleanup
+remains; current source root has zero Dart files. No claim all legacy paths are gone.
+T255/T256/T257/T258/T265/T266/T276 and goal remain open until full composition and
+cutover; link checks and independent review of this increment remain mandatory.
+
+
+- [x] T289 Исправить подтверждённый P2 engine_sessions_port_review: expiry до openOwner capacity, safe Future errors и stop recheck aftercallbacks; добавить RAM all8expired/mixedlive-expired-pending/callbackfailure-stop regressions. Повторить checks и completed fresh review.
+- [x] T290 Исправить подтверждённый P2 engine_sessions_port_review: общий physical proof tracking для grant-open/root/terminal helpers, cap4openwork до worker/key/finalphase/lateproof drain; aggregate256 acrossretired requests. Добавить RAM helper-timeout/complete/close и256retired-bound regressions; повторить checks и completed fresh review.
+
+Первый completed engine_sessions_port_review:2P2 expirycapacity и3untrackedhelper
+paths;138passingunits предшествовали fixes. Реализованы sharedtrackedhelper,
+expiry-beforecapacity и retainedcharges/drain.5новых RAM cases вместе с прежними9
+покрывают обе ошибки и явный256aggregatecap по уже отключённым records. Direct
+MCP grant/terminal backend cases не симулируются native store; их полной приёмкой
+T268 эти tests не объявляются. Full checks/fresh review ещё обязательны.
+
+
+- [x] T291 Закрыть подтверждённый P2 engine_sessions_fix_review: MCP operation-context late-phase drain удерживает runtime→channel→runtime как один physical chain, зарегистрированный до первого await; fixed-point drain сохраняет поздний channel proof после logical failure. Registry также удерживает/ограничивает256chains и закрывает admission на stop; bootstrap verification использует тот же путь. Добавить RAM snapshot-consumer regression с short outer deadline/late runtime/channel logical error/physical pause, сохранив своевременный logical result. Проверить consumers connections/reads/executor/plans/jobs/authority/catalog, повторить full checks и fresh completed review.
+
+Второй completed review подтвердил T289/T290 и выявил1P2 поздней chain за
+actor snapshot. Fix uses physical chain handle beforework (не forwarding logical
+error как physical failure).15session RAM cases всего; новый snapshot case
+проверяет и retainedclose, и отсутствие ложного native-failure сигнала. Aggregate
+case оставляет live session заранее, чтобы отдельно проверить256requests и отказ
+нового proof до native вызова. Первый full chain run нашёл misplaced test variable;
+исправлено, repeatfull144units exit0 .local/engine-sessions-chain-fixed-full.log.
+Финальный полный прогон после усиления assertion и fresh review ещё обязательны.
+
+
+### Completed portable session/service extraction review loop
+
+Final full tools/test-unit.ps1 exit0 .local/engine-sessions-final-full.log:
+format322/0changes, root+5analyses clean, root2+engine135+protocol7=144units passed.
+Locald/MCP/Windows do not have currenttask tests; pass not claimed. Lychee exit0
+.local/engine-sessions-final-links.log1463total1462OK0errors1excluded; scoped
+gitdiffcheckexit0.3generatedschema parts SHA256 unchanged. Earlier failedruns and
+review findings retained; no native/platform test evidence inferred.
+
+Completed fresh independent read-only engine_sessions_chain_review:0findings,
+all88scopedpaths/all40moves compared to baseline, T289–T291 fixes confirmed,
+consumer chain ownership and typed service/store parity inspected. Increment
+ready for continuation, not whole engine/app/cutover readiness. T255/T256/T257/
+T258/T261/T265/T266/T268/T276 and main goal remain open. Actual grant/tool/terminal
+backend parity, Host/gateway/UI/MCP bridge/tray/native adapters and cleanup remain
+mandatory. Source-empty oldpackage/cache deletion still blocked by automatic
+approval review (blocked by policy), no equivalent retry or success claim.
+
+
+### T257/T258/T273: in-process owner gateway
+
+EngineGateway/InProcessGateway route actual typed owner services through opaque
+OwnerSession with initial/final proofs, Ready gates, immutable input/result
+capture, original5s budget and physical-close drain. Retired unused
+TrustedOwnerDispatch extension removed, no facade or new protocol/API selector.
+Existing closed JSON byte/depth budgets include metadata via validation-only
+placeholder (no owner credential serialization); Unicode/finite metrics preserved.
+Error projection keeps existing safe public code/field/retry without diagnostics.
+
+12new RAM units cover typed invocation/admission and immutable result; input
+mutation during proof; readiness/builtins/domain denial; MCP gate beforepayload;
+catalog projection; safe errors/invalidoutput; timeout vsphysicalclose;16pending
+andlateclose; readiness/generation/revocation fences; session close/cleanup failure;
+whole-message limits; noncanonical Unicode/finite JSON fidelity. Domain DTO/CAS
+validation stays in its existing suites, not simulated by the dispatcher fake.
+Firstfull source run found missing RetryAdvice import; firstnewtest run found
+import-prefix shadowing; fixed and full checks rerun. No design/native/FS/SSH/UI
+checks or new dependency/testmode interfaces. Mandatory checks/review below.
+T257/T258/T261/T273 and full goal remain open until Host/UI lifecycle and remaining
+parity/cutover work; this gateway is not completion of those tasks.
+
+
+In-process gateway final checks completed: tools/test-unit.ps1 exit0
+.local/inprocess-gateway-final-full.log, format324/0changes, root+5analyses clean,
+root2+engine147+protocol7=156units passed. Lychee exit0
+.local/inprocess-gateway-links.log1463total1462OK0errors1excluded; scoped
+gitdiffcheckexit0. Completed independent read-only inprocess_gateway_review:
+0findings, gateway increment ready for Host/UI composition. Reviewer inspected
+real adapters/session lifetimes and request/response limits/DTO/cleanup parity,
+not just fake tests. T257/T258/T261/T273 and main goal remain open; full Host,
+UI/MCP/tray/cutover/parity and legacy cleanup remain required. No runnable app,
+native/platform qualification or completed whole-task claim.
+
+
+### T257/T259/T261: Host startup and explicit-exit ownership
+
+Added EngineHost and engine-owned HostResources/WorkspaceHostResources. The normal
+composition opens the sole existing Workspace/TrustedControlServices; OS ports do
+not implement domain storage. Ready follows lease/runtime/vault/workspace and
+service/job recovery plus final proof. Startup shares one30s operation, refuses
+busy/wrong-owner/vault failures and tracks late physical startup through shutdown.
+openOwner uses only Host-issued opaque authority with8total sessions, same-binding
+pending deduplication and separate window response interests.
+
+Explicit exit stops admission immediately, retains detached gateway drains and
+waits startup/services/registry/authority/store/vault before lease. Default drain10s,
+CloseBlocked keeps the lease after late resource completion until explicit
+waitForClose; no retry/reopen/new generation. Failed cleanup/reservation/callback
+keeps CloseBlocked. Actual lease release begun after confirmed drain is never
+restarted. Safe readiness/errors do not contain provider diagnostics.
+
+13RAM-only lifecycle units cover recovery readiness, shared startup/store, two
+windows and detach/reopen, busy lease, owner/vault rejection, safe errors, startup
+and monotonic deadlines, exit during late acquisition, CloseBlocked and explicit
+waiting, failed service/store close/reservation, detached gateway physical work,
+observed lease loss and throwing detach callback. No widget/design/native/realFS/
+SSH/process/integration/UI test or execution was added. T257/T259/T261 remain open:
+whole Windows/MCP/UI/capabilities/tray and suspend/resume composition remain
+mandatory. Full checks and independent review are recorded after completion.
+
+
+- [x] T292 Исправить подтверждённый P2 engine_host_ownership_review: перед same-binding replacement и pruning closed/expired gateway передать его в Host-owned physical drain, сохранить sticky cleanup failure и revoke прежний UI capability; isClosed не означает physical close. Добавить RAM regression для обоих путей с self-retired cleanup failure и late active dispatch. Повторить full checks/link check/fresh independent review; T257/T259/T261 и полная цель этим не закрываются.
+
+Первый completed engine_host_ownership_review нашёл1P2: closed gateway мог быть
+перезаписан/удалён без close, теряя cleanup failure. Исправлена единая retirement
+ветка до reuse/pruning, включая revoke старого capability. Добавлены4RAMregressions
+(по2на same-binding replacement и slot pruning):17Host units проходят адресно;
+полный прогон и fresh review ещё обязательны. Исходная история13tests сохранена.
+
+
+- [x] T293 Исправить подтверждённый P2 engine_host_fixed_review: резервировать Host pending owner future/physical work до runtime и retirement callouts; удалить/revoke весь old batch до gateway.close callbacks, чтобы synchronous reentry не создавала2gateways и не отзывала replacement. Добавить RAM onProof/detach/shutdown reentry regressions; full checks и fresh independent review обязательны.
+
+Второй completed engine_host_fixed_review подтвердил исправление T292, нашёл1P2
+T293: pending регистрировался после начала proof/retirement. Исправлено shared
+Completer до callouts и batch retirement до close listeners.3новые RAM units
+проверяют synchronous runtime proof reentry, expired2bindings с detach callback
+и shutdown из retirement callback.20Host units проходят адресно. Полный final
+runner и третий fresh review ещё обязательны; broad tasks/цель остаются открытыми.
+
+
+- [x] T294 Исправить подтверждённый P2 engine_host_final_review: зарегистрировать physical startup Completer и timeout/readiness observers до _initialize/acquireLease; synchronous shutdown из provider ждёт actual startup, не dispose vault/Closed до late acquisition success/failure. Добавить RAM regressions, full checks/link check/fresh independent review.
+
+Третий completed engine_host_final_review подтвердил T292/T293 и нашёл1P2 T294:
+_startupWork присваивалась после начала _initialize и синхронного acquireLease.
+Теперь physical startup/observers зарегистрированы до provider callout.2RAM cases
+проверяют поздний успешный/ошибочный acquire после shutdown callback; до actual
+completion нет vault dispose/Closed, успешный lease закрывается ровно1раз после
+explicit waiting.22Host units проходят адресно. Убрано лишнее event-loop yield
+между уже выданным release permission и lease.close после подтверждённого drain.
+Final full checks и свежий независимый review обязательны, broad tasks/цель открыты.
+
+
+Host increment final verification: .local/engine-host-owned-startup-full.log
+EXIT0, repository format327files/0changes, root Flutter analyze plus5package
+analyses clean, root2+engine169+protocol7=178units pass (22Host RAM units).
+No test pass claimed for absent locald/MCP/Windows suites; excluded nested work
+formatter lint-resolution warnings remain recorded. Lychee
+.local/engine-host-owned-startup-links.log EXIT0:1463total1462OK0errors1excluded;
+scoped git diff --check EXIT0 (CRLFwarningonly).
+
+Fourth completed fresh read-only engine_host_startup_fixed_review:0findings,
+bounded Host startup/local-owner/explicit-exit ready for further integration.
+Reviewer independently confirmed T292/T293/T294 and the real Workspace/services
+composition, cleanup ordering and request/physical-work ownership. Those3fix
+tasks are closed; T257/T259/T261 and broader engine/Windows/MCP/UI/tray/capability/
+suspend-resume tasks and main goal remain open. No native/realFS/SSH/process/UI/
+integration/build/install acceptance was run; current UI is not connected to Host.
+No new specification package or compatibility/production test-mode path was added.
+
+
+### T265/T276: embedded-only discovery descriptor and portable custody
+
+Replaced the sole protocol DiscoveryDescriptor parser with format2/hostKind app,
+apiMinor1, required recovered workspace and Host generation; removed pre-ready
+creation, random alternate generation and withWorkspace. Exactly8embedded-v1
+pipes/newfile retain the old writer-mutex hash/name. Legacy versions/foreign
+builds fail INCOMPATIBLE; bounded malformed payloads fail STORAGE_BLOCKED.
+Moved DiscoveryCustody directly Windows→engine credentials, changed exact purpose
+to embedded-v1, deleted the Windows implementation/export and rebound actual
+Windows read imports/file paths. No façade, old-entropy/file fallback or legacy
+migration/reset was introduced; old files remain untouched.
+
+14new unit tests (8protocol+6engine) exercise Host bindings, exact fields/versions,
+namespace/mutex hash, owner/slot/PID/build/UUID/nonce validation,8192byte raw and
+16384byte wrapped limits, immutable copies/closed token, purpose binding, provider
+failures, transient wipes, caller input mutation and late close. Tests use only
+RAM protection; no native/realFS/process/SSH/integration/UI/design execution.
+T265/T276 remain open: Windows runtime/publication/pipe worker, old client roots,
+connection-only MCP bridge and actual Host/UI/tray composition are still required.
+Full checks and fresh independent review follow before readiness conclusions.
+
+
+- [x] T295 Исправить подтверждённый P3 embedded_discovery_review: проверять foreign build до closed-field validation, как требует embedded-host contract; закрепить смешанный случай foreign build+unknown field с INCOMPATIBLE. Повторить applicable full/link checks и fresh independent review всего descriptor/custody increment.
+
+Первый completed embedded_discovery_review нашёл1P3: build проверялся после
+closed fields вопреки точному порядку контракта. Код приведён к контракту,
+в существующий unit добавлен foreign build+role field mixed case;14units сохраняют
+normal/edge coverage. Full/fresh review обязательны; T265/T276/цель ещё открыты.
+
+
+Embedded discovery final verification: .local/embedded-discovery-fixed-full.log
+EXIT0: repository format329files/0changes, root Flutter analyze plus5package
+analyses clean; root2+engine175+protocol15=192units pass,14new RAM units. No tests
+pass claimed for absent locald/MCP/Windows suites; excluded nested checkout
+formatter lint-resolution warnings retained. Lychee
+.local/embedded-discovery-fixed-links.log EXIT0:1463total1462OK0errors1excluded;
+scoped diffcheck EXIT0 CRLFwarningonly.
+Fresh completed read-only embedded_discovery_fixed_review:0findings, bounded
+descriptor/custody ready for continued runtime/IPC composition; T295 independently
+confirmed. T265/T276 and all broader Host/Windows/MCP/UI/tray cutover tasks and
+main goal remain open. No native/DPAPI/ACL/FS/SSH/process/UI/integration/build/
+install acceptance, no new feature/spec or compatibility façade, no retry of
+previously blocked cleanup. The current app still requires root/IPC integration.
+
+
+### T256/T265/T276: actual Windows runtime and publication kernel extraction
+
+Added genuine bundle4/current-app WindowsVerifiedRuntime with private-factory
+WindowsWorkspaceLease identity binding, sticky proof failure, one-generation shared
+gate creation registered before native callouts. It borrows root self identity
+and never releases workspace lease. Extracted the single native gate directly to
+publication_gate.dart as WindowsPublicationGate/acquisition/lease; old part file,
+role dependency and gate-native observation hooks deleted, no forwarding aliases.
+Existing kernel mutex/event/ACL/keeper and16actual/5s bounded drain/poison behavior
+retained. Partial initialization returns a failed owned gate for Host close rather
+than discarding native cleanup. Process handle close status is cached and checked
+by the gate; every owned handle is attempted even after another cleanup failure.
+
+Pure PublicationIdentity owns the unchanged kernel naming vector and validates
+bounds/UUID/separators/Unicode without normalization.4RAM unit cases cover frozen
+SHA256 identity, tuple separation, metadata boundaries and invalid generations.
+Existing old IPC policy code remains outside kernel until the mandatory final
+cutover; its direct gate references and MCP checked-creation paths were rebound,
+not adapted into a new format3 runtime. T256/T265/T266/T274/T276 remain open for
+new native MCP endpoint, root/bridge/UI/tray composition and complete old-source
+removal. No Native/Win32/ACL/process/FS/SSH/UI/integration/build/install tests or
+runtime qualification; full unit/static/link checks and independent review follow.
+
+
+- [x] T296 Исправить подтверждённый P2 windows_runtime_gate_review: Windows publication namespace использует normalize+lowercase root до pure hash, как требует021publication-gate. Добавить RAM case/UNC/разные roots checks; full checks/fresh review обязательны.
+- [x] T297 Закрепить подтверждённый P2 windows_runtime_gate_review: обязательный один engine worker владеет native Host/store/runtime/handles вне Flutter UI; trusted root-bound Dart-port proxy без owner export, общие monotonic deadlines/settlement bounds, window detach/shutdown/CloseBlocked/worker loss без in-process restart. Уточнить существующие plan/contract/T258/T261, проверить links и fresh review; реализация Root/proxy остаётся открытой.
+
+Первый completed windows_runtime_gate_review нашёл2P2 T296/T297. Windows pure
+publication_binding теперь выполняет normalize/lowercase до общего hash;3новые
+RAM unit cases проверяют регистр/нормализацию/UNC/invalid roots без native imports.
+В существующем plan и engine contract принято обязательное worker/UI размещение,
+trusted private-port binding, Timeline.now budgets/physical settlement, shutdown
+и lost-worker policy. Это prerequisite T258/T261, не опциональное предложение.
+Эти две implementation задачи остаются открытыми: T258 включает private Root/
+proxy/monotonic remaining-budget plumbing и все late/error paths из контракта;
+T261 включает RAM worker/channel/clock/close-ack/loss coverage, без native/UI/design
+запусков. Full checks и fresh independent review ещё обязательны для этого increment.
+
+
+Windows runtime/gate final .local/windows-runtime-gate-reviewed-full.log EXIT0:
+format333files/0changes, root Flutter analyze plus5package analyses clean;
+root2+engine179+protocol15+Windows3=199unitpasses. Windows3units import only the
+pure publication binding, no native Win32/FFI calls. No testpasses claimed for
+absent locald/MCP suites; excluded nested work lint-resolution warnings retained.
+Lychee .local/windows-runtime-gate-fixed-links.log EXIT0:1464total1463OK0errors/
+1excluded; scoped diffcheck EXIT0 CRLFwarnings only.
+Fresh completed independent windows_runtime_gate_fixed_review:0findings, bounded
+runtime/kernel increment and prerequisite worker decisions ready for continuation.
+T296/T297 independently confirmed; T297 closes the decision, not T258/T261 code.
+Actual root/proxy/endpoint/MCP/UI/tray/capabilities/suspend-resume and old-source
+removal T256/T258/T261/T265/T266/T274/T276 and main goal remain open. No native/
+ACL/Win32/Isar/realFS/process/SSH/UI/integration/build/install qualification, no new
+feature/spec, no retry of previously blocked package/cache cleanup. Current UI
+still needs the mandatory engine-worker/proxy and same-executable MCP cutover.
+
+
+### T258/T261/T273: bound worker gateway and original request ownership
+
+Added EngineInvocation result/physical-settled split, absolute OwnerSession expiry
+that cannot exceed5s, registered gateway work before preparation and shared exact
+input capture. Added VmEngineClock, WorkerGatewayProxy/GatewayWorkerBinding and
+actual private DartGatewayChannel (send/reply ports + opaque VM route binding).
+Data adapter only consumes an existing private owner gateway, never attaches or
+creates authority.16UI/worker tokens remain after response timeout until settlement;
+reserved close, safe errors, generation/correlation, original deadlines, byte wipe,
+terminal session.close and no retry on uncertain sends are implemented.
+
+15RAM unit cases exercise capture/freeze/buffer wiping, completed-response physical
+charges and17th denial, expired/queued/original5s budgets, accepted late effect,
+reserved/reentrant close and cleanup failure, bad generation/control fields,
+terminal close, uncertain call/reply sends, native-proof logical vs physical drain,
+delayed timer/delivery and refusal to enlarge budget. Existing real session/owner
+registry and gateway are used with RAM services/protection, no native/storage/UI
+or actual engine-isolate dispatch. Root attach/control/native startup and UI/MCP/
+tray replacement remain mandatory and open; this is not runnable app cutover.
+
+- [x] T298 Закрыть выявленный full unit run unobserved proof Future: вычислять rpcBudgetRemaining до вызова final request.revalidate, чтобы expired budget не оставлял started Future без handler. Новый accepted-effect timeout regression должен проходить без uncaught UNAUTHORIZED. Full checks и независимый review всего bound worker increment обязательны.
+
+First full worker-gateway-first-full run failed two unawaited test future lints and
+an uncaught revalidate future when budget expired after accepted effect. Budget
+ordering and lints fixed; targeted15new RAM units pass. Uncertain worker send never
+resends an error/result; receipt checks absolute expiry even with delayed timers.
+Full final checks/link validation and fresh independent review still required.
+
+
+- [x] T299 Исправить подтверждённый P2 worker_gateway_review: early closed guards worker handle и proxy receive обязаны очищать owned mutable body даже до try/finally; поздний queued/in-flight пакет не выполняет prepare/effect и не создаёт другую close operation. Добавить RAM regressions обоих discard paths, full/link checks и fresh independent review всего increment.
+
+Первый completed worker_gateway_review подтвердил остальные ownership/deadline/
+authority ветки и нашёл1P2 discard wipe. Исправлены оба early guards, добавлены2RAM
+cases: closed binding+queued body и in-flight listener callback после proxy cancel.
+Итого17новых RAM tests проходят адресно. T298 ordering подтверждён чтением review;
+T299 требует final full checks/fresh independent review. Root/UI/MCP/tray и цель
+остаются открытыми, native/isolate/platform приёмка не заявляется.
+
+
+Bound worker gateway final .local/worker-gateway-fixed-full.log EXIT0: repository
+format336files/0changes, root Flutter analyze plus5package analyses clean;
+root2+engine196+protocol15+Windows3=216unitpasses,17newRAM transport cases. Windows3
+remain pure naming-policy units; no testpass claimed absentlocald/MCPsuites or
+excluded nestedwork checkout (formatter lint-resolution warnings recorded).
+Lychee .local/worker-gateway-fixed-links.log EXIT0:1464total1463OK0errors1excluded;
+scoped diffcheckEXIT0 CRLFwarningonly.
+Fresh completed read-only worker_gateway_fixed_review:0findings, bounded transport
+ready for further integration, T298/T299 independently confirmed. Core actual
+work/deadline/session consumers and17RAM scenarios were inspected. T258/T261/T273
+remain open for trusted worker spawn/attach/control/native platform composition,
+UIclient replacement and remaining parity; nativeMCP/tray/oldsource removal and
+main goal remain open. No real isolate/native/FS/SSH/process/UI/integration/build/
+install acceptance, no new feature/spec/compatibility facade or blocked cleanup
+retry. Current UI still uses pending legacy bootstrap and is not claimed runnable.
+
+
+### T258/T261: trusted worker root and Windows bootstrap
+
+Added private VM-capability root routing, eight owner windows, reserved lifecycle
+control, original startup/attach/exit budgets, partial startup ownership, explicit
+CloseBlocked waiting, physical closed acknowledgement handshake, and Windows
+worker entry/native bootstrap. Host adds runtime-metadata disposal before lease
+release and managed automatic failure hold. Root controller/spawn and Flutter UI
+cutover are still pending; existing UI remains legacy/not claimed runnable.
+13newRAM tests (10root+3Host) exercise these boundaries; first full check found
+Dart Capability/protocol enum collision, corrected by hiding protocol enum.
+No old tests restored and no widget/design/integration/native tests added.
+Full checks and independent review must finish before bounded readiness claim.
+
+
+Trusted worker root final evidence: .local/worker-root-fixed-full.log EXIT0;
+format339files/0changes, rootFlutter+5package analyses clean; root2+engine209+
+protocol15+Windows3=229unitpasses, including13newRAMtests. Windows3 remain pure
+policy tests; excludednestedwork formatter lint warnings do not imply qualification.
+.local/worker-root-links.log EXIT0:1464total1463OK0errors1excluded. Scoped diffcheck
+EXIT0, CRLFwarningonly. Completed independent read-only worker_root_review found
+0findings and bounded Root/bootstrap readiness for further integration. No native/
+FS/SSH/process/isolate/UI/design execution. Actual spawn/controller, UI cutover,
+MCP publication, tray/suspend, broad tasks and goal remain open; current app still
+uses pending legacy bootstrap and is not claimed runnable. No new feature spec,
+compatibility facade, build/install/publish or blocked-cleanup retry.
+
+
+### T258/T261: worker controller / concrete VM connection
+
+Added EngineWorkerController and DartWorkerConnection, private actual spawn/control/
+error/exit paths, retained original budgets/control slots, root-bound window links,
+physical close acknowledgement before expected exit, loss without restart, and a
+Windows desktop singleton factory. UI still uses old bootstrap; no runnable-app
+claim.12newRAMtests exercise actual Root/Host/gateway with fake connection/timers,
+not Isolate.spawn/native/UI/design. First full run caught two test errors; addressed
+then all12targeted pass. Retired controller start now returns current CloseBlocked,
+not old successful startup. Full checks/independent review follow.
+
+- [x] T300 Исправить подтверждённую при concrete VM composition коллизию Capability: DartGatewayChannel.binding использовал protocol permission enum вместо VM capability. Скрыть protocol enum в enclosing gateway library, проверить concrete typed construction, RAM controller scenarios/full checks и независимое review. Не добавлять совместимость или owner DTO.
+
+
+Worker controller final pre-review checks: .local/worker-controller-final-full.log
+EXIT0, format342files/0changes, rootFlutter+5package analyses clean; root2+
+engine223+protocol15+Windows3=243unitpasses,14newRAMcontroller cases. Added late
+bootstrap/earlier exit deadline and changed generation rejection coverage. An
+intermediate full run caught an outdated assertion expecting old Ready afterloss;
+updated to require current CloseBlocked, then the complete suite passed. Native
+spawn/FS/SSH/process/UI/design/build/install remains unexecuted. Formatter warnings
+for excludednestedwork remain recorded; no qualification of that checkout.
+Independent read-only review follows; broadgoal and UI/MCP/tray tasks stay open.
+
+
+- [x] T301 Исправить подтверждённый P2 worker_controller_review: конкурентные shutdown/waitClose могут вернуть2Closed, concrete connection отклоняет второйACK, а observer зависает после_closed guard. Регистрировать physicalClosed/ACK однократно, до ACK завершать всех уже созданных same-root close observers с сохранением истёкших deadlines; второе сообщение не требуется. Добавить strict-ACK RAM regressions для обоих порядков ответов и onExit после первогоACK, затем fullchecks/linkcheck/fresh independent review.
+
+First completed worker_controller_review found1P2 T301. Fixed shared physical-close
+settlement before ACK and duplicate acknowledgement; retained bounded correlations
+absorb queued close replies, no dependence on delivery after exit. Four new RAM
+cases enforce oneACK across both response orders, with/without control-stream exit.
+Current total18newcontroller RAM cases. Expired observers preserve their result;
+late callbacks cannot overwrite current physicalClosed status. T300/T301 await
+fresh completed review. No native/isolate/UI/design acceptance claimed.
+
+
+Worker controller final reviewed evidence: .local/worker-controller-reviewed-fixed-full.log
+EXIT0, format342files/0changes, rootFlutter+5package analyses clean; root2+
+engine227+protocol15+Windows3=247unitpasses including18newcontrollerRAMcases.
+.local/worker-controller-reviewed-fixed-links.log EXIT0:1464total1463OK0errors1excluded;
+scopedgitdiffcheckEXIT0CRLFwarningonly. Fresh completed read-only
+worker_controller_fixed_review found0findings and independently confirmed T300/
+T301 closure. Bounded controller/VMconnection ready for further integration only;
+actualIsolate/native/FS/SSH/process/UI/design/platform/build/install/release not
+qualified. Excludednestedwork lint warnings recorded, no suite pass claimed there.
+Existing T258/T261 and UI/MCP/tray/suspend/removal tasks and fullgoal stay open.
+Current UI legacy bootstrap remains to be replaced; no runnable-app claim.
+
+
+### T258/T261/T273/T276: UI embedded-engine owner cutover
+
+FoundationApp/bootstrap now use DesktopEngineHost→single EngineWorkerController
+and issued EngineClient/EngineApiClient; removed all four old UI IPC/native
+bootstrap/child-launch source files. Rebound automation/server/software and profile
+consumers without changing their widgets/layout. Bootstrap has one30s monotonic
+budget, format3 readiness and no old prepare/ensure/relaunch/backoff path. Engine
+Gateway gains logical retired notification separate from physicalclose. Explicit
+app exit requires actualRootClosed before UI cleanup/Exit; CloseBlocked cancels.
+Final tray/hide/menu/continue-waiting, activation, MCP mode/publication and broader
+parity remain open. No feature readiness/runnable/runtime claim yet.
+13newpresentation unit cases +3actualgateway/proxyRAM retirement cases exercise
+logical behavior only; no design/widget/native/isolate/realFS/SSH/process tests.
+First full run found callback defaultname collision/unnecessaryimport; corrected.
+Retirement loss test initially expected serverclose success despite lost reply
+channel; fixed to require SERVICE_UNAVAILABLE, and3targeted cases pass. Mandatory
+complete checks/linkcheck/fresh independent review follow.
+
+
+- [x] T302 Исправить подтверждённый P2 ui_engine_cutover_review: запоздавший snapshot/read вызывал _connected и мог создать attachment после retirement без explicit retry. Разрешить создание attachment только явному connect; reads/mutations могут ждать уже начатый connect. Проверять epoch/current session перед вторым snapshot read и polling перед queued callback. RAM regression с retirement после первого read, поздним detach, отсутствием скрытого attachment и ровно одним attachment после explicit retry; повторить full/link checks/fresh review.
+
+First completed ui_engine_cutover_review found1P2 T302. Corrected attachment
+admission and pre-second-read/queued-poll guards. Two new units cover no attachment
+from read/mutate and retirement after first typed snapshot read with delayed
+physicaldetach; completingdetach does not reopen, explicitconnect opensone next
+session. Existing units now explicitly establish their sessions. Total15newUI
+units+3actualgateway retirement units. No additional product decision introduced;
+remaining tray/MCP/activation/suspend and broadgoal still open.
+
+
+UI cutover final reviewed evidence: .local/ui-engine-cutover-fresh-full.log EXIT0,
+format342files/0changes; rootFlutter+5package analyses clean; root17+engine230+
+protocol15+Windows3=265unitpasses (15newUIlogic+3gateway/proxyRAMretirement).
+.local/ui-engine-cutover-fresh-links.log EXIT0:1464total1463OK0errors1excluded;
+scopeddiffcheckEXIT0CRLFwarnings. Fresh completed independent read-only
+ui_engine_cutover_fixed_review found0findings and confirmed T302. Bounded UI
+cutover ready for further integration only, no native/isolate/FS/SSH/process/UI/
+design/build/install/runtime/release qualification. Excludednestedwork lint
+warnings do not imply testing. T258/T261/T273/T276 remain open for complete path/
+parity/cleanup reconciliation with remaining tray/MCP/activation/suspend work;
+actual UIcomposition uses desktop_engine_host.dart and engine_client.dart plus
+portable worker_controller/worker_connection, not the originally planned UI worker
+filenames. No new feature spec or compatibility facade introduced.
+
+
+### T259/T275: actual Windows tray/app lifetime and private desktop status
+
+Added DesktopLifetime policy + native MethodChannel adapter + DesktopApplication
+root, same-HWND restoration/section routing and window-subtree detach separate
+from the one Host lifetime. Windows runner owns notification icon/menu/keyboard
+callbacks, Explorer recreation, hide guard, custom Exit/Stay and CloseBlocked
+Wait/Force/Stay dialogs, physical-only normalfinish and explicit whole-processforce.
+CommonControls6 manifest and systemlibs/UTF8source options added; no executable,
+build/install/deploy/publish or native/UI/design run. Added private bounded
+Host→Root desktopStatus counts, no names/secrets or owner attachment. Old app-level
+exit observer removed; close-to-tray is root-owned, no AppExit blanket-success.
+15newRAM policy units plus2engine desktopstatus units cover these paths. Initial
+full run caught an obsolete fallback after a newer Open; coalescing intent now
+suppresses it. Root status validates0..4MCP and null/0..250unresolved jobs. Full
+checks/linkcheck/independent review still required; suspension/activation/MCP and
+fullfeature/native/release readiness remain open.
+
+
+Tray final pre-review checks: .local/desktop-tray-reviewed-full.log EXIT0;
+format347files/0changes, rootFlutter+5package analyses clean, root33+engine232+
+protocol15+Windows3=283unitpasses.16newRAM desktop-policy cases+2desktopstatus cases;
+one added case prevents physical wait completion destroying a native modal prompt
+before it returns. Excludednestedwork formatter lint-resolution warnings remain,
+notqualified. Lychee .local/desktop-tray-links.log EXIT0:1466total1465OK0errors1excluded.
+Native C++/CMake/manifest source inspected against MicrosoftAPI references and local
+Flutter headers only; no C++build/link, native/isolate/tray/dialog/FS/SSH/process/
+UI/design/build/install qualification. Fresh independent read-only review follows.
+
+
+Tray/lifetime final reviewed evidence: .local/desktop-tray-reviewed-full.log EXIT0,
+format347files/0changes, rootFlutter+5package analyses clean; root33+engine232+
+protocol15+Windows3=283unitpasses incl16newRAM policy+2private desktopstatus units.
+.local/desktop-tray-reviewed-links.log EXIT0:1466total1465OK0errors1excluded;
+scopeddiffcheckEXIT0CRLFwarnings. Completed independent read-only desktop_tray_review
+found0findings and bounded tray/lifetime/status readiness for further integration.
+Native C++/CMake/manifest inspected statically; build/link/Win32/tray/dialog/isolate/
+FS/SSH/process/UI/design/runtime/release acceptance unexecuted. Excludednestedwork
+lint warnings remain and that checkout is not qualified. Actual tray lifetime is
+now wired in main/DesktopApplication and runner; T259/T275 remain open for final
+path/acceptance reconciliation with pending suspend/resume, activation, MCP and
+packaging/cleanup. Main goal stays active; no native build/install/deploy/publish.
+
+
+### T256/T265/T274: genuine embedded MCP pipe ownership foundation
+
+Added EmbeddedPipeListener/Channel with dedicated actual Windows I/O worker,
+bundle4/self/peer proof, descriptorPID pin, actualSID embedded8 namespace, one-peer
+listener/no handle reuse,16retained slots/original5s budgets and physicalclose ACK.
+Publication gate factory uses same actual app/root and peer revalidation. Primitive
+NativePipe now rejects old v1 names and propagates sticky close failures for pipe,
+peer, event/cancellation handles and partial creation; client drain uses inbound
+quota and server outboundquota per MicrosoftFSCC.4newpureWindows units cover these
+policies only (no native imports/dispatch). Existing MCP bootstrap no longer owns
+or starts any child process; missingdiscovery/availableendpoint is unavailable.
+User reconfirmed MCP depends on alreadyrunningServerDeck (includingtray); absence
+is a connector-side failure, no response from absent service, no autoHost. This
+also applies to unconfigured/no-grant mode; live-app binding/entry remains open.
+No new feature/spec created. Broadendpoint/handshake/stdio/legacy cleanup remain
+pending; existing old bundledrole/session wiring not claimed runnable.
+
+Finalpre-review .local/embedded-pipe-final-full.log EXIT0: format350files/0changes,
+rootFlutter+5package analyses clean; root33+engine232+protocol15+Windows7=
+287unitpasses.4newWindows tests pure RAM; no native worker/isolate/IPC/FS/SSH/process/
+UI/design/build/install/deploy execution. Excludednestedwork lint warnings recorded,
+notqualified. Linkcheck and mandatory independent source review follow.
+
+
+- [x] T303 Исправить подтверждённый P2 embedded_pipe_review: общий5s producer limit запрещал штатное idle read60s из McpServerChannel. Разделить read≤60s и proof/write/drain≤5s; partialframe остаётся5s у framing owner. Оригинальные absolute deadlines включают очереди. RAM regression handshake5→idle60→partial5, исправить текущий контракт, повторить full/link checks и fresh independent review.
+
+First completed embedded_pipe_review found1P2 T303 idle60 compatibility. Producer
+now accepts read≤60s with unchanged absolute deadline; proof/write/drain≤5s and
+server frame-owned partial5 remain. One new RAM sequence case covers this existing
+server/port contract; no polling workaround or new protocol/compatibility mode.
+
+
+Embedded pipe final reviewed evidence: .local/embedded-pipe-reviewed-fixed-full.log
+EXIT0, format350files/0changes; rootFlutter+5packageanalyses clean; root33+engine232+
+protocol15+Windows8=288unitpasses,5newpureWindows policy units. Lychee
+.local/embedded-pipe-reviewed-fixed-links.log EXIT0:1467total1466OK0errors1excluded;
+scopeddiffcheckEXIT0CRLFwarning. Fresh completed independent read-only
+embedded_pipe_fixed_review found0findings and confirmed T303. Foundation ready
+for further integration only; no native/isolate/IPC/FFI/FS/SSH/process/UI/design/
+build/install/runtime qualification. Excludednestedwork lint warnings recorded,
+notqualified. NewMCP endpoint/client/entry/oldbindingremoval and broadgoal remain
+open. User clarification preserved: absent ServerDeck gives no service response;
+only connector/client can report local connection failure, without starting app.
+
+
+### T257/T265: actual Host-owned MCP endpoint pool
+
+Added neutral ownedlistener/discovery ports and McpEndpointPool using the existing
+McpServerHandshake/McpServerChannel/registry, eight bind-before-publish slots,
+Ready-only activation, badpeer isolation, physicalclose-before-rebind, retained
+latebind/publish work and stop/remove/descriptorwipe ownership. Native listener
+implements the port. Host/WorkspaceHostResources now create same-actual-services
+McpApiServer after recovery, require activated/exact API/generation/workspace,
+optional platform pool factory, publish-before-parent-ready acknowledgement and
+final runtime proof, published-only MCP feature, synchronous stop and physical
+pool drain before store/vault/metadata/lease. Windows factory/discovery I/O is
+still pending, so Windows MCP feature staysfalse, not a fake/stub available path.
+13newRAM units (9pool+4Host) use actual core authority/router/session/handshake
+and fake I/O/services without Native/FS/Isar or domain effects. First full checks
+found a test await-on-void/unneededimport and an unobserved fake read error in
+lateaccept; corrected, then13targeted cases passed. Full checks/linkcheck/fresh
+independent review follow. App must already run; no autoHost/child process added.
+
+
+Endpoint-pool final pre-review checks: .local/mcp-endpoint-pool-final-full.log EXIT0,
+format353files/0changes; rootFlutter+5package analyses clean; root33+engine245+
+protocol15+Windows8=301unitpasses including13newRAM pool/Host cases. Windows8remain
+puremetadata/policy tests, no native dispatch. Existing excludednestedwork lint
+warnings remain/notqualified. Native discovery owner/Windows bootstrap factory,
+new client/bootstrap/stdio entry, suspend/activation/cleanup and broadgoal open.
+Linkcheck and independent review follow before bounded readiness conclusion.
+
+
+- [x] T304 Исправить P2 mcp_endpoint_pool_review: late accept после успешного listener.close не отменяет отдельное владение peer/channel. Ошибка физического disconnect остаётся sticky; pool.close завершается ошибкой, Host сохраняет lease/CloseBlocked. Добавить RAM regression в pool и Host, повторить обязательные проверки и независимое review.
+
+
+T304 implementation and fresh independent review completed: mcp_endpoint_pool_fixed_review found no findings and confirmed separate late peer/channel close ownership, sticky physical failure, Host CloseBlocked and lease retention. Full .local/mcp-endpoint-pool-fixed-full.log EXIT0: format353/0changes, root Flutter plus5package analyses clean, root33+engine247+protocol15+Windows8=303RAM unitpasses. No native/runtime qualification. Scoped diff check EXIT0 (CRLF warning only). Link gate remains open: three lychee runs, including --timeout120 --max-retries1, exit2 with1467total1464OK0errors1excluded2timeouts at existing Mozilla MPL FAQ/index links. T304 checkbox remains unchecked until this mandatory gate passes. Windows discovery/factory/client/stdio and broad goal remain open; no end-to-end MCP readiness claimed.
+
+
+Final link gate recovered: .local/mcp-endpoint-pool-final-record-links.log EXIT0 after completed independent review. Earlier Mozilla timeouts were transient. T304 is complete; broad T257/T265 and Windows/stdio integration remain open.
+
+
+- [x] T305 Compose actual Windows Host MCP publication using the same retained runtime/lease/vault and fixed protected discovery file. Implement protected stale inspection, write/readback, exact retained-object removal, sticky unconfirmed native handle close and physical drain. Add RAM units, full mandatory checks/linkcheck and independent review. Keep full stdio/native qualification and remaining T265/T274/T276 open.
+
+
+T305 final pre-review checks: .local/mcp-publication-final-full.log EXIT0,
+format356/0changes, root Flutter plus5package analyses clean; root33+engine260+
+protocol15+Windows8=316RAM unitpasses, including13new protected publisher cases.
+First full run found generic T? return type and fixture legacy missing buildId;
+fixed,13targeted units passed, then full suites passed. Added sticky unexpected
+native I/O RemoteError handling and reran full checks successfully. Formatting
+initially used wrong package-relative paths; formatted correctly from root
+before successful full runs. Linkcheck .local/mcp-publication-final-links.log
+EXIT0 (1469total1468OK0errors1excluded). Scoped diff check EXIT0 with CRLFwarning.
+Source-empty locald/MCP have no tests and are not counted as passing suites.
+Excluded nested work lint warnings are not qualification of that checkout.
+No native/isolate/IPC/DPAPI/ACL/FS/Isar/SSH/process/UI/design/build/run/install
+checks executed; static source analysis only for Windows implementation. Fresh
+independent review is still required; broad client/stdio/cleanup goal remains.
+
+
+Completed independent read-only mcp_publication_review found0findings and
+confirmed bounded T305 readiness. Reviewed actual baseline6changed+3newfiles,
+requirements/contracts/implementation/13RAM acceptance cases and supplied logs.
+T305 complete. Actual Windows protected file/DPAPI/ACL/rename/disposition/pipes/
+CloseHandle/isolate/build/run qualification is not established. Next work is
+client/stdio/headless entry and oldbinding removal, not a new spec or a second
+service. Whole goal remains active and broad T265/T274/T276 are not complete.
+
+
+- [x] T306 Implement sole portable MCP-only client bootstrap/grant/RPC foundation over VerifiedMcpChannel, fixed API1.1 proof and descriptor binding, no owner method/role,16pending, absolute deadlines, no replay/reconnect, captured immutable frames/results and physical close ownership. Add RAM unit normal/edge/failure checks, run mandatory suites/links and independent review. Actual Windows client/gateway/stdin cutover and old source deletion remain T265/T274/T276.
+
+
+T306 pre-review evidence: .local/mcp-client-fixed-full.log EXIT0, repository
+format361/0changes, root Flutter plus5package analyses clean; root33+engine276+
+protocol15+Windows8=332RAM unitpasses including16new client cases. First full
+run failed missing host_trust protocol import and lint cleanup; corrected,
+14targeted client cases passed, then two additional frame/envelope bound cases
+and grant original-budget check were included in the successful final full run.
+No source-empty locald/MCP tests are counted as passed. Excluded nested work lint
+warnings are not qualification of that checkout. Lychee .local/mcp-client-links.log
+EXIT0:1469total1468OK0errors1excluded. Scoped diff check EXIT0 CRLFwarning only.
+Client tests use a scripted RAM peer, actual wire DTO/transcript MAC primitives
+and fake memory file/protection providers; no Host/store/native/isolate/IPC/FS/
+Isar/SSH/process/UI/design/build/run/install checks. Independent review follows;
+actual Windows client/stdio cutover and full goal remain open.
+
+
+- [x] T307 Fix confirmed P2 mcp_client_review: recursively freeze/capture result before final original-deadline and ownership check, then release pending slot/cancel timer/deliver. Add deterministic RAM CPU-boundary regression, rerun full/link checks and fresh independent review. Preserve T306 history and broad open cutover tasks.
+
+
+T306/T307 final evidence: .local/mcp-client-reviewed-fixed-full.log EXIT0,
+format361/0changes, clean root Flutter and5package analyses, root33+engine277+
+protocol15+Windows8=333RAMunitpasses including17client cases. First independent
+mcp_client_review found1P2 capture-after-deadline; T307 fixed it and added the
+production-helper nested fake-clock boundary regression. Fresh completed
+mcp_client_fixed_review found0findings and confirmed bounded foundation readiness.
+Lychee .local/mcp-client-reviewed-fixed-links.log EXIT0:1469total1468OK0err1excluded.
+No native/Host/Isar/FS/isolate/process/SSH/UI/design/build/install qualification.
+Windows bootstrap/gateway migration, stdio/headless entry and old source removal
+remain open T265/T274/T276; whole goal stays active, no end-to-end MCP claim.
+
+
+- [x] T308 Switch actual Windows MCP connector/bootstrap/gateway to sole portable client and bundle4/descriptor2 without app-root/owner role/launch/store/writer or autonomous unconfigured mode. Own native connecting attempts and late startup, guard all fixed/builtin stdio output with live connection, separate logical retirement from physical drain, preserve publication through actual flush and return nonzero on uncertain EOF cleanup. Remove replaced separate MCP entry/ten old Windows client/bootstrap/worker files, add RAM units, mandatory checks/links and independent review. Keep lib/main/headless runner T274 and remaining T276 open.
+
+
+- [x] T309 Preserve unconfirmed native protected-file close through WindowsProtectedFiles safe error conversion, latch it in desktop and stdio runtime owners, and check writer/copy/replacement CloseHandle outcomes. Desktop final disposal must fail and retain lease, stdio close must fail, including late credential reads. Verify existing RAM Host metadata-close boundary cases plus full static/unit/link checks and independent review; no native failure-injection qualification claimed.
+
+
+T308/T309 pre-review evidence: .local/mcp-cutover-final-full.log EXIT0, repository
+format353/0changes, root Flutter plus5package analyses clean. Root33+engine277+
+MCP11+protocol15+Windows8=344RAMunitpasses,11new gateway/stdio cases; source-empty
+locald has no testpass claim. First full failed missing extension imports and
+nullable publication access, fixed; targeted first failed untyped empty-map
+fixtures, fixed, then11targeted cases passed. Intermediate full passed before
+final native file cleanup propagation; final full above includes T309 changes.
+Lychee .local/mcp-cutover-final-links.log EXIT0:1469total1468OK0errors1excluded.
+Scoped diffcheck EXIT0, CRLFwarnings only. Current-source rg has no deleted
+Windows client/bootstrap/worker imports; engine's new client_bootstrap part is
+unrelated to the deleted Windows file. No Host/store/realFS/native/isolate/pipe/
+DPAPI/ACL/Isar/SSH/process/UI/design/build/run/install checks. Native source and
+composition are statically checked only; excluded nestedwork notqualified.
+Fresh independent review required. Main/headless branch and remaining legacy
+artifact/source cleanup stay open; whole goal/end-to-end MCP notcomplete.
+
+
+- [x] T310 Fix mcp_cutover_review P2 fixed RPC/overload no-op publication bypass. All fixed responses use native gate+verifyLive, update existing gateway.md exceptions, add RAM remote-error/overload acquisition+failed-proof regressions, rerun full/links/fresh independent review.
+- [x] T311 Fix mcp_cutover_review P2 native worker identity factory uncertainty: failed factory latches failed physical close even with self=null, connector cannot reuse/advance slot after that close failure. Static Native lifecycle review plus full/link/fresh independent review; no native failure-injection qualification.
+
+
+- [x] T312 Fix mcp_cutover_fixed_review P2 queued-expiry/domain-guard fallback without proof: settle/release denied original before stdout, then protect fixed fallback with fresh native gate+verifyLive under original writer budget. Preserve late guard/flush ownership, add RAM queued-expiry healthy/failed proof regression, full/link/fresh independent review.
+
+
+T312 final pre-review evidence: .local/mcp-cutover-fallback-final-full.log EXIT0,
+format353/0changes, clean root Flutter plus5package analyses; root33+engine277+
+MCP15+protocol15+Windows8=348RAMunitpasses. Two added cases cover queued UTC grant
+expiry with healthy/failed native proof and policy-ping denial after original
+lease acquisition; fake gate refuses recursive/concurrent acquisition, proving
+release-before-replacement ordering. No private fallback data or extra domain
+request is sent. Earlier .local/mcp-cutover-fallback-fixed-full.log passed347
+before this additional gate-ordering case; final log above is authoritative.
+Fresh independent review and final links required; no native qualification or
+main/headless single-exe readiness claim.
+
+
+Completed fresh independent read-only mcp_fallback_fixed_review found0findings
+and confirmed bounded T308-T312 readiness. Initial review found2P2 T310/T311;
+second found1P2 T312, all fixed without erasing history. Final authoritative
+.local/mcp-cutover-fallback-final-full.log EXIT0: format353/0changes, clean root
+Flutter+5package analyses, root33+engine277+MCP15+protocol15+Windows8=348RAMunits.
+.local/mcp-cutover-fallback-final-links.log EXIT0:1469total1468OK0err1excluded.
+Review verified exact16changed+3new+11deleted sources/docs against scopedbaseline;
+no deletedproductionimports/aliases. No native/Win32/DPAPI/ACL/FS/Host/Isar/isolate/
+process/SSH/UI/widget/design/build/install/headless runtime qualification. Excluded
+nestedwork and source-emptylocald notqualified. Normal main/headless mode binding
+T274 and remaining T276artifact/protocol/sourcecleanup remain mandatory/open;
+whole goal is active and single-exe MCP command is not yet declared runnable.
+
+
+- [x] T313 Remove MCP direct dart:io stdio composition in favor of mandatory owned McpStdioPort, implement private pre-UI PlatformDispatcher carrier adapter with original physical I/O ownership and bounded diagnostics, RAM unit cases, full mandatory static/unit/link checks and independent review. Preserve native runner/main binding T274 as mandatory/open; do not claim a working headless command before that binding exists.
+
+
+T313 pre-review evidence: .local/headless-port-reviewed-full.log EXIT0,
+repository format356/0changes, root Flutter and5package analyses clean;
+root45+engine277+MCP15+protocol15+Windows8=360RAMunitpasses, including12new
+scripted carrier cases. First two full runs failed only Flutter analysis
+(unnecessary import and missing unawaited in a test); fixed and final full passed.
+Source-empty locald is not counted as a testpass. Formatter emitted existing
+unresolved-lint warnings in excluded nested work; that checkout is notqualified.
+flutter pub get added only the existing local serverdeck_mcp path dependency.
+No native/realFS/Host/store/Isar/isolate/process/SSH/platform-dispatch/UI/widget/
+design/build/install execution. Application main and Windows runner remain
+unchanged, native carrier and headless dispatch T274 remain open. Independent
+review and final link evidence are required before closing this bounded task.
+
+
+- [x] T314 Fix headless_stdio_port_review P2: update existing021 gateway.md Process stdio runner to mandatory McpStdioPort/physical ACK/drain, remove normative direct-stdio fallback and clarify T115 history without erasing it. Rerun mandatory links, preserve successful unchanged-code full results and obtain fresh independent review.
+
+First completed read-only headless_stdio_port_review found1P2 normative gateway
+contract still requiring deleted direct IOSinks; no confirmed Dart code defect.
+T314 updates that existing contract and records supersession of historical T115.
+Code has not changed since .local/headless-port-reviewed-full.log EXIT0/360RAM
+units. T274 native/main runner and whole-goal readiness remain unproven/open.
+
+
+Completed fresh independent read-only headless_stdio_port_fixed_review found0
+findings and confirmed bounded T313/T314 foundation readiness. Prior completed
+review found1P2 contradictory normative direct-IOSink gateway section; fixed in
+place, T115 history preserved. Authoritative unchanged-code full checks remain
+.local/headless-port-reviewed-full.log EXIT0: format356/0changes, rootFlutter and
+5package analyses clean, root45+engine277+MCP15+protocol15+Windows8=360RAMunits.
+.local/headless-port-fixed-links.log EXIT0:1470total1469OK0errors1excluded
+(the new relative contract link adds1 versus earlier1470-minus1 figures).
+Reviewed12 exactsources/docs against scoped baseline; no native/platformdispatch/
+realFS/Host/Isar/isolate/process/SSH/UI/widget/design/build/install execution.
+Native carrier, SDKlog quarantine, argv/main/headless message pump T274 remain
+mandatory/open. Single-executable stdio is not yet runnable or qualified, whole
+Spec Kit goal remains active. No new feature/specification package was created.
+
+
+- [x] T315 Complete T274 source binding: pre-UI native/Dart argv dispatch, same-executable viewless Flutter runtime and private owned stdio carrier, original handle capture/SDK log quarantine including transitive plugins and current CRT inheritance, physical I/O/close/owned-exit semantics, six RAM dispatch/zone units, full required checks plus C++ static syntax/links and independent review. No app/native I/O/build/install execution or runtime-readiness claim; keep T271 and overall acceptance open.
+
+
+T274/T315 pre-review evidence: .local/headless-runner-final-full.log EXIT0,
+format358/0changes, rootFlutter+5package analyses clean; root51+engine277+
+MCP15+protocol15+Windows8=366RAMunitpasses,6new dispatch/owned-zone cases plus
+12previous carrier cases. First full failed only avoid_print lint on the test
+that intentionally exercises Zone.print; narrowly documented suppression fixed
+that lint, then final full passed. No source-empty locald testpass claim;
+excluded nested-work lintresolution warnings do not qualify that checkout.
+.local/headless-runner-cpp-reviewed.log EXIT0: MSVC14.44.35207 cl /Zs /std:c++17
+/EHsc /W4 /WX /wd4100 /D_HAS_EXCEPTIONS=0 /DUNICODE /D_UNICODE /DNOMINMAX
+/D_WIN32_WINNT=0x0A00 /utf-8 on mcp_stdio.cpp/main.cpp/utils.cpp, using actual
+WindowsSDK and pinned Flutter engine/wrapper headers; command and include paths
+in .local/headless-runner-cpp-command.json. Syntax/type checking only: no object,
+link, app build, executable dispatch or native I/O. Initial compiler invocation
+used a missing default SDK include location; corrected from installed registry
+path and array construction, actual final parse succeeded. Native control-handle
+finish close was added after full Dart checks and included in final C++ parse;
+Dart source has not changed since successful full. Native/platform/CRT/loader/
+GPU/tray/FS/process/SSH/Isar/UI/widget/design/build/install behavior is unqualified.
+Independent review and final link results are required before closure; T271 and
+remaining full-goal acceptance stay open.
+
+
+Completed independent read-only headless_runner_review found0findings and
+accepted bounded T274/T315 source binding. It inspected all18 scopedfiles against
+baseline, related001/021 contracts/bootstrap/connector/server and pinned SDK
+messenger/task-runner semantics. Mandatory decision chain and current source
+binding are supported; no native runtime/installed-command readiness concluded.
+Authoritative .local/headless-runner-final-full.log EXIT0: format358/0changes,
+rootFlutter+5package analyses clean, root51+engine277+MCP15+protocol15+Windows8=
+366RAMunits. Six new production-dispatch/owned-zone cases complement existing
+entry_mode argv cases,12 carrier cases and gateway EOF/physical-flush/close tests.
+.local/headless-runner-cpp-reviewed.log EXIT0 is only cl /Zs syntax/type check
+with /W4 /WX, no object/link/app execution. Exactcommand/sdkinclude paths saved
+in .local/headless-runner-cpp-command.json. Lychee .local/headless-runner-final-links.log
+EXIT0:1470total1469OK0errors1excluded; scoped diffcheckEXIT0 CRLFwarnings.
+No native I/O/loader/CRT/GPU/FS/Isar/SSH/processfixture/UI/widget/design/build/
+install/deploy qualification. T271 manifests/scripts and remaining T253-T276
+acceptance/converge/finalgoal review remain mandatory; whole goal stays active.
+No new feature/specification package was created; completed history preserved.
+
+
+- [x] T316 Implement T271 embedded build entry/manifest4 source: one Flutter exe, engine codegen and current five locked contexts, strict RAM manifest composer plus8 RAM unit cases in full runner, current notice/source/ABI/review bindings, remove three replaced standalone/alias scripts, update existing startup/build contracts and quickstarts/docs in place. Full checks/static PowerShell parse/lychee and independent review required. No build/launch/notices collection/native activation or runtime qualification; T276 remaining legacy qualifier validators and overall readiness remain open.
+
+
+T316 pre-review evidence: .local/embedded-build-reviewed-full.log EXIT0,
+format358/0changes, rootFlutter+5package analyses clean; root51+engine277+MCP15+
+protocol15+Windows8=366DartRAMunits plus8PowerShellRAMmanifest cases (374total).
+Earlier two full runs also passed; final includes UTF8-byte overflow assertion,
+engine build.yaml preserving generated-only experimental exemption and current
+notices/source changes. Source-empty locald not counted as testpass; excluded
+nestedwork lint-resolution warnings do not qualify that checkout.
+.local/embedded-build-final-parse.log:8current PowerShell scripts AST-parsed,
+0errors. No buildscript/collector/ABI/activation path was executed. No build,
+app/native/realFS/processfixture/Isar/SSH/containers/UI/widget/design/install/deploy
+checks. Existing NotoSansSC license is now included in collector sources without
+changing foreign design/font assets. Three replaced individual source scripts
+were removed; prior broad recursive cleanup refusals were not retried.
+Native qualified-provider/old validator cleanup T276 and full T271/goal remain
+open; source input/receipt guards were not replaced with RAM qualification.
+Independent review and final links required before closing this increment.
+
+
+- [x] T317 Fix embedded_build_review P2 output reparse guard gap: inspect existing layout descendants and explicit metadata paths before/post build, repeat exact output-file checks immediately before executor/manifest writes; full RAM/static/link checks and fresh independent review. No build or realFS fixtures; retain prior T316 history and open T271/T276 scope.
+
+First completed read-only embedded_build_review found1P2: layout ancestor-only
+guard allowed an existing metadata symlink to redirect Python/File.WriteAllText
+outside output. T317 adds producer-path checks and existing-descendant validation.
+The suspected NotoSansSC notice vs199payload count conflict was explicitly
+unconfirmed: notices aggregate texts. No source-only/RAM check is promoted into
+native behavior qualification, current-source activation or full T271 readiness.
+
+
+T317 final pre-review evidence: .local/embedded-build-fixed-final-full.log EXIT0,
+format358/0changes, clean rootFlutter+5package analyses,366DartRAM+8PSRAM=374
+unitpasses. .local/embedded-build-fixed-final-parse.log:8PS ASTfiles0errors.
+Actual output guard enumerates existing descendants without following directory
+symlinks, checks each entry's own ReparsePoint attributes plus plain-path policy,
+checks named destinations before and after Flutter, and repeats exact executor/
+manifest destination guards immediately before each producer. Static inspection
+covers these real calls; no filesystem fixture/source-golden test was introduced.
+No build/native/collector/activation/app/processfixture/FS/Isar/SSH/UI/design/
+install checks; no atomic hostile-filesystem or native-readiness claim. Fresh
+independent review required, prior finding/history retained, whole goal active.
+
+
+Completed fresh read-only embedded_build_fixed_review found0findings and
+accepted bounded T316/T317 source readiness. Initial completed review found1P2
+metadata reparse-output gap; fixed without FSfixtures or weakened source guards.
+All23 scopedfiles compared with original baseline; deleted script callers absent
+from currenttools. Current .local/embedded-build-fixed-final-full.log EXIT0:
+format358/0changes, rootFlutter+5package analyses clean,366DartRAM+8PSRAM=374cases.
+.local/embedded-build-fixed-final-parse.log:8PS ASTfiles0errors; actual build paths
+not executed. .local/embedded-build-fixed-final-links.log EXIT0:1461total1460OK
+0errors1excluded; scopedgitdiffcheckEXIT0 CRLFwarnings. Earlier history retained.
+Native/FS/runtime/collector/ABI/activation/build/app/Isar/SSH/processfixtures/UI/
+widget/design/install/deploy behavior unqualified. No atomic adversarial-path
+or current-source native-provider qualification claimed. T271/T276 legacy qualifier
+and remaining overall requirements stay open; whole Spec Kit goal stays active.
+
+
+- [x] T318 Remove unused legacy protocol branches and bundle1/2/3 parsers/FramedReader/API1.0 handshake/schema1 readiness DTO+parser/old response validator/unused request-capability metadata, keep target sharedDTO/format3/schema3 behavior and Dart isolate Capability, remove obsolete import hides only, update existing021 bundle contract and add5RAM target boundary regressions. Full checks/links and independent review; no Native/FS/process/UI/design tests. T271/T276 broader cleanup remains open.
+
+
+T318 pre-review evidence: .local/legacy-protocol-reviewed-full.log EXIT0,
+repository format358/0changes, rootFlutter+5package analyses clean;
+root51+engine277+MCP15+protocol20+Windows8=371DartRAMunits plus8PSRAM=379total.
+Five new target-contract cases pass. First two full runs failed analysis because
+one worker_root import still hid removed model Capability; fixed without changing
+Dart isolate Capability, final full passed. Old tests were not deleted/relaxed;
+existing current-task tests retain their assertions. Source-empty locald and
+excluded nestedwork are not qualified. Current source search has no removed
+symbol use; only ordinary English Authenticated in an unrelated comment remains.
+No native/FS/Isar/processfixture/SSH/UI/widget/design/build/install execution.
+UI changes are import-only; schema3 records/format3 handshake and permissions
+unchanged. Independent review and final links required; T271/T276 remain open.
+
+
+Completed independent read-only legacy_protocol_review found0findings and
+accepted bounded T318 source/contract readiness. All16 scopedpaths compared to
+originalbaseline; retained target parser bodies and UI bodies unchanged, actual
+caller/admission/capture chains verified. Reviewer corrected an initial log-
+reading omission after rereading line79:8PowerShellRAMpasses are indeed in the
+actual full log, so total379RAM=371Dart+8PS confirmed. No codefix was required.
+.local/legacy-protocol-reviewed-full.log EXIT0: format358/0changes, rootFlutter+
+5package analyses clean; root51+engine277+MCP15+protocol20+Windows8. Final lychee
+.local/legacy-protocol-final-links.log EXIT0:1462total1461OK0errors1excluded;
+scopedgitdiffcheckEXIT0 CRLFwarnings. Excludednestedwork/sourceemptylocald not
+qualified. No native/FS/Isar/processfixtures/SSH/container/UI/widget/design/build/
+install/deploy checks, no whole T271/T276/goal or release readiness conclusion.
+Current native qualifier legacy and other remaining implementation/audit work
+stay mandatory/open. Completed task history preserved; no newfeature/spec created.
+
+
+- [x] T319 Remove old normal-bundle format1/locald compatibility gate and shortened historical evidence fallback. Reuse strict current manifest4 composition for retained-bundle source-lock/DLL/root binding; current16 top-level analysis/native phases include engine/MCP and preserve all actual hash/ABI/review/current-source/activation requirements. Add8RAM metadata-policy groups, static AST/full checks/links and independent review. No native proof/receipt/provider qualification or build/activation execution; remaining T271/T276 procedure/producer cleanup open.
+
+
+T319 pre-review evidence: .local/native-manifest-final-full.log EXIT0,
+format358/0changes, clean rootFlutter+5package analyses;371DartRAMunits
+(root51+engine277+MCP15+protocol20+Windows8) plus16PSRAMgroups=387total.
+Eight added PS groups exercise retained map/JSON manifest/source/DLL/type/case/
+Unicode/capture and exact current phase-policy boundary, including missing MCP,
+legacy locald, false/string passed flags and nonstring names. Earlier full also
+passed before final name/log type assertions; final is authoritative.
+.local/native-manifest-final-parse.log:5PSscripts AST0errors. Actual filesystem
+receipt/ABI/current-source/provider/build/collector/activation paths not executed.
+Source-empty locald nottestpass; excludednestedwork lintwarnings notqualification.
+Source review must confirm retained filehash/nativeABI/review gates and strict
+14-runtime evidence remain required; RAM DTO success never supplies that proof.
+No Native/FSfixtures/app/process/SSH/Isar/UI/design/build/install/deploy checks.
+Independent review/final links required; broader T271/T276 and goal stay open.
+
+
+Completed independent read-only native_manifest_gate_review found0findings and
+accepted bounded T319 metadata-gate/source readiness. Reviewer compared9scoped
+files, actual reader/policy/builder/source and activation call chain, preserved
+Native checks and contracts; independently ran only pureRAM PSsuite16groups EXIT0.
+Authoritative .local/native-manifest-final-full.log EXIT0: format358/0changes,
+clean rootFlutter+5package analyses,371DartRAM+16PSRAM=387passes. AST5scripts0errors
+.local/native-manifest-final-parse.log; lychee .local/native-manifest-final-links.log
+EXIT0:1463total1462OK0errors1excluded; scoped diffcheck0 CRLFwarnings. Existing
+assertions retained. No native reader/ABI/provider/build/collector/qualification/
+activation/FSfixture/app/process/Isar/SSH/container/UI/widget/design/install/deploy
+execution. Emptylocald/excludednestedwork notqualified. Full T271/T276/Native
+workflow and overallgoal remain open; no newfeature/spec or readiness promotion.
+
+
+## Phase 9: Convergence
+
+2026-10-31, speckit-converge. Scope — действующая embedded-поправка001 и
+сохраняемые обязательства002/021; пользовательские RAM/static-only и no-design/
+no-native/build/install/deploy границы имеют приоритет над прежними harness.
+Инвентарь:319 прежних task IDs, максимумT319; текущие15FR+15AC+5SC=35 items,
+12групп решений плана,8принципов конституции. Прежние задачи оценены по результату
+действующих corrective chains, не по галочкам; superseded отдельный daemon,
+upgrade/rollback и старые native suites не восстановлены. Эта фаза append-only,
+не меняет spec/plan/code/старые задачи и не подтверждает готовность всей feature.
+
+Классификация11 findings: missing2, partial7, contradicts2, unrequested0;
+HIGH8/MEDIUM3. Отдельного подтверждённого CRITICAL нарушения конституции этим
+source-аудитом не установлено. Static/RAM результаты не native qualification.
+Двенадцать проверенных групп решений: private worker/Host; portable ports;
+verified bundle/peer; schema3 custody/adoption; owner/MCP authority; target sampler;
+typed DTO/CAS/receipts; remote attempt recovery; executable/tray; capabilities;
+bundle/runtime/notices; allowed checks/review. Реальные другие ОС и backend —
+последующие поставки, не новая реализация в этой фазе.
+
+- [x] T320 HIGH CG-01 Реализовать отдельный secondary-instance outcome в Windows/app bootstrap и engine ownership path per FR-SVC-EMB-03, AC-SVC-EMB-01, plan: ownership, T260 (partial). Сейчас windows/runner/main.cpp для каждого обычного запуска создаёт окно, DesktopLifetime запускает worker/Host, а lease-busy превращается в общий storage-blocked без отдельного activation/conflict outcome; hosting/instance_owner.dart отсутствует. Сохранить отсутствие второго store/writer; использовать только verified activation show-existing-window action, если такой канал предоставлен, иначе явно объяснять занятый экземпляр по действующему контракту, без owner/domain IPC, новых credentials, kill или автозапуска. RAM policy/contender tests должны проверять одновременный start, busy/starting owner, недоступную activation и отсутствие второго store/sampler; не создавать Native process fixtures. Новую обязательную activation-службу/протокол не изобретать: контракт допускает безопасный busy fallback.
+
+- [x] T321 HIGH CG-02 Подключить suspend/resume к тому же worker/Host и observation/admission fence per FR-SVC-EMB-04/09, AC-SVC-EMB-02/08, plan: worker lifecycle, T259/T260/T261 (missing). DesktopAction/NativeDesktopPlatform/DesktopApplication и EngineHost сейчас не имеют этих переходов, Windows message handling не передаёт power/lifecycle events. Suspend закрывает новые эффекты и sampler/transports/interest, accepted remote jobs не cancel/replay; resume сверяет vault/capabilities/lease/revisions и делает новый observation fence с явным SSH connect. Тот же worker/store, без нового поколения как обхода незавершённого close. Добавить RAM original-deadline/late-reply/lost-callback/revoke/close-race cases; Native wiring только static, UI/design/native runtime не запускать.
+
+- [x] T322 HIGH CG-03 Завершить target sampler/gateway parity проверку действительных сервисов per FR-SVC-EMB-02/03/09, AC-SVC-EMB-01/08/09, SC-SVC-EMB-01/04, T260/T261/T273 (partial). RemoteReadService._refreshes[profile]/_SharedRefresh уже реализуют shared work и identity checks, но имеющиеся hosting target/worker tests не проверяют этот сервис с несколькими UI/MCP interests и readKinds. Через RAM transport/store seams проверить сохранённые typed start/status/cancel и poll2s/cursor/cache bounds, одну физическую refresh identity, два SSH transports, разные scopes/revisions, revoke/target retirement и поздний physical drain. Переиспользовать реальную policy/domain логику, без общего watch/topic API, fake-success echo вместо сервиса или Native/SSH/Isar fixtures.
+
+- [x] T323 HIGH CG-04 Добавить полную current MCP tool/permission parity через действительный router/domain services per FR-SVC-EMB-07, AC-SVC-EMB-07, SC-SVC-EMB-03, T268/T273 (partial). Сохранённые15 embedded_gateway_test cases проверяют client/gateway/publication на scripted peer, а не положительные/отказные маршруты всех24 tools. Catalog/router/services перенесены, но новый full parity suite отсутствует. Использовать общие RAM repositories/transport ports для реально вызываемых обработчиков; проверить все scopes/allowed targets, expired/revoked grant, private owner forgery, schema/input validation, proof-to-effect/publication fences, IDs и fixed errors без secrets. Не вводить production test-only authority bypass, не подменять assertion echo-ответом и не запускать Native/FS/Isar/SSH/process fixtures.
+
+- [x] T324 HIGH CG-05 Завершить LocalJobObservation overlay и восстановление remote attempts per FR-SVC-EMB-08/09, AC-SVC-EMB-08/09, SC-SVC-EMB-04, T267/T268 (partial). jobs.dart уже сохраняет progress до submit и имеет recover/reconcile/unknown branches, но отдельного attached/detached/stale runtime observation overlay и новых observer_recovery RAM cases не найдено. Сохранить format3 external DTO и schema3 persistent identities, выражать observation отдельно от remote result; lost ACK после submit, detach/exit/crash, missing attempt, old generation/target, duplicate terminal/revoke и explicit authorized reconcile/cancel не освобождают occupancy и не отправляют submit заново. Проверять фактическую domain driver/state policy с RAM executor/repository; no native/SSH/process/FS fixtures и no restored one-time authority.
+
+- [x] T325 HIGH CG-06 Дополнить synthetic adoption/retention полным непустым schema3 графом per FR-SVC-EMB-05/06, AC-SVC-EMB-04/05/06, SC-SVC-EMB-02, T262/T263 (partial). WorkspaceSnapshot reader захватывает16 collections и проверяет custody/graph, но populated fixture/schema3_state/workspace_snapshot tests заполняют в automation только grant/receipt, оставляя revision/plan/delegation/approval/job/event/desired families пустыми. Добавить допустимый связанный граф всех сохраняемых семейств, IDs/nativeIds/revisions/blobs/enrollment/history и refusal/fault cases; сравнить точные retained rows и semantic snapshot, убедиться что session/one-time permit не воскресает. Не открывать Isar/FS, не добавлять migration/rollback или snapshot reset; использовать существующие row-source/protection fakes.
+
+- [x] T326 HIGH CG-07 Реализовать immutable EngineCapabilities и lifecycle/vault matrix fakes per FR-SVC-EMB-10/11, AC-SVC-EMB-10/11/12, SC-SVC-EMB-05, T269 (missing). platform/ports.dart имеет vault/protection/runtime contracts, но capability_snapshot.dart/эквивалент snapshot с platform/storageReady/vaultStatus/directSsh/localMcpBridge/tray/backgroundPolicy/reasonCodes отсутствует. OperationalFeatures не заменяет эту модель. Windows Ready/admission должны отражать соответствующие состояния; unknown/locked/unavailable не success. Для остальных5строк — честные unsupported/foregroundOnly/Web directSsh=false и fake-host import/loader boundaries без Windows fallback; реальные не-Windows adapters/backend не реализовывать. Добавить RAM matrix/vault/lifecycle tests, static import checks считать отдельно от RAM assertions.
+
+- [x] T327 HIGH CG-08 Удалить оставшиеся legacy inputs и test-only helper dependencies per FR-SVC-EMB-14/15, AC-SVC-EMB-15, T271/T276 (contradicts). Source-empty packages/serverdeck_locald всё ещё содержит pubspec/build/analysis/lock, а .github/workflows/unit.yml и tools/test-unit.ps1 автоматически обходят все package directories и продолжают разрешать/анализировать этот старый package. Найти оставшиеся callers/внешние entry каждого старого helper и убрать только заменённый/неиспользуемый код без re-export/deprecated facades. Закрепить точный текущий package/build/CI input set; сохранить target schema3/format3 helpers, runtime/notices/source/receipt guards. Не обходить и не повторять эквивалентным способом ранее системно отклонённую broad recursive cleanup; разрешённую часть закрывать отдельно, недоступный остаток честно фиксировать. Наличие такого остатка не считать завершённым T276.
+
+- [x] T328 MEDIUM CG-09 Завершить актуальные storage/platform инструкции и безопасную presentation copy per FR-SVC-EMB-06/10/12, AC-SVC-EMB-06/10/11/12, T264/T270 (partial). docs/development/embedded-engine-storage.md и platform-capabilities.md отсутствуют; README продолжает описывать client/locald и удалённый test-foundation-available.ps1, readiness/error views предлагают локальную службу и согласование client/service версий. Описать только target-schema3 refusal/preservation/writer-busy и реальные шесть platform statuses/prerequisites, существующий app/tray и отсутствие отдельной службы; не обещать миграцию, поддержку будущих OS или Native/release readiness. Presentation structure/design003 не менять и не тестировать; unit проверять лишь безопасный message/status policy, если он меняется.
+
+- [x] T329 MEDIUM CG-10 Согласовать dependency pin и оставшиеся статусные утверждения плана с принятой current-source реализацией per plan: Technical Context/Reuse boundaries, FR-SVC-EMB-12, T255/T270 (contradicts). Embedded plan указывает dartssh2 4.2.0, engine pubspec/lock используют перенесённый4.1.0; план также сохраняет заявления об ещё отсутствующем Root/proxy после выполненных component increments. Исправить артефакты по подтверждённому текущему scope и pins без незапрошенного dependency upgrade, не стирая task history и не присваивая unsupported/native readiness. Converge сам spec/plan не меняет.
+
+- [x] T330 MEDIUM CG-11 Завершить aggregate evidence/приёмку и повторный Analyze/Converge per FR-SVC-EMB-12/13, все35 FR/AC/SC поправки, T261/T268/T272 (partial). Текущие component checks/reviews не закрывают целиком незавершённые T255–T276; embedded-engine-verification.md заканчивается T312 и не отражает T313–T319. Перепроверить все применимые требования и task corrective chains по текущему source, записать точные commands/exit/scope/остатки и обновить агрегатные статусы лишь с доказательствами. engine/test/platform_boundary_test.dart читает source Directory/File и является static source check, а не RAM domain test: выделить его в static stage или явно разделить классификацию/count, не удаляя import-boundary coverage. Последний полный результат387checks содержит371Dart tests (один static source scan) и16PSRAMgroups; не выдавать все за RAM. Выполнить необходимые полные format/analyze/unit/link checks и обязательный независимый whole-scope review/fix loop; завершение только после подтверждения всей текущей цепочки, без Native/FS/process/SSH/UI/design/build/install/deploy запусков или пропуска unresolved findings.
+
+Implementation handoff: выполнять T320–T330 в существующем пакете после
+specification link check и обязательного независимого review/fix loop. Ни одна
+прежняя галочка не изменена. Следующий Converge должен проверять полученное
+поведение заново, не считать появление этих задач реализацией.
+
+
+### Phase 9: independent review correction — 2026-10-31
+
+Завершённый read-only converge_phase9_review нашёл1P2 в безусловной формулировке
+T324 о release occupancy после cancel/reconcile. Это исправление требований
+CG-05, не новая remote операция и не изменение существующего021. Остальные
+findings подтверждены source review. Ни предыдущие задачи, ни их галочки не
+переписываются; эта явная поправка имеет приоритет над спорной фразой T324.
+
+Нормативный критерий T324/T331: detach, loss/отсутствие ACK, stale observation,
+сам запрос cancel или reconcile и ответ pending/unknown НЕ освобождают occupancy
+и не разрешают новый apply. Verified correlated terminal той же актуальной
+attempt допускает release только по действующим условиям021: валидный terminal
+receipt/sequence/identity, необходимые проверки результата и доказанное отсутствие
+продолжающегося child (childrenStopped, где требуется). Поздний/чужой/некоррелированный
+terminal не освобождает актуальную attempt. Успешно доказанный terminal не должен
+оставлять бессрочную блокировку. Использовать существующие переходы
+[records021](../021-mcp-control/contracts/records.md) и
+[executor021](../021-mcp-control/contracts/executor.md), без нового wire/schema.
+
+- [x] T331 HIGH Исполнить CG-05/T324 с исправленным occupancy criterion per FR-SVC-EMB-08/09, AC-SVC-EMB-08/09, SC-SVC-EMB-04 и completed converge_phase9_review P2 (partial). Для действительной domain policy добавить RAM случаи: cancel/reconcile intent и pending/unknown сохраняют occupancy; доказанный correlated terminal с необходимыми checks/childrenStopped освобождает; late/foreign terminal не освобождает актуальную attempt; затем разрешённая новая работа не блокируется навсегда. Эта задача уточняет приёмку T324, не отменяет её overlay/recovery работу и не выдаёт существующий запрос отмены за доказанный remote terminal. No Native/FS/Isar/process/SSH/UI/design fixtures.
+
+Проверка append-only до Phase9:575353bytes SHA256
+b28d5915936e4ea52a2de9ffbfa57808b638c492a107664a8c0c85a42dfbfc69 сохранены.
+Исторический full результат T319387checks не перепроверялся этой Converge-фазой;
+один из371Dart tests — static source scan, остальные370Dart и16PS группы RAM.
+Code/spec/plan/constitution в Converge не менялись. После поправки требуются
+повтор lychee и свежее независимое read-only review до implementation handoff.
+
+
+Phase9 handoff review complete: initial converge_phase9_review found1P2 ambiguous
+T324 terminal/occupancy wording; explicit normative append-only correction and
+T331 added without rewriting oldtasks. Fresh completed read-only
+converge_phase9_fixed_review found0findings and accepted bounded implementation
+handoff for T320–T331. It confirmed both supplied prefix hashes and actual source
+basis/contract trace. These12tasks remain unchecked/unimplemented; this does not
+close T255–T276 or the whole goal. Code/spec/plan/constitution unchanged by this
+Converge. No extension hooks registered. .local/converge-phase9-fixed-links.log
+EXIT0:1465total1464OK0errors1excluded (two added relative contract references).
+No Flutter/unit/native/runtime/FSfixture/process/Isar/SSH/UI/design/build/install/
+deploy checks were run by Converge or its reviewers. Prior387checks are historical
+current-source evidence only, including1static source scan, not387RAM assertions.
+Next: speckit-implement against the remaining tasks, then repeat Analyze/Converge
+and the mandatory final AGENTS review/fix loop; no feature recreation.
+
+
+### T320 implementation evidence: explicit busy fallback
+
+Platform/Host now distinguish immutable actual acquisition failure from a lost
+acquired lease; only an owner/default-bound contender within its original startup
+budget receives HostStartResult.workspaceBusy. No store/services/sampler/MCP opens.
+Private worker status carries validated busy/readiness, preserving the historical
+startup outcome separately from physical cleanup status. Bootstrap never attaches
+an owner or retries that incarnation. The existing readiness screen explains the
+conflict; no design/layout or widget tests were added. Closing the contender exits
+its own process through the common cleanup/CloseBlocked/Wait/Force path, without
+warning about another process's jobs. An early hidden window is restored on a late
+busy outcome. No verified activation channel exists; the permitted safe fallback
+is used without inventing IPC, compatibility, credentials or app auto-launch.
+
+- [x] T332 Correct the confirmed C++ syntax defect in the affected desktop status
+  parser: local identifier `small` collided with the Windows macro. Rename the
+  int32/int64 locals; preserve numeric limits and behavior. Static MSVC `/Zs`
+  checks only, without compilation/linking/executing a native application.
+
+Actual checks before independent review: tools/test-unit.ps1 EXIT0 in
+.local/secondary-instance-full.log: repository format358files/0changed; root
+Flutter analysis and five package analyses clean; root54 + engine286 + MCP15 +
+protocol20 + Windows8 =383 Dart checks, plus16 PS RAM groups. One existing Dart
+check is a static source boundary scan, so this is398 RAM checks +1 static scan,
+not399 RAM tests. The empty residual locald package has no tests/pass claim.
+Formatter warnings concern the excluded nested work/ checkout's lint resolution.
+The first Host-only full run failed one new asynchronous test assertion; after
+waiting for actual owner startup, targeted31 Host tests and the subsequent full
+suite passed. lychee EXIT0:1465total1464OK0errors1excluded. MSVC `/Zs` of
+windows/runner/flutter_window.cpp with existing SDK include paths + /Iwindows
+EXIT0 after correcting the macro collision; initial attempts failed (missing local
+include path, then macro collision). No Native runtime/FS fixture/process/SSH/
+Isar/UI/design/build/install/deploy tests were run. Completed independent secondary_instance_review found no findings and accepted
+bounded T320/T332 readiness. It inspected the22-file baseline diff, actual
+sources and supplied check logs, without executing tests or modifying files. Other Phase9 and T255-T276 tasks remain open.
+
+
+### T321 session admission foundation (T333)
+
+- [x] T333 Implement the same-registry admission pause needed by T321, per
+  FR-SVC-EMB-04/09, AC-SVC-EMB-02/08 and the existing worker lifecycle contract.
+  Pause synchronously retires owner/MCP session records and observation interests;
+  physical proofs/pending charges remain owned. A new private epoch rejects late
+  owner issuance/handshake proofs even after resume or reentrant expiry callbacks.
+  Only the current same-registry opaque pause can resume admission once; repeated
+  pause, foreign/stale tokens, failed detach and permanent stop cannot revive it.
+  Do not block privileged local cleanup publications or interpret detach as remote
+  cancel/terminal evidence. RAM tests exercise actual EngineSessions and retained
+  platform proof futures, without Native/FS/process/store/SSH/UI/design fixtures.
+
+This is a bounded internal admission component, not completion of T321. Host and
+service physical pause/drain, sampler/cache/observation fence, vault/capability/
+lease/revision recheck, same-worker desktop power routing, original deadlines and
+close races remain required. No standalone runtime, new spec, compatibility or
+wire role/credential was introduced. The public Host start summary above was
+aligned with the already implemented WorkspaceBusy outcome from T320.
+
+Initial full tools/test-unit.ps1 run failed one new test's expected safe code:
+MCP reservation correctly rejects the already removed record as UNAUTHORIZED
+before generic admission gating. The test was corrected to preserve that rule.
+Source inspection also retained the existing safe expiry callback error handling
+and added an epoch check around registration's reentrant expiry callback. The
+subsequent targeted sessions suite passed24tests including9new pause cases.
+Final full tools/test-unit.ps1 EXIT0 in .local/suspend-admission-final-full.log:
+format358/0changed; root Flutter +5 package analyses clean; root54 +engine295
++MCP15 +protocol20 +Windows8 =392Dart checks, plus16PS RAM groups. One existing
+Dart case is the static import boundary scan, so407RAM+1static, not408RAM. Empty
+residual locald package has no tests/pass claim; formatter warnings refer only to
+excluded work/ lint resolution. lychee EXIT0 in .local/suspend-admission-links.log:
+1465total1464OK0errors1excluded. No Native/runtime/UI/build/install/deploy tests.
+Mandatory independent review is pending. T321 and the full goal remain open.
+
+
+- [x] T334 Fix confirmed P2 from completed suspend_admission_review: nested detach
+  callbacks could pause/resume and admit a new owner before outer retirement
+  completed. Track active retirement frames and reject resume until all unwind.
+  Return the latest token from the outer pause after nested epochs, rather than
+  stranding its caller with a stale token. Keep uncaught callback failures final.
+  Two RAM regressions exercise caught resume refusal/no new owner and uncaught
+  refusal/permanent stop. T333 review loop requires full applicable checks and a
+  fresh independent reviewer; the initial review was not clean. T321 stays open.
+
+
+T334 fix verification: full tools/test-unit.ps1 EXIT0 in
+.local/suspend-admission-fixed-full.log: format358/0changed; rootFlutter and5
+package analyses clean; root54+engine297+MCP15+protocol20+Windows8=394Dart checks,
+plus16PSRAM groups. One existing Dart case is static, so409RAM+1static (not410RAM).
+All11 new pause/regression cases are RAM-only and included in this full run.
+lychee EXIT0 .local/suspend-admission-fixed-links.log:1465total1464OK0errors1excluded.
+No Native/platform/UI/runtime/release qualification asserted. A fresh independent
+review is required before treating T333/T334 as accepted. T321 stays unchecked.
+
+
+Completed review evidence for T333/T334: fresh suspend_admission_fixed_review
+found0findings and accepted bounded admission component readiness, after the
+initial1P2 fix. It inspected the6-file baseline diff, current sources/contracts/
+tasks and supplied check logs without running tests or modifying files. Full
+T321 lifecycle and all remaining aggregate work are still open.
+
+### T321 shared SSH pool physical pause foundation (T335)
+
+- [x] T335 Implement the reusable physical pause boundary of the existing shared
+  SshTransportPool for T321 / FR-SVC-EMB-04/09 / AC-SVC-EMB-02/08. Fence reserve,
+  connect and probe synchronously; stop existing operations and own their physical
+  settled futures. Preserve custody reservations until their actual owners close,
+  so logical timeout cannot free either of the two transport slots. Return a
+  same-pool opaque pause handle with the original physical settled future;
+  repeated suspend shares it. Resume only after drain for the current handle;
+  stale/foreign/reused handles, uncompleted drain and permanent close cannot open
+  intake. Resume never connects, restores a reservation or replays a remote job.
+  Six actual-pool RAM unit cases exercise these slot/handle/timeout/close rules
+  without admitting any network operation or invoking files/processes/isolates.
+
+The shared physical drain path is also used by permanent close. This does not
+claim actual socket/client/key-worker failure-injection coverage or application
+suspend implementation. Host/service owner cleanup must start before awaiting
+pool.settled; domain admission/fences, sampler/observer/transport service wiring,
+resume revalidation and desktop events remain openT321. No new feature spec,
+compatibility path, dependency, wire protocol, credentials or independent runtime.
+
+Actual full tools/test-unit.ps1 run completed successfully in .local/ssh-pause-full.log;
+final counts and links are recorded below before independent review. No native,
+SSH, FS fixture, process, Isar, integration, UI/design/widget, build/install/deploy
+checks were run. Mandatory independent review remains required for this slice.
+
+
+T335 pre-review evidence: .local/ssh-pause-full.log EXIT0: format359files/0changed,
+rootFlutter +5package analyses clean; root54+engine303+MCP15+protocol20+Windows8
+=400Dart checks, plus16PS RAM groups. One existing Dart case is a static import
+boundary scan:415RAM+1static total416, not416RAM. Six new pool cases are RAM-only.
+Empty residual locald package has no tests/pass claim; formatter lint warnings
+concern only excluded work/ checkout. lychee .local/ssh-pause-links.log EXIT0:
+1465total1464OK0errors1excluded. No native/platform/runtime/release qualification.
+No application code changed after this successful full run; only in-place spec
+contract/task evidence updated. Independent AGENTS review is pending for T335.
+
+
+Completed T335 review: independent ssh_pool_pause_review found0findings and
+accepted the bounded shared SSH pool pause. Read-only source/diff/spec/log review,
+no independent test execution. FullT321/Host binding remains open.
+
+### T321 actual service composition suspension (T336/T337)
+
+- [x] T336 Implement same-composition suspension of actual TrustedControlServices
+  and remote connections/reads/executor/trust probes/job observers per T321,
+  FR-SVC-EMB-04/09 and AC-SVC-EMB-02/08. Retire external sessions before remote
+  cleanup, start all service owners before awaiting pool reservations, preserve
+  privileged local cleanup authority and physical proof/native work ownership.
+  Clear old observation interests/cursors/cache/inspections, preserve store/key/
+  trust/grants and service identity. Job driver drain includes late transfers;
+  do not send remote cancel or repeat submit. Resume only the current successfully
+  drained service handle, with current snapshot and provider gates restored before
+  fresh external sessions. Failed partial restore seals pool/registry and begins
+  permanent close. Keep original physical ownership after observer timeout and
+  permanent-close races. Add actual-composition RAM tests over validated16family
+  schema3 snapshot and explicit typed repository/runtime/publication RAM adapters.
+- [x] T337 Correct the confirmed unit/analysis interface issue exposed by the first
+  full run: assertAutomationCustody was a static extension and could not be
+  implemented by the RAM repository adapter. Move its exact existing native-store/
+  key-binding body into StateStore instance interface; remove extension definition
+  entirely. No test-only production mode, weakened body, compatibility forwarding,
+  different root factory or wire-selected provider. Actual root continues using
+  native StateStore; unexpected RAM repository operations throw immediately.
+
+Ten RAM cases exercise fresh settings/read/jobs after resume, stable snapshot/
+component identity, retired handles, late request proof and logical timeout,
+custody/local cleanup authority, handle identity, close race, failed snapshot
+read, provider closure, superseded registry fence and detach failure. Empty remote
+graph guarantees tests never open SSH/Isar/FS/process/isolate/native work. This is
+not accepted-remote-job fault-injection, full snapshot parity or Host/desktop
+lifecycle coverage. T321 remains unchecked: HostResources/Host/worker/controller/
+desktop power wiring, full observation fence and runtime/vault/lease/capabilities/
+revision recheck remain mandatory; T322-T331 and aggregate work remain open.
+
+First full tools/test-unit.ps1 failed analysis and all7 initial new cases because
+an extension cannot be overridden by the fake; T337 moved the unchanged body.
+Subsequent targeted run found an explicit missing RAM isReady property; added it.
+The targeted suite then passed, expanded to10cases and passed again. A failed
+attempt to redirect the initial targeted command used the root working directory;
+no tests ran in that attempt; the command was rerun from the package directory.
+Normalized custody binding source body was compared to the saved baseline and
+matched SHA256 2dd964b803ac18e4196971ca534dd29ccd4441ab0ea8c40bb1c39c46902c956a;
+old extension definition is absent (.local/service-pause-custody-body.json).
+Final full checks and independent review are recorded next; no wholeT321 readiness
+or native/platform/runtime/release qualification is claimed.
+
+
+T336/T337 pre-review evidence: .local/service-pause-final-full.log EXIT0:
+format360files/0changed; rootFlutter and5package analyses clean; root54+engine313
++MCP15+protocol20+Windows8=410Dart checks plus16PSRAMgroups, total425RAM+1existing
+static import boundary scan (not426RAM). Ten new cases use actual domain services
+and gateway with RAM repository/proof ports. Empty residual oldlocald has no
+current-task tests/pass claim; formatter lint warnings only excluded work/.
+lychee .local/service-pause-links.log EXIT0:1465total1464OK0errors1excluded.
+No source code changes after this full run; only spec evidence updated and links
+rerun. Mandatory independent AGENTS review/fix loop remains pending for this slice.
+
+
+Completed T336/T337 review: independent service_pause_review found0findings and
+accepted bounded service component readiness. It inspected the12-file source/diff/
+contract/tasks and actual logs read-only, independently verified unchanged custody
+binding body and old extension removal, ran no tests. FullT321 remains open.
+
+### T321 Host lifecycle ownership (T338/T339)
+
+- [x] T338 Bind actual EngineHost to the existing same-composition service pause
+  via required HostResources suspend/revalidate/resume methods, per T321,
+  FR-SVC-EMB-04/09 and AC-SVC-EMB-02/08. Fence readiness/domain admission before
+  callouts, retire pending/issued owner bindings, retain gateway/owner/runtime
+  physical proofs and same store/vault/runtime/lease. Add startup services-ready
+  checkpoint without extending original30s budget or publishing earlyReady.
+  Resume current opaque Host pause with original<=30s observer budget and<=5s
+  individual runtime proof; recheck runtime/vault/store runtime/current services/
+  selected executor capability and fixed workspace identity before admission.
+  Keep physical provider ownership beyond logical timeout, retire failed Host
+  through existing10s shutdown/CloseBlocked/Wait path. Superseded/reentrant resume
+  cannot open a gate or poison a new epoch; no replacementworker/store/services,
+  reset, SSH reconnect or jobreplay. Add actual Host/authority/session/gateway/MCP
+  policy RAM tests, including startup/shutdown and originaldeadline races.
+- [x] T339 Correct confirmed Host/MCP activation boundaries while implementing
+  T338: a pause after activation bind await must wait for the Host admission
+  barrier before readiness/publication, not fail the same Host. Make activation's
+  beforePublish callback required and bind the real Host checkpoint; update all
+  current callers without an optional legacy/default path. Preserve the existing
+  SERVICE_UNAVAILABLE mapping for an unactivated MCP server: lifecycle epoch
+  NOT_READY is typed/scoped, not a broad change to startup error normalization.
+  RAM regression validates deferred publication behind the actual pool barrier.
+
+Fifteen new Host RAM cases plus one pool RAM case cover unstarted/no autostart,
+foreign/consumed handles, fresh owner/singleopen, late revoked owner physicalproof,
+startup publication pause, original startup/resume budgets, superseded/reentrant
+resume, early startup shutdown, late servicepause/revalidation and vault/lease/
+workspace/native metadata/snapshot/restore failures. Native ports/resources are
+RAM fakes; actualHost/authority/session/gateway and MCP publication policy execute.
+No actualNative/Isar/FS/process/SSH/UI/widget/design/integration/build/install/
+deploy work was run. Actual service composition was separately exercised by T336;
+these fakes do not assert end-to-end native or release readiness.
+
+T321 stays unchecked: worker/controller lifecycle phases and desktop power event/
+lostcallback handling, UI reattachment, immutable capability matrix T326 and its
+full resume binding remain required. Root must apply an early power intent after
+normal Host.start begins, without calling start from suspend. Resume during
+startup observes the original startfuture for eventualReady. No newfeature/spec,
+compatibility path, wire role/credential, data migration or optional noop recheck.
+
+First full .local/host-pause-full.log failed one new superseded-resume code mapping.
+Targeted8Host tests passed after a first correction. The expanded next full
+.local/host-pause-final-full.log exposed an existing unactivated-MCP error mapping
+regression from that overly broad safe-code change. Correction was narrowed to
+lifecycle epoch errors; the original test/assertion was preserved. Added startup
+monotonic-budget guard and mandatory activation barrier, then targeted31 Host/pool/
+publication tests passed. Final fullchecks and mandatory independent review follow.
+
+
+T338/T339 pre-review evidence: .local/host-pause-reviewed-full.log EXIT0:
+format361files/0changed; rootFlutter +5package analyses clean; root54+engine329
++MCP15+protocol20+Windows8=426Dart checks plus16PSRAMgroups, total441RAM+1existing
+static import boundary scan (not442RAM). The16new Host/pool cases are RAM-only.
+Empty residual locald has no current-task tests/pass claim; formatter lintwarnings
+refer only to excluded work/ checkout. lychee .local/host-pause-links.log EXIT0:
+1465total1464OK0errors1excluded. No code changed after this successful full run;
+only spec evidence updated and links rerun. Independent AGENTS review pending;
+T321 and fullgoal readiness are not established by these bounded checks.
+
+
+- [x] T340 Fix confirmed P2-1 from completed host_pause_review: a reentrant new
+  suspend after service restore fenced only Host readiness while the shared
+  registry stayed open until deferred physical suspension. Supply mandatory pure
+  Host-owned admissionBlocked policy to EngineSessions; enforce it before owner
+  proofs/registration and session current/domain admission independently of the
+  service token. Update every actual/RAM root explicitly, with no optional default.
+  Strengthen reentrant RAM case to reject MCP handshake synchronously inside the
+  callback and verify no new provider proof starts.
+- [x] T341 Fix confirmed P2-2 from completed host_pause_review: final startup
+  timeout-success callback bypassed pause/monotonic deadline after initialize.
+  Commit start Ready inside owned startup work immediately after final checks,
+  without await/provider call before publication; observer only handles failures.
+  Two RAM scheduling cases sweep41microtask offsets each across initialization
+  completion, checking pause-held acknowledgement and expired startup budget,
+  and assert coverage on both sides of Ready. Original physical startup future
+  still owns the commit and cleanup. Full applicable checks/fresh review required.
+
+Initial completed host_pause_review found2P2 and was not clean; its findings are
+recorded above without erasing T338/T339 implementation history. T321 and the
+whole goal remain open. Fixed source/check/review evidence follows below.
+
+
+T340/T341 post-fix evidence: full tools/test-unit.ps1 EXIT0 in
+.local/host-pause-fixed-full.log: format361files/0changed; rootFlutter +5package
+analyses clean; root54+engine331+MCP15+protocol20+Windows8=428Dart cases plus16PS
+RAMgroups, total443RAM+1existingstatic source scan (not444RAM). Eighteen new
+Host/pool RAM cases include the82 scheduling variants inside two sweep cases.
+No source changed after this full check. lychee .local/host-pause-fixed-links.log
+EXIT0:1465total1464OK0errors1excluded; links rerun after this evidence update.
+No Native/platform/runtime/UI/release qualification. Fresh independent review
+required; original review2P2 does not establish readiness.
+
+
+- [x] T342 Fix confirmed P2 from completed host_pause_fixed_review: suspend could
+  arrive after beforePublish future completed but before pool continuation, making
+  recovering readiness a terminal activation failure. Return a synchronous current
+  Host epoch/deadline guard from the required barrier. Recheck after await and
+  readiness, then accept publication I/O without an async gap. Superseded guard
+  waits the current Host barrier in the same operation/budget; genuine readiness/
+  identity errors remain terminal. Add pool epoch regression and an actualHost+
+  pool RAM sweep across41activation microtask offsets, asserting no pre-resume
+  publication for pauses before I/O, same startfuture/Host/store and eventualReady.
+
+Completed host_pause_fixed_review found1P2 (not clean), while confirming the two
+original fixes. The third review loop remains required. Full post-T342 check
+.local/host-pause-publication-fixed-full.log EXIT0: format361/0changed, rootFlutter
++5package analyses clean; root54+engine333+MCP15+protocol20+Windows8=430Dart plus16PS
+RAMgroups, total445RAM+1static import scan (not446RAM). Twenty new Host/pool cases
+include123microtask scheduling variants inside3sweep cases. No source changes
+after this full run; specification evidence only. No Native/platform/runtime/UI/
+release qualification. T321/T326 and wholegoal remain open.
+
+Completed third review evidence: host_publication_fixed_review reported zero
+findings for T338–T342 after reading the scoped sources/specification/diff and
+the actual full/link logs. It ran no tests and changed no files. This accepts
+the bounded Host/pool scope; T321/T326 and the full goal remain open.
+
+### T321 private worker/controller power ownership (T343–T345)
+
+- [x] T343 Implement private capability-authenticated WorkerPowerIntent with a
+  strictly increasing positive signed63-bit epoch, original at-most30s absolute
+  deadline and latest-intent coalescing. Parent immediately masks readiness and
+  retires owner interests; Root fences the same Host upon receipt independently
+  of16ordinary correlation slots. One physical pump observes current pause,
+  window retirement and restore. Pin generation, ignore stale acknowledgements,
+  reject old metadata/attach replies with NOT_READY and wait actual parent owner
+  detaches before fresh Ready/owner admission. No restart, replay or new service.
+- [x] T344 Preserve early startup: retain power without launching anything,
+  apply it after ordinary Host.start begins, permit resume to release original
+  startup without blocking a newer intent on the start reply, preserve busy and
+  expire failed restore through the shared shutdown barrier. Do not let a late
+  initial lifecycle acknowledgement downgrade a newer power Ready. Retain the
+  original startup/deadline/physical ownership and shutdown paused startup safely.
+- [x] T345 Deliver coalesced early power before authenticated one-time begin in
+  the actual worker connection and normal Windows worker entry, before storage
+  or publication. Keep accepted discovery I/O runtime/owner/lease/generation/
+  activation proofs after awaits; a later recovering phase alone cannot make
+  accepted publication fatal. Add RAM boundary/queue/startup/quota/epoch/fresh
+  owner cases. Apply the amended embedded-engine contract; do not claim native
+  execution or completed desktop power event/capability integration.
+
+T343–T345 checks: tools/test-unit.ps1 EXIT0 recorded in
+.local/worker-power-coalesced-full.log. Formatter363files/0changed; rootFlutter
+and5package analyses clean; root54+engine346+MCP15+protocol20+Windows8=443Dart,
+plus16PS RAMgroups:458RAM+1existing static import scan. Thirteen new RAM cases
+exercise actual private worker/controller/Host policy with RAM ports, including
+1000-intent bursts,16pending ordinary controls, early busy/expired restore and
+superseding physical restore. Native/isolate/FS/SSH/process/UI/design/build/
+installation/release checks were not executed. Formatter warnings concern
+unresolved lint includes in the excluded nested work checkout.
+
+Independent review/fix loop and specification link results are recorded next.
+T321 stays unchecked: desktop/native power event and phase binding, fresh UI
+attachment and the full T326 capability snapshot/matrix remain required. MCP
+requires a running app (tray counts); absent app permits only local connector
+stderr/nonzero failure, never a service response or application autostart.
+
+- [x] T346 Fix confirmed P2-1 from completed worker_power_review: add an
+  independently observed original resume deadline spanning pending Host pause,
+  window drain, restore and original startup. Expiry begins common shutdown;
+  cancel the observer when superseded, current Ready succeeds, or shutdown
+  begins. Retain physical work/lease ownership; add RAM case with a held service
+  suspension, expired resume and later actual cleanup on the same Root.
+- [x] T347 Fix confirmed P2-2/P2-3 from completed worker_power_review: a deferred
+  Ready must not overwrite newer same-epoch terminal metadata. Validate pinned
+  generation synchronously before deferring acceptance and observe callback
+  exceptions through fail-closed retirement. Add RAM regressions for pending
+  detach plus newer failed readiness, and foreign-generation power Ready without
+  an unhandled asynchronous failure. No retry/new incarnation or new protocol.
+
+Completed worker_power_review found3P2, not a clean result. The original full
+checks above did not exercise these orders. All three findings were confirmed
+against code and contract and corrected in T346/T347. Fresh full/link checks
+and independent review are still required before accepting this increment.
+
+T346/T347 post-fix checks completed: .local/worker-power-fixed-full.log EXIT0,
+format363files/0changed; rootFlutter+5package analyses clean; root54+engine349+
+MCP15+protocol20+Windows8=446Dart plus16PS RAMgroups =>461RAM+1static source scan.
+All16new RAM cases pass. .local/worker-power-fixed-links.log EXIT0:
+1465total1464OK0errors1excluded. No Native/isolate/UI/FS/SSH/process execution.
+Fresh independent review remains required; the original3P2 report is not clean.
+
+- [x] T348 Fix confirmed P2 from completed worker_power_fixed_review: public
+  refreshReadiness/refreshDesktopStatus returned raw Root Ready while parent
+  detaches still held the controller barrier. Return the controller-accepted
+  status at the public await continuation, retaining validated desktop counts
+  and original frame/correlation checks. Add RAM case for both metadata results
+  while power Ready waits detach, plus two reply-to-public-continuation races
+  with a newer intent. Fresh Ready is visible only after actual old detach.
+
+Completed worker_power_fixed_review confirmed all original3P2 fixes and found
+the new metadata projection P2; it was not clean. T348 corrects the confirmed
+defect without introducing UI/design tests or changing power event scope.
+Fresh full/link checks and independent review remain required.
+
+T348 post-fix evidence: .local/worker-power-projection-fixed-full.log EXIT0;
+format363files/0changed; rootFlutter+5package analyses clean; root54+engine352+
+MCP15+protocol20+Windows8=449Dart plus16PS RAMgroups =>464RAM+1static import scan.
+All19new RAM cases pass. .local/worker-power-projection-fixed-links.log EXIT0:
+1465total1464OK0errors1excluded. Native/isolate/UI/FS/SSH/process qualification
+was not executed. Third independent review is required before acceptance.
+
+Completed third review worker_power_projection_fixed_review reported zero
+findings for T343–T348, confirmed all4previous P2 fixes and accepted this bounded
+worker/controller scope after read-only source/spec/diff/log inspection. It ran
+no tests and changed no files. OverallT321/T326 readiness remains open.
+
+### T321 desktop power and fresh presentation binding (T349–T350)
+
+- [x] T349 Bind normal Windows WM_POWERBROADCAST to suspend/resume desktop actions
+  and the existing worker power intent. Use APMSUSPEND and RESUMEAUTOMATIC;
+  subsequent RESUMESUSPEND user activity does not start another restore. Retain
+  one latest Native intent before Dart initialize and flush before its reply,
+  after Dart subscribes and before ordinary engine start. Forward to Flutter/
+  plugins and return TRUE for handled power events. Add three lifecycle phases
+  to the existing tray status allowlist; preserve close/tray/Exit policy.
+- [x] T350 Bind DesktopLifetime power revisions to private window epochs and
+  current accepted status. Invalidate old private UI on intent; preserve window
+  visibility and remembered section, sample one physically owned status at a
+  time with one pending2s timer, reject stale revision samples and remount once
+  on current resume Ready. Fresh presentation reattaches/new snapshot on the
+  same worker without replay. DesktopEngineHost.start must project current
+  status after its await, preserving confirmed historical busy. Add RAM unit
+  coverage for early intent, hidden/visible restore,1000intent burst/stale poll,
+  Exit barriers, initial resuming/currentReady and continuation races. No UI/
+  design/native execution. T321 stays unchecked pending T326 and final audit.
+
+T349/T350 pre-review evidence: tools/test-unit.ps1 EXIT0 in
+.local/desktop-power-full.log; format364files/0changed, rootFlutter+5package
+analyses clean; root62+engine352+MCP15+protocol20+Windows8=457Dart plus16PS
+RAMgroups =>472RAM+1existingstatic import scan. Eight new RAM cases cover
+desktop lifetime/current presentation projection; no widget/design/UI tests.
+MSVC /Zs on actual windows/runner/flutter_window.cpp EXIT0 in
+.local/desktop-power-cpp.log with existing compiler flags plus /Iwindows; no
+object/link/build/run. Lychee .local/desktop-power-links.log EXIT0:
+1467total1466OK0errors1excluded. Independent review/fix loop remains required.
+T321/T326 and whole goal readiness remain open; no Native/platform qualification.
+
+Completed desktop_power_review reported zero findings and accepted bounded
+T349/T350 after read-only inspection of eight changed files, actual lifetime/
+controller/presentation/native chain, specification and recorded full/C++/link
+logs. It ran no checks or edits. This closes those increments only, not T326,
+T321 or whole goal readiness.
+
+### T326 capability snapshot design and implementation chain (T351–T355)
+
+- [x] T351 Fix the concrete EngineCapabilities design in the existing
+  embedded-platforms contract: six platform rows, eight closed fields, safe
+  canonical reasons, explicit platform declarations, actual Host proof ownership,
+  unsupported startup without provider access, required private WorkerStatus
+  snapshot and controller-local actual tray overlay. Preserve existing authority,
+  publication, deadlines, schema3 and cleanup; no Windows fallback or new public
+  protocol. This marks written decisions, not implementation or review acceptance.
+- [x] T352 Implement immutable hosting/capability_snapshot.dart per T351/T326:
+  strict closed parser/capture, copied immutable collections, explicit matrix
+  and derived necessary core predicate. Bind EnginePlatform's required enum and
+  actual Windows composition. No native imports, implicit platform defaults,
+  optional old shapes or metadata-derived permission authority.
+- [x] T353 Bind actual EngineHost startup/suspend/resume/failure/stop and shared
+  admission to the current snapshot per T351. Withdraw positive proofs before
+  callbacks, retain observed negative vault status, revalidate existing actual
+  ports and commit only current successful epoch. Unsupported start rejects
+  before provider probes/open/lease; transferred cleanup remains owned. Preserve
+  optional MCP publication order, original budgets and physical retention.
+- [x] T354 Adopt required platform/snapshot in Bootstrap/Root/controller private
+  status and all current callers/fixtures; pin platform alongside generation,
+  mask power/loss/terminal projections and old replies, and retain current
+  parent Ready barrier. Bind actual desktop tray observations through local
+  immutable overlay with stale initialize protection, without a new worker frame
+  or grant. Preserve visible fallback and current post-restore fresh UI policy.
+- [x] T355 Add task RAM acceptance for all six rows/immutable shapes/unknown and
+  negative vault, actual Host transition/proof ownership and superseded epochs,
+  unsupported/mismatch without provider startup, Root/controller metadata masks,
+  actual tray policy ordering and no metadata grant escalation. Separately run
+  static import/loader-boundary checks and existing source scan; do not count
+  filesystem source inspection as RAM. Full mandatory checks and independent
+  code review/fix loop precede T326/T321 closure; no Native/platform qualification.
+
+T351 is a specification handoff update only. T352–T355/T326/T321 remain open.
+Mandatory link check and completed independent specification review are required
+before treating this design as implementation-ready. No new feature/spec file,
+runtime code, tests, dependencies, generated files or checklist markers changed.
+
+Completed capabilities_design_review reported zero findings for the T351 design
+handoff after read-only contract/task/current-source inspection. It confirmed
+the separate Host core/pre-publication Ready and masked nonready Root projection,
+and controller-local tray authority boundary. T352–T355 above are now implemented
+with code review pending; T326/T321 aggregate closure still requires the evidence
+and final trace audit, not merely these checked implementation subtasks.
+
+T352–T355 pre-review checks: tools/test-unit.ps1 EXIT0 in
+.local/capabilities-fixed-full.log: format366files/0changed; rootFlutter+5package
+analyses clean; root64+engine373+MCP15+protocol20+Windows8=480Dart plus16PS RAMgroups,
+495RAM+1existingstatic import scan. Twenty-three added RAM cases cover matrix,
+closed immutable parsing, actual Host startup/unknown/vault failure/restore/stop,
+unsupported early rejection and owned cleanup, Root mismatch, controller/tray
+projection and stale desktop initialize. Existing lifecycle tests additionally
+assert withdrawn/current capability state for timeout and superseded restore.
+First full .local/capabilities-full.log failed one old desktop status fixture
+missing the now-required capabilities field; only that fixture was corrected,
+its original strict-field/count assertions preserved. No targeted runs.
+
+Separate static .local/capabilities-static.json records the actual pure snapshot
+import graph (capability_snapshot.dart and platform/ports.dart, SDK typed_data),
+and source order of Windows OS guard before bundle/native providers. It is not
+RAM or native loader execution. No Native/isolate/FSfixtures/SSH/process/UI/
+widget/design/build/install/deploy qualification. Formatter lint-include warnings
+concern the excluded nested checkout. Link check and independent code review/fix
+loop follow; whole goal readiness remains unproved.
+
+Completed capabilities_code_review reported zero findings for T352–T355 after
+read-only inspection of sixteen changed files and actual Host/Root/controller/
+desktop/source/check evidence. All proposed capabilities decisions are now
+implemented; no source edits followed that review. The previous bounded review
+alone did not close aggregate tasks. The following primary requirement audit
+supports T269/T326 closure within their authorized implementation/unit scope:
+
+| T269/T326 obligation | Current source and acceptance evidence |
+| --- | --- |
+| Immutable exact snapshot, safe canonical reasons and six platform rows | [snapshot](../../packages/serverdeck_engine/lib/hosting/capability_snapshot.dart), [matrix/parser/immutability tests](../../packages/serverdeck_engine/test/hosting/capability_snapshot_test.dart),9RAMcases |
+| Unknown/locked/unavailable not successful; actual lifecycle/current resume and physical ownership | [Host](../../packages/serverdeck_engine/lib/hosting/engine_host.dart),8added [Host cases](../../packages/serverdeck_engine/test/hosting/engine_host_test.dart) and additional current/superseded/timeout assertions in [lifecycle cases](../../packages/serverdeck_engine/test/hosting/host_lifecycle_test.dart) |
+| Unsupported five rows before provider startup, honest mobile/Web limits | explicit kinds and five actual Host failure cases with zero lease/vault/storage starts; matrix mobile foregroundOnly, Web no SSH/MCP; owned fake cleanup distinguished |
+| Platform/generation and parent-detach masks; actual tray projection | [Root](../../packages/serverdeck_engine/lib/hosting/worker_root.dart), [controller](../../packages/serverdeck_engine/lib/hosting/worker_controller.dart), [desktop](../../lib/platform/desktop_lifecycle.dart), Root mismatch/three controller/two tray RAM cases plus existing worker/private metadata suite |
+| Pure domain/platform import boundary, no UI direct Isar/SSH or Windows fallback startup | existing full [static domain source scan](../../packages/serverdeck_engine/test/platform_boundary_test.dart), pure two-file snapshot import graph and OS-guard ordering in .local/capabilities-static.json; fresh direct UI source scan0matches |
+
+Fresh audit .local/capabilities-aggregate-audit.json confirmed the current source
+reconstructs the exact reviewed capabilities diff and no direct UI storage/SSH
+imports. Authoritative prior .local/capabilities-fixed-full.log EXIT0 includes
+480Dart+16PSgroups:495RAM+1static. These checks prove the implementation/fake-host
+matrix, not a real non-Windows adapter, native FFI/vault/loader or OS power event.
+T269/T326 are marked complete accordingly. T270 documentation handoff, fullT321,
+remote parity T322–T325/T331 and finalT330 audit remain open; no whole-goal or
+platform/release readiness is promoted.
+
+### T322 real sampler parity handoff (T356–T360)
+
+- [x] T356 Fix the internal RAM I/O/key-handle/time seam and acceptance decisions
+  in the existing embedded-engine contract for T322. Keep actual pool/sampler/
+  connection/owner/MCP policies, quotas, original deadlines and physical drain;
+  no echo service, forged role/context, public command API or Native execution.
+  This marks written design, not implementation or review acceptance.
+- [x] T357 Extract the existing native socket/key-worker/SSHClient lifecycle into
+  one I/O provider behind factory/attempt/client/byte-session ports in the actual
+  ssh_transport library. Actual SshTransportPool/Lease/read/executor classes keep
+  all admission/host-pin/result/timer/quota/drain policy, including2transports and
+  4channels. One shared pool receives the provider only at trusted composition;
+  preserve safe errors, credential lifecycle and no success before verification.
+- [x] T358 Provide the owned McpGrantKey repository handle interface with the
+  existing private holder/body, no new grant or context constructor. Bind shared
+  engine clock to RemoteReadService cache/cursor/history/receipt time and owner
+  read-handle retention, preserving actual grant/session/proof/deadline clocks
+  and parsed remote observation time. No write/Isar transaction API or production
+  quota/default is weakened for tests.
+- [x] T359 Exercise actual RemoteReadService/TrustedConnectionService and owner/
+  MCP adapters/authority with validated RAM schema3 repository, real custody/HMAC
+  and controlled byte I/O. Cover concurrent healthy shared refresh, authority
+  handoff, profiles/read kinds/scopes/revisions, typed start/status/cancel, cache/
+  cursor/history/ring/channel/work bounds, revoke/target retirement and late
+  physical drains. Measure actual provider calls/owned slots; no fake result DTO
+  in place of source capture/domain policy. Preserve existing no-secret behavior.
+- [x] T360 Exercise list/settings poll2s and coherent owner snapshots through
+  actual EngineApiClient/gateway/foundation/coordinator over RAM repository,
+  scheduled callbacks and shared target sampler; no duplicate collector/start,
+  old-generation publication or mutation replay. This is unit controller policy,
+  not UI/widget/design execution; target5s minimum and owner500ms/MCP250ms poll
+  remain distinct unchanged policies. Full required checks and independent code
+  review/fix loop precede T322 closure.
+
+T356 is specification handoff only. T357–T360/T322 remain unimplemented. Link
+check and completed independent specification review are required before this
+handoff is treated as implementation-ready. Existing runtime, tests, generated
+files, dependencies and reviewer-owned checklist markers are unchanged here.
+
+Completed sampler_design_review found zero findings, accepted T322/T357–T360
+handoff and independently confirmed T269/T326 closure in implementation/RAM/
+static scope after actual source/requirements inspection. It ran no tests and
+changed no files. The T357 implementation now follows that accepted handoff;
+T358–T360 and T322 remain open, with no real sampler parity claim yet.
+
+T357 extraction keeps actual SshTransportPool/_SshOperation admission, host-pin
+verification, logical result deadlines,2slots/4channels and physical drain. New
+ssh_io.dart interfaces carry only typed SshIoCommand.read(existing request) or
+fixed executor kind; no raw command selector reaches any wire. ssh_native_io.dart
+owns the single former socket/key-worker/SSHClient provider lifecycle. The
+key-worker/KDF/spawn code remains byte-for-byte identical SHA256
+5020ef0f5540153ec84cc30d725f9060a19a9056ac988d8828e8d249d09b6079; algorithm source
+also unchanged. Static .local/ssh-io-static.json records these comparisons and
+one socket/client constructor and fixed executor literal. This is source proof,
+not Native/SSH/key-isolate execution. TrustedControlServices supplies one provider
+to its existing shared pool; default normal provider is native, RAM injection is
+engine-only, with no role/profile/environment/wire toggle or legacy path.
+
+T357 pre-review .local/ssh-io-fixed-full.log tools/test-unit.ps1 EXIT0:
+format369files/0changed, rootFlutter+5package analyses clean; root64+engine383+
+MCP15+protocol20+Windows8=490Dart plus16PS RAMgroups =>505RAM+1static source scan.
+Ten new RAM I/O-event cases exercise actual pool/lease/read/executor policy:
+2slots, typed output capture/truncation,4shared channels, no/mismatched pin,
+probe-after-drain, late client/provider retention, synchronous factory stop,
+shortened original connect budget and suspend/drain. First full
+.local/ssh-io-full.log failed new fixture noncanonical fingerprint and two
+unawaited observation Futures; corrected fixture/observations, preserving the
+assertions. No targeted run. Link check and completed independent code review
+remain required before bounded T357 acceptance; full T322 is not complete.
+No Native/isolate/socket/SSH/process/FSfixture/UI/widget/design/build/install/
+deploy qualification. Formatter warnings concern excluded nested lint includes.
+
+- [x] T361 Fix confirmed P2 from completed ssh_io_review: provider settled error
+  or synchronous cancel/close throw escaped run/finally and stranded public
+  completion. Observe provider/client Futures on ownership receipt; report safe
+  failed completion, seal intake and retain unconfirmed slot/channel ownership.
+  Continue other cleanup and late observers; failed pause never resumes. Bound
+  read/executor cleanup failures and retire connection metadata on errored lease
+  completion. Add RAM regressions for settled/cancel/client/session failure,
+  healthy peer drain and probe refusal; preserve normal native error mapping.
+
+Completed ssh_io_review found1P2, not clean. T361 corrects the confirmed boundary
+failure and amends the existing contract with failed-drain semantics; no product
+role, wire/schema, retry, quota or native readiness is introduced. A successful
+intermediate .local/ssh-io-drain-fixed-full.log is retained; final probe-regression
+full/link checks and fresh independent review follow. T358–T360/T322 remain open.
+
+T361 final post-fix evidence .local/ssh-io-reviewed-full.log EXIT0:
+format369files/0changed; rootFlutter+5package analyses clean; root64+engine388+
+MCP15+protocol20+Windows8=495Dart plus16PS RAMgroups =>510RAM+1static source scan.
+Fifteen new RAM I/O cases now include errored provider drain, failed probe drain,
+synchronous cancel/client/session-close failures, healthy-peer stop and denied
+new read/executor after fatal pool seal, retained failed slot and denied resume.
+Additional passing intermediate full logs retain probe/seal/handler steps; the
+listed reviewed-full log covers the final source. Native provider forwards an
+unexpected run/cleanup failure into its owned result/settled safe failure path;
+field-only failure handler does not retain constructor credential arguments.
+Key-worker/algorithm source remains unchanged; known native close normalization
+is preserved. No Native workload was run. Final links and fresh independent
+review/fix loop still precede acceptance; prior1P2 review was not a clean result.
+
+- [x] T362 Fix confirmed remaining P2 from completed ssh_io_fixed_review:
+  observe session.done immediately on execute handoff before pending stdin.close;
+  known byte-session failure immediately fails its own public read/executor
+  completion while remaining physical work stays owned. Add pending stdin-close
+  with failed done and pending done with throwing close for both read/executor.
+  Release retained provider/client handles only after positive complete drain,
+  preserving native authentication-state lifetime after a closed lease.
+
+Completed ssh_io_fixed_review confirmed the earlier general-provider fix but
+found the remaining byte-session P2; it was not a clean result. T362 fixes that
+confirmed case under the existing contract, without new product decisions.
+Final .local/ssh-io-session-reviewed-full.log tools/test-unit.ps1 EXIT0:
+format369files/0changed, rootFlutter+5package analyses clean; root64+engine391+
+MCP15+protocol20+Windows8=498Dart plus16PS RAMgroups =>513RAM+1static source scan.
+All18newRAM I/O cases pass. No targeted rerun or Native workload. Original
+key-worker/algorithm source remains unchanged. Fresh links and third independent
+review remain required; T358–T360/T322 and whole-goal readiness stay open.
+
+- [x] T363 Fix confirmed P2 from completed ssh_io_session_review: propagate
+  failed transport settlement through ConnectionReadWork/ConnectionExecutorWork
+  and dependent refresh, read, executor and trust-probe completions. Start and
+  observe all owned cleanup/proof/call drains despite the first error; publish
+  only fixed SERVICE_UNAVAILABLE on failed drain, retain uncertain ownership
+  and prevent registry resume. Add RAM regressions through the actual
+  TrustedConnectionService and read refresh service. Complete mandatory full
+  checks, links and a fresh independent review before accepting this fix.
+
+The third completed review was not clean: transport settlement could throw from
+connection wrappers' finally blocks, skipping their public done completion and
+stranding service shutdown. T363 closes the dependent completion chain under the
+already accepted T361/T362 failed-drain contract; it adds no product requirement.
+
+T363 accepted after .local/connection-drain-full.log tools/test-unit.ps1 EXIT0:
+formatter371/0changed; rootFlutter and all5package analyses clean;
+root64+engine394+MCP15+protocol20+Windows8=501Dart plus16PS RAMgroups,
+including3actual connection/read-service failure regressions. One existing
+Dart test is a static source scan; other500Dart+16PSgroups are RAM.
+.local/connection-drain-links.log lychee EXIT0:1476total/1475OK/0errors/1excluded.
+Completed independent connection_drain_review:0findings; scoped implementation
+readiness accepted for T357/T361/T362/T363 only. No Native/SSH/isolate/realFS/UI
+workload or release qualification was run. T358–T360/T322 and whole-goal work
+remain open; no new specification package, compatibility path or application
+autostart was introduced.
+
+T358 implementation: McpGrantKey is an owned repository return interface; the
+existing private store holder retains the same open/revalidate/disposal body.
+RemoteReadService owns one EngineClock (SystemEngineClock by default), passed
+only at trusted composition; RemoteReadOwnerApi uses that same clock. Cache,
+cursor, history and local observation receipt timestamps use it; parsed remote
+system/metric/journal timestamps and CPU deltas remain unchanged. Operation,
+proof, grant and session deadlines retain their independent existing clocks.
+Six RAM units cover5s refresh/15s staleness,5min cursor,10min history,60s owner
+handle boundaries and actual custody/HMAC key transfer/disposal.
+First full .local/read-clock-full.log failed because the new test import prefix
+was shadowed by its snapshot getter. Renaming the test-only import fixed the
+compile error; .local/read-clock-targeted.log EXIT0 (6tests), run only after the
+full failure. Fresh full checks, links and independent review precede acceptance.
+This closes neither broad T359/T360 nor aggregate T322/native readiness.
+
+T358 accepted: .local/read-clock-fixed-full.log tools/test-unit.ps1 EXIT0,
+format373files/0changed, rootFlutter plus5package analyses clean;
+root64+engine400+MCP15+protocol20+Windows8=507Dart, including1static source scan
+and506RAM tests, plus16PS RAMgroups. All6newRAM cases pass.
+.local/read-clock-links.log lychee EXIT0:1476total/1475OK/0errors/1excluded.
+Completed independent read_clock_review:0findings, limited T358 implementation
+readiness established. Native holder body except constructor name and operation
+timer classes are unchanged by direct source comparison; no Native execution.
+T359/T360/T322 and the remaining aggregate goal stay open.
+
+- [x] T364 Implement the first T359 actual owner/MCP RAM read-service matrix:
+  real bootstrap/grant-open/client+server HMAC and key disposal; healthy shared
+  four-source refresh/poll reuse; per-interest cancel; revoked actor handoff
+  with late physical drain; read/log/plan/server permission separation; stable
+  principal/kind-bound owner handles; actual16per-principal/48total work and
+  four-channel limits. Keep broader T359/T322 open for remaining identity,
+  source-error, cursor/cache/history/ring and aggregate bounds acceptance.
+
+T364 supplies a read-only validated schema3 RAM repository and actual domain
+composition through declared ports. Owner/MCP sessions/contexts/authority, typed
+owner adapter, MCP router/read+connection adapters, custody/HMAC, connection/pool,
+byte capture and parsers are real; no successful domain output DTO is injected.
+First .local/shared-reads-full.log full checks failed one new test: it awaited
+cancel cleanup before releasing the shared source still needed by owner, thus
+correctly reaching the unchanged5s cancellation deadline. Corrected concurrent
+event ordering and the existing cancelled:true/FORBIDDEN-poll wire expectation.
+.local/shared-reads-targeted.log EXIT0(8tests), run only after full failure.
+Fresh complete checks, links and independent review precede T364 acceptance.
+No production code/quotas/deadlines, native qualification or T359 closure claimed.
+
+- [x] T365 Fix confirmed P2 from completed shared_reads_review: independently
+  verify the48global work quota using a fourth admitted principal below its
+  personal limit. Cancel a live interest while its physical proof is held and
+  verify admission still refuses that fourth principal; after actual drain,
+  verify fresh work is admitted. Preserve all existing per-principal assertions.
+
+First shared_reads_review was not clean: the original3principals×16 case only
+proved the personal quota. T365 adds independent global refusal, cancelled-work
+retention and positive admission-after-drain criteria under the existing contract.
+No product decision or production change. Fresh full/link checks and independent
+review must pass before T364/T365 acceptance; T359/T360/T322 remain open.
+
+T364/T365 accepted after .local/shared-reads-quota-full.log tools/test-unit.ps1
+EXIT0: format375files/0changed, rootFlutter plus5package analyses clean;
+root64+engine408+MCP15+protocol20+Windows8=515Dart(1static source scan,514RAM),
+plus16PS RAMgroups. All8actual owner/MCP matrix units pass.
+.local/shared-reads-quota-links.log lychee EXIT0:1476total/1475OK/0errors/1excluded.
+Completed fresh independent shared_reads_quota_review found0findings and
+confirmed closure of prior quota P2 in bounded T364/T365. No production code,
+Native/SSH/Isar/OS/process/isolate/UI/build/install/deploy execution changed.
+T359 remains open for profile/revision/identity and source-error isolation,
+cache/cursor/history/ring and aggregate bounds; T360/T322 and whole goal open.
+
+- [x] T366 Extend actual T359 RAM matrix with separately connected profile
+  caches, reconciled revision/late-result/cursor retirement, partial/stale/denied
+  observations without raw diagnostics,128cursor and8MiB cursor-byte bounds,
+  history120/10min and inventory5min,500journal ring/duplicates, independent
+  owner-handle16 retention, all five exact/overflow source capture limits,
+  fitted1536KiB target cache and independent64MiB cache/journal aggregate budgets.
+  Build multiple profiles through ordinary rows, complete receipt chains, actual
+  schema3/custody validation and declared RAM read/publication boundaries.
+
+T366 expands fixtures only; no production quotas/defaults or permission/deadline
+policy is changed.16newRAM cases retain actual services/pool/parsers/custody.
+The250profile cursor case reaches8MiB below128handles; cache uses72profiles and
+journal uses3targets with507large records each, independently testing64MiB
+rather than silently reducing limits. Source capture checks exact and one-byte
+overflow for256KiB system/metrics,4MiB packages,2MiB units and8MiB journal.
+First .local/read-bounds-full.log failed unused test import and invalid new
+revision3 fixture without its required receipt; failed test also retained its
+RAM target lease. Only that owned hung full process was stopped via its exec
+handle, EXIT1; not a pass. Fixed complete receipt/cleanup, used complete system
+source; .local/read-bounds-targeted.log EXIT0(7cases) after full failure.
+Expanded .local/read-bounds-expanded-full.log failed two new budget tests because
+empty catalog input was an untyped Dart map rather than the typed JSON object
+contract. Corrected typed input; .local/read-aggregate-targeted.log EXIT0(2cases)
+after that full failure, cache44s+journal15s RAM workloads. Fresh whole checks,
+links and completed independent review precede T366 acceptance. T359 still
+requires executor-backed read absence and its final whole-matrix assessment;
+T360/T322 and remaining aggregate goal work stay open. No Native qualification.
+
+- [x] T367 Fix confirmed P2 from completed read_bounds_review: keep an existing
+  opaque cursor ID and mutate only its MAC to another well-formed32byte
+  base64url value. First accept the original token in the same current session
+  and filter; then require CURSOR_EXPIRED without another source execution for
+  the altered MAC. Retain absent-ID, filter, principal and read-kind negatives.
+
+First read_bounds_review was not clean: ID tampering alone could be rejected by
+lookup with HMAC checking removed. T367 independently exercises signature
+verification under the existing contract without production or crypto changes.
+Fresh mandatory full checks, links and fresh independent review precede T366/
+T367 acceptance; whole T359/T360/T322 and goal readiness remain open.
+
+T366/T367 accepted after .local/read-bounds-mac-full.log tools/test-unit.ps1
+EXIT0: format378files/0changed, rootFlutter plus5package analyses clean;
+root64+engine424+MCP15+protocol20+Windows8=531Dart(1static source scan,530RAM),
+plus16PS RAMgroups. All16newRAM cases pass, including finite real-size aggregate
+cache/journal64MiB tests. .local/read-bounds-mac-links.log lychee EXIT0:
+1476total/1475OK/0errors/1excluded. Completed fresh independent
+read_bounds_mac_review:0findings, prior MAC P2 closed in bounded T366/T367.
+No production code or Native/SSH/Isar/OS/realFS/process/isolate/UI/build/install/
+deploy workload was changed or qualified. T359 remains open for executor-backed
+read absence and final whole-matrix assessment; T360/T322 and whole goal open.
+
+- [x] T368 Finish actual T359 read-policy acceptance: move the existing public
+  enrollment read from extension dispatch to StateStore instance dispatch,
+  retaining exactly its original queued metadata body and removing the old
+  extension method/import. Supply the existing actual ExecutorEnrollmentStore
+  over RAM protected files/custody/lease in the declared test repository port;
+  do not expose write APIs or fake private native fields. Exercise owner and MCP
+  absent-enrollment reads, cached unknown configuration/read-kind isolation,
+  metadata cancellation/drain, last-waiter sampler retirement/suspend/resume,
+  typed owner cancel, apply denial and session-detach handoff.
+
+T368 is an internal read dependency extraction under accepted T356; the same
+StateStore operation/name, native writer queue/metadata reader and wire/data
+contracts remain. No fallback, native test branch, new context constructor or
+compatibility facade. First .local/executor-read-full.log failed analysis on
+imports made obsolete by instance dispatch and a new test unused type import;
+its5new RAM cases passed but the full run is not a pass. Removed obsolete
+production import and used explicit actual work type; after that full failure,
+.local/executor-read-targeted.log EXIT0(6cases), including final-waiter physical
+sampler drain. Three further acceptance cases now join the required fresh full
+run: typed owner cancel, independent apply-scope denial and session detach.
+
+T359 aggregate RAM evidence assembled for independent review (T359 remains
+unchecked until that review completes; T360 and aggregate T322 remain open):
+
+| Existing T359 criterion | Current real-service RAM evidence |
+| --- | --- |
+| Native I/O policy seams and2slots/4channels | ssh_io_policy_test.dart and ssh_pool_lifecycle_test.dart: real pool/reservations/leases, verifier, original deadline, late provider/client/channel drain; shared_reads_test.dart actual connection4channels and read48/16 |
+| Current grant and owner authority | shared_reads_test.dart: actual schema3/custody, bootstrap, client/server HMAC, grant key disposal, owner admission and typed adapters; mcp_grant_handle_test.dart owned key versus current revoke |
+| Healthy shared refresh and no polling replay | shared_reads_test.dart owner/MCP same4sources, repeated poll and cache reuse; read_clock_test.dart exact5s expiry |
+| Typed start/status/cancel and foreign handles | shared_reads_test.dart stable principal/kind-bound owner handles; executor_read_absence_test.dart actual owner readCancel/repeat/foreign/late publication and MCP router cancel/poll |
+| Actor handoff and detach/revoke | shared_reads_test.dart revoke with remaining owner and old physical work; executor_read_absence_test.dart session detach with unchanged grant and remaining owner |
+| Profile/revision/read-kind and authority isolation | read_isolation_bounds_test.dart separate connected profiles, receipt-backed reconciled revision, old output/cursor retirement; shared_reads_test.dart read/log/plan/server scopes; executor_read_absence_test.dart read/plan cannot apply |
+| Existing cache/cursor/receipt time policies | read_clock_test.dart exact5s/15s/5min/10min/60s under independent authority/operation clocks, remote observation times and CPU counters preserved |
+| Source errors, stale/denied and safe errors | read_isolation_bounds_test.dart failed unknown/stale values, denied stderr and no raw diagnostic output; connection_drain_test.dart safe failed completion through actual services |
+| Finite work/retention bounds | shared_reads_test.dart independent48global/16principal and no capacity release before proof drain; read_isolation_bounds_test.dart16owner handles and all5 source capture exact/overflow limits |
+| Cache/history/inventory budgets | read_isolation_bounds_test.dart120points with121inside10min and inventory5min; read_aggregate_budget_test.dart1536KiB target and64MiB aggregate72profiles |
+| Cursor/log budgets and bindings | read_isolation_bounds_test.dart live-ID MAC negative/positive control, filter/principal/kind/identity/expiry,128cursors independent8MiB/250profiles,500ring; read_aggregate_budget_test.dart separate64MiB journal budget3targets |
+| Configuration/recipes preserve executor scope | executor_read_absence_test.dart actual metadata reader, owner and MCP EXECUTOR_UNAVAILABLE, unknown/unmanaged cached observation and independent state capture; no fake enrollment or privileged channel |
+| Logical cancellation versus physical shutdown | ssh_io_policy_test.dart and connection_drain_test.dart provider/session/failed-close ownership; executor_read_absence_test.dart retained metadata and final shared sampler through suspend/resume without reconnect/replay |
+
+All these are RAM/static acceptance, not Native/SSH/Isar/OS/process/isolate/UI,
+real filesystem or release qualification. No UI/widget/design workload. Full
+checks, links and independent full T359 matrix review still precede closure.
+
+T368 final assertion audit adds3independent RAM checks before T359 review:
+a grant revision alone invalidates an actual HMAC-open context with unchanged
+current key/permission/lifetime and no revoke; isolated credential revision and
+isolated trust revision invalidate a captured actual connection identity while
+connection revision/key and the other credential/trust revision remain equal.
+Both target snapshots use real schema3/custody loading and complete receipt3
+under the real reconciled target lease, not private-state or context fabrication.
+These cases close masked-guard coverage concerns; they do not add new policy.
+The prior fixed-full run was green; these new cases require a fresh full run.
+
+The fresh12case matrix-full run failed its new credential-only fixture because
+CredentialRecord replacement is immutable: createdAt must equal updatedAt.
+The schema3 loader correctly refused that invalid fixture. Fixed it to a new
+credential ID/row, actual custody wrapper and matching replacement timestamps,
+while connection/trust revision and host key remain unchanged. After full
+failure, .local/executor-read-matrix-targeted.log EXIT0(12cases). No production
+validation was relaxed; the corrected fixture passes the real loader. A final
+fresh full suite and independent full T359 review remain mandatory.
+
+T359/T368 accepted after .local/executor-read-final-full.log tools/test-unit.ps1
+EXIT0: format379files/0changed, rootFlutter plus5package analyses clean;
+root64+engine436+MCP15+protocol20+Windows8=543Dart(1static source scan,542RAM),
+plus16PS RAMgroups. All12new cases pass. .local/executor-read-final-links.log
+lychee EXIT0:1476total/1475OK/0errors/1excluded. Completed independent
+read_matrix_completion_review:0findings, inspected current whole T359 assertions
+and contracts and established bounded T368 plus RAM-matrixT359 readiness.
+T359 checkbox is now closed on that criterion-by-criterion evidence, not merely
+aggregate green counts. Static .local/executor-read-static.json confirms the
+queued read body, remaining metadata writes/StateStore and executor body are
+unchanged except the intended method move and obsolete import removal.
+T360 and aggregateT322 remain open. This does not qualify Native/SSH/Isar/OS/
+realFS/process/isolate/UI/build/install/deploy or a release. Whole goal active.
+
+T360 implementation assembled for independent acceptance; checkbox remains open
+until full checks and review. New root owner_snapshot_policy_test.dart runs the
+actual EngineApiClient/EngineClient, InProcessGateway, HostAuthority/EngineSessions,
+TrustedFoundationOwnerApi, MutationCoordinator and declared RAM StateStore with
+validated schema3/custody. It shares actual RemoteReadService/owner/MCP sampler
+from T359. Scheduler controls callbacks; TraceGateway only delegates/records real
+calls and can delay captured real replies or inject a declared boundary timeout.
+No successful list/settings DTO is synthesized and no writer/DB transaction API
+is faked. The mutation fault is before writer admission: it verifies controller
+no-resubmission policy, not a committed effect or native durability claim.
+
+| T360 criterion | New actual-pipeline RAM assertion |
+| --- | --- |
+|2s snapshots and no collector restart | Four list/settings cycles from real coordinator, one immutable revision2 publication, one attachment, no SSH source calls;2s poll and20s heartbeat callbacks remain distinct |
+| Shared in-flight reads | Repeated start/refresh shares one captured profiles read, one settings read and one active scheduled poll |
+| Coherent snapshot | Real validated settings/receipt revision3 is published between actual list and settings replies; torn2/3 frame is suppressed; next poll publishes matching3/3 |
+| UI/MCP share sampler | Actual typed owner start and HMAC-open MCP refresh share one4source group while2s snapshots run; fresh cache prevents repeat and explicit expiry5s allows only the next system/metrics collector |
+| Retired epochs | Stopped poll and its stale callback cannot publish captured old data or schedule attachment; no late snapshot error |
+| Actual generation replacement | Old real gateway/root closes after capture, a new real HostAuthority/gate/session generation attaches, delayed old reply/error is discarded and only new generation snapshot publishes |
+| No mutation replay | Caller-owned stable UUID intent gets one declared gateway TIMEOUT; three actual read polling cycles never resubmit or admit the writer; state stays revision2 |
+
+RAM Gate/Runtime fixture defaults preserve all existing tests, with explicit
+new generation parameter for a new actual host incarnation. Repository custody
+assertion checks original actual key/custody identities for coordinator creation.
+No production client, gateway, mutation/read policy, timer or model code changed.
+Initial .local/snapshot-policy-full.log failed new root test enum/import errors
+and missing root package:test resolution for reused engine fixtures; not a pass.
+Corrected to existing Local API TIMEOUT rather than adding a protocol code.
+First targeted compile also failed missing package:test. Added exact dev pin
+1.31.1 already used in engine, resolved with flutter pub get --offline EXIT0.
+All existing lock versions are retained except dev-only package_config3.0.0→
+2.2.0 required by that existing test toolchain;24new test-transitive entries.
+Actual flutter pub deps --no-dev output excludes package_config/test/test_core:
+no production dependency or runtime pin changed, no override/upgrade introduced.
+.local/snapshot-policy-targeted-ready.log EXIT0(7cases), run after full failure.
+Fresh full checks, links and independent T360/T322 aggregate review remain
+required. T360/T322 and whole goal are still open; no Native/UI/design execution.
+
+T360 and aggregateT322 RAM parity accepted after
+.local/snapshot-policy-fixed-full.log tools/test-unit.ps1 EXIT0: format380files/
+0changed, rootFlutter plus5package analyses clean; root71+engine436+MCP15+
+protocol20+Windows8=550Dart(1static source scan,549RAM) plus16PS RAMgroups.
+Seven actual-pipeline root cases pass. .local/snapshot-policy-links.log lychee
+EXIT0:1476total/1475OK/0errors/1excluded. Completed independent
+snapshot_policy_review:0findings, inspected current assertions and contracts,
+confirmed both T360 and aggregateT322 accepted T356 RAM criteria complete.
+Checkboxes close on that full chain, not merely aggregate green counts.
+Production client remains unchanged by exact baseline comparison; devdependency
+and generation fixtures do not introduce a runtime mode, writer API or native
+claim. Native/SSH/Isar/OS/realFS/process/isolate/UI/design/build/install/release
+qualification remains unperformed. Other aggregate goal tasks remain open;
+this is not whole-feature or whole-goal completion.
+## T323 actual transactional storage dependency — 2026-10-31
+
+Direct IsarCollection access prevents the existing read-only RAM repositories
+from proving positive mutation routes. Refine the accepted T323 requirement in
+place under FR-SVC-EMB-07/14/15, AC-SVC-EMB-07 and SC-SVC-EMB-03; retain every
+completed task and the separate remaining acceptance tasks. See the
+[contract](contracts/embedded-engine.md#t323t369t373--transactional-storage-dependency-2026-10-31),
+[plan](plan.md#t323-storage-dependency-refinement--2026-10-31) and
+[research decision](research.md#t323-actual-mutation-tests-persistence-boundary--2026-10-31).
+
+- [x] T369 Review the existing-package transactional dependency design after
+  lychee passes. Independent read-only AGENTS.md reviewer must inspect current
+  code and this contract for a complete requirement→decision→contract→task→RAM
+  acceptance chain. No code handoff until confirmed mandatory gaps are fixed
+  and a fresh completed review is clean. This is design scope, not T323 parity.
+- [x] T370 Implement storage/workspace_storage.dart and storage/isar_storage.dart
+  in packages/serverdeck_engine: fixed16-family enum, scoped transactional rows,
+  explicit IDs/unique entity keys, Isar class mappings, exact pinned options,
+  owned per-open attempt and conservative memoized close. Factor the current
+  preflight common semantic/enrollment checks without weakening native byte
+  preflight or allowing unchecked snapshot attachment. Verify static mapping/
+  ownership and new RAM port cases; do not execute native Isar.
+- [x] T371 Refactor StateStore.open and all foundation/profile/plan/grant/delta
+  writes and snapshot reloads to that single owned dependency. Preserve actual
+  common ownership/runtime checks, queue32, HMAC/idempotency/CAS, current row
+  IDs/payloads, credential staging, policy/proof fences, readback and publication.
+  Remove the replaced direct native access rather than retain a second path.
+  Unknown open/close/write retains reservation/custody as contracted. Production
+  root keeps the Native provider and exposes no wire/config provider choice.
+- [x] T372 Add test/support-only transactional RAM storage with captured-byte
+  decoding, atomic rollback, unique indexes and scoped lifetimes. Exercise the
+  actual StateStore with actual fixture custody/lease/files/runtime: normal
+  mutation families and exact resulting rows/receipts; pre/post mismatch,
+  incompatible/invalid graph, wrong custody, capacity with actual prior-snapshot
+  proof, callback/policy failure, late/escaped transaction and failed/unknown
+  open/close. Full current unit/static checks and independent review are required;
+  RAM results do not prove native durability, DB layout or OS close.
+- [x] T373 Complete T323's actual24-tool matrix through real MCP authentication,
+  router/domain services and the actual T371 StateStore over T372 RAM storage.
+  Map each catalog tool to positive and denied assertions; check every scope/
+  allowed target, expired/revoked grant, private owner forgery, input/schema,
+  idempotency IDs, safe fixed errors and proof-to-effect/publication fences.
+  Real remote command/framing/parser policy uses declared byte transport ports;
+  no scripted domain-success handler. Run full checks, links and independent
+  review before closing T373 or aggregate T323. T324/T325/T331 remain separate.
+
+T369 design amendment assembled; link checks and completed independent review
+are pending. T370–T373 and T323 remain open. No code, runtime mode, persisted
+format, dependency, Native/Isar/FS/SSH/process/isolate/UI/design/build/install or
+release behavior was executed or qualified by this document change.
+
+T369 accepted: .local/transaction-storage-links.log lychee EXIT0,1483total/
+1482OK/0errors/1excluded. Completed independent read-only
+transaction_storage_design_review:0findings; bounded design readiness for
+T370–T373 established, not implementation or T323 completion. Static document
+audit confirmed all16 declared collection families match current IsarRowSource
+and all6 changes preserve prior history. Native runtime/Isar/realFS/SSH/process/
+isolate/UI/design/build/install/release checks were not performed. Production
+code is unchanged. T370–T373, T323 and the whole goal remain open.
+
+T370 implementation assembled for independent review: new workspace_storage.dart
+fixed16-family port, shared transaction lifetime/abort/close mechanics and
+isar_storage.dart pinned production adapter with attributable per-open cleanup.
+preflightWorkspace delegates to the common lazy source/semantic/enrollment gate;
+its native-byte parser still runs after owner checks. Test/support RAM row
+backend exercises actual shared mechanics in14 new unit cases: all16 families,
+exact payload/IDs, callback rollback, case-sensitive unique keys/caught failure,
+max native ID/update/delete, invalid shape, expired scope/read zone, nested
+transaction denial, pending unawaited operation abort/drain, coherent queued
+read, close sealing/drain/false/throw memoization and capacity candidate. It is
+not a fake StateStore or a successful domain handler. Captured-byte RAM provider
+and actual StateStore/MCP integration remain T371–T373, not claimed here.
+
+.local/transaction-port-full.log tools/test-unit.ps1 EXIT0: format384files/
+0changed, rootFlutter plus5package analyses clean; root71+engine450+MCP15+
+protocol20+Windows8=564Dart(1static source scan,563RAM) plus16PS RAMgroups.
+No targeted tests were run. .local/transaction-port-static.json records a source
+audit matching all16 adapter classes to current IsarRowSource, explicit ID/
+payload/entity conversion and pinned open options. An initial audit regex did
+not account for formatter line wrapping and failed; corrected whitespace-aware
+audit passed. This is static evidence, not executed native I/O. No Native/Isar/
+realFS/SSH/process/isolate/UI/design/build/install/release qualification. T370
+checkbox stays open until links and a completed independent review.
+
+T370 first completed transaction_port_code_review found2P2 defects. Accepted
+against current code/SDK: a write scope checked storage identity but not its
+original transaction context; public async read created a second unobserved
+Future for abandoned failed reads. T370 stays open; first green checks do not
+close the review loop. Record fixes without erasing the completed design/task
+history:
+
+- [x] T374 Bind each write scope to its exact originating transaction context;
+  reject a reference used from another concurrent read/write context before
+  backend access. Extend the RAM backend with coherent concurrent read snapshots
+  and assert foreign-context rejection plus full rollback of the original write.
+- [x] T375 Return the observed public read Future directly; add a held RAM read
+  that fails after callback settlement and verify transaction abort/drain with
+  no uncaught zone errors. Preserve all previously checked operation lifetimes.
+
+T374/T375 fixes assembled;16RAM port cases now include genuine concurrent read
+snapshot isolation, foreign-active-context rejection and late abandoned read
+failure. Fresh complete checks and fresh independent review are required before
+acceptance. No new architecture/product decisions or native workloads added.
+
+T374/T375 fresh complete checks: .local/transaction-port-fixed-full.log
+tools/test-unit.ps1 EXIT0, format384files/0changed, rootFlutter+5package analyses
+clean; root71+engine452+MCP15+protocol20+Windows8=566Dart(1static565RAM)
+plus16PS RAMgroups.16port unit cases pass; no targeted tests run.
+.local/transaction-port-fixed-links.log lychee EXIT0:1483total/1482OK/0errors/
+1excluded. Initial green T370 checks remain historical; acceptance requires the
+fresh completed independent review of current fixes.
+
+Second completed transaction_port_fixed_review confirmed T374/T375 fixes but
+found1remainingP2: outer read/count scope stayed active while inner write scope
+drained an abandoned put after callback settlement. T370 remains unaccepted.
+
+- [x] T376 Use one operation scope for write callback and public read/count.
+  On callback settlement expire all new row admission together while retaining
+  already-started physical operations until drain. Extend held unawaited-put
+  regression with saved callback zone: late count/read reject with unchanged
+  backend-call counters before hold release; original write fully rolls back.
+
+T376 fix assembled by replacing nested scope lifetimes with one shared write
+operation scope. Existing16RAMcases now include no backend access from expired
+read/count during mandatory write drain. Fresh full checks/links and another
+completed independent review remain required. No native workloads executed.
+
+T376 fresh complete checks: .local/transaction-port-scope-full.log
+tools/test-unit.ps1 EXIT0, format384files/0changed, rootFlutter+5package analyses
+clean; root71+engine452+MCP15+protocol20+Windows8=566Dart(1static565RAM)
+plus16PS RAMgroups. All16port cases pass including expired saved-zone read/count
+no-backend-access assertion before abandoned-put drain. No targeted tests run.
+.local/transaction-port-scope-links.log lychee EXIT0:1483total/1482OK/0errors/
+1excluded. Final fresh independent review still required; T370/T374–T376 open.
+
+T370/T374–T376 accepted after completed independent transaction_port_scope_review:
+0findings, bounded implementation readiness established against current
+contract/source/assertions. Final mandatory full evidence remains
+.local/transaction-port-scope-full.log EXIT0(format384/0changed; all analyses;
+566Dart including16new RAM port cases,16PS RAMgroups). No targeted tests run.
+Latest recorded-link run initially failed only an existing pub.dev version URL
+with HTTP502; .local/transaction-port-scope-recorded-links-retry.log then passed
+EXIT0(1483total/1482OK/0errors/1excluded), with no exclusions or URL changes.
+
+Earlier2+1review findings are fixed and the whole applicable review loop is now
+clean. Native adapter mappings/options and ownership were inspected statically;
+no native/Isar/realFS/SSH/process/isolate/UI/design/build/install/release behavior
+was executed or qualified. T371 StateStore integration, T372 captured-byte RAM
+provider/actual mutations, T373 full24-tool matrix and aggregate T323 remain
+open, as do the other goal tasks. This closes the storage dependency step, not
+the full requested refactor or whole feature.
+
+T371 implementation assembled for independent acceptance: StateStore.open uses
+the checked WorkspaceStorageProvider dependency (default pinned Isar), one owned
+WorkspaceStorage and attributable attempt cleanup. Common owner/root/runtime/
+manifest/wrapper/lock/enrollment/preflight/post-open equality/recovery ordering
+remains in StateStore. Uncertain failed-open attempt is retained together with
+the writer reservation. Foundation/profile/plan/grant/delta row operations and
+all actual snapshot reloads now use the one storage dependency; replaced direct
+IsarCollection/IsarRowSource/_isar/_writeNative paths are removed from those
+parts. Explicit returned native IDs are checked for equality. No wire/config
+provider choice, unchecked attach or alternate domain implementation was added.
+
+T372 partial evidence is now available without closing its full matrix:
+test/support memory_workspace_provider.dart decodes captured synthetic bytes
+and independently reopens from the current RAM byte store. The actual common
+StateStore checks validate manifests/keys/semantic graph and exact pre/post rows.
+RAM storage commits persist synthetic bytes and close releases only its owned
+RAM handle.10new actual_state_store_test cases exercise real StateStore with
+actual fixture custody/protected files/lease/runtime, actual coordinator and
+typed commands:16-family ID/payload adoption; invalid captured bytes; exact
+payload change before open; settings HMAC/receipt/replay/conflict; profile create/
+update/archive/CAS/retained revisions; denied read-only grant before row write;
+grant publication/revoke/key rejection; delegation create/revoke through common
+delta; capacity with actual full prior-graph readback; post-commit runtime-proof
+failure that blocks rather than claiming rollback, then checked reopen retaining
+the committed receipt. These prove domain/persistence behavior in RAM, not wire
+authentication for all tools or native byte/OS/durability qualification.
+
+Initial .local/actual-store-full.log tools/test-unit.ps1 EXIT1: a new revoked-key
+expectation used FORBIDDEN but the unchanged current-key contract returns
+UNAUTHORIZED. Corrected the test to existing behavior; no production auth error
+was changed. An attempted targeted command had a wrong log-relative path and
+did not execute tests; it is not a pass. Actual subsequent
+.local/actual-store-targeted.log dart test actual_state_store_test.dart EXIT0
+(10cases), only after the full failure. Fresh full checks are pending.
+.local/actual-store-static.json records exact unchanged _ensure/runtime proof/
+custody binding bodies, snapshot reload with only its source dependency changed,
+and no direct _isar/_writeNative references in changed store parts. This is
+source evidence only. T371/T372/T373/T323 and whole-goal acceptance remain open.
+
+The first fresh full run after the expectation fix
+(.local/actual-store-fixed-full.log) completed tests/analyses successfully but
+failed the repository formatter on the edited test indentation; not a pass.
+Formatted that test, then .local/actual-store-final-full.log tools/test-unit.ps1
+EXIT0: format386files/0changed, rootFlutter+5package analyses clean; root71+
+engine462+MCP15+protocol20+Windows8=576Dart(1static575RAM) plus16PS RAMgroups,
+including all10new actual-store cases and all16accepted port cases.
+.local/actual-store-links.log lychee EXIT0:1483total/1482OK/0errors/1excluded.
+T371 and partialT372 changes now await independent review before acceptance.
+No Native/Isar/realFS/SSH/process/isolate/UI/design/build/install/release execution.
+
+T371 accepted after completed independent actual_store_integration_review:
+0findings, bounded readiness for the integration and presented partialT372
+evidence established from the actual source/assertions and accepted contract.
+Final gate .local/actual-store-final-full.log EXIT0: format386/0changed, all
+applicable analyses,576Dart(1static575RAM) plus16PS RAMgroups; all10actual-store
+and16port cases pass. .local/actual-store-recorded-links.log lychee EXIT0:
+1483total/1482OK/0errors/1excluded. Native default composition and removed direct
+store access were inspected; no native execution or whole-feature claim.
+
+T372 remains open for its complete normal/failure/boundary mutation matrix,
+including the remaining plan/job/progress/approval paths and uncertain open/close
+retention cases; T373 actual24-tool positive/denied authorization matrix and
+aggregateT323 remain open. T324/T325/T331 and other goal tasks retain their own
+acceptance. No Native/Isar/realFS/SSH/process/isolate/UI/design/build/install/
+release qualification. This is the completed StateStore dependency refactor,
+not whole-goal completion.
+
+T372 remaining RAM matrix assembled: five new test/support files and controlled
+RAM-provider/backend fault hooks; no production code, schema, protocol, package
+pin or runtime/config mode changed. actual_plan_fixture uses the real compiler,
+strict preflight/plan DTO parsers and actual stored revision/target identities.
+Its synthetic structural preflight is NOT a verified executor response or
+permission for remote execution. Tests call the existing trusted StateStore
+metadata primitives; no successful remote/domain service DTO is scripted. Full
+MCP actor/auth/root framing acceptance remains T373.
+
+| T372 acceptance | Actual current-task evidence |
+| --- | --- |
+| Mutation families | Existing10 actual-store cases plus new plan persistence/replay/TTL/blocked history, approvals and atomic consumption, canonical job aliases/replay, job progress/CAS/events/desired state/success+reopen, queued cancel, unknown occupancy/reconcile, foundation profile/credential create/rotate/delete and trusted-target edit revoking trust with retained native ID, grant secret/policy replacement |
+| Permission before effect | Real grant expires in actual writer callback; no extra backend put/commit; actual prior snapshot restored and FORBIDDEN returned |
+| Bounds/concurrency | Actual32 pending profile writes, shared duplicate future,33rd rejected without commit; admitted work drains before positive close/reservation release |
+| Readback failures | Existing actual capacity→prior graph proof and postcommit runtime-proof failure; new failed rollback readback blocks instead of claiming RESOURCE_LIMIT |
+| Checked open | Existing actual exact pre/post rows and invalid captured bytes; new schema2/orphan credential/wrong wrapper leave bytes unchanged and never open writer; known pre-owning failure cleans once then checked retry |
+| Uncertain ownership | Separate terminal unit files exercise actual StateStore with unknown no-handle open and false close; reservation/key/lease retained, next open blocked and close memoized, without any production reset escape |
+| Transaction mechanics | Existing16 accepted port RAM cases cover rollback/unique IDs/indexes/singletons/exact payloads/late and foreign scopes/unawaited drain/close outcomes; actual-store suites execute the real common loader/custody and domain callbacks |
+
+Terminal ownership cases run as ordinary unit files under the existing Dart test
+runner; no explicit engine/worker isolate or native process fixture is dispatched.
+Each file intentionally leaves its synthetic reservation retained; no StateStore
+reset, force-close or private-field assignment is introduced. Fixture teardown
+only disposes synthetic RAM test data; these cases do not qualify production OS
+handle closure, durable native rollback or Host-level native retention.
+
+Initial .local/store-matrix-full.log tools/test-unit.ps1 EXIT1: new plan fixture
+had an invalid trailing comma after a named-parameter group (formatter/analysis/
+load failure); new profile test incorrectly expected accepted trust immediately
+after creation. The former was corrected after that run had captured its parse
+errors. The latter now asserts no confirmed key and exercises a real existing
+trusted-target edit to cover actual trust-row writes/revocation. Initial targeted
+retry then exposed missing ProfileRecord getters in the new test; corrected to
+its existing toJson fields. .local/store-matrix-targeted-fixed.log EXIT0(15new
+cases), only after the completed full failure. Added2further real grant replacement/
+writer-expiry cases and launched fresh full checks; no pass claimed before exit.
+T372 remains open until full checks, links and independent aggregate review.
+
+T372 fresh full gate .local/store-matrix-fixed-full.log tools/test-unit.ps1
+EXIT0: format391files/0changed, rootFlutter+5package analyses clean; root71+
+engine479+MCP15+protocol20+Windows8=593Dart(1static592RAM), plus16PS RAMgroups.
+All17new matrix cases,10actual-store cases and16port cases pass.
+.local/store-matrix-links.log lychee EXIT0:1483total/1482OK/0errors/1excluded.
+Independent aggregateT372 review remains required before closing that task.
+All application production files remain unchanged in this matrix increment.
+
+T372 accepted after completed independent store_matrix_completion_review:
+0findings. The reviewer inspected all17new cases plus previous10actual-store/
+16port/preopen/snapshot assertions and current source, and established aggregate
+T372 RAM/static readiness against the accepted T369 contract. Acceptance is
+not inferred from counts or prior review conclusions alone. Final full evidence
+.local/store-matrix-fixed-full.log EXIT0: format391/0changed, rootFlutter+5package
+analyses clean,593Dart(1static592RAM) plus16PS RAMgroups.
+.local/store-matrix-recorded-links.log lychee EXIT0:1483total/1482OK/0errors/
+1excluded. Production application code is unchanged by this matrix step.
+
+Synthetic structural preflight/driver outcomes prove StateStore persistence,
+not qualified remote facts or actual execution authority. T373 actual24-tool
+positive/denied router/domain/framing matrix and aggregateT323 remain open.
+T324/T325/T331 and other goal tasks keep separate acceptance. No Native/Isar/
+realFS/SSH/process/engine-isolate/UI/design/integration/build/install/release
+qualification; this is not whole-feature or whole-goal completion.
+
+## T373 production MCP composition and first parity stage — T377
+
+- [x] T377 Establish actual TrustedControlServices factory over the accepted
+  actual StateStore/RAM storage, real HostAuthority/EngineSessions and two-stage
+  bootstrap/grant HMAC. Verify literal24-tool catalog and policy/schema/owner/
+  allowlist/expiry/revoke denials; positive seven author and six inventory/
+  connection/state/log tools; committed mutation publication-proof loss and
+  explicit stable-ID replay. Complete full checks/links/independent review for
+  this prerequisite. Keep T373/T323 open until the other11positive executor/
+  plan/approval/apply/job routes and their fences are accepted.
+
+T377 implementation assembled: actual_mcp_setup composes the production factory
+with real StateStore, custody/key/lease, protected metadata, HostAuthority,
+EngineSessions, router and services. Only verified platform proofs/SSH byte I/O
+are RAM ports. There is no repository noSuchMethod facade, scripted router or
+successful domain response. Bootstrap and grant transcripts use real HMACs and
+verify the returned server MAC. Valid source bytes run real SSH captures/parsers.
+
+11new tests currently cover:
+- Literal24-tool catalog; empty policy denies all24 before effects; six explicit
+  valid policy lattice rows compare expected tool names and deny each missing
+  required scope. Clients disconnect between rows, preserving the real4MCP limit.
+- Each24tool has otherwise valid minimal arguments established before adding
+  forbidden owner field; returns only protocolError -32602, zero new commits/SSH
+  or charged operations. Direct MCP SessionRequest cannot enter owner prepare.
+- Allowlist denial before missing-target lookup, actual stored revocation and
+  expired-grant refusal despite a real protected-key proof, with actual authority
+  close/drain before asserting no retained open work.
+- All7profile tools over actual catalog/store, persisted caller/grant IDs, revisioned update,
+  canonical digest, retained revisions, stable-ID replay and conflict; no SSH.
+- Inventory/get/connect/state/log/disconnect: exact target/profile, connected
+  state, parsed known hostname/packages and journald record; five exact read
+  source kinds over one transport, no domain storage write beyond grant setup.
+- Actual peer-proof failure after a committed profile suppresses ACK with fixed
+  UNAUTHORIZED. Receipt survives, no automatic resubmission; a new authenticated
+  peer's explicit same-ID request returns the retained result without a second
+  commit. No wire success/authority is synthesized.
+
+This is13positive tools plus denied/catalog coverage of24, not full24positive
+parity. configuration_get,recipes_list,plan_create,plans_get,approval_request,
+apply,jobs_list,jobs_get,jobs_events,jobs_cancel,jobs_reconcile remain positive
+executor/framing stage work under T373. Existing15scripted gateway cases and
+T372 structural metadata tests do not close those routes. No new specification
+package or runtime mode, production code/dependencies unchanged.
+
+Initial .local/mcp-router-full.log full checks EXIT1: policy loop exceeded the
+real4MCP-session limit by retaining6clients, and expired-open test observed
+cleanup counter before physical drain. Corrected fixture/client lifecycle,
+not production bounds; first targeted mcp-router-targeted.log EXIT0(10cases),
+only after full failure. Strengthened schema isolation/read semantics and added
+publication loss/replay; next .local/mcp-router-fixed-full.log EXIT1 from a missing
+operations.dart import in new test. Corrected import after its errors were
+captured, then .local/mcp-router-targeted-fences.log EXIT0(11cases), after full
+failure. Fresh complete checks are now running; no pass claimed before exit.
+T377/T373/T323 remain open; no native/platform/remote execution qualification.
+
+T377 fresh full checks .local/mcp-router-final-full.log tools/test-unit.ps1
+EXIT0: format394files/0changed, rootFlutter+5package analyses clean; root71+
+engine490+MCP15+protocol20+Windows8=604Dart(1static603RAM) plus16PS RAMgroups.
+All11new actual-router cases pass. .local/mcp-router-links.log lychee EXIT0:
+1483total/1482OK/0errors/1excluded. Current bounded T377 prerequisite awaits
+independent review; T373/T323 remain open for the full executor-backed matrix.
+No production changes, Native/Isar/realFS/SSH/process/engine-isolate/UI/design/
+integration/build/install/release qualification by this increment.
+
+T377 accepted after completed independent mcp_router_stage_review:0findings.
+Actual factory/auth/store/router/domain assertions establish this prerequisite,
+not the complete T373/T323 matrix. Final full evidence
+.local/mcp-router-final-full.log EXIT0: format394/0changed, current app/package
+analyses clean,604Dart(1static603RAM) plus16PS RAMgroups;11new cases pass.
+Formatter warnings resolving lint includes in the separate historical
+work/isar-encryption-implementation are not claimed absent or qualified.
+.local/mcp-router-recorded-links.log lychee EXIT0:1483total/1482OK/0errors/
+1excluded. No application production code changed by T377.
+
+T373/T323 stay open for11positive executor-backed routes listed above, their
+actual framing/parsers/command policy and remaining effect/publication fences.
+T324/T325/T331 and other whole-goal acceptance tasks remain separate. No Native/
+Isar/realFS/SSH/process/engine-isolate/UI/design/integration/build/install/release
+qualification. The full objective remains active and incomplete.
+
+
+## T373 actual framed executor stage — 2026-10-31
+
+- [x] T378 Fix confirmed plan receipt ordering defect: plan compilation and
+  later storage admission use distinct instants. The retained loader must
+  accept createdAt >= plan.createdAt with exactly one exact-request creation
+  receipt, preserving digest/origin/target authority and readback validation.
+  Actual RAM StateStore persistence, reopen/replay and earlier/wrong-request/
+  wrong-digest/duplicate graph rejection regressions; full checks and review.
+- [x] T379 Establish the positive24-tool prerequisite of T373 through actual
+  factory, owner inspect/challenge/confirm enrollment, HMAC MCP authentication,
+  router/domain services and StateStore. A declared RAM byte peer supplies
+  fragmented executor envelopes through actual SSH pool/framing/response parsers;
+  no domain-success stub. Verify real plan/preflight/compiler comparison,
+  approval, per-step authorization, success/desired-state, cancel, unknown and
+  reconcile, explicit same-ID apply without another submit. Source release and
+  root journal/effects are declared RAM models, not platform qualifications.
+  Full checks, links and independent review before acceptance.
+
+Initial .local/mcp-executor-full.log EXIT1 and subsequent diagnostic runs expose
+an actual plan loader mismatch: creation() required equal plan/receipt times,
+although persistence validates at a later instant. Fixed in snapshot.dart;
+publication/authentication checks are unchanged. Deterministic regression first
+exposed duplicate plan receipts under different request IDs; exact-one plan
+creation receipt now closes that gap too. Targeted runs occur after the full
+failure. Owner approval request ID and nested jobs-list expectations were also
+corrected in the new fixture, without changing production wire contracts.
+T373/T323 remain open for the remaining negative effect/publication fences.
+No Native/Isar/realFS/SSH/process/explicit engine-isolate/UI/design/integration/
+build/install/release qualification. Existing specification amended in place.
+
+
+T378/T379 fresh full checks .local/mcp-executor-fixed-full.log EXIT0:
+format397files/0changed, Flutter and all5package analyses clean; root71+
+engine496+MCP15+protocol20+Windows8=610Dart cases(1static609RAM), plus16PS RAM
+groups. Engine includes the new actual24-tool scenario and5receipt regressions.
+.local/mcp-executor-links.log lychee EXIT0:1483total/1482OK/0errors/1excluded.
+Formatter warnings from the separate historical worktree's lint include remain
+outside this scope. Independent review is pending; T378/T379 are not accepted
+yet. T373/T323 remain open and no platform/release readiness is claimed.
+
+
+- [x] T380 Close confirmed independent-review finding in T378 wrong-request
+  regression: change both receipt row.entityId and document.requestId together,
+  retaining the plan's original requestId. This valid row identity must reach
+  the exact plan-request guard and fail STORAGE_BLOCKED there, rather than
+  passing only because of a malformed receipt row key. Fresh full checks and
+  fresh independent review required; no production contract change.
+
+Completed executor_positive_stage_review found1P2: the wrong-request regression
+previously failed the earlier row/document identity check, leaving the intended
+plan-request guard unprotected. T380 corrects only the fixture. T378/T379/T380
+remain pending acceptance; no clean review or full T373 completion claimed.
+
+
+The first attempted T380 replacement did not match formatted indentation; the
+subsequent .local/mcp-executor-review-fixed-full.log run tested the unchanged
+fixture and does not close T380. Corrected the exact line only after that run
+completed; a new full run supplies the post-fix evidence.
+
+
+T380 post-fix full .local/mcp-executor-final-full.log EXIT0: format397/0changed,
+Flutter+5package analyses clean; root71+engine496+MCP15+protocol20+Windows8=
+610Dart(1static609RAM), plus16PS RAMgroups. Corrected wrong-request graph case
+passes only with mismatched plan/receipt request identity while receipt row and
+document IDs agree. Fresh independent review pending; T378/T379/T380 not yet
+accepted. .local/mcp-executor-final-links.log lychee EXIT0 1483/1482OK/0/1excluded.
+
+
+T378/T379/T380 accepted after completed fresh independent
+executor_positive_fixed_review:0findings. The previous1P2 regression finding is
+closed by consistent receipt row/document IDs with a different plan request ID.
+Final .local/mcp-executor-final-full.log EXIT0: format397/0changed, clean current
+Flutter+5package analyses,610Dart(1static609RAM)+16PS RAMgroups.
+.local/mcp-executor-review-ready-links.log EXIT0:1483total/1482OK/0errors/1excluded.
+This accepts the positive24-tool prerequisite and receipt-order fix only.
+T373/T323 remain unchecked for remaining negative effect/publication fences;
+T324/T325/T331 and other whole-goal tasks remain open. No Native/platform/remote
+Python executor/storage durability/UI/design/integration/build/install/release
+qualification, and no new specification package or compatibility path.
+
+
+## T373 negative effect/publication boundary stage — 2026-10-31
+
+- [x] T381 Extend actual factory/HMAC/router/domain/StateStore RAM parity with
+  corrupted executor preflight digest/compiler effects/target; blocked retained
+  plans cannot request approval. Lose peer proof or revoke grant during pending
+  preflight: no plan receipt/effect/ACK. Lose proof after plan commit: retained
+  receipt supports explicit same-ID replay without another preflight or commit.
+  At accepted submit/status boundaries, lost proof, foreign status or lost submit
+  ACK must retain unknown, no step permit/effect, no resubmit on explicit replay.
+  Inject only through declared RAM byte reply hook; no domain handlers/authority
+  bypass. Full checks/links and independent review required. This does not close
+  T324 overlay/recovery or T331 complete occupancy matrix by implication.
+
+
+T381 also closes the previously uncovered inferred-target/object-origin policy
+rows: retained known plan/job IDs under another full-scope grant, and the same
+grant after target removal with fresh protected-key authentication. plans_get,
+approval_request, apply, jobs_get/events/cancel/reconcile must return FORBIDDEN;
+unfiltered jobs_list must hide these jobs. Assert no metadata write/root request/
+step permit and no disclosed forged preflight effect diagnostic. These scenarios
+use actual records and policy, not missing-object denial or synthetic handler ACK.
+
+Initial .local/mcp-fences-full.log EXIT1 (8new cases failed): fixture omitted the
+MCP client's explicit server_connect, so root preflight never ran. Corrected the
+fixture and nested tool-error assertion without changing production connection
+ownership or contracts. Only after that full failure,
+.local/mcp-fences-targeted.log EXIT0:9new cases. Added2object-policy cases after
+the coverage audit; fresh full checks follow. Production code unchanged.
+
+
+The second full .local/mcp-fences-fixed-full.log EXIT1 caught an invalid fixture:
+read/plan/apply grants require a nonempty target set. For target removal, create
+an actual second foundation target through owner profiles.create, then replace
+the grant's target set with that target (keep scopes). The inferred original
+plan/job target is denied, while servers_list shows only the new allowed target.
+After full failure .local/mcp-fences-object-targeted.log EXIT0:11cases. Added a
+post-submit revoke-before-step case: owner observes unknown; the revoked client
+cannot replay or reopen. No next step permit/root effect/submit; no implicit
+cancel or reconciliation. This supplements preflight revocation with an already
+accepted remote attempt and does not claim full occupancy release coverage.
+
+
+T381 final full .local/mcp-fences-final-full.log EXIT0: format398/0changed,
+Flutter+5package analyses clean; root71+engine508+MCP15+protocol20+Windows8=
+622Dart(1static621RAM) plus16PS RAMgroups. All12new fence/policy cases pass.
+.local/mcp-fences-final-links.log lychee EXIT0:1483total/1482OK/0errors/1excluded.
+Formatter warnings for lint includes in the separate historical worktree are
+outside qualification. Current application production code is unchanged.
+
+T373/T323 aggregate evidence map, pending independent assessment:
+- actual_router_policy_test.dart: literal24catalog and independent scope-lattice
+  expectations, empty/missing scopes, all24 validated argument shapes plus owner
+  forgery field, explicit target denial, private owner invocation denial,
+  revoked session and valid-MAC expired grant open denied.
+- actual_router_profiles_test.dart: actual profile CRUD/revisions/conflict/replay,
+  known inventory/read parsing, commit-before-proof-loss and explicit replay.
+- actual_router_executor_test.dart: positive24tool set through actual composition,
+  enrollment and owner approval, fragmented byte transport and strict parsers;
+  plan/capsule/compiler consistency, jobs success/cancel/unknown/reconcile,
+  desired state, explicit apply replay without a second submit.
+- actual_router_fences_test.dart: malformed preflight, pre/postcommit proof and
+  revoke fences, accepted-submit proof/revoke/foreign status/lost ACK boundaries,
+  retained unknown without permit/effect/resubmit; existing object origin and
+  inferred target denial, authorized server-list filtering and hidden job rows.
+- Test support owns only declared RAM platform proof/storage/protected-byte/SSH
+  ports. Factory, StateStore, queues/CAS/HMAC, router and all domain handlers run
+  unchanged. No replacement domain-success stub or test-only authority bypass.
+
+T373/T323/T381 remain unchecked until completed independent review confirms this
+scope. Their closure would not close T324/T325/T331 or whole-goal acceptance,
+legacy cleanup, final Analyze/Converge or native/platform/release readiness.
+
+
+T381 accepted independently by completed mcp_full_parity_review: no defects in
+its12cases/hook. Aggregate T373/T323 not accepted:2P2 evidence gaps remain.
+No production defect or missing architecture decision established by that review.
+- [x] T382 Close AC-MCP-2A evidence gap: real StateStore/factory starts in an empty
+  workspace, author-only HMAC grant with no targets successfully runs all7profile
+  handlers/real revisions/receipts; no server read/apply authority or SSH.
+- [x] T383 Close AC-MCP-3A/3B and FR-MCP-009 evidence gap through actual router:
+  runnable own plan without approval/delegation and with pending approval returns
+  APPROVAL_REQUIRED, no job admission/submit/effect. Matching owner delegation
+  permits successful apply with exact authorityRef without separate approval.
+  Wrong exact revision/body tuple or parameters, revoked or expired delegation
+  denies admission without submit/permit/effect. Historical expiry fixture uses
+  actual validated RAM trusted writes, not malformed row injection or a domain
+  success handler. Full checks/links and fresh independent aggregate review.
+
+Final accepted T381 evidence remains .local/mcp-fences-final-full.log EXIT0:
+622Dart(1static621RAM)+16PS,format398/0; review-ready-links EXIT0:1483/1482OK/0/1.
+T373/T323 remain unchecked until T382/T383 and fresh review close both findings.
+
+
+T382/T383 implementation uses actual RAM fixture controls only: populated=false
+now reaches actual StateStore.open and TrustedControlServices.create without
+server/trust/credential rows; author-only grant is still generated/staged and
+HMAC-authenticated normally. Existing populated defaults remain unchanged.
+Test grant lifetime is selectable through the real grant command to leave room
+for the existing minimum300s delegation; default300s remains unchanged. No
+runtime permission/clock bypass or production implementation change.
+
+New8cases: author-only7handlers in empty workspace; runnable apply with absent
+and pending approval; successful live owner delegation with exact job/receipt
+reference; wrong exact revision, body digest, parameter constraint, revoked and
+expired delegation refuse admission. Expiry seed uses validated real trusted
+RAM writes at a historical clock and authenticates a still-live grant with the
+unchanged current factory clock; current apply/driver are never replaced.
+
+Initial .local/mcp-authority-full.log EXIT1: new fixture omitted the public
+StateStore extensions import, so Flutter/engine analysis and that test load
+failed. Corrected the import after full completion. Only then targeted
+.local/mcp-authority-targeted.log EXIT0:8cases. Fresh full checks are required;
+T382/T383/T373/T323 remain unchecked pending checks and fresh independent review.
+
+
+T382/T383 fresh full .local/mcp-authority-final-full.log EXIT0: format399/0changed,
+Flutter+5package analyses clean; root71+engine516+MCP15+protocol20+Windows8=
+630Dart(1static629RAM)+16PS RAMgroups. All8new authority cases pass alongside
+T381's12fence cases and previous policy/profile/positive24tool suites.
+.local/mcp-authority-final-links.log lychee EXIT0:1483total/1482OK/0errors/1excluded.
+Separate historical-worktree lint-include formatter warnings are not qualified.
+Fresh independent aggregate T373/T323 review remains pending. No production
+runtime or protocol version changed; no platform/native/release claim.
+
+
+T382/T383 and aggregate T373/T323 accepted after completed fresh independent
+mcp_authority_parity_fixed_review:0findings, readiness established for the stated
+actual24-tool RAM/static permission matrix. Both previous2P2 evidence findings
+are closed by actual author-only empty-workspace and approval/delegation routes.
+The reviewer inspected all5actual_router suites and current production handlers,
+auth/storage/driver paths and the 001/021 trace, not only the incremental tests.
+
+Final full .local/mcp-authority-final-full.log EXIT0: format399/0changed,
+Flutter+5package analyses clean,630Dart(1static629RAM)+16PS RAMgroups.
+.local/mcp-authority-review-ready-links.log EXIT0:1483total/1482OK/0errors/1excluded.
+This establishes T323/T373 tool/permission parity through actual domain
+composition. It does not mark T324/T331 observation/recovery/occupancy acceptance,
+T325 complete retained16family adoption, old runtime cleanup, final documentation/
+SDK audit, overall coverage, Analyze/Converge or whole-goal acceptance complete.
+No Native/Isar/realFS/SSH/Python executor/explicit engine-isolate/UI/design/
+integration/build/install/release qualification. Existing001/002/021 remain the
+only amended feature packages; no new feature spec or compatibility path.
+
+
+## Local job observation / recovery implementation decisions — T384–T388
+
+- [x] T384 Refine existing001/021 for T324/T331: closed runtime observation view,
+  component placement, no new protocol/schema, explicit lifecycle/freshness/
+  identity/order/resource rules, owner projection and actual recovery/occupancy
+  acceptance. Source confirms reconcile currently ignores false childrenStopped
+  and the ACK sequence floor. Links and independent specification readiness
+  review required before dependent implementation; no new feature package.
+- [x] T385 Implement protocol observation DTO and bounded engine runtime model,
+  current-driver lifecycle/status capture and authorized jobs_get/list sibling
+  projections with existing factory clock. Preserve job/ACK/schema3 and private
+  authority. Pure DTO/model plus actual factory projection RAM cases.
+- [x] T386 Fix confirmed reconcile terminal gate in actual driver: validate ACK
+  fields/ranges, honor childrenStopped and status sequence floors, preserve
+  current attempt/session/target and nonbackwards progress. No ACK-only terminal
+  or recovery step authority. Retain unknown on insufficient/malformed evidence;
+  enforce existing terminal/check/CAS rules and prove actual same-host reuse only
+  after valid terminal. Add tasks for further confirmed findings, preserve history.
+- [x] T387 Add actual factory/store/framed-transport recovery and occupancy RAM
+  matrix under T324/T331: checked reopen states, lost ACK/detach/power/close/revoke,
+  missing/unavailable attempt, stale identity/old generation, monotonic/duplicate
+  terminal, cancel/reconcile pending/childrenStopped=false, valid terminal release
+  and no restored permit/resubmit. Keep separate claims for runtime model and
+  actual domain/StateStore behavior; no native/SSH/FS/process/isolate fixtures.
+- [x] T388 Wire separate observation through AutomationController and existing
+  jobs display, validate generation/attempt and epoch, detach/stale local view on
+  client/read loss without rewriting remote result or enabling auto-retry. Add
+  controller-only RAM units; no widget/layout/design/native UI tests. Full required
+  checks, links and independent code review before T324/T331 aggregate closure.
+
+T384 is design only. T385–T388/T324/T331 remain unimplemented/unaccepted until
+source evidence, mandatory checks and completed clean independent review prove
+otherwise. Constitution I–VII and existing one executable/writer/format3/schema3
+constraints are retained. No migration/legacy fallback, new service or release.
+
+
+T384 specification readiness accepted after completed job_observation_design_review:
+0findings, ready for T385–T388. Links .local/job-observation-design-links.log EXIT0:
+1483total/1482OK/0errors/1excluded. Reviewed source confirms existing recovery and
+reconcile proof gaps; no implementation has yet been accepted. Unknown+cancel
+continues to follow unchanged021 graph: no direct unknown→terminal; explicit
+reconcile is required. T385–T388/T324/T331 and the full goal remain open.
+
+
+T385 first runtime full .local/job-observation-runtime-full.log EXIT1: model
+incorrectly treated existing decimal-string target revisions as int32, cancelling
+before submit; constructor also requested Store.state unnecessarily instead of
+the already validated snapshot used by composition lifecycle fixtures. Corrected
+to existing requireRevision/validated snapshot, without accepting an alternate
+counter format. A protocol negative fixture had changed a valid UUID digit rather
+than its version; corrected the fixture, not UUID validation. Added explicit
+int64 decimal precision/no-int-substitute regression. No legacy fallback.
+
+Only after completed full failure, .local/job-observation-runtime-targeted.log
+EXIT0:40affected model/projection/lifecycle/MCP cases and
+.local/job-observation-dto-targeted.log EXIT0:14DTO cases. A fresh full run follows.
+New observer callbacks detach on actual session loss/target transport retirement,
+not on ordinary request completion. Native work remains physically drained and
+remote state/occupancy stays governed by the existing writer and authority.
+T385 pending full checks/review; T386–T388/T324/T331 not accepted by this increment.
+
+
+T385 fresh complete gate .local/job-observation-runtime-final-full.log EXIT0:
+format404files/0changed; rootFlutter+5package analyses clean; root71+engine526+
+MCP15+protocol34+Windows8=654Dart(1static653RAM)+16PS RAMgroups. Includes8new
+engine model cases,2actual owner/MCP projection cases and14protocol DTO cases.
+.local/job-observation-runtime-links.log lychee EXIT0:1483/1482OK/0errors/1excluded.
+The historical separate-worktree lint-include warnings are not qualification.
+Independent code review pending. This does not accept T386 false-child/ACK floor
+fix, T387 recovery/occupancy matrix, T388 controller/display or aggregateT324/T331.
+
+
+T385 accepted after completed independent job_observation_runtime_review:
+0findings, bounded runtime/model/projection readiness established. The reviewer
+inspected the exact8file increment, source dependencies and acceptedT384 trace.
+Final full .local/job-observation-runtime-final-full.log EXIT0:format404/0changed,
+clean current Flutter+5package analyses,654Dart(1static653RAM)+16PS RAMgroups.
+.local/job-observation-runtime-review-links.log EXIT0:1483/1482OK/0errors/1excluded.
+
+T386 remains required: actual driver must enforce reconcile childrenStopped and
+ACK sequence floor, using the existing wire. T387 actual recovery/occupancy
+matrix and T388 controller/display remain separate. T324/T331 and full-goal
+acceptance remain unchecked. No Native/Python executor/Isar/realFS/SSH/process/
+explicit engine-isolate/UI/design/integration/build/install/release qualification.
+
+
+## T386 actual terminal proof regression/fix — 2026-10-31
+
+First .local/job-reconcile-red-full.log EXIT1 established actual-domain regressions:
+false childrenStopped, ACK sequence ahead of status, invalid ACK state/negative
+sequence all wrongly published cancelled; negative submit ACK allowed a step.
+Other malformed/foreign/status/postcheck cases retained unknown. The fractional
+fault was rejected by the RAM peer's strict encoder before delivery and marked
+peer.errors; replaced with valid-wire wrong-type sequence for that actual route,
+while DTO units separately reject fractional data. No protocol weakening.
+
+T386 introduces closed structural ExecutorReconcileResult over the existing4field
+response and shares existing executor state enums. The actual driver captures
+bounded ACK fields, rechecks actor proof, advances its retained runtime floor
+from submit/reconcile ACK, and requires stopped-child proof before terminal
+query/publication. False stopped proof publishes unknown/uncertain without
+observationally inventing a status sample. Cancel/older apply cannot publish
+unknown/reconciling directly terminal or overwrite a newer reconciling transition.
+All existing private authority, format3/ACK/job/schema3/executor wire stay intact.
+
+Actual11case matrix covers malformed evidence, current host occupancy while
+unknown, subsequent explicit valid stopped terminal then distinct approved work
+on the same host, unknown cancel then explicit reconcile, and negative submit
+ACK with no step permit. Matching terminal in the declared peer is idempotently
+reconciled just as the unchanged root protocol already specifies. Only after
+completed full failure .local/job-reconcile-targeted.log EXIT0:11cases. Fresh
+full checks/review are required before acceptance. T387/T388/T324/T331 remain open.
+
+- [x] T389 Under T387, prove/fix accepted control handoff across owned physical
+  driver drain with a deterministic RAM latch. Source risk is concrete:
+  TrustedJobService._drive returns false while the prior driver remains charged,
+  but accepted unknown→reconciling may already be durable; merely removing the
+  old driver later does not start the accepted observation. Preserve one current
+  driver, current actor proof/deadlines, bounded retained control interests,
+  explicit cancel versus reconcile semantics and physical quiescence. No new
+  apply/submit queue, restored permission or direct unknown→terminal. Refine any
+  necessary continuation decision in existing001/021 and complete specification
+  readiness review before that handoff implementation; do not claim it closed
+  by T386 terminal safety or normal cancel/reconcile cases.
+
+
+T386 fresh full .local/job-reconcile-final-full.log EXIT0: format406/0changed,
+Flutter+5package analyses clean; root71+engine537+MCP15+protocol47+Windows8=
+678Dart(1static677RAM)+16PS RAMgroups. All11new actual-driver and13new structural
+reconcile DTO cases pass. .local/job-reconcile-links.log lychee EXIT0:
+1483total/1482OK/0errors/1excluded. Historical separate-worktree lint warnings
+are not qualification. Fresh independent T386 code review is pending.
+T387/T388/T389 and aggregateT324/T331 remain open; no native/platform/release claim.
+
+
+Completed job_reconciliation_gate_review found1P2 insideT386: its old-mode guard
+was outside publish's read/CAS retry. Old cancel/apply error could read unknown,
+then overwrite a newer durable reconciling on read/retry. This is distinct from
+T389 control activation and blocks T386 acceptance despite the earlier green gate.
+- [x] T390 Fix confirmed T386 review finding: move originating-driver mode/phase
+  predicates into every progress CAS iteration, including after a conflict.
+  Extract only the existing data publication loop into JobService-owned
+  automation/job_progress.dart; actual driver uses the same real-store read/CAS
+  ports and authority logic. Add deterministic actual StateStore RAM commit/latch
+  regressions for awaited read and real REVISION_CONFLICT, proving newer accepted
+  reconciling is untouched. No fake StateStore, result stub, new wire/authority,
+  mode from caller JSON or restoration of permission. Fresh checks/review required.
+
+
+T390 deterministic race proof: .local/job-reconcile-race-red-full.log full EXIT1
+with both actual-store latches reproducing reconciling overwritten as unknown
+using the unguarded extracted loop. The fixed loop re-evaluates originating mode
+against each freshly read/CAS-retried state, rather than relying on stale guards
+in terminal/catch callers. Redundant outside guards removed. Actual production
+ports remain guarded store reads plus the same expected-sequence queued writer.
+
+Expanded race matrix covers apply and cancel for both awaited-read and real
+REVISION_CONFLICT windows, comparing the complete durable job and commit count.
+These are metadata CAS boundary units using actual StateStore; they do not claim
+native/root actor proof. Existing11actual factory/framed-driver cases cover the
+composed terminal gate. Only after full red completed,
+.local/job-reconcile-race-targeted.log EXIT0:4race+11driver=15cases. Fresh mandatory
+checks and a new completed reviewer are still required; T386/T390 not accepted.
+
+
+T386/T390 fresh post-fix full .local/job-reconcile-race-fixed-full.log EXIT0:
+format408/0changed; current Flutter+5package analyses clean; root71+engine541+
+MCP15+protocol47+Windows8=682Dart(1static681RAM)+16PS RAMgroups. Includes4actual
+StateStore CAS race cases,11framed actual-driver cases and13reconcile DTO cases.
+.local/job-reconcile-race-links.log lychee EXIT0:1483/1482OK/0errors/1excluded.
+Initial independent1P2 is not declared closed until fresh review completes.
+T387/T388/T389/T324/T331 and other whole-goal tasks stay open; no native claim.
+
+
+T386/T390 accepted after completed fresh job_reconciliation_cas_fixed_review:
+0findings, bounded terminal-gate/CAS publication readiness supported. Previous
+job_reconciliation_gate_review1P2 is closed by predicate evaluation inside each
+read/CAS iteration and4actual-store latch regressions; not by a stale caller guard.
+Final .local/job-reconcile-race-fixed-full.log EXIT0:format408/0changed, clean
+Flutter+5package analyses,682Dart(1static681RAM)+16PS RAMgroups.
+.local/job-reconcile-race-review-links.log EXIT0:1483/1482OK/0errors/1excluded.
+
+T389 accepted-control activation after physical drain remains open and requires
+its existing-package decision/readiness work and deterministic actual acceptance.
+T387/T388/T324/T331 and all remaining whole-goal acceptance/cleanup/coverage/
+Analyze/Converge tasks remain open. No Native/Python/Isar/realFS/SSH/process/
+explicit engine-isolate/UI/design/integration/build/install/release qualification.
+No new feature/spec package, protocol/schema version or compatibility path.
+
+
+## Accepted job control handoff decisions — T391–T393
+
+- [x] T391 Refine T389 in existing001/021: one bounded FIFO control metadata
+  coordinator, per-kind pending slots and original30s invocation deadline;
+  admission/readback registration ordering; no old-driver drain under its lock;
+  fresh proof, fair one-shot control activation, replay rearm, conservative
+  expiry/sealing and explicit resource/ownership limits. Links and independent
+  specification readiness review before dependent code. No new feature package.
+- [x] T392 Implement JobService-owned automation/job_controls.dart and actual
+  registration/driver completion/activation in jobs.dart using T391. One current
+  driver, separate real cancel/read actors, no apply queue/resubmit/permission
+  restoration; keep T386/T390 terminal/CAS fences. Standard internal time port,
+  bounded metadata mutex/slots/pump/timer and no discarded accepted continuation.
+  Pure bookkeeping/time units and full mandatory checks; no caller-supplied mode.
+- [x] T393 Prove T389 through actual factory/StateStore/native-boundary RAM actors
+  and framed peer with physical stdin/channel drain latch, not scripted tool
+  success. Cover deadlines, coalescing/fairness, role/identity loss, terminal,
+  seal/late native completion, limits and exact retained IDs/events/receipts;
+  no root work before positive quiescence, no submit/permit after handoff.
+  Fresh complete checks/links and independent code review before T389 closure.
+
+T391 only supplies design; T392/T393/T389 remain open until their own evidence.
+T387's full recovery/occupancy matrix, T388 controller/display and aggregate
+T324/T331 are not closed by this decision package. Existing single executable,
+private worker/MCP/tray and schema3/format3 constraints remain unchanged.
+
+
+T391 design readiness evidence: independent read-only review
+job_control_handoff_design_review completed with no findings and readiness for
+T392/T393 only. The reviewer inspected the eight changed existing001/021 documents,
+actual admission/driver/CAS/store/actor code and factory/framed RAM support.
+Link gate .local/job-control-design-reviewed-links.log EXIT0:1483total/1482OK/
+0errors/1excluded. No application code changed in T391; no new SDK test pass or
+handoff implementation is claimed. T392/T393/T389 remain unchecked; full recovery,
+controller and aggregate T387/T388/T324/T331 also remain open. No native/platform/
+build/install/release qualification. Original requirements/receipts/identities and
+single executable with tray/MCP lifecycle remain unchanged.
+
+
+T392 implementation increment (pending checks and independent source review):
+JobControlContinuations and actual JobOperation registration/pump/physical-driver
+completion now replace the lost boolean handoff. One FIFO metadata interest,
+per-kind actor slot, original monotonic deadline and service timer retain native
+settlement ownership. Control activation replays the actual receipt and may rearm
+unknown through queued CAS; root work starts after coordinator release. An internal
+continuation fence runs after asynchronous transport proof, immediately before
+root bytes; it grants no actor rights. Standalone cancel is one stop/status cycle,
+with typed correlated stop ACK coalescing, no submit or permit. Seal/resume does not
+restore pending contexts. No new wire/schema/service or compatibility path.
+
+T393 has an initial actual factory/store/framed RAM regression holding the old
+executor session's physical done with autoClose=false. Its corrected-fixture red
+run .local/job-control-red-target-fixed-fixture.log EXIT1 leaves reconciling after
+release; initial implementation targeted run .local/job-control-first-target.log
+EXIT0 passed16 cases (one handoff plus existing reconcile/CAS cases). Five new
+coordinator-only RAM units cover FIFO/cancellation, same-kind actor replacement,
+one-cancel fairness, monotonic original deadline/retired timer, bounded capacity,
+seal and stop-ACK pruning. These are limited evidence, not the complete T393 matrix.
+The first full post-code run .local/job-control-runtime-full.log EXIT1 had one
+unawaited_futures lint in the new unit; all test suites ran, engine547 passed.
+The lint is fixed; a fresh full gate and independent review remain required.
+T389/T392/T393/T387/T388/T324/T331 remain open until their complete required evidence.
+No Native/realFS/Isar/SSH/process/engine-isolate/UI/design/build/release check.
+
+
+T392 subsequent evidence before final source review: full
+.local/job-control-runtime-final-full.log completed EXIT0 (format411/0changed,
+root71+engine547+MCP15+protocol47+Windows8 =688 Dart including one static source
+check, plus16 PowerShell RAM groups). Further source inspection added an operation
+settlement wake so a native write finishing after its logical wrapper failed does
+not strand reconciling without a ticket. Actual handoff RAM cases now additionally
+cover original30s wait expiry with a still-live real grant, a newer same-kind
+invocation retaining its own deadline without an extra state event, revocation,
+and JobService suspend waiting actual close then resuming without old intents.
+The existing factory readClock port is forwarded by RAM helpers; actor/native
+proof clocks and grant lifetime are not replaced. Targeted10 cases passed after
+correcting a test-only assertion to the actual ClientGrantRecord.id field.
+The688-check evidence predates these later changes; a fresh complete gate and
+independent review are required. Full T393 role/identity/native-write/terminal/
+false-proof/generation/fairness matrix and whole-goal aggregates remain open.
+
+
+T392/T393 current increment full gate .local/job-control-expanded-full.log completed
+EXIT0: format411/0changed, Flutter and five package analyses clean; root71+
+engine551+MCP15+protocol47+Windows8 =692 Dart checks (one static source boundary,
+691 RAM units), plus16 PowerShell RAM groups. Includes the five actual handoff
+cases and five coordinator units above. Empty locald test directory is not a test
+pass. Link gate .local/job-control-expanded-links.log EXIT0:1483/1482OK/0errors/
+1excluded. Independent review of this implementation increment is required next;
+T392/T393/T389 and whole-goal aggregates remain unchecked. No native qualification.
+
+
+## Stop-ACK retirement correction — T394
+
+- [x] T394 Fix confirmed P2 from completed job_control_handoff_runtime_review:
+  retire cached stop-ACK for the corresponding server/connection/enrollment;
+  late pre-retirement ACK must not restore it. Preserve actual physical drain
+  ownership and pending actor retirement. Prove ACK→unknown→full disconnect→
+  explicit current reconnect→new stable cancel/status in actual factory/store/
+  framed RAM, plus stale ACK/token scheduling units. Fresh full checks/links
+  and new independent review; do not close the remaining T393 matrix.
+
+Review found1 confirmed lifetime defect; T391 remains ready for implementation,
+but current T392 increment is unaccepted until T394 fix/review. Existing task
+history and T389/T392/T393/T387/T388/T324/T331 unchecked state are preserved.
+
+
+T394 red evidence: .local/job-control-retirement-red-full.log EXIT1 first exposed
+fixture reconnect before physical connection retirement; the fixture now awaits
+actual disconnected view before explicit reconnect. Corrected actual regression
+.local/job-control-retirement-red-target.log EXIT1: expected2 stable cancel requests,
+actual1. Cache retirement now uses the entry's immutable server binding and rotates
+an opaque stop-ACK correlation token; an in-flight old ACK cannot repopulate the
+fact after retirement. No snapshot read or new Native work is added to retirement
+notification. Pending actors and physical driver ownership keep their existing
+retirement/drain rules. Actual reconnect plus six coordinator units now pass12
+addressed cases in .local/job-control-retirement-fixed-target.log EXIT0. Fresh
+full gate, links and independent fix review remain required; T394 stays open.
+
+
+T394 fixed full .local/job-control-retirement-fixed-full.log completed EXIT0:
+format411/0changed; Flutter+five package analyses clean; root71+engine553+MCP15+
+protocol47+Windows8 =694 Dart (one static source check,693 RAM), plus16PSRAMgroups.
+Six actual factory handoff/retirement cases and six coordinator RAM units pass.
+Current code now awaits fresh independent fix review; T394 is not yet accepted.
+No Native/platform/integration qualification or full T393 closure is claimed.
+
+
+T394 accepted after completed independent job_control_retirement_fixed_review:
+0findings; server-bound stop-ACK retirement and stale ACK correlation inspected
+against actual source/spec, no unresolved confirmed finding in this increment.
+Full .local/job-control-retirement-fixed-full.log EXIT0:411formatted/0changed,
+Flutter+five package analyses clean,694Dart (one static,693RAM)+16PSRAMgroups.
+Links .local/job-control-retirement-review-links.log EXIT0:1483/1482OK/0errors/
+1excluded. Review is limited to the implemented increment and T394 correction;
+it does not establish the remaining T393 matrix or whole service readiness.
+T392/T393/T389/T387/T388/T324/T331 remain unchecked. No native/platform/release
+qualification, new service/package/schema or compatibility path was introduced.
+
+
+## Owner cancellation envelope correction — T395
+
+- [x] T395 Fix concrete failure exposed by actual T393 native-write interest loss:
+  automation.cancel must retain the CANCELLED envelope already required by021
+  owner-automation. Shared closed McpToolResult allowlist currently rejects that
+  code, throwing VALIDATION after marking the handle cancelled but before
+  cancelling its response interest. Add the fixed lifecycle category to the same
+  shared business envelope, freeze it before changing handle state, preserve
+  closed error parsing and local/none semantics. No new envelope/schema/version,
+  authority, job stop, compatibility branch or rollback. Protocol RAM and actual
+  factory/native-write tests; full checks/links/independent review before closure.
+
+T393 first complete .local/job-control-matrix-first-full.log EXIT1: two new
+readonly-denial tests expected an envelope where the actual router correctly
+throws FORBIDDEN; one test inspected metadata during temporary authority
+publication. Test boundaries corrected without production relaxation. Subsequent
+actual same-ID rearm, accepted pending terminal pruning and response-interest
+loss cases plus queued expiry/retired epoch units extend the matrix. The interest
+loss regression .local/job-control-matrix-lifetimes-target.log EXIT1 establishes
+T395 (McpToolResult.failure CANCELLED→FormatException VALIDATION). Native write,
+actor permission and physical ownership behavior remain required, not mocked ACKs.
+
+
+## T393 handoff acceptance matrix and T395 verification
+
+Current actual factory/StateStore/actor/framed RAM evidence is19 handoff cases:
+six in job_control_handoff_test.dart and thirteen in job_control_roles_test.dart.
+These use actual metadata receipts/CAS/readback, HMAC/owner contexts and byte
+framing; the declared RAM peer is not Native/root artifact qualification.
+
+| Required behavior | Evidence in current unit sources |
+| --- | --- |
+| Old physical owner must drain before accepted control starts | Held executor session done, immediate durable reconciling, no root control before release, one activation without another invocation |
+| Original deadline and coalescing | Still-live grant with elapsed31s refuses expired ticket; newer invocation retains its own deadline and no duplicate state event; private retired timer units |
+| Separate actor rights and fairness | Read-only originating MCP context is forbidden cancel; owner cancel then read reconcile; new cancel alias during malformed stop ACK gets its turn only after pending reconcile |
+| Trust/target loss | Actual grant revoke; owner profile target revision update; actual owner enrollment revoke under target fence, then explicit inspection/re-enrollment and fresh HMAC recovery |
+| Terminal and replay correlation | Already accepted pending cancel/reconcile pruned after current observer proves terminal, before its close; terminal replay immutable; same-ID explicit unknown cycle rearm uses same receipt/attempt/authority and exactly two state events |
+| Insufficient proof keeps occupancy | False childrenStopped, foreign reconcile/status IDs after handoff; distinct approved apply remains HOST_BUSY, no additional submit/permit |
+| Native ownership and sealing | Actual RAM storage holdPut through JobService suspend/exit; no positive drain before settlement; accepted receipt survives; resume needs fresh invocation; response-only cancellation retains accepted continuation |
+| Cleanup failure fails closed | Actual executor session done error suppresses pending root control; pause/close fail and resume is refused; retained job remains nonterminal and workspace lease is not released |
+| Bounds and retired callbacks | Eight coordinator-only units: FIFO unstarted cancel/expiry, charged active interest, latest slots/fairness, one timer,250entries/500actors/33interests, stop-ACK retirement/prune, late timer/ACK and resumed epoch |
+
+The factory seal/native-write cases and coordinator epoch assertions cover this
+service's retirement boundary. Checked workspace reopen/new-generation recovery
+and the larger power/close/occupancy matrix remain T387; controller view remains
+T388. They are not closed by the T389 handoff slice. No engine-isolate fixture.
+
+T395 uses the cancellation category already required by021 owner-automation;
+protocol units assert fixed local/none cancellation, immutable owner capture,
+rejection of arbitrary diagnostic codes and extra owner fields. Actual cancelled
+response remains CANCELLED while accepted reconciliation completes without stop,
+resubmit or permission restoration. No envelope/schema/version or raw error
+text was added. Production change is the shared code allowlist and capture before
+marking the owner handle, not a second result parser or compatibility branch.
+
+Full .local/job-control-matrix-fixed-full.log completed EXIT0: format413/0changed,
+Flutter+five package analyses clean; root71+engine568+MCP15+protocol49+Windows8=
+711 Dart (one static source check,710 RAM), plus16PSRAMgroups. No tests claimed for
+empty locald. Complete first run failed before addressed checks; later targeted
+20 cases passed after the concrete fixture corrections and T395 fix. Two protocol
+units and the final physical-close failure case are included in this fresh full
+run. T389/T392/T393/T395 remain unchecked pending independent acceptance review;
+T387/T388/T324/T331 and all other whole-goal work remain open. No Native/Python/
+Isar/realFS/SSH/process/container/UI/design/build/install/release qualification.
+
+
+T389/T392/T393/T395 accepted after completed independent
+job_control_complete_matrix_review:0findings, ready for this handoff/cancellation
+slice. Review directly inspected coordinator, actual JobService/driver/CAS,
+actor/native transport dispatch/cleanup, owner API/protocol and nineteen actual
+factory/framed RAM cases, eight coordinator units and two cancellation protocol
+units. Full .local/job-control-matrix-fixed-full.log EXIT0: format413/0changed,
+Flutter+five package analyses clean,711Dart (one static710RAM)+16PSRAMgroups.
+Links .local/job-control-matrix-review-links.log EXIT0:1484/1483OK/0errors/1excluded.
+T395 closes the documented CANCELLED producer/parser mismatch, not a new result
+shape or job cancellation side effect. Earlier T394 stop-ACK retirement acceptance
+is retained. Task history and earlier red/partial evidence are not erased.
+
+This acceptance closes only accepted-control physical handoff and its verified
+boundaries. T387 reopen/new-generation/power/recovery/occupancy, T388 controller,
+T324/T331 aggregates and all other remaining implementation/cleanup/Spec Kit/final
+whole-goal checks stay open. No Native/platform/Isar/realFS/SSH/process/isolate/UI/
+design/integration/build/install/release readiness is established.
+
+
+## T387 checked reopen and recovery RAM matrix
+
+job_reopen_recovery_test.dart adds15 actual factory/store/HMAC/owner/framed RAM
+cases. Capture existing admitted states from MemoryWorkspaceProvider.afterCommit;
+no job/receipt rows are invented. Queued capture seals JobService during the
+actual queued commit before any root submit. Running/unknown captures use an
+actual accepted root submit whose framed ACK is lost at session EOF, with no
+step permit. Other captures follow actual cancel, reconcile, failure or fully
+checked success. Captured bytes are restored only inside the declared RAM
+provider after old services/host/store positively close; this models a retained
+crash image, not user-file mutation or a production rollback feature.
+
+A new actual HostAuthority/EngineSessions generation and real StateStore.open
+repeat signed metadata/custody/semantic validation. Checks assert queued→cancelled/
+none, running/cancel-requested/reconciling→unknown/uncertain, existing unknown and
+three terminal states unchanged; exact job/plan/attempt/request/authority and
+cancel flag survive, state sequence advances only when required. Every other
+native collection row/native ID/payload is retained byte-exact, previous event
+rows stay exact with only the required recovery event, including retained grants,
+credentials/trust, approval/delegation and desired state. Runtime observation is
+new-generation detached with no sequence/sample restored. Startup creates no SSH
+attempt and issues no root call, submit or step permission. Original apply receipt
+replay remains exactly its retained ACK and does not restart a job.
+
+Actual detach, full TrustedControlServices suspend/resume and full close retain
+an already admitted attempt while its physical channel close is held. A new
+factory/store generation then observes unknown; no permission is restored, and
+only an explicit fresh reconciliation obtains a proven stopped terminal. Revoked
+origin grant stays revoked through reopen: its valid-key client is denied, owner
+apply replay is denied, while actual owner observational recovery preserves the
+original grant/attempt/authority and writes an owner-origin control receipt.
+
+Missing root attempt is a typed framed NOT_FOUND; unavailable control returns
+EXECUTOR_UNAVAILABLE, and foreign status is rejected. Each remains unknown and
+HOST_BUSY for a distinct approved plan. Only a separate valid correlated stopped
+reconciliation releases occupancy; retrying the previously denied new admission
+then creates a distinct job and one new authorized effect. Terminal cancel and
+reconcile aliases preserve immutable terminal rows/events without root I/O.
+T386/T390 correlation/CAS and T393 false-proof/physical-failure/fairness acceptance
+remain part of this chain. Their accepted task history is retained.
+
+The declared byte peer now models no-launch queued/waiting reconciliation using
+the current executor/serverdeck_executor/jobs.py reconcile/_job source: stopped
+no-launch jobs become cancelled, missing attempt reports NOT_FOUND, and explicit
+fixture errors retain the existing closed root error frame. No Python process,
+SSH/socket, native database/FS or native artifact qualification is exercised.
+New test setup reopen supplies a fresh generation and distinct RPC counter range;
+ordinary setup defaults and the actual production factory/loader remain unchanged.
+
+First complete .local/job-reopen-first-full.log EXIT1: a final-local assignment
+in the extended RAM peer prevented affected test loads; two then-planned imports
+were unused. Fixture compiler issue fixed, revoked-owner case added using those
+imports. After that completed failure, .local/job-reopen-expanded-target.log EXIT0
+passed15cases. Fresh full gate and independent source/spec acceptance review are
+required before T387 closure. T388/controller and T324/T331 aggregates remain open;
+no Native/platform/realFS/Isar/SSH/process/isolate/UI/design/build/release readiness.
+
+
+T387 fresh complete .local/job-reopen-final-full.log finished EXIT0:
+format414/0changed; Flutter+five package analyses clean; root71+engine583+MCP15+
+protocol49+Windows8=726Dart (one static source check,725RAM)+16PSRAMgroups.
+Link gate .local/job-reopen-links.log EXIT0:1484total/1483OK/0errors/1excluded.
+The15case addressed matrix is included in this full run, together with all prior
+T386/T390/T393 regressions. No current production application code was changed;
+RAM factory setup/peer support and acceptance tests exercise the existing loader,
+recovery and shared services. T387 remains unchecked until completed independent
+acceptance review confirms the full stated scope, not merely successful tests.
+T388/controller, T324/T331 aggregates and remaining whole-goal work stay open.
+
+
+T387 accepted after completed independent job_reopen_recovery_review:0findings,
+ready for this checked-reopen/recovery/occupancy RAM scope. Review directly read
+the exact four-file increment, actual loader/factory/JobService/CAS/actor paths,
+previous accepted correlation/handoff matrices and primary Root _job/reconcile
+source; no domain-success substitution or mandatory gap was found. Fresh full
+.local/job-reopen-final-full.log EXIT0:414formatted/0changed, clean Flutter+five
+package analyses,726Dart(one static725RAM)+16PSRAMgroups. Latest links
+.local/job-reopen-review-links.log EXIT0:1484/1483OK/0errors/1excluded.
+
+This closes T387's stated static/RAM acceptance only. T388 controller/local
+observation display and T324/T331 aggregates, plus all other remaining whole-goal
+implementation/adoption/cleanup/docs/final Spec Kit audits, remain open. Native,
+real FS/Isar/Python/SSH/process/isolate/UI/design/build/install/release qualification
+was not performed and is not established by these assertions. Existing task
+history, including red checks and narrower prior acceptance, remains intact.
+
+
+## T388 controller observation projection
+
+AutomationController now stores immutable LocalJobObservationView separately for
+selected/listed jobs, removes the raw observation from displayed job rows, and
+validates current bound generation plus exact immutable job/hostAttemptId before
+installing replies. A whole list page is captured before any row is installed;
+selected job/events are captured before changing selection. Read loss changes
+only local observation confidence: sample→stale, no sample→detached. Client loss
+retires the epoch/timer and detaches local observations while keeping durable
+job state/outcome/IDs untouched. Disposed or older-epoch callbacks cannot update
+remote result or local observation. No automatic control/retry/permission flow is
+introduced; existing explicit owner actions and pending request IDs remain.
+
+One normal1s Timer/scheduling port is internal to the controller. Token, epoch,
+selected ID and client generation fence the fired callback; busy reads cannot
+create overlapping polling, and the current action schedules one next poll.
+Existing native store bound250active+1000terminal limits retained list data;
+listpage25/events200 display bounds stay in force. Existing jobs section receives
+the separate views and adds observation state and last response sequence/time
+alongside remote job state, using existing DeckKeyValue composition and unchanged
+action rules. No design003 layout/theme rewrite or visual readiness assertion.
+
+Fifteen controller-only RAM units use the real EngineClient/strict owner framing
+with a bounded declared gateway and structural presentation records, not native
+permission or domain success proof. They cover separate selected/listed data,
+invalid generation/attempt/state/extra fields and changed known attempt, atomic
+list/event failure, stale/no-sample behavior without changing succeeded, client
+loss, old timer/selection, busy timer coalescing, dispose/late reply and changed
+client generation. Existing T385/T386/T387/T393 actual factory/store/actor/framed
+RAM acceptance remains the independent backend half of the T384 chain.
+
+First complete .local/job-controller-red-full.log EXIT1: the new controller API
+and scheduling seam were absent before implementation, so the new test did not
+compile. After the completed full failure, addressed13case units passed; two
+additional atomic-events/busy-timer units and the disposed-observation fence were
+included in the fresh full .local/job-controller-final-full.log EXIT0:
+format415/0changed; Flutter+five package analyses clean; root86+engine583+MCP15+
+protocol49+Windows8=741Dart(one static source740RAM)+16PSRAMgroups. No pass claimed
+for empty locald, no widget/layout/design/native tests. Links and independent
+review/fix loop are required before marking T388 accepted. T324/T331 aggregate
+acceptance and all other remaining whole-goal tasks stay open.
+
+
+T388 accepted after completed independent job_observation_controller_review:
+0findings, ready for the specified controller/RAM scope. Reviewer directly read
+current controller/client/DTO/backend projection, the exact five-file increment,
+functional fields in the existing jobs view and15 controller RAM cases. Full
+.local/job-controller-final-full.log EXIT0:415formatted/0changed, clean Flutter+
+five package analyses,741Dart(one static740RAM)+16PSRAMgroups. Link gate
+.local/job-controller-review-links.log EXIT0:1484/1483OK/0errors/1excluded.
+Read/dispose/client loss does not rewrite remote outcome or start job control.
+No widget/layout/design/native UI qualification; prior task history is retained.
+
+## T324/T331 aggregate observation/recovery traceability audit
+
+The aggregate checkboxes remain open pending an independent review of this
+complete chain; accepted component results alone are not a whole-goal claim.
+
+| Aggregate requirement | Accepted source and actual verification chain |
+| --- | --- |
+| FR-SVC-EMB-08/AC08: unknown occupancy, no automatic apply | T386 actual correlated stopped proof and HOST_BUSY/new approved work; T387 checked reopen/lost ACK/missing/unavailable/foreign/current authorized recovery; T389/T392/T393 actual physical handoff, no submit/permit restoration |
+| FR-SVC-EMB-09/AC09: observation separated from remote result and authority | T384 decisions; T385 strict sibling DTO/runtime-only observations and actual owner/MCP projection without reads opening SSH or metadata writes; T388 separate selected/listed views and unchanged remote outcome/control rules |
+| Current generation/target/trust/grant/event ordering | T385 monotonic5s/UTC jump, old token/target/generation/semantic sequence rules; T386/T390 actual StateStore CAS conflict/retry fences; T393 role/target/enrollment/revoke/deadline/retirement; T387 fresh generation/old session refusal; T388 reply/timer/client epoch and attempt fences |
+| SC-SVC-EMB-04: no false success from loss or intent ACK | T386 false childrenStopped/foreign/bad ACK/status/postchecks keep unknown+HOST_BUSY; T393 cancel ACK only stop intent, physical cleanup failure blocks activation/pause; T387 native loader recovery retains uncertainty, owner control after revoke stays observational |
+| T331 terminal releases only after proof and no observer-only lock | T386 actual valid terminal plus distinct approved apply; T387 same-host admission after separately valid reconciliation and exact terminal alias/no-event preservation; T393 accepted pending control terminal prune and same-ID rearm without a new receipt |
+
+Source locations are engine/automation/job_observations.dart, jobs.dart,
+job_controls.dart, job_progress.dart and storage/automation_job_progress.dart;
+protocol/automation/job_observation.dart and executor_jobs.dart; Flutter
+AutomationController and existing jobs section. Actual RAM evidence is retained
+in job_observation_projection_test, job_reconciliation_test, job_progress_race_test,
+job_control_handoff_test, job_control_roles_test and job_reopen_recovery_test;
+pure model/DTO/controller evidence is separately labelled. No alternate service,
+wire/schema version, legacy fallback, permission producer or apply queue was
+introduced. T324/T331 acceptance must be assessed against FR08/09, AC08/09, SC04,
+not inferred from all-green compilation. Whole feature/runtime/bundle/adoption/
+cleanup/platform/Spec Kit final acceptance remains separate and incomplete.
+
+
+T324/T331 aggregate acceptance confirmed by completed independent
+job_observation_recovery_aggregate_review:0findings, both aggregate tasks may
+close; T388 acceptance also confirmed. Reviewer independently inspected the
+current DTO/overlay/projection/driver/handoff/CAS/recovery/controller chain,
+FR-SVC-EMB-08/09, AC08/09 and SC04 against actual unit sources and logs, not
+merely the green component statuses. All11 recorded source hashes matched.
+741Dart(one static740RAM)+16PSRAMgroups, format415/0changed and clean Flutter+
+five package analyses remain .local/job-controller-final-full.log EXIT0.
+Current package links .local/job-controller-aggregate-links.log EXIT0:
+1484total/1483OK/0errors/1excluded. All earlier completed task/evidence history
+is retained; narrowed component acceptance is not rewritten as global acceptance.
+
+T324/T331/T388 close only observation/recovery/controller static/RAM obligations.
+Remaining adoption/retention, source cleanup, platform/storage copy, pins, bundle
+and final whole-feature Spec Kit/requirement acceptance tasks stay open. No native,
+real FS/Isar/SSH/process/isolate/UI/design/integration/build/install/release
+qualification is claimed; the full goal remains active and incomplete.
+
+
+## T325 nonempty schema3 retention matrix
+
+The increment in `packages/serverdeck_engine/test/storage/full_schema3_retention_test.dart`
+creates a runnable plan through the actual service factory, owner-approved apply,
+framed RAM Root peer, terminal succeeded job and then an owner-created delegation.
+Every one of the16 WorkspaceCollection families must be nonempty before assertions;
+this closes the empty-family limitation of earlier retention/recovery fixtures.
+No production snapshot restore, migration or compatibility path is introduced.
+
+The positive test closes the original actual store/services, reopens the current
+persisted RAM bytes through the actual preflight/custody/loader/factory and compares
+all16 raw nativeId/entityId/payload families, foundation semantic state, terminal
+job semantic state, signed executor enrollment and every protected RAM file byte.
+These comparisons include IDs, revisions, credentials and their bindings, trust,
+grants, delegation, consumed approval, history/events, receipts and desired state.
+Startup performs no SSH/Root request. The prior client cannot use the new host
+session generation; a fresh HMAC client can read and replay the original apply
+receipt without resubmitting, consuming a new permit or changing any retained row.
+Persistent delegation policy is retained; it is not a runtime session or one-time
+Root permission.
+
+Sixteen refusal cases corrupt a native ID in each separately populated family;
+five more cover schema1/schema2/unknown schema99, broken credential reference and
+invalid receipt-key wrapper. All use only the declared RAM provider, require no
+additional writable open and compare every input file unchanged after rejection.
+The existing T371/T372 and snapshot/preopen custody, concurrent-writer and semantic
+fault checks remain applicable; this increment does not replace their coverage.
+T325 remains unchecked pending the full check result and independent review.
+Native/realFS/Isar/SSH/Python/process/isolate/UI/design/build/release qualification
+is outside these unit assertions and has not been performed.
+
+
+T325 accepted after completed independent schema3_retention_review:0findings,
+ready in the scoped synthetic/RAM retention matrix. Reviewer inspected the exact
+two-file increment, actual loader/custody/factory and related001/002-security-storage/
+021 requirements, and the existing prerequisite fault/recovery suites. Exact raw
+payload retention followed by actual semantic revalidation was assessed sufficient;
+separate serialization of every automation map is not an unresolved requirement.
+
+Fresh complete `.local/schema3-retention-first-full.log` finished EXIT0:
+416formatted/0changed; Flutter+five package analyses clean; root86+engine605+MCP15+
+protocol49+Windows8=763Dart (one static source check,762RAM)+16PSRAMgroups.
+`.local/schema3-retention-links.log` EXIT0:1484total/1483OK/0errors/1excluded.
+The22 new cases are included in that full run; no addressed-only run was needed.
+Existing nested work/ lint-include formatter warnings do not change its success.
+Empty residual locald has no current-task suite and is not counted as a test pass.
+
+This closes T325 only. T321, cleanup/documentation/pin work and final whole-feature
+Spec Kit Analyze/Converge/acceptance remain separate. No native/platform/realFS/
+Isar/SSH/Python/process/isolate/UI/design/build/install/release qualification is
+claimed. Existing task history and narrower earlier acceptance are preserved.
+
+
+## T321 complete power lifecycle aggregate acceptance
+
+T321 accepted after completed independent power_lifecycle_aggregate_review:
+0findings, ready only for this implementation/RAM/static scope. The review read
+current Desktop/worker/Root/Host/services/SSH/jobs/capabilities source and the full
+applicable requirement→contract→task→acceptance chain; earlier T333–T350 clean
+reviews were provenance rather than a substitute for this aggregate assessment.
+
+Native WM_POWERBROADCAST/early latest intent → subscribed desktop actions →
+controller epoch/private owner retirement → authenticated coalesced Root power
+intent → synchronous Host admission fence → actual service/sampler/transport/job
+drain → current runtime/vault/lease/store/revisions/capability restore → fresh
+observation/window binding is connected. Same worker/Host/store/lease/generation
+is retained; uncertain physical close never permits replacement. Resume without
+a suspend callback fences first. Cleanup failure prevents resume. One original
+resume deadline includes pending pause, owner detach, restore and startup; late
+replies and superseding epochs cannot publish stale Ready/capabilities.
+
+Actual jobs seal/drain does not remotely cancel, resubmit or restore one-time
+permits. Accepted remote history/occupancy remains governed by current actor and
+repository rules; explicit SSH reconnect and explicit recovery remain required.
+Static wiring and RAM tests cover original deadline, late reply, lost suspend
+callback, revoke, close/shutdown races and fresh private binding. Native delivery,
+real sleep/wake and actual UI remount are not established by these checks.
+
+Current complete `.local/schema3-retention-first-full.log` EXIT0 covers this code:
+416formatted/0changed; Flutter+five package analyses clean;763Dart(one static,
+762RAM)+16PSRAMgroups. No application code changed for the aggregate audit.
+`.local/schema3-retention-accepted-links.log` EXIT0:1484total/1483OK/0errors/
+1excluded. Historical component MSVC `/Zs` evidence is syntax only, not execution.
+No Native/realFS/Isar/SSH/Python/process/isolate/UI/design/build/install/release
+qualification is claimed. T327/T328/T329/T330 and remaining whole-goal work stay
+open; T321 acceptance does not close the feature or those separate requirements.
+
+
+## T329 current plan and existing dependency pins
+
+Correct the embedded Technical Context from dartssh2 4.2.0 to the already-used
+4.1.0 in packages/serverdeck_engine/pubspec.yaml and root/engine pubspec.lock.
+Replace the stale assertion that Root/proxy is absent with current implementation
+and accepted static/RAM lifecycle/owner/gateway scope. Keep historical foundation
+sections/task history, the distinct constitution version, and explicit limits on
+native/isolate/IPC/FFI/UI/build/release qualification. No source, manifest, lockfile
+or dependency resolution is changed. T327/T328/T330 remain separate. T329 remains
+unchecked until links and completed independent review establish this correction.
+
+
+T329 accepted after completed independent plan_current_status_review:0findings,
+ready for this documentation-only pin/current-source correction. Direct engine
+pubspec and both current lockfiles confirm4.1.0; current Root/controller/gateway/
+desktop source and prior accepted T321/T324/T331/T325 evidence support the scoped
+status. No dependency resolution, upgrade, application source or lockfile change.
+`.local/plan-status-links.log` EXIT0:1484total/1483OK/0errors/1excluded. The cited
+763Dart/16PS full gate is historical source evidence, not a new app execution for
+this docs-only change. T327/T328/T330 remain open; no whole-feature or native/
+platform/isolate/IPC/FFI/UI/build/install/release readiness is implied.
+
+
+## T328 current storage/platform instructions and presentation wording
+
+README now describes the existing single executable, tray/Exit lifetime and
+connection-only MCP mode; absent app means no MCP response, local stderr/nonzero.
+It links the current test-unit entry and existing build/setup instructions rather
+than the deleted available-foundation runner. New developer storage/platform
+instructions document target-schema3 retention/refusal/writer-busy/custody,
+all six current platform rows, actual capabilities and prerequisites, suspend/
+resume and explicit runtime/platform/release qualification limits.
+
+Only display literals change in readiness_view.dart, error_view.dart, motion.dart
+and software_panel.dart: ServerDeck wording replaces separate local-service and
+client/service-version instructions. Error codes, permissions, retry/action/tone
+policy, layout/widget structure, styling and callbacks are unchanged. Existing
+closed safe ErrorCode mapping excludes arbitrary exception text; no new message
+transport or runtime decision is introduced. No UI/design/widget/native checks
+are added or run; the full existing static/unit gate applies to this text change.
+T328 remains unchecked until actual checks and completed independent review.
+
+
+T328 accepted after completed independent current_storage_platform_docs_review:
+0findings, ready in this storage/platform instruction and presentation-copy scope.
+The review read all eight changed files and actual storage/capability/MCP/desktop
+source,001/002/021 contracts and evidence. Display changes retain the closed
+safe-code mapping, actions/retry/tone/auth policy and widget/layout structure.
+No UI/design/widget test or native dispatch was added or run.
+
+Fresh complete `.local/current-docs-full.log` finished EXIT0:416formatted/0changed;
+Flutter+five package analyses clean; root86+engine605+MCP15+protocol49+Windows8=
+763Dart(one static762RAM)+16PSRAMgroups. Empty residual locald is not a passed
+suite; historical nested work/ lint warnings do not change the formatter success.
+`.local/current-docs-spec-links.log` EXIT0:1484total/1483OK/0errors/1excluded;
+`.local/current-docs-guide-links.log` EXIT0:22total/22OK/0errors. The auxiliary
+literal comparison is only a one-off lexical check; actual diff and independent
+source review establish the limited copy change. No message/runtime policy or
+current test coverage was replaced by this comparison.
+
+T329 was separately accepted by completed plan_current_status_review and
+plan_status_acceptance_record_review, both0findings; its pins/locks/source were
+not changed. T327 cleanup and T330 final whole-feature Analyze/Converge/evidence
+remain open. These current instructions do not establish native/platform/realFS/
+Isar/SSH/Python/process/isolate/UI/design/build/install/release readiness, and no
+whole-goal completion is claimed. Earlier task/check history is retained.
+
+
+## T327 exact package inputs and remaining owner configuration parser
+
+- [x] T396 Remove the concrete old MCP owner configuration contract still present
+  in protocol/grant_owner.dart. Actual Windows VerifiedAppConfiguration emits
+  serverdeck.exe plus exactly --mcp-stdio/--grant-id/UUID, while the shared owner
+  result validator still demands mcp.exe/--app-root. This breaks the actual
+  grants.configuration result before delivery. Accept only the current shape,
+  preserve strict immutable result capture and existing owner bundle/current
+  grant/revalidation checks; reject old executable/root/extra arguments. Add
+  protocol units and actual owner/store/session composition RAM regression.
+- [x] T397 Define one exact engine/MCP/protocol/Windows package input set shared
+  by SDK consumers, CI dependency resolution, unit runner, build dependency loop
+  and bundle lock paths. Stop directory discovery from resolving/analyzing the
+  source-empty locald package. Remove its four unused package manifests/locks
+  individually; do not recursively remove build/cache/native-backup trees.
+  Keep current lock/native/receipt guards and negative tests that reject former
+  bundle inputs. Correct the MCP library README's removed executable/autostart
+  instructions. Verify full static/unit checks and links, then independent review.
+
+T396 is a current-code defect discovered while tracing T327 callers, not a new
+feature or compatibility path. Tests keep the actual StateStore/Host/sessions/API;
+only platform bundle identity is a declared RAM port. Existing fixture defaults
+remain unchanged; the fixture may explicitly supply a current app bundle/root.
+T397 addresses only the exact current inputs and four individually named files.
+The earlier rejected broad recursive legacy/native-backup cleanup is not retried.
+T327/T276 stay open pending the remaining caller/helper/artifact audit and cannot
+be closed merely because these two bounded corrections pass. No native/build/
+process/realFS/SSH/isolate/UI/design/deploy qualification is added or claimed.
+
+
+T396/T397 accepted after completed independent legacy_inputs_configuration_review:
+0findings, ready only for these bounded corrections. The review traced actual
+Windows configuration producer→OwnerGrantApi→shared/trusted/UI capture, retained
+owner/root/build/current-grant/publication checks, protocol and actual-store RAM
+regressions. It also inspected all current SDK/unit/CI/build/lock callers, exact
+four package inputs and the four individually removed unused locald manifests.
+No compatibility branch, new authority or dependency change was introduced.
+
+Fresh complete `.local/legacy-input-first-full.log` finished EXIT0:418formatted/
+0changed; Flutter+four target package analyses clean; root86+engine606+MCP15+
+protocol51+Windows8=766Dart(one static765RAM)+16PSRAMgroups. The three new Dart
+cases are included; first full pass succeeded and no addressed run was needed.
+Existing PS groups now assert the shared current package/lock set. Static six-
+script parse and exact4packages/5locks are recorded in
+`.local/legacy-input-static.json`. Links `.local/legacy-input-links.log` EXIT0:
+1488total/1487OK/0errors/1excluded. No CI workflow or build was executed; syntax
+and shared policy units do not establish hosted-CI/native/runtime qualification.
+
+The read-only Dart import/part census found232production files reachable from
+main+97current test/support roots and0missing local URIs. This is helper/caller
+inventory only, not proof that every public symbol is needed or all legacy
+artifacts are removed. Synthetic native-format byte fixtures have actual current
+preflight/registry test callers and are not real native/FS/Isar fixtures.
+
+T327/T276 remain open for the complete remaining source/helper/artifact audit;
+the earlier rejected broad recursive/native-backup cleanup was not retried.
+Build/cache/native-backup trees were not removed by this increment. Whole-goal
+completion and native/platform/realFS/Isar/SSH/Python/process/isolate/UI/design/
+build/install/release qualification are not established. Task history is retained.
+
+
+## Phase 10: Convergence
+
+- [x] T398 HIGH CG-12 Complete the remaining generated/cache artifact boundary
+  for T327/T276 per FR-SVC-EMB-14/15, AC-SVC-EMB-15 and Constitution I (partial).
+  Current inputs use only engine/MCP/protocol/Windows, but the old locald folder
+  still contains17 generated .dart_tool files, including old generated source and
+  compiled snapshots; read-only tools/executor/locald census also found22 orphan
+  Python bytecode files from removed source/test runners. Trace current callers
+  and classify exact residue; retain active executor/runtime/notices/receipt and
+  native-source guards. Do not retry the previously rejected broad recursive or
+  native-backup/bytecode cleanup by an equivalent method. Record any external
+  removal/authorization boundary honestly; do not claim T327/T276 or full goal
+  complete while required old-code residue remains. No user workspace data,
+  foreign work/process/003 installation or historical evidence tree may be altered.
+- [x] T399 MEDIUM CG-13 Reconcile aggregate acceptance evidence per FR-SVC-EMB-12/13,
+  all35 embedded FR/AC/SC, plan Validation, T253–T276 and T330/T272 (partial).
+  Update the existing embedded-engine-verification journal beyond T312 with a
+  current source→contract→task→unit/static evidence matrix, actual command/exit/
+  scope and rejected-cleanup limits. Assess current parent task completion from
+  source and accepted corrective chains rather than checkbox inheritance. Keep
+  T398 and other unresolved requirements open; do not recast native/manual/
+  historical001.1 gates as passed or runnable in the current scope. Complete a
+  fresh independent aggregate review/fix loop, repeat Analyze/Converge on the
+  resulting artifacts, and close only supported parent tasks. No new feature,
+  compatibility facade, build/native/SSH/FS/UI/design/deploy qualification.
+
+Converge10 assessed the current embedded amendment:35requirements/acceptance/
+success criteria,12architecture/validation decisions and8constitution principles;
+145current T253–T397 task chains were included, with T001–T252 retained as explicit
+historical scope rather than current native execution requirements. Two remaining
+partial findings above were appended:one HIGH and one MEDIUM. This is a
+`tasks_appended` outcome, not `converged` and not whole-feature readiness.
+The source-empty locald manifests and current MCP parser defect are already
+accepted under T396/T397; this phase does not erase or reopen that history.
+
+
+- [x] T400 Fix LOW governance-pointer finding from completed
+  embedded_whole_scope_aggregate_review per Constitution VI/VII and FR-SVC-EMB-12.
+  The actual constitution footer/Sync Impact Report is Version4.3.0, not4.2.0 used
+  in the current journal/embedded plan nor4.0.0 used by checklist CHK012. Update
+  current pointers only, preserve historical increment claims, keep all12reviewer-
+  owned checklist markers untouched, and do not change the constitution itself.
+  Run applicable links and fresh independent aggregate review. Known HIGH T398
+  remains a separate unresolved cleanup boundary; no whole-goal readiness claim.
+
+First completed aggregate review found2items:known HIGH T398 residue and LOW
+current-governance pointer T400. Actual current source389/389hashes matched; no
+additional confirmed runtime regression or missing mandatory architecture/product
+decision was identified. Review supported parent T255–T271/T273–T275 closure only
+in static/RAM scope after doc fix/check/fresh review; T272/T276 stay open. Custom
+checklist criteria were assessed individually; markers remain0/12, not auto-pass.
+The actual current governing file is constitution4.3.0; earlier4.2.0 metadata is
+not used as authority for this review. T400 changes only current pointers and
+this audit record, preserving prior task history and the known cleanup blocker.
+
+
+Completed fresh embedded_governance_fixed_aggregate_review confirmed T400 fixed
+and no new document/source defect: current governance pointers match actual4.3.0,
+all12reviewer-owned markers unchanged,389/389source/test/tool hashes unchanged.
+It independently supported the18parent closures now recorded: T255–T268,
+T270/T271/T273/T275, strictly implementation/static/RAM acceptance. Existing
+T253/T254/T269/T274 remain closed. This is not native/release qualification.
+
+Both aggregate reports retain the known HIGH T398 finding; neither is a clean
+full-goal result. T272/T276,T327/T330/T398 remain open. Links after governance fix
+`.local/aggregate-governance-fixed-links.log` EXIT0:1484total1483OK0errors1excluded.
+Existing app source remains covered by `.local/legacy-input-first-full.log` EXIT0,
+766Dart(one static765RAM)+16PSgroups; no new application run is claimed for docs.
+T399 still requires the follow-up Analyze/Converge and final acceptance record.
+
+
+## Phase 11: Convergence
+
+- [x] T401 HIGH CG-12 Carry the verified remaining T398 cleanup/external execution
+  boundary to final acceptance per FR-SVC-EMB-15, AC-SVC-EMB-15, Constitution I and
+  T276/T327 (partial). Follow-up assessment still confirms17old locald generated/
+  cache files and22orphan bytecode files; all current source/build/unit/CI inputs
+  exclude them, but the requested full removal is not satisfied. Resolve only
+  through an allowed external-state change; do not repeat or route around the
+  earlier rejected equivalent cleanup. Revalidate actual absence and current
+  source/input invariants, applicable checks and independent final review before
+  closing T398/T401/T327/T276 and final T272/T330. This task tracks the same known
+  CG-12, not a newly invented product decision or permission to alter user data,
+  foreign003/worktrees/processes, historical evidence or active runtime guards.
+
+Follow-up Converge11 inspected resulting148current task chains T253–T400,
+35FR/AC/SC,12architecture/validation decisions and8constitution principles using
+current4.3.0 and unchanged389source/test/tool hashes. No additional behavioral
+or missing-decision finding was established by the independent aggregate loops.
+One known partial HIGH implementation obligation remains (CG-12); it is retained
+above rather than falsely returning `converged`. Outcome:`tasks_appended`.
+This append leaves existing tasks/history byte-for-byte unchanged.
+
+
+T399 follow-up evidence work is recorded: read-only Analyze found35/35semantic
+requirement coverage,400unique existing task IDs/148current task chains, actual
+constitution4.3.0, unchanged12quality markers and389source/test/tool hashes; no
+new confirmed mandatory decision/behavior gap. Converge11 appended only T401 for
+known CG-12, outcome tasks_appended, not converged. The18supported parent closures
+and T400 fix are recorded after the completed fresh review.
+
+T399 remains open with T272/T330 until the full aggregate review/fix loop can be
+closed without the known HIGH cleanup finding. T398/T401/T327/T276 remain open;
+this record does not redefine success to documentation alone or waive the user's
+full old-code removal. No new app/source/lock/native runtime check was performed
+for the final documentation record. The prior actual766Dart+16PS full pass remains
+valid for unchanged source; the final link/check/review results are recorded in
+the existing verification journal after completion.
+
+
+## User-authorized archival resolution — 2026-11-01
+
+The user resumed the existing goal and explicitly authorized moving leftovers to
+an archive when deletion is unavailable. This permits a reversible archive outside
+the client repository, not another equivalent deletion attempt. The prior HIGH
+CG-12 finding remains historical; its current filesystem condition has changed.
+
+All39 inventoried residues were moved: the complete old source-empty locald tree
+(17generated/cache files plus empty directories), and22individually named orphan
+Python bytecode files whose matching source no longer exists. Archive location:
+`H:/projects/unng/serverdeck-legacy-archive/2026-11-01-f5f10ba8ae434759ab4dbb02d3d3cf15`.
+Its manifest records original relative paths, destinations, lengths and SHA256;
+all39archive hashes match and all39original paths are absent. The old package
+directory is absent. No source file was recreated, overwritten or deleted.
+
+Before moving, all paths were resolved and checked within the named source/archive
+boundaries; reparse entries and unexpected package files were refused. No user
+workspace data, current source/runtime/credential/notices guard, foreign worktree/
+process/003 installation, backend or historical evidence tree was moved. Current
+389source/test/tool hashes remain unchanged. Archive manifest/result evidence:
+`.local/legacy-archive-result.json`; the archive itself is outside every current
+build/test/release input. This resolves the former execution boundary through the
+new explicit user instruction; it does not waive full source removal from checkout.
+
+T398/T401/T327/T276 and final T272/T330/T399 remain unchecked until the fresh full
+check, links and independent aggregate review confirm the changed current state.
+No native/realFS/Isar/SSH/Python/product-process/isolate/UI/design/build/install/
+release qualification is added by this filesystem maintenance operation.
+
+
+Fresh post-archive full `.local/archive-completion-full.log/.exit` finished EXIT0:
+418formatted/0changed; Flutter+four current package analyses clean; root86+
+engine606+MCP15+protocol51+Windows8=766Dart(one static765RAM)+16PSRAMgroups.
+No addressed run was needed. Current39source paths remain absent, all39external
+archive hashes match, old locald directory absent and389active-source hashes
+unchanged. Links `.local/archive-completion-links.log/.exit` finished EXIT0:
+1484total/1483OK/0errors/1excluded. Fresh independent aggregate review is required
+before checking the seven remaining cleanup/final tasks; no native/release claim.
+
+
+## Completed embedded amendment — 2026-11-01
+
+Completed fresh archive_cleanup_final_aggregate_review found0findings and accepted
+implementation in the explicitly authorized static/RAM scope. It independently
+verified all39archive hashes/lengths,39absent original paths, absent old locald
+root and389unchanged current source/test/tool hashes, current four-package/five-
+lock inputs and the35requirement/source/acceptance chain. No missing mandatory
+product/architecture decision or behavioral regression was confirmed. External
+archival follows the user's explicit fallback instruction, not a deletion retry.
+
+The formerly empty standalone MCP bin directory was additionally archived with
+no files, so both named obsolete entry directories are now absent. External
+manifest `emptyDirectories` records that path; the39file hashes are unchanged.
+This removes no current source and introduces no runtime/compatibility code.
+
+Final Analyze actually ran read-only:35/35requirements have contract/task/
+acceptance coverage;401unique task IDs include149current T253–T401 chains;
+0duplicate IDs,0new ambiguity/missing mandatory decision/critical findings;
+current constitution4.3.0 and unchanged12reviewer-owned quality markers. Final
+Converge actually returned `converged`:35requirements,12plan decisions,
+8constitution principles,149current task chains,0remaining missing/partial/
+contradicts/unrequested implementation findings. It appended0tasks and left
+Tasks001 byte-for-byte unchanged during that stage. Later status/evidence writes
+belong to Implement, not Converge.
+
+The seven supported final closures are now recorded: T272/T276/T327/T330/T398/
+T399/T401. All24parent tasks T253–T276 and all149current tasks T253–T401 are
+checked. T001–T252 and their native/manual historical gates retain their own
+original states and are not claimed passed by this amendment. Earlier red checks,
+HIGH blockers, LOW governance fix and reviewer conclusions remain historical.
+
+Fresh post-archive full `.local/archive-completion-full.log/.exit=0`:
+418formatted/0changed; Flutter+four current package analyses clean;766Dart
+(one static765RAM)+16PSRAMgroups. Fresh source/cleanup review completed0findings.
+Final documentation links and independent acceptance-record review are the last
+record-verification gate; their actual artifacts are inspected before completing
+the goal. Native/realFS/Isar/DPAPI/ACL/SSH/Python/product-process/isolate/UI/design/
+hosted-CI/build/install/release qualification remains unperformed and is not an
+open obligation of this explicitly limited amendment. No new feature/package,
+backend change, deployment, foreign003/worktree/process change or commit.

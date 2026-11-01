@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_protocol/wire.dart';
+import 'package:serverdeck_protocol/host_trust.dart';
 
-import '../bootstrap/local_api_client.dart';
+import '../bootstrap/engine_client.dart';
 import 'profile_controller.dart';
 
 enum MutationPresentation {
@@ -50,7 +50,7 @@ class MutationController extends ChangeNotifier {
     }
     try {
       _intent = MutationIntent(method, input);
-    } on LocalApiException catch (error) {
+    } on EngineApiException catch (error) {
       _set(MutationPresentation.failed, error.code);
       return;
     }
@@ -86,7 +86,9 @@ class MutationController extends ChangeNotifier {
       await _committed(reply.result);
     } on Object catch (error) {
       if (_disposed) return;
-      final code = error is LocalApiException ? error.code : ErrorCode.internal;
+      final code = error is EngineApiException
+          ? error.code
+          : ErrorCode.internal;
       if (code == ErrorCode.revisionConflict) {
         _set(MutationPresentation.conflict, code);
         if (!_disposed) await model.refresh();
@@ -130,7 +132,7 @@ class MutationController extends ChangeNotifier {
       }
       final reply = await model.bootstrap.client.mutationStatus(_intent!);
       if (_disposed) return;
-      validateMethodResult('mutations.get', reply.result);
+      captureTrustedMethodResult('mutations.get', reply.result);
       if (reply.result['state'] == 'committed') {
         // A durable receipt stays true across owner generations. Display its
         // effect only after observing a current coherent snapshot.
@@ -151,7 +153,7 @@ class MutationController extends ChangeNotifier {
       if (!_disposed) {
         _set(
           MutationPresentation.unknown,
-          error is LocalApiException ? error.code : ErrorCode.internal,
+          error is EngineApiException ? error.code : ErrorCode.internal,
         );
       }
     } finally {
@@ -161,7 +163,7 @@ class MutationController extends ChangeNotifier {
   }
 
   Future<void> _committed(Map<String, Object?> result) async {
-    validateMethodResult(_intent!.method.wireName, result);
+    captureTrustedMethodResult(_intent!.method.wireName, result);
     _committedRevision = result['storeRevision'] as String;
     _readbackStarted = false;
     _set(MutationPresentation.committed);

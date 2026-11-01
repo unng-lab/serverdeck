@@ -34,3 +34,18 @@
 ## Notes
 
 Пройдено на уровне Specify. Для001.1 созданы [Plan](../plan.md)/[Tasks](../tasks.md); scaffold и часть primitives реализованы, полная служба, пересмотренное хранение, CRUD/UI и приёмка не завершены. Для001.2/001.3 нужны отдельные Plan/Tasks. Продолжение Implement требует clean review пересмотренного пакета; runnable readiness не установлена. Галочки описывают качество текста, а не работающий продукт. Приёмка старого приложения не переносится.
+
+
+## Пересмотр Specify/Clarify — 2026-10-30
+
+- [x] Встроенный app host заменяет обязательный locald в существующей001, без нового feature.
+- [x] Пользователь уточнил tray lifetime; окно/exit/suspend/crash различены.
+- [x] Новые FR-SVC-EMB-01–13 имеют AC и границы, реализация отдельно от проверенности.
+- [x] Нынешний ServerDeckNext отличается от исторического hard cutover; preservation/return заданы.
+- [x] Scope не включает backend deploy, установку003 или native/integration tests.
+
+Clarify coverage: scope, entities, lifecycle, permissions, migration, concurrency,
+limits, dependencies, acceptance — Clear для Windows/extraction. Последующие
+платформенные SDK/delivery вне текущих implementation задач, не отсутствие решения
+Windows. Один вопрос задан и отвечен пользователем (tray); повторного согласования
+удаления locald не требуется. Галочки — quality текста, не runtime acceptance.

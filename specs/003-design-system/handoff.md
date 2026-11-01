@@ -45,6 +45,10 @@ T190/T195/T196/T197/T199 закрыты после фактического root
 Следующая очередь: открытые T193 (search/action/pager) и T198 (shared header origins/post-tabs margins; clean readiness review уже завершён), затем полная прямая сверка T191 и установленная поставка T192. T198 ещё не реализован. Все98 экранов сохраняются:37base здесь,61design+functionality в собственных пакетах. Установлен прежний private T188 (`0.2.1+11`); текущие правки туда не доставлены, фактическое содержимое окна не осматривалось. Новых build/install/launch/commit/push/CI/publication, native/integration и Computer Use не было. Цель активна; final visual/installed acceptance не заявляется.
 
 # Локальная передача дизайна ServerDeck
+
+> Примечание source-preview0.4: ссылки на удалённые fixtures/tools сохранены как
+> permalinks опубликованного commit0.3.0-preview.1. Это исторические свидетельства,
+> а не текущие runtime/test inputs или новая визуальная/native приёмка.
 ## T189 закрыт в scoped code/check/review; T190 продолжается — 2026-10-29
 
 T189 получил clean fresh `t189_code_review_r3` после двух реальных RED/fix циклов clipping и first-frame resize focus. Последний относящийся к нему полный root gate:685/0format,0analysis issues,8856PASS/1expected capture SKIP8:06 exit0; ссылки на обычные журналы и границы проверки сохранены в evidence. Три файла T189 не менялись после этого gate/review. Это не visual/installed acceptance37/98.
@@ -92,7 +96,7 @@ T179–T181 реализованы: mandatory root format/analyze чистые,8
 Пользователь вернул003 в работу после сравнения установленного приложения с
 макетами. Первыми выполняются точный дизайн37 существующих базовых экранов/
 состояний и интеграция их функций. Остальные61экран сохраняются в своих
-функционально-визуальных пакетах; все98 остаются в [программе](../design-delivery.md).
+функционально-визуальных пакетах; все98 остаются в [программе](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/specs/design-delivery.md).
 
 Последнее прямое указание пользователя удаляет самостоятельный reference-движок,
 его язык bindings, corpus/schema bundles, двойную валидацию и receipt graphs.

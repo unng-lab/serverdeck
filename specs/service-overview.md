@@ -1,5 +1,11 @@
 # Состав сервиса и границы расширений
 
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
 Полное описание сервиса, обязанностей, жизненного цикла и первоначального результата находится в [001 — Основа сервиса](001-service-foundation/spec.md). Это общий указатель, не отдельная спецификация и не отдельный MR.
 
 [Пакет 003](003-design-system/spec.md) владеет визуальными ролями, адаптивной композицией, доступностью и контрактом отображения состояний. [Эталон всех страниц](../docs/design/README.md) не меняет обязанности locald/backend или права операций. Компоненты UI получают существующие данные и callbacks; функциональное владение и gates остаются у профильных пакетов.
@@ -40,3 +46,22 @@ ServerDeck состоит из пользовательского клиента
 | Пакет | Компоненты | Ответственность |
 | --- | --- | --- |
 | [021](021-mcp-control/spec.md) | MCP bridge, locald grants/profile authoring, общий coordinator, Ansible executor и UI | Открыть ИИ чтение, настройки, журналы, создание/правку профилей, делегируемую установку и verified jobs без выдачи SSH-доступа |
+
+
+## Действующая архитектура — поправка 2026-10-30
+
+Новая спецификация/номер не создаются. [Существующая001](001-service-foundation/spec.md)
+пересмотрена: один desktop/mobile app со встроенным доменным движком вместо
+обязательного locald. [План](001-service-foundation/plan.md), T253–T272 и
+[engine](001-service-foundation/contracts/embedded-engine.md) задают новый host;
+[adoption/return](001-service-foundation/contracts/embedded-migration.md) сохраняет
+текущий ServerDeckNext без двух writers и plaintext fallback. Прежний hard cutover
+относится только к сервису до ServerDeckNext. [MCP](021-mcp-control/contracts/embedded-host.md)
+сохраняет tools/grants через обновлённый мост к работающему app. Close desktop окна
+оставляет app в tray; explicit exit завершает engine/MCP; remote outcome не подменяется.
+Термин locald в прежних функциональных обязанностях означает теперь доменный engine,
+а отдельный process/mandatory daemon/idle-grace более не является требованием.
+Native/integration/manual/SSH/container gates не запускаются в текущем scope: только
+static/unit/widget, без заявления native/platform qualification. [Matrix](001-service-foundation/contracts/embedded-platforms.md)
+отделяет первый Windows этап от будущих Linux/macOS/mobile/Web. Backend не обязательный.
+003 и его поставка не меняются этой подготовкой; прежняя история задач сохраняется.

@@ -1,5 +1,11 @@
 # Immutable plans and resource observations v1
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Model](../data-model.md), [records](records.md), [profiles](profiles.md), [executor](executor.md), [tasks](../tasks.md).
 
 This defines structural metadata for T002/T023 and the inputs shared with the trusted compiler/preflight. Parsing a self-consistent digest is not permission, recipe qualification, trustworthy remote attestation or proof that a compiler rendered correct bytes. Actual plan creation/admission additionally checks current session/origin/target/trust, exact registered release/runtime/compiler/catalog hashes, full compiler output and factual prerequisite evidence (T011/T019/T023/T024/T028). No path/module/SQL string in these records becomes a caller-selected executable.

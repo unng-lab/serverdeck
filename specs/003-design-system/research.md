@@ -1,5 +1,9 @@
 # Research: адаптивный дизайн ServerDeck
 
+> Примечание source-preview0.4: ссылки на удалённые fixtures/tools сохранены как
+> permalinks опубликованного commit0.3.0-preview.1. Это исторические свидетельства,
+> а не текущие runtime/test inputs или новая визуальная/native приёмка.
+
 **Дата**: 2026-10-25. **Пакет**: [003 — Дизайн и доступность](spec.md).
 
 Документ фиксирует решения Phase 0 для визуального внедрения в существующий Flutter-клиент. Исследование кода и SDK не является приёмкой реализации. Фактические проверки приложения и независимое ревью фиксируются отдельно после изменений.
@@ -116,7 +120,7 @@ Global Logs/Jobs получают точное объяснение отсутс
 
 **Decision**: после спецификации запускать `lychee "specs/**/*.md"`, после Flutter изменений — `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, `flutter test`; далее независимый review/fix loop по [AGENTS.md](../../AGENTS.md). Проверки HTML не заменяют эти gates. На момент этого исследования перечисленные обязательные проверки изменения приложения не выполнялись.
 
-Сохранить regression coverage существующих [theme tests](../../test/theme/brand_theme_test.dart), [shell tests](../../test/widget/foundation_shell_test.dart), [profile list tests](../../test/widget/profile_list_test.dart), [accessibility forms tests](../../test/widget/accessibility_test.dart) и [reduced-motion tests](../../test/widget/reduced_motion_test.dart). Добавить измеримые сценарии выбранных breakpoint boundaries, phone labels/targets при 200%, смены темы/размера без потери draft/filter/controller identity, keyboard focus/selection, честного shell context и graph text values. Для remote observations использовать synthetic controllers/fixtures; оформление не требует соединения с пользовательским сервером.
+Сохранить regression coverage существующих [theme tests](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/theme/brand_theme_test.dart), [shell tests](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/widget/foundation_shell_test.dart), [profile list tests](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/widget/profile_list_test.dart), [accessibility forms tests](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/widget/accessibility_test.dart) и [reduced-motion tests](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/widget/reduced_motion_test.dart). Добавить измеримые сценарии выбранных breakpoint boundaries, phone labels/targets при 200%, смены темы/размера без потери draft/filter/controller identity, keyboard focus/selection, честного shell context и graph text values. Для remote observations использовать synthetic controllers/fixtures; оформление не требует соединения с пользовательским сервером.
 
 **Rationale**: существующий dirty worktree включает несвязанные изменения и незавершённые сценарии других пакетов; их прежние результаты не доказывают 003 и не должны быть затёрты. В документах сохраняется различие «исследовано», «запланировано», «реализовано» и «проверено»; независимое ревью пакета предшествует handoff в реализацию.
 
@@ -168,7 +172,7 @@ Global Logs/Jobs получают точное объяснение отсутс
 
 DeckLocation содержит section, baseView и необязательные serverId/entityId; не содержит credentials, draft payload, challenge secret или permission. EntityID проверяется существующим owner/result context перед использованием; правильный UUID сам по себе не является authority. NavigationController изменяет только RAM location/back state. ProfileForm/SettingsController остаются единственным явным путём записи профиля/настроек. Target selection в навигации не изменяет сохранённый selectedProfileId.
 
-**Evidence/rationale**: production [LocalApiClient](../../lib/bootstrap/local_api_client.dart) предоставляет verified TrustedApiClient; [ProfileController](../../lib/profiles/profile_controller.dart) проверяет generation/store revision и очищает private projections. `ModelClient` находится в [contract test](../../test/contract/profile_controller_test.dart), DesignModelClient — в test support; это не installed runtime. Имеющихся controllers достаточно для базового переноса без новой БД, transport, wire schema или packages navigation.
+**Evidence/rationale**: production [LocalApiClient](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/lib/bootstrap/local_api_client.dart) предоставляет verified TrustedApiClient; [ProfileController](../../lib/profiles/profile_controller.dart) проверяет generation/store revision и очищает private projections. `ModelClient` находится в [contract test](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/test/contract/profile_controller_test.dart), DesignModelClient — в test support; это не installed runtime. Имеющихся controllers достаточно для базового переноса без новой БД, transport, wire schema или packages navigation.
 
 **Alternatives considered**: новый universal model client с production demo payload, UI→SSH и перенос control authority в shell нарушили бы существующие границы. Общий widget с request-building logic затруднил бы проверку того, что новый дизайн вызывает прежний handler ровно один раз.
 

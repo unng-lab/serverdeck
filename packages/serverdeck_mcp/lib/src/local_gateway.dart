@@ -2,19 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:serverdeck_protocol/errors.dart';
-import 'package:serverdeck_protocol/mcp/handshake.dart';
 import 'package:serverdeck_protocol/mcp/operations.dart';
 import 'package:serverdeck_protocol/mcp/wire.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
-import 'package:serverdeck_windows/pipe_worker.dart';
+import 'package:serverdeck_engine/mcp/client.dart';
+import 'package:serverdeck_engine/platform/ports.dart';
 
 import 'server.dart';
 
 ErrorCode _publicCode(ErrorCode code) =>
     code == ErrorCode.unauthorized ? ErrorCode.forbidden : code;
 
-ErrorCode _trustedCode(String code) => _publicCode(
+ErrorCode _domainCode(String code) => _publicCode(
   ErrorCode.values.where((value) => value.wireName == code).firstOrNull ??
       ErrorCode.internal,
 );
@@ -30,7 +29,7 @@ final class _RpcFailure implements Exception {
   final ErrorCode code;
   final RetryAdvice retry;
   final bool terminal;
-  final OperationalRpcFailureOrigin? origin;
+  final McpClientFailureOrigin? origin;
   final String? domainCode;
   Map<String, Object?> result() => McpToolResult.failure(
     domainCode ?? _publicCode(code).wireName,
@@ -48,76 +47,33 @@ final class _RpcWork {
   final settled = Completer<void>();
 }
 
-sealed class _GatewayRpc {
-  bool get isClosed;
-  int get pendingRequests;
-  Future<void> get done;
-  Future<Map<String, Object?>> call(String method, Map<String, Object?> params);
-  Future<void> close();
-}
-
-final class _OperationalGatewayRpc extends _GatewayRpc {
-  _OperationalGatewayRpc(this.client);
-  final OperationalApiClient client;
-  @override
-  bool get isClosed => client.isClosed;
-  @override
-  int get pendingRequests => client.pendingRequests;
-  @override
-  Future<void> get done => client.done;
-  @override
-  Future<Map<String, Object?>> call(
-    String method,
-    Map<String, Object?> params,
-  ) => client.call(method, params);
-  @override
-  Future<void> close() => client.close();
-}
-
-final class _TrustedGatewayRpc extends _GatewayRpc {
-  _TrustedGatewayRpc(this.client);
-  final TrustedApiClient client;
-  @override
-  bool get isClosed => client.isClosed;
-  @override
-  int get pendingRequests => client.pendingRequests;
-  @override
-  Future<void> get done => client.done;
-  @override
-  Future<Map<String, Object?>> call(
-    String method,
-    Map<String, Object?> params,
-  ) => client.call(method, params);
-  @override
-  Future<void> close() => client.close();
-}
-
 /// Standard MCP adapter over one claimed, protected native MCP session.
 /// No raw transport, authority, credential or method-provider injection.
 final class LocalMcpGateway implements McpGateway {
-  LocalMcpGateway.unconfigured()
-    : _client = null,
-      _gate = null,
-      _expires = null;
-  LocalMcpGateway._(this._client, this._gate, this._expires) {
-    _client!.done
-        .then<void>(
-          (_) {
-            close().ignore();
-          },
-          onError: (Object _) {
-            close().ignore();
-          },
-        )
-        .ignore();
+  LocalMcpGateway.attach(
+    McpClient client,
+    PublicationGate gate, {
+    EngineClock? clock,
+  }) : _client = client,
+       _gate = gate,
+       _clock = clock ?? SystemEngineClock(),
+       _expires = client.grant == null
+           ? null
+           : DateTime.parse(client.grant!.expiresAt) {
+    if (client.isClosed ||
+        gate.isClosed ||
+        gate.generation != client.generation) {
+      throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
+    }
+    client.retired.then<void>((_) => close().ignore()).ignore();
     _heartbeat = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (_closed || _heartbeatBusy || _client.pendingRequests >= 16) return;
+      if (isClosed || _heartbeatBusy || _client.pendingRequests >= 16) return;
       _heartbeatBusy = true;
       _ping(_now + const Duration(seconds: 5))
           .catchError((Object error) {
             if (error is! _RpcFailure ||
                 error.code != ErrorCode.resourceLimit ||
-                error.origin != OperationalRpcFailureOrigin.local ||
+                error.origin != McpClientFailureOrigin.local ||
                 error.terminal)
               close().ignore();
           })
@@ -128,115 +84,49 @@ final class LocalMcpGateway implements McpGateway {
     });
   }
 
-  /// Admission denial leaves the caller-owned bootstrap session untouched.
-  static Future<LocalMcpGateway> connect(
-    OperationalClientSession session,
-  ) async {
-    final grant = session.grant;
-    if (session.role != OperationalRole.mcp || grant == null)
-      throw const McpGatewayFailure(ErrorCode.forbidden);
-    late final OperationalApiClient client;
-    try {
-      client = OperationalApiClient(session);
-    } on OperationalRpcException catch (error) {
-      throw McpGatewayFailure(_publicCode(error.code));
-    }
-    final creating = session.peer.publicationGate(session.hello.generation);
-    creating.ignore();
-    try {
-      final gate = await creating.timeout(const Duration(seconds: 5));
-      if (client.isClosed) {
-        await gate.close();
-        throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
-      }
-      return LocalMcpGateway._(
-        _OperationalGatewayRpc(client),
-        gate,
-        DateTime.parse(grant.expiresAt),
-      );
-    } catch (error) {
-      // A timed-out factory still owns any later-created gate and native work.
-      creating.then<void>((gate) => gate.close()).ignore();
-      try {
-        await client.close();
-      } catch (_) {
-        /* Remains terminal. */
-      }
-      throw McpGatewayFailure(
-        error is TimeoutException
-            ? ErrorCode.timeout
-            : ErrorCode.serviceUnavailable,
-      );
-    }
-  }
-
-  /// The production path accepts only a genuine format3 session which has
-  /// already completed protected grant proof. No role or credential DTO suffices.
-  static Future<LocalMcpGateway> connectTrusted(
-    TrustedClientSession session,
-  ) async {
-    final grant = session.grant;
-    if (session.role != OperationalRole.mcp || grant == null)
-      throw const McpGatewayFailure(ErrorCode.forbidden);
-    late final TrustedApiClient client;
-    try {
-      client = TrustedApiClient(session);
-    } on TrustedRpcException catch (error) {
-      throw McpGatewayFailure(_trustedCode(error.code));
-    }
-    final creating = session.peer.publicationGate(session.hello.generation);
-    creating.ignore();
-    try {
-      final gate = await creating.timeout(const Duration(seconds: 5));
-      if (client.isClosed) {
-        await gate.close();
-        throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
-      }
-      return LocalMcpGateway._(
-        _TrustedGatewayRpc(client),
-        gate,
-        DateTime.parse(grant.expiresAt),
-      );
-    } catch (error) {
-      creating.then<void>((gate) => gate.close()).ignore();
-      try {
-        await client.close();
-      } on Object {
-        /* Terminal cleanup failure. */
-      }
-      throw McpGatewayFailure(
-        error is TimeoutException
-            ? ErrorCode.timeout
-            : ErrorCode.serviceUnavailable,
-      );
-    }
-  }
-
-  final _GatewayRpc? _client;
-  final OperationalPublicationGate? _gate;
+  final McpClient _client;
+  final PublicationGate _gate;
   final DateTime? _expires;
-  final _watch = Stopwatch()..start();
+  final EngineClock _clock;
   final _operations = <_Operation>{};
   final _calls = <_RpcWork>{};
   Timer? _heartbeat;
   bool _heartbeatBusy = false, _closed = false;
   Future<void>? _closeFuture;
-  Duration get _now => _watch.elapsed;
+  final _retired = Completer<void>();
+  @override
+  bool get isClosed => _closed || _client.isClosed;
+  @override
+  Future<void> get retired => _retired.future;
 
-  McpInvocation _immediate(Map<String, Object?> value) {
-    final complete = Future<void>.value();
+  @override
+  McpInvocation protect(Map<String, Object?> value) => _fixedInvocation(value);
+  McpInvocation _fixedInvocation(Map<String, Object?> value) {
+    if (isClosed) throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
+    // At most16 tool interests plus the one active builtin writer guard.
+    if (_operations.length >= 17)
+      throw const McpGatewayFailure(ErrorCode.resourceLimit);
+    final operation = _Operation(this, 'fixed', const {}, value);
+    return _launch(operation);
+  }
+
+  McpInvocation _launch(_Operation operation) {
+    _operations.add(operation);
+    operation.run().ignore();
     return McpInvocation(
-      Future.value(value),
-      () => complete,
-      beforePublish: () => complete,
-      validatePublication: () {},
-      afterPublish: () => complete,
+      operation.result.future,
+      operation.cancelInterest,
+      beforePublish: operation.beforePublish,
+      validatePublication: operation.validatePublication,
+      afterPublish: operation.afterPublish,
     );
   }
 
+  Duration get _now => _clock.elapsed;
+
   @override
   McpInvocation start(String method, Map<String, Object?> params) {
-    if (_closed) throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
+    if (isClosed) throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
     if (method != 'tools/list' && method != 'tools/call')
       throw const McpProtocolException(-32601);
     late final Map<String, Object?> snapshot;
@@ -260,17 +150,17 @@ final class LocalMcpGateway implements McpGateway {
                 snapshot.containsKey('arguments') &&
                     snapshot['arguments'] is! Map<String, Object?>)))
       throw const McpProtocolException(-32602);
-    if (_client == null) {
-      return _immediate(
+    if (_operations.length >= 16) {
+      if (method == 'tools/list')
+        throw const McpGatewayFailure(ErrorCode.resourceLimit);
+      return _fixedInvocation(McpToolResult.failure('RESOURCE_LIMIT').toJson());
+    }
+    if (_expires == null) {
+      return _fixedInvocation(
         method == 'tools/list'
             ? {'tools': <Object?>[]}
             : McpToolResult.failure('FORBIDDEN').toJson(),
       );
-    }
-    if (_operations.length >= 16) {
-      if (method == 'tools/list')
-        throw const McpGatewayFailure(ErrorCode.resourceLimit);
-      return _immediate(McpToolResult.failure('RESOURCE_LIMIT').toJson());
     }
     final operation = _Operation(
       this,
@@ -284,15 +174,7 @@ final class LocalMcpGateway implements McpGateway {
               },
             },
     );
-    _operations.add(operation);
-    operation.run().ignore();
-    return McpInvocation(
-      operation.result.future,
-      operation.cancelInterest,
-      beforePublish: operation.beforePublish,
-      validatePublication: operation.validatePublication,
-      afterPublish: operation.afterPublish,
-    );
+    return _launch(operation);
   }
 
   Duration _remaining(Duration until) {
@@ -309,7 +191,7 @@ final class LocalMcpGateway implements McpGateway {
     bool cancel = false,
   }) async {
     void live() {
-      if (_closed || _client!.isClosed)
+      if (_closed || _client.isClosed)
         throw _RpcFailure(ErrorCode.serviceUnavailable, terminal: true);
       if (!cancel && operation?._retired == true)
         throw const McpGatewayFailure(ErrorCode.forbidden);
@@ -318,12 +200,12 @@ final class LocalMcpGateway implements McpGateway {
     live();
     final stage = _now + const Duration(seconds: 5);
     until = until < stage ? until : stage;
-    while (_client!.pendingRequests >= 16 || _calls.length >= 16) {
+    while (_client.pendingRequests >= 16 || _calls.length >= 16) {
       live();
       if (_calls.isEmpty)
         throw _RpcFailure(
           ErrorCode.resourceLimit,
-          origin: OperationalRpcFailureOrigin.local,
+          origin: McpClientFailureOrigin.local,
         );
       try {
         await Future.any<void>([
@@ -357,18 +239,10 @@ final class LocalMcpGateway implements McpGateway {
     } on _RpcFailure {
       close().ignore();
       throw _RpcFailure(ErrorCode.timeout, terminal: true);
-    } on OperationalRpcException catch (error) {
+    } on McpClientException catch (error) {
       if (error.terminal) close().ignore();
       throw _RpcFailure(
-        error.code,
-        terminal: error.terminal,
-        origin: error.origin,
-        retry: error.retry,
-      );
-    } on TrustedRpcException catch (error) {
-      if (error.terminal) close().ignore();
-      throw _RpcFailure(
-        _trustedCode(error.code),
+        _domainCode(error.code),
         domainCode:
             mcpDomainCodes.contains(error.code) && error.code != 'UNAUTHORIZED'
             ? error.code
@@ -400,14 +274,15 @@ final class LocalMcpGateway implements McpGateway {
     _closeFuture = done.future;
     done.future.ignore();
     _closed = true;
+    _retired.complete();
     _heartbeat?.cancel();
     for (final operation in _operations.toList()) {
       operation.retire();
     }
     // Start native cleanup before awaiting publication interests. A publication
     // lease is released only by afterPublish after actual guard/flush settlement.
-    final native = _client?.close() ?? Future<void>.value();
-    final gate = _gate?.close() ?? Future<void>.value();
+    final native = _client.close();
+    final gate = _gate.close();
     Future.wait<void>([
       native,
       gate,
@@ -428,7 +303,7 @@ final class LocalMcpGateway implements McpGateway {
 }
 
 final class _Operation {
-  _Operation(this.gateway, this.method, this.input)
+  _Operation(this.gateway, this.method, this.input, [this.fixed])
     : until = gateway._now + const Duration(seconds: 35) {
     result.future.ignore();
     done.future.ignore();
@@ -436,6 +311,7 @@ final class _Operation {
   final LocalMcpGateway gateway;
   final String method;
   final Map<String, Object?> input;
+  final Map<String, Object?>? fixed;
   final Duration until;
   final result = Completer<Map<String, Object?>>();
   final done = Completer<void>(), _ack = Completer<void>();
@@ -450,7 +326,7 @@ final class _Operation {
       _guardStarted = false,
       _published = false,
       _cancelDone = false;
-  OperationalPublicationLease? _lease;
+  PublicationLease? _lease;
   Future<void>? _cancelFuture, _guardFuture, _releaseFuture;
 
   McpInvokeReply parse(Map<String, Object?> value) {
@@ -467,7 +343,7 @@ final class _Operation {
   }
 
   void live() {
-    if (gateway._closed || gateway._client!.isClosed)
+    if (gateway._closed || gateway._client.isClosed)
       throw _RpcFailure(ErrorCode.serviceUnavailable, terminal: true);
     if (_retired) throw const McpGatewayFailure(ErrorCode.forbidden);
     gateway._remaining(until);
@@ -475,6 +351,13 @@ final class _Operation {
 
   Future<void> run() async {
     try {
+      if (fixed != null) {
+        _ack.complete();
+        live();
+        _needsPublication = true;
+        result.complete(fixed!);
+        return;
+      }
       late final McpInvokeReply initial;
       try {
         initial = parse(
@@ -529,8 +412,10 @@ final class _Operation {
       _fixed = true;
       if (method == 'tools/list')
         result.completeError(McpGatewayFailure(_publicCode(error.code)));
-      else
+      else {
+        _needsPublication = true;
         result.complete(error.result());
+      }
       if (_handle != null) cancelInterest().ignore();
     } on McpProtocolException catch (error) {
       result.completeError(error);
@@ -590,16 +475,19 @@ final class _Operation {
 
   Future<void> beforePublish() => _guardFuture ??= _guard();
   Future<void> _guard() async {
-    if (_fixed) return; // Only locally synthesized, fixed, data-free failures.
     _guardStarted = true;
     validatePublication();
     final budget = gateway._now + const Duration(seconds: 5);
     try {
-      _lease = await gateway._gate!.acquire(
+      _lease = await gateway._gate.acquire(
         deadline: gateway._remaining(budget),
       );
       validatePublication();
-      await gateway._ping(budget, operation: this);
+      if (fixed != null || _fixed) {
+        await gateway._client.verifyLive(deadline: gateway._remaining(budget));
+      } else {
+        await gateway._ping(budget, operation: this);
+      }
     } on _RpcFailure catch (error) {
       throw McpGatewayFailure(_publicCode(error.code));
     } on McpGatewayFailure {
@@ -615,10 +503,13 @@ final class _Operation {
   }
 
   void validatePublication() {
-    if (_fixed) return;
-    if (gateway._closed || gateway._client!.isClosed)
+    if (gateway._closed || gateway._client.isClosed)
       throw const McpGatewayFailure(ErrorCode.serviceUnavailable);
-    if (_retired || !DateTime.now().toUtc().isBefore(gateway._expires!))
+    if (!_fixed &&
+        (_retired ||
+            fixed == null &&
+                gateway._expires != null &&
+                !gateway._clock.utcNow.isBefore(gateway._expires!)))
       throw const McpGatewayFailure(ErrorCode.forbidden);
   }
 
@@ -630,7 +521,7 @@ final class _Operation {
     Future<void>(() async {
       try {
         await _lease?.close();
-        if (gateway._closed) await gateway._gate?.close();
+        if (gateway._closed) await gateway._gate.close();
       } catch (_) {
         gateway.close().ignore();
         throw const McpGatewayFailure(ErrorCode.serviceUnavailable);

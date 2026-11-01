@@ -1,8 +1,53 @@
 # Feature Specification: MCP и делегируемые Ansible-профили
 
+**Последнее указание пользователя — unit only**: все прежние собственные тесты,
+fixtures и harness удаляются; пишутся только unit-тесты под эту задачу. Дизайн,
+widget/visual/integration/native/реальные SSH/container проверки сейчас не выполняются.
+Исторические результаты ниже остаются историей, не текущим gate. Изменение не
+разрешает потерять функции, данные, права или проверки целевого поведения в новых units.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](../001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
+**Поправка 2026-10-30**: [основа001](../001-service-foundation/spec.md)
+заменяет обязательный locald встроенным engine. [Adoption/return](../001-service-foundation/contracts/embedded-migration.md)
+сохраняет нынешний ServerDeckNext; hard cutover исключает только сервис до него.
+[MCP app host](../021-mcp-control/contracts/embedded-host.md) заменяет autolaunch/identity,
+сохраняя tools/grants. Scope проверок — static/unit/widget без native claims.
+
 **Feature**: `021-mcp-control`
 **Created**: 2026-10-21
-**Status**: Design review3 завершён без замечаний, готов к поэтапной реализации. Implement начат; рабочая MCP-функция и приёмка не завершены.
+**Status**: Прежний MVP принят пользователем; embedded-поправка001/021 реализуется. Текущая приёмка — новые unit tests этой задачи и обязательные static/review checks. Прежний >80% coverage gate и T213 отменены, не подтверждены выполнением.
+
+## История: отменённый MVP verification update — 2026-10-23
+
+Весь раздел ниже, включая прежний SC-MCP-UNIT-001, superseded последним unit-only reset. Не является текущим gate; coverage-конвейер удалён.
+
+The user accepted the previous task set for the MVP and subsequently changed
+its verification requirements: integration/end-to-end/native-process/Docker
+acceptance suites are not required for these MVP tasks. Their historical plans
+and results below remain evidence, not pending MVP gates. Product behavior,
+authorization, secret custody and data preservation requirements are unchanged.
+
+**SC-MCP-UNIT-001**: unit tests must cover strictly more than80% of executable
+lines in the first-party MVP runtime: application lib/, the four ServerDeck
+packages' lib/ and bin/, and executor/serverdeck_executor/. Count the union of
+covered source lines, not the mean of module percentages. Exactly80% fails.
+Exclude generated *.g.dart, third-party dependencies, test fixtures and build/
+verification tooling; do not exclude an authored runtime file because it was not
+loaded by tests. Missing source coverage makes the measurement incomplete and
+cannot produce a passing gate. Report each module and the weighted total.
+
+Run isolated tests with in-memory/fake external boundaries. Native process,
+real database/network, Docker and installed-server scenarios are not unit tests
+and their hits cannot contribute. Isolated widget component tests with mocked services count as component units;
+full application journeys and real native/service interactions do not.
+Mandatory formatting, analysis, unit checks, specification links and independent
+review remain applicable. See the current MVP section in [Plan](plan.md).
+
 **Planning**: [Plan](plan.md), [Tasks](tasks.md), [Contracts](contracts/mcp.md), [Quickstart](quickstart.md).
 **Input**: Управление ServerDeck из Codex и других ИИ через MCP: настройки, состояние, журналы, установка приложений и создание/изменение делегируемых Ansible-профилей.
 
@@ -74,7 +119,7 @@
 ### Functional Requirements
 
 - **FR-MCP-001**: Стандартные MCP-клиенты MUST обнаруживать и вызывать tools без SDK конкретной ИИ-компании. Stdout содержит только протокол; несовместимость версии/lifecycle явная.
-- **FR-MCP-002**: Единственный locald MUST владеть серверами, настройками, наблюдениями, автоматизацией, разрешениями и jobs. UI/MCP используют одни ID/ревизии/правила. ИИ не получает credentials, туннель, raw SSH или shell tool.
+- **FR-MCP-002**: Единственный встроенный engine MUST владеть серверами, настройками, наблюдениями, автоматизацией, permissions и jobs. UI/MCP используют одни ID/ревизии/правила; ИИ не получает credentials/raw SSH/shell. Bridge соединяется с работающим app, включая tray.
 - **FR-MCP-003**: Владелец MUST выдавать/видеть/отзывать отдельные grants: цели, read/logs/author/plan/apply, точные ревизии профилей, параметры и срок. Default deny; чтение/авторство не дают apply, grant management или подтверждение доверия.
 - **FR-MCP-004**: Locald MUST проверять полномочия каждого вызова, перед новым эффектом и выдачей результата. Отзыв/срок/ревизии цели, доступа и доверия инвалидируют прежние планы и задержанные чтения; рестарт не восстанавливает отозванные права.
 - **FR-MCP-005**: Tools MUST предоставлять inventory/state/configuration и bounded logs с фильтрами/курсорoм, источником/временем и stale/denied/unsupported/incomplete/dropped. Бюджеты 001 общие с UI; raw logs не сохраняются в основной БД.
@@ -110,21 +155,6 @@
 - **SC-MCP-006**: Миграция сохраняет профили/секреты/настройки/историю новой реализации; mandatory checks и completed independent review не имеют незакрытых подтверждённых замечаний.
 
 ## Assumptions
-
-The existing native freshness/bounds requirements are further specified by
-[accepted-peer control coordination](contracts/native-control.md), implemented
-as the scoped T204–T207 correction to US1/FR-MCP-004/005. It preserves the native3
-and logical16 limits and introduces no new wire or storage format. Its design,
-implementation and acceptance are separately reviewed; the historical readiness
-statement above does not claim this correction has passed those gates.
-
-The current explicit unit/widget/static stage, locally and in automatic CI,
-is defined by Constitution4.0.0/VII and the
-[003 stage record](../003-design-system/plan.md#unit-widget-stage-2026-10-27),
-with separate [T213 acceptance](tasks.md#current-unit-widget-stage-2026-10-27).
-It changes no product FR/AC or native-control oracle; implemented source and
-scoped unit evidence do not close original T207/full-native correction
-acceptance or establish full021/platform/distribution readiness.
 
 - Windows первая, Ubuntu 24.04 amd64/systemd первая target; обязательное облако/смена Flutter/Dart/Isar не требуются.
 - Локальный stdio MCP достаточен для первой поставки; remote MCP требует отдельного auth/network design.

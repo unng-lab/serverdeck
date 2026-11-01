@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      source_gen:combining_builder:
+        options:
+          # Isar 3.3.2 generated index helpers use its pinned experimental API.
+          # Preserve this exemption in generated output only after extraction.
+          ignore_for_file:
+            - experimental_member_use

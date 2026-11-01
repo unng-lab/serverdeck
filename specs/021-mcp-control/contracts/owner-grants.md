@@ -1,5 +1,11 @@
 # Native owner grant writes — 021
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Owner methods](mcp.md), [records](records.md), [credential transactions](credential-files.md), [registry gate](target-fence.md), [gateway](gateway.md), [tasks](../tasks.md).
 
 ## Route and authority

@@ -42,20 +42,19 @@ Map<String, Object?> captureGrantOwnerResult(
       final command = value['command'], args = value['args'];
       if (command is! String ||
           args is! List ||
-          args.length != 4 ||
-          args[0] != '--app-root' ||
-          args[2] != '--grant-id' ||
-          args[1] is! String)
+          args.length != 3 ||
+          args[0] != '--mcp-stdio' ||
+          args[1] != '--grant-id')
         _bad();
-      requireUuid(args[3]);
-      final root = args[1] as String;
-      if (root.isEmpty ||
-          root.length > 32767 ||
-          root.contains(RegExp(r'[\x00-\x1f]')) ||
-          !(RegExp(r'^[A-Za-z]:[\\/]').hasMatch(root) ||
-              root.startsWith(r'\\')) ||
-          command !=
-              '$root${root.endsWith(r'\') || root.endsWith('/') ? '' : r'\'}mcp.exe')
+      requireUuid(args[2]);
+      if (command.length > 32767 ||
+          command.contains(RegExp(r'[\x00-\x1f"<>|?*]')) ||
+          !RegExp(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+[\\/])')
+              .hasMatch(command) ||
+          !RegExp(r'[\\/]serverdeck\.exe$').hasMatch(command) ||
+          command
+              .split(RegExp(r'[\\/]'))
+              .any((part) => part == '.' || part == '..'))
         _bad();
     default:
       requireFields(value, {'grantId', 'revision'});

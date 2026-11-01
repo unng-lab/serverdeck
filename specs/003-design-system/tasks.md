@@ -1,5 +1,9 @@
 # Tasks: Дизайн и доступность
 
+> Примечание source-preview0.4: ссылки на удалённые fixtures/tools сохранены как
+> permalinks опубликованного commit0.3.0-preview.1. Это исторические свидетельства,
+> а не текущие runtime/test inputs или новая визуальная/native приёмка.
+
 **Feature**: `003-design-system` · **Created**: 2026-10-25
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [presentation contract](contracts/presentation.md), [quickstart.md](quickstart.md), [screen-map.md](screen-map.md).
 **Исторический status 003.1–003.3**: 003.1–003.3 завершены в согласованном scoped UI. Current full7448passed+1opt-in skip, format657/0, analyze0, defaultWindows2passed/12markers; baseline744/state4580/stock64PNG. [Clean code0033-03](reviews/2026-10-26-code-0033-03.md) и [visual08](reviews/2026-10-26-visual-0033-08.md) закрыли T100/T102/T041; previous failed reports и completed task history сохранены. T042 завершён:98IDs/35scopedUI/63concepts,16FR/4SC/9AC/P01–P12/A01–A12 и stableboundaries сверены. T043 содержательно завершён clean docreview01;102/102tasks closed. Финальная administrative-record audit и read-only Converge выполняются перед закрытием общей цели.63concepts не runtime-accepted.
@@ -410,7 +414,7 @@ T141 является обязательным исправлением readines
 
 По прямому решению пользователя 003 переносит дизайн 37 уже реализованных базовых
 экранов/состояний и интегрирует имеющиеся функции. Остальные 61 экран описываются
-в функциональных спеках вместе с их дизайном и сервисами: [программа](../design-delivery.md).
+в функциональных спеках вместе с их дизайном и сервисами: [программа](https://github.com/unng-lab/serverdeck/blob/4932b94c13fed36ec1efb3749c58b3986bc64c3e/specs/design-delivery.md).
 Новые провайдеры, backend и гипотетический Ubuntu Core в этот increment не входят.
 Нельзя исключать локальные фильтры, табы, композицию карточек или доступный контекст
 только потому, что их не было в прежнем UI. Приёмка — FR-003-BASE-01–04,

@@ -1,5 +1,11 @@
 # UI contract and acceptance — 001.1
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-engine.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [API](local-api.md), существующий [brandbook](../../../docs/brandbook/README.md). Использовать обе темы из tokens и Noto fonts с OFL. Источники/ассеты брендбука не изменяются; шрифты подключаются в новый pubspec.
 
 ## Оболочка

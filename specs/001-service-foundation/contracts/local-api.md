@@ -1,5 +1,11 @@
 # Local API v1 — 001.1
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-engine.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 Normative client/locald interface. [Data model](../data-model.md), [runtime](runtime-storage.md). Только локальный Windows named pipe, не HTTP/TCP. API major1/minor0.
 
 ## Framing и limits

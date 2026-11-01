@@ -1,4 +1,33 @@
-# Установка и обновления ServerDeck
+# Распространение ServerDeck
+
+## Текущий выпуск: 0.4.0-preview.1
+
+GitHub Releases публикует preview исходников: `ServerDeck-0.4.0-preview.1-source.zip`
+и `SHA256SUMS.txt`. Это не Windows installer, исполняемый комплект или пакет
+обновления. Хеш проверяет целостность архива, но не заменяет подпись издателя.
+Версия приложения в исходниках — `0.4.0-preview.1+13`; публикация связана с
+точным Git tag/commit и описанием проверок в GitHub Release.
+
+Новая архитектура — один `serverdeck.exe` со встроенным engine и отдельным
+connection-only invocation `--mcp-stdio` того же файла. MCP требует уже работающий
+app/tray и действующий grant. Отдельных locald/mcp executable и старого API нет.
+Поддерживается только текущий schema3/storage format3 с сохранением его данных;
+несовместимые данные не мигрируются и не заменяются пустыми.
+
+Текущая реализация Windows проверена static/RAM units. Нативные запуск/установка/
+обновление/подписи/Isar/SSH и другие ОС не квалифицированы, готовые публичные
+пакеты для них здесь не заявлены. Backend не нужен для обычной локальной работы.
+См. [актуальную среду и build entry](development/foundation.md),
+[MCP](development/mcp.md), [platform statuses](development/platform-capabilities.md)
+и [верификацию embedded-поправки](development/embedded-engine-verification.md).
+
+## Историческое описание прежних пакетов
+
+Следующий текст сохраняет историю прежней реализации. Перечисленные далее
+package scripts, desktop-release workflow, updater, locald и платформенные пакеты
+не являются текущими build/release inputs и не описывают preview0.4.0. Не используйте
+эти исторические команды как инструкции для новой embedded-архитектуры.
+
 
 Этот документ описывает существующие сборки. Новая реализация разрабатывается
 по [новой спецификации поставки](../specs/005-client-distribution/spec.md)
