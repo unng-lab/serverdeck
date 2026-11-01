@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
+
+import '../bootstrap/engine_client.dart';
 
 import 'automation_controller.dart';
 import 'automation_sections.dart';
@@ -23,7 +24,7 @@ class AutomationPanel extends StatefulWidget {
     this.installationCatalog = false,
     this.serverProfiles = const [],
   });
-  final TrustedApiClient client;
+  final EngineClient client;
   final String? serverId;
   final bool installationCatalog;
   final List<ProfileView> serverProfiles;
@@ -1101,6 +1102,8 @@ class _AutomationPanelState extends State<AutomationPanel> {
                 serverId: widget.serverId,
                 jobs: model.jobs,
                 job: job,
+                jobObservations: model.jobObservations,
+                jobObservation: model.jobObservation,
                 events: model.events,
                 loaded: model.jobsLoaded,
                 hasMore: model.jobsCursor != null,

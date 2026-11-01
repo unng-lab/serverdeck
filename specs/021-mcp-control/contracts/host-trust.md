@@ -1,5 +1,11 @@
 # Persisted owner host trust — 021
 
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Transport](ssh-transport.md), [loading](loading.md), [migration1→2](migration.md),
 [owner foundation](owner-foundation.md), [target fence](target-fence.md),
 [model](../data-model.md), [tasks](../tasks.md).

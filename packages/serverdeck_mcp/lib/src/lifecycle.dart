@@ -17,7 +17,7 @@ final class McpIgnored extends McpDispatch {
 }
 
 /// Dispatch permission at the protocol layer, never grant authorization.
-/// Locald must still validate schema, current grant and target for every call.
+/// The application Host must still validate schema, current grant and target for every call.
 final class McpForward extends McpDispatch {
   const McpForward();
 }
@@ -30,7 +30,7 @@ final class McpCancelInterest extends McpDispatch {
 
 /// Pure lifecycle policy; the stdio owner supplies the fixed30s timer and EOF,
 /// owns pending IDs/backpressure, and writes initialization before accepting
-/// the initialized notification. This class does not open a locald session.
+/// the initialized notification. This class does not open an application session.
 final class McpLifecycle {
   McpPhase _phase = McpPhase.fresh;
   McpPhase get phase => _phase;

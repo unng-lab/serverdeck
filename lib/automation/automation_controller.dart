@@ -2,30 +2,104 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:serverdeck_protocol/automation/job_observation.dart';
+import 'package:serverdeck_protocol/automation/job_records.dart';
 import 'package:serverdeck_protocol/automation/profile_body.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/mcp/operations.dart';
 import 'package:serverdeck_protocol/executor_recipes.dart';
 import 'package:serverdeck_protocol/validation.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
 
-import '../bootstrap/local_api_client.dart' show newRequestId;
+import '../bootstrap/engine_client.dart';
 
-/// Borrows the native owner client. All effects use the shared owner services;
+CancelDeadline _scheduleObservationPoll(Duration delay, void Function() fire) {
+  final timer = Timer(delay, fire);
+  return timer.cancel;
+}
+
+/// Borrows the bound engine client. All effects use the shared owner services;
 /// this controller owns response interest, never SSH or the lifetime of a job.
 class AutomationController extends ChangeNotifier {
-  AutomationController({required this.client, this.serverId}) {
+  AutomationController({
+    required this.client,
+    this.serverId,
+    ScheduleDeadline? schedule,
+  }) : _generation = client.generation,
+       _schedulePoll = schedule ?? _scheduleObservationPoll {
     client.done.then<void>((_) {
       if (_disposed) return;
       _epoch++;
-      _timer?.cancel();
+      _cancelTimer();
+      _loseObservations(detached: true);
       busy = false;
       error = 'SERVICE_UNAVAILABLE';
       notifyListeners();
     }).ignore();
   }
-  final TrustedApiClient client;
+  final EngineClient client;
+  final String _generation;
+  final ScheduleDeadline _schedulePoll;
   final String? serverId;
+  final _jobObservations = <String, LocalJobObservationView>{};
+  Map<String, LocalJobObservationView> get jobObservations =>
+      Map.unmodifiable(_jobObservations);
+  LocalJobObservationView? jobObservation;
+  bool get _currentClient =>
+      !client.isClosed && client.generation == _generation;
+
+  void _loseObservations({bool detached = false}) {
+    LocalJobObservationView lose(LocalJobObservationView view) =>
+        LocalJobObservationView.fromJson({
+          ...view.toJson(),
+          'state': detached || view.lastSequence == null ? 'detached' : 'stale',
+        });
+    _jobObservations.updateAll((_, view) => lose(view));
+    if (jobObservation case final LocalJobObservationView view)
+      jobObservation = lose(view);
+  }
+
+  void _cancelTimer() {
+    _cancelPoll?.call();
+    _cancelPoll = null;
+    _pollToken = null;
+  }
+
+  AutomationJobRecord _captureJob(Object? value) {
+    if (value is! Map<String, Object?>) throw StateError('INCOMPATIBLE');
+    final AutomationJobRecord record;
+    try {
+      record = AutomationJobRecord.fromJson(value);
+    } on FormatException {
+      throw StateError('INCOMPATIBLE');
+    }
+    final known = job?['id'] == record.id
+        ? job
+        : jobs
+                  .where((row) => (row['job'] as Map)['id'] == record.id)
+                  .firstOrNull?['job']
+              as Map<String, Object?>?;
+    if (known != null && known['hostAttemptId'] != record.hostAttemptId)
+      throw StateError('INCOMPATIBLE');
+    return record;
+  }
+
+  LocalJobObservationView _captureObservation(
+    Object? value,
+    AutomationJobRecord record,
+  ) {
+    if (value is! Map<String, Object?>) throw StateError('INCOMPATIBLE');
+    final LocalJobObservationView view;
+    try {
+      view = LocalJobObservationView.fromJson(value);
+    } on FormatException {
+      throw StateError('INCOMPATIBLE');
+    }
+    if (view.generation != _generation ||
+        view.attemptId != record.hostAttemptId)
+      throw StateError('INCOMPATIBLE');
+    return view;
+  }
+
   String get _target => serverId ?? (throw StateError('VALIDATION'));
   final profiles = <AutomationProfileRecord>[];
   final jobs = <Map<String, Object?>>[];
@@ -43,11 +117,12 @@ class AutomationController extends ChangeNotifier {
   bool profilesLoaded = false, jobsLoaded = false, authoritiesLoaded = false;
   int droppedEvents = 0, _afterEvent = 0, _epoch = 0;
   bool busy = false, _disposed = false, _cancelled = false;
-  Timer? _timer;
+  CancelDeadline? _cancelPoll;
+  Object? _pollToken;
   String? _operation, _cancelMethod;
   _Action? _pending;
-  bool get canMutate => !busy && _pending == null && !client.isClosed;
-  bool get canRetry => !busy && _pending != null && !client.isClosed;
+  bool get canMutate => !busy && _pending == null && _currentClient;
+  bool get canRetry => !busy && _pending != null && _currentClient;
   String? get pendingLabel => _pending?.label;
   static const terminal = {
     'succeeded',
@@ -57,16 +132,20 @@ class AutomationController extends ChangeNotifier {
   };
 
   void _live(int epoch) {
-    if (_disposed || _cancelled || epoch != _epoch || client.isClosed)
+    if (_disposed || _cancelled || epoch != _epoch || !_currentClient)
       throw StateError('CANCELLED');
   }
 
   Future<void> _run(_Action action, {bool retry = false}) async {
-    if (_disposed ||
-        busy ||
-        client.isClosed ||
-        action.durable && _pending != null && !retry)
+    if (_disposed || busy || action.durable && _pending != null && !retry)
       return;
+    if (!_currentClient) {
+      _cancelTimer();
+      _loseObservations(detached: true);
+      error = 'SERVICE_UNAVAILABLE';
+      notifyListeners();
+      return;
+    }
     busy = true;
     _cancelled = false;
     error = null;
@@ -80,7 +159,7 @@ class AutomationController extends ChangeNotifier {
     } catch (failure) {
       if (!_disposed && epoch == _epoch) {
         error = switch (failure) {
-          TrustedRpcException() => failure.code,
+          EngineCallFailure() => failure.code,
           StateError() => failure.message,
           FormatException() => 'VALIDATION',
           _ => 'SERVICE_UNAVAILABLE',
@@ -402,48 +481,106 @@ class AutomationController extends ChangeNotifier {
 
   Future<void> _jobs(int epoch, {bool more = false}) async {
     if (serverId == null) return;
-    final value = await _async('jobs.list', {
-      'serverId': serverId,
-      'limit': 25,
-      if (more && jobsCursor != null) 'cursor': jobsCursor,
-    }, epoch);
-    if (!more) jobs.clear();
-    for (final row in (value['items'] as List).cast<Map<String, Object?>>()) {
-      final id = (row['job'] as Map<String, Object?>)['id'];
-      jobs.removeWhere(
-        (old) => (old['job'] as Map<String, Object?>)['id'] == id,
-      );
-      jobs.add(row);
+    try {
+      final value = await _async('jobs.list', {
+        'serverId': serverId,
+        'limit': 25,
+        if (more && jobsCursor != null) 'cursor': jobsCursor,
+      }, epoch);
+      final items = value['items'], cursor = value['nextCursor'];
+      if (items is! List ||
+          items.length > 25 ||
+          cursor != null && cursor is! String)
+        throw StateError('INCOMPATIBLE');
+      final captured = <Map<String, Object?>>[];
+      final observations = <String, LocalJobObservationView>{};
+      for (final item in items) {
+        if (item is! Map<String, Object?> || item['serverId'] != serverId)
+          throw StateError('INCOMPATIBLE');
+        final record = _captureJob(item['job']);
+        if (observations.containsKey(record.id))
+          throw StateError('INCOMPATIBLE');
+        observations[record.id] = _captureObservation(
+          item['observation'],
+          record,
+        );
+        captured.add({'job': record.toJson(), 'serverId': serverId});
+      }
+      final rows = more
+          ? List<Map<String, Object?>>.of(jobs)
+          : <Map<String, Object?>>[];
+      final views = more
+          ? Map<String, LocalJobObservationView>.of(_jobObservations)
+          : <String, LocalJobObservationView>{};
+      for (final row in captured) {
+        final id = (row['job'] as Map)['id'];
+        rows.removeWhere((old) => (old['job'] as Map)['id'] == id);
+        rows.add(row);
+      }
+      // The existing store retains at most250 active and1000 terminal jobs.
+      if (rows.length > 1250) throw StateError('RESOURCE_LIMIT');
+      views.addAll(observations);
+      _live(epoch);
+      jobs
+        ..clear()
+        ..addAll(rows);
+      _jobObservations
+        ..clear()
+        ..addAll(views);
+      if (observations[job?['id']] case final LocalJobObservationView view)
+        jobObservation = view;
+      jobsCursor = cursor as String?;
+      jobsLoaded = true;
+    } catch (_) {
+      if (!_disposed && epoch == _epoch)
+        _loseObservations(detached: !_currentClient);
+      rethrow;
     }
-    jobsCursor = value['nextCursor'] as String?;
-    jobsLoaded = true;
   }
 
   Future<void> refreshJobs({bool more = false}) =>
       _run(_Action('Задания', false, (epoch) => _jobs(epoch, more: more)));
   Future<void> _job(String id, int epoch) async {
-    final value = await _async('jobs.get', {'jobId': id}, epoch);
-    if ((value['plan'] as Map<String, Object?>)['serverId'] != serverId)
-      throw StateError('FORBIDDEN');
-    if (job?['id'] != id) {
-      events.clear();
-      _afterEvent = 0;
-      droppedEvents = 0;
+    try {
+      final value = await _async('jobs.get', {'jobId': id}, epoch);
+      if ((value['plan'] as Map<String, Object?>)['serverId'] != serverId)
+        throw StateError('FORBIDDEN');
+      final record = _captureJob(value['job']);
+      if (record.id != id) throw StateError('INCOMPATIBLE');
+      final observation = _captureObservation(value['observation'], record);
+      final changing = job?['id'] != id;
+      final page = await _async('jobs.events', {
+        'jobId': id,
+        'after': changing ? 0 : _afterEvent,
+        'limit': 100,
+      }, epoch);
+      final incoming = (page['events'] as List)
+          .cast<Map<String, Object?>>()
+          .toList();
+      final next = page['nextSequence'] as int,
+          dropped = page['dropped'] as int;
+      _live(epoch);
+      if (changing) {
+        events.clear();
+        _afterEvent = 0;
+        droppedEvents = 0;
+      }
+      job = record.toJson();
+      jobObservation = observation;
+      final index = jobs.indexWhere((row) => (row['job'] as Map)['id'] == id);
+      if (index >= 0) {
+        jobs[index] = {'job': job, 'serverId': serverId};
+        _jobObservations[id] = observation;
+      }
+      events.addAll(incoming);
+      if (events.length > 200) events.removeRange(0, events.length - 200);
+      droppedEvents += dropped;
+      _afterEvent = next - 1;
+    } catch (_) {
+      if (!_disposed && epoch == _epoch)
+        _loseObservations(detached: !_currentClient);
+      rethrow;
     }
-    job = value['job'] as Map<String, Object?>;
-    final index = jobs.indexWhere(
-      (row) => (row['job'] as Map<String, Object?>)['id'] == id,
-    );
-    if (index >= 0) jobs[index] = {'job': job, 'serverId': serverId};
-    final page = await _async('jobs.events', {
-      'jobId': id,
-      'after': _afterEvent,
-      'limit': 100,
-    }, epoch);
-    events.addAll((page['events'] as List).cast<Map<String, Object?>>());
-    if (events.length > 200) events.removeRange(0, events.length - 200);
-    droppedEvents += page['dropped'] as int;
-    _afterEvent = (page['nextSequence'] as int) - 1;
   }
 
   Future<void> selectJob(String id) =>
@@ -462,18 +599,26 @@ class AutomationController extends ChangeNotifier {
   }
 
   void _schedule() {
-    _timer?.cancel();
+    _cancelTimer();
     final selected = job;
     if (_disposed ||
-        client.isClosed ||
+        !_currentClient ||
         selected == null ||
         terminal.contains(selected['state']))
       return;
-    final id = selected['id'] as String;
-    _timer = Timer(const Duration(seconds: 1), () async {
-      if (_disposed || client.isClosed) return;
-      if (!busy) await selectJob(id);
-      if (!_disposed && !client.isClosed) _schedule();
+    final id = selected['id'] as String, epoch = _epoch;
+    final token = _pollToken = Object();
+    _cancelPoll = _schedulePoll(const Duration(seconds: 1), () {
+      if (_disposed ||
+          !_currentClient ||
+          epoch != _epoch ||
+          !identical(token, _pollToken) ||
+          job?['id'] != id)
+        return;
+      _cancelPoll = null;
+      _pollToken = null;
+      // The active action's finally schedules the next read when busy.
+      if (!busy) selectJob(id).ignore();
     });
   }
 
@@ -707,7 +852,8 @@ class AutomationController extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _epoch++;
-    _timer?.cancel();
+    _cancelTimer();
+    _loseObservations(detached: true);
     final operation = _operation, cancel = _cancelMethod;
     if (operation != null && cancel != null && !client.isClosed)
       client.call(cancel, {'operationId': operation}).ignore();

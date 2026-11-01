@@ -10,74 +10,6 @@ void _exact(Object? actual, Object expected) {
     _invalid();
 }
 
-void _capabilities(Object? value) {
-  if (value is! List) _invalid();
-  final allowed = Capability.values.map((c) => c.wireName).toSet();
-  String? previous;
-  for (final item in value) {
-    if (item is! String ||
-        !allowed.contains(item) ||
-        (previous != null && previous.compareTo(item) >= 0))
-      _invalid();
-    previous = item;
-  }
-}
-
-void _identity(Map<String, Object?> value) {
-  _exact(value['product'], 'serverdeck-next');
-  _exact(value['apiMajor'], 1);
-  _exact(value['apiMinor'], 0);
-  _exact(value['workspaceSlot'], 'default');
-  requireUuid(value['generation']);
-}
-
-void validateHello(Map<String, Object?> value) {
-  requireFields(value, {'hello'});
-  final body = _map(value['hello']);
-  requireFields(body, {
-    'product',
-    'apiMajor',
-    'apiMinor',
-    'workspaceSlot',
-    'generation',
-    'serverNonce',
-  });
-  _identity(body);
-  requireNonce(body['serverNonce']);
-}
-
-void validateAuthenticate(Map<String, Object?> value) {
-  requireFields(value, {'authenticate'});
-  final body = _map(value['authenticate']);
-  requireFields(body, {
-    'clientNonce',
-    'clientBuildId',
-    'requestedCapabilities',
-    'proof',
-  });
-  requireNonce(body['clientNonce']);
-  requireNonce(body['proof']);
-  if (body['clientBuildId'] is! String ||
-      (body['clientBuildId'] as String).isEmpty)
-    _invalid();
-  _capabilities(body['requestedCapabilities']);
-}
-
-void validateAuthenticated(Map<String, Object?> value) {
-  requireFields(value, {'authenticated'});
-  final body = _map(value['authenticated']);
-  requireFields(body, {
-    'sessionId',
-    'capabilities',
-    'idleLeaseSeconds',
-    'proof',
-  });
-  requireNonce(body['sessionId']);
-  requireNonce(body['proof']);
-  _capabilities(body['capabilities']);
-  _exact(body['idleLeaseSeconds'], 60);
-}
-
 void _timestamp(Object? value) {
   if (value is! String ||
       !RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$').hasMatch(value))
@@ -173,44 +105,6 @@ void _mutation(Object? value, {String? operation}) {
 
 void validateMethodResult(String method, Map<String, Object?> value) {
   switch (method) {
-    case 'readiness.get':
-      requireFields(value, {
-        'state',
-        'reason',
-        'product',
-        'apiMajor',
-        'apiMinor',
-        'workspaceSlot',
-        'workspaceId',
-        'generation',
-        'storageSchema',
-        'features',
-        'clientPlatform',
-      });
-      _identity(value);
-      _exact(value['storageSchema'], 1);
-      _exact(value['clientPlatform'], 'windows-x64');
-      if (!{
-        'starting',
-        'recovering',
-        'ready',
-        'storage-blocked',
-        'incompatible',
-        'stopping',
-        'unavailable',
-      }.contains(value['state']))
-        _invalid();
-      if (value['reason'] != null &&
-          !ErrorCode.values.map((e) => e.wireName).contains(value['reason']))
-        _invalid();
-      if (value['workspaceId'] != null) requireUuid(value['workspaceId']);
-      if (value['state'] == 'ready' && value['workspaceId'] == null) _invalid();
-      final features = _map(value['features']);
-      requireFields(features, {'profiles', 'ssh', 'jobs', 'backend'});
-      _exact(features['profiles'], true);
-      for (final feature in ['ssh', 'jobs', 'backend']) {
-        _exact(features[feature], false);
-      }
     case 'session.ping':
       requireFields(value, {'leaseSeconds'});
       _exact(value['leaseSeconds'], 60);

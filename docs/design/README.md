@@ -1,6 +1,8 @@
 # Дизайн ServerDeck
 
-Версия эталона: 2026-10-25. Основа — [брендбук 1.1](../brandbook/README.md) с неизменными [токенами палитры и типографики](../brandbook/tokens/serverdeck.tokens.json).
+Версия эталона: 2026-11-01, этап 003.4. Основа — Flutter Material 3 / Deck и [брендбук 1.1](../brandbook/README.md) с неизменными [токенами палитры и типографики](../brandbook/tokens/serverdeck.tokens.json).
+
+[Библиотека компонентов](components/README.md) — 30 согласованных семейств, отдельные дизайн-примеры и Flutter-каталог. Переключение «Экраны / Компоненты» встроено в атлас.
 
 [Открыть автономный атлас](ServerDeck-design.html) · [Визуальные правила](DESIGN.md) · [Реестр 98 экранов](screens.json) · [Пакет Spec Kit 003](../../specs/003-design-system/spec.md)
 

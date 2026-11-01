@@ -152,7 +152,7 @@ class MotionDropdown<T> extends StatelessWidget {
                               ),
                               if (!(available?.call() ?? true))
                                 const Text(
-                                  'Выбор недоступен: локальная служба не готова',
+                                  'Выбор недоступен: ServerDeck ещё не готов',
                                 ),
                               for (final item
                                   in (available?.call() ?? true)

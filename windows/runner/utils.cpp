@@ -21,19 +21,24 @@ void CreateAndAttachConsole() {
   }
 }
 
-std::vector<std::string> GetCommandLineArguments() {
+std::optional<std::vector<std::string>> GetCommandLineArguments() {
   // Convert the UTF-16 command line arguments to UTF-8 for the Engine to use.
   int argc;
   wchar_t** argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
   if (argv == nullptr) {
-    return std::vector<std::string>();
+    return std::nullopt;
   }
 
   std::vector<std::string> command_line_arguments;
 
   // Skip the first argument as it's the binary name.
   for (int i = 1; i < argc; i++) {
-    command_line_arguments.push_back(Utf8FromUtf16(argv[i]));
+    const auto converted = Utf8FromUtf16(argv[i]);
+    if (argv[i][0] != L'\0' && converted.empty()) {
+      ::LocalFree(argv);
+      return std::nullopt;
+    }
+    command_line_arguments.push_back(converted);
   }
 
   ::LocalFree(argv);

@@ -28,7 +28,11 @@ class FoundationShell extends StatefulWidget {
   const FoundationShell({
     super.key,
     required this.state,
+    this.requestedSection = FoundationSection.servers,
+    this.navigationEpoch = 0,
+    this.onSectionChanged,
     this.reason,
+    this.workspaceBusy = false,
     this.onRetry,
     this.retryInProgress = false,
     this.servers,
@@ -39,8 +43,12 @@ class FoundationShell extends StatefulWidget {
     this.recoveryAction,
   });
 
+  final FoundationSection requestedSection;
+  final int navigationEpoch;
+  final ValueChanged<FoundationSection>? onSectionChanged;
   final ReadinessState state;
   final ErrorCode? reason;
+  final bool workspaceBusy;
   final VoidCallback? onRetry;
   final bool retryInProgress;
   final Widget? servers, settings, software;
@@ -52,7 +60,14 @@ class FoundationShell extends StatefulWidget {
 }
 
 class _FoundationShellState extends State<FoundationShell> {
-  FoundationSection _section = FoundationSection.servers;
+  late FoundationSection _section = widget.requestedSection;
+  @override
+  void didUpdateWidget(covariant FoundationShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationEpoch != widget.navigationEpoch)
+      _select(widget.requestedSection);
+  }
+
   _NavigationLayout? _layout;
   final _featureFocus = FocusNode(debugLabel: 'Foundation content');
   final _navigationFocus = {
@@ -87,6 +102,7 @@ class _FoundationShellState extends State<FoundationShell> {
 
   void _select(FoundationSection section) {
     setState(() => _section = section);
+    widget.onSectionChanged?.call(section);
     for (final entry in _navigationStates.entries) {
       entry.value.update(WidgetState.selected, entry.key == section);
     }
@@ -281,6 +297,7 @@ class _FoundationShellState extends State<FoundationShell> {
       return ReadinessView(
         state: widget.state,
         reason: widget.reason,
+        workspaceBusy: widget.workspaceBusy,
         onRetry: widget.onRetry,
         retryInProgress: widget.retryInProgress,
       );
@@ -372,55 +389,23 @@ class _FoundationShellState extends State<FoundationShell> {
             Expanded(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: contentPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ConstrainedBox(
-                      key: const ValueKey('foundation-page-context'),
-                      constraints: BoxConstraints(
-                        maxHeight: constraints.maxHeight * .35,
-                      ),
-                      child: DeckBoundedTextView(
-                        text: name != null && address != null
-                            ? '$name · $address'
-                            : null,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                        ),
-                        leading: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                _section.label,
-                                key: const ValueKey('foundation-page-title'),
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            if (ready) ...[
-                              const SizedBox(height: 8),
-                              const DeckStatus(
-                                label: 'Локальная служба готова',
-                                tone: DeckTone.available,
-                              ),
-                              if (name != null && address != null) ...[
-                                const SizedBox(height: 8),
-                              ],
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Focus(
-                        key: const ValueKey('foundation-feature-slot'),
-                        focusNode: _featureFocus,
-                        canRequestFocus: false,
-                        child: _content(),
-                      ),
-                    ),
-                  ],
+                child: DeckPageBody(
+                  title: _section.label,
+                  titleKey: const ValueKey('foundation-page-title'),
+                  contextKey: const ValueKey('foundation-page-context'),
+                  featureKey: const ValueKey('foundation-feature-slot'),
+                  contextHeight: constraints.maxHeight * .35,
+                  target: name != null && address != null
+                      ? '$name · $address'
+                      : null,
+                  status: ready
+                      ? const DeckStatus(
+                          label: 'Локальная служба готова',
+                          tone: DeckTone.available,
+                        )
+                      : null,
+                  focusNode: _featureFocus,
+                  child: _content(),
                 ),
               ),
             ),

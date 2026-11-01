@@ -20,7 +20,7 @@ function Get-NativeArtifactReviewEvidence {
         if ($review.$name -isnot [bool] -or $review.$name -ne $false) { throw 'Native review falsely claims product distribution or activation.' }
     }
     $required=@('tools/native-artifact.ps1','tools/native-artifact-compatibility.ps1','tools/native-artifact-activation.ps1',
-        'tools/activate-native-isar.ps1','tools/native-artifact-abi.ps1','tools/test-native-isar.ps1','tools/run-foundation.ps1',
+        'tools/activate-native-isar.ps1','tools/native-artifact-abi.ps1','tools/run-serverdeck.ps1',
         'specs/001-service-foundation/contracts/native-artifact.md')
     $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($file in $review.scope) {

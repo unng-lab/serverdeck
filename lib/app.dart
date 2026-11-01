@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,8 +6,9 @@ import 'package:serverdeck_protocol/models.dart'
     show ThemePreference, ReadinessState, ErrorCode;
 
 import 'bootstrap/bootstrap_controller.dart';
-import 'bootstrap/local_api_client.dart';
-import 'bootstrap/trusted_native_bootstrap_host.dart';
+import 'bootstrap/engine_client.dart';
+import 'bootstrap/desktop_engine_host.dart';
+
 import 'profiles/profile_controller.dart';
 import 'profiles/profile_list.dart';
 import 'profiles/startup_recovery.dart';
@@ -21,16 +21,24 @@ import 'theme/brand_theme.dart';
 import 'theme/motion.dart';
 
 class FoundationApp extends StatefulWidget {
-  const FoundationApp({super.key, this.bootstrap});
+  const FoundationApp({
+    super.key,
+    this.bootstrap,
+    this.section = FoundationSection.servers,
+    this.navigationEpoch = 0,
+    this.onSectionChanged,
+  });
+  final FoundationSection section;
+  final int navigationEpoch;
+  final ValueChanged<FoundationSection>? onSectionChanged;
   final BootstrapController? bootstrap;
   @override
   State<FoundationApp> createState() => _FoundationAppState();
 }
 
-class _FoundationAppState extends State<FoundationApp>
-    with WidgetsBindingObserver {
+class _FoundationAppState extends State<FoundationApp> {
   late final BootstrapController controller;
-  TrustedNativeBootstrapHost? _host;
+  DesktopEngineHost? _host;
   late final ProfileController profiles;
   late final StartupRecovery recovery;
   late final StreamSubscription<ClientConnectionState> _privateConnections;
@@ -44,19 +52,13 @@ class _FoundationAppState extends State<FoundationApp>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     final supplied = widget.bootstrap;
     if (supplied != null) {
       controller = supplied;
     } else {
-      final host = TrustedNativeBootstrapHost();
+      final host = DesktopEngineHost();
       _host = host;
-      controller = BootstrapController(
-        client: host.client,
-        prepare: host.prepare,
-        ensureService: host.ensureService,
-        recoverService: host.ensureService,
-      );
+      controller = BootstrapController(client: host.client, start: host.start);
       controller.retry().ignore();
     }
     profiles = ProfileController(bootstrap: controller);
@@ -142,7 +144,6 @@ class _FoundationAppState extends State<FoundationApp>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(_observePrivateReadiness);
     _privateConnections.cancel().ignore();
     _privateErrors.cancel().ignore();
@@ -154,7 +155,6 @@ class _FoundationAppState extends State<FoundationApp>
   Future<void> _closeResources() => _closing ??= _close();
 
   Future<void> _close() async {
-    _host?.dispose();
     recovery.dispose();
     profiles.dispose();
     try {
@@ -162,16 +162,6 @@ class _FoundationAppState extends State<FoundationApp>
     } finally {
       await _host?.close();
     }
-  }
-
-  @override
-  Future<AppExitResponse> didRequestAppExit() async {
-    try {
-      await _closeResources();
-    } on Object {
-      // Closing the window must remain possible after transport failure.
-    }
-    return AppExitResponse.exit;
   }
 
   @override
@@ -223,8 +213,12 @@ class _FoundationAppState extends State<FoundationApp>
           home: ListenableBuilder(
             listenable: controller,
             builder: (context, child) => FoundationShell(
+              requestedSection: widget.section,
+              navigationEpoch: widget.navigationEpoch,
+              onSectionChanged: widget.onSectionChanged,
               state: _visibleReadiness,
               reason: _visibleReason,
+              workspaceBusy: controller.workspaceBusy,
               retryInProgress: controller.retryInProgress,
               recoveryAction: RecentOperationsButton(recovery: recovery),
               onRetry: () => controller.retry().ignore(),
@@ -234,7 +228,7 @@ class _FoundationAppState extends State<FoundationApp>
                   recovery: recovery,
                   child: ProfileList(
                     controller: profiles,
-                    controlClient: controller.client.trustedClient,
+                    controlClient: controller.client.controlClient,
                   ),
                 ),
               ),
@@ -251,7 +245,7 @@ class _FoundationAppState extends State<FoundationApp>
                   recovery: recovery,
                   child: SoftwarePanel(
                     profiles: profiles,
-                    client: controller.client.trustedClient,
+                    client: controller.client.controlClient,
                   ),
                 ),
               ),

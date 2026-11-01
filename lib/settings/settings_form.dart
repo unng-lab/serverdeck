@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:serverdeck_protocol/models.dart' hide ReadinessView;
+import 'package:serverdeck_protocol/models.dart';
 
 import '../profiles/profile_controller.dart';
 import '../profiles/mutation_controller.dart';

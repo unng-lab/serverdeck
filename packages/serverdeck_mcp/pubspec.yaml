@@ -5,6 +5,8 @@ version: 0.1.0
 environment:
   sdk: '>=3.13.5 <4.0.0'
 dependencies:
+  serverdeck_engine:
+    path: ../serverdeck_engine
   serverdeck_protocol:
     path: ../serverdeck_protocol
   serverdeck_windows:

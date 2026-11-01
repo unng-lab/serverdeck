@@ -4,11 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/connections.dart';
 import 'package:serverdeck_protocol/executor_enrollment.dart';
 import 'package:serverdeck_protocol/host_trust.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
 
-import '../bootstrap/local_api_client.dart' show newRequestId;
+import '../bootstrap/engine_client.dart';
 
-/// The UI borrows one genuine format3 owner client; no SSH or secret is held.
+/// The UI borrows one bound engine client; no SSH or secret is held.
 class ServerController extends ChangeNotifier {
   ServerController({required this.client, required this.profileId}) {
     client.done.then<void>((_) {
@@ -23,7 +22,7 @@ class ServerController extends ChangeNotifier {
     }).ignore();
     _scheduleSample();
   }
-  final TrustedApiClient client;
+  final EngineClient client;
   final String profileId;
   HostTrustSnapshot? trust;
   HostTrustChallenge? trustChallenge;
@@ -59,7 +58,7 @@ class ServerController extends ChangeNotifier {
     } catch (failure) {
       if (!_disposed && epoch == _epoch)
         error = switch (failure) {
-          TrustedRpcException() => failure.code,
+          EngineCallFailure() => failure.code,
           StateError() => failure.message,
           _ => 'SERVICE_UNAVAILABLE',
         };

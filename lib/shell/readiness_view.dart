@@ -9,12 +9,14 @@ class ReadinessView extends StatelessWidget {
     super.key,
     required this.state,
     this.reason,
+    this.workspaceBusy = false,
     this.onRetry,
     this.retryInProgress = false,
   });
 
   final ReadinessState state;
   final ErrorCode? reason;
+  final bool workspaceBusy;
   final VoidCallback? onRetry;
   final bool retryInProgress;
 
@@ -23,18 +25,24 @@ class ReadinessView extends StatelessWidget {
     if (state == ReadinessState.ready) {
       throw StateError('Ready requires the workspace shell');
     }
-    final title = switch (state) {
-      ReadinessState.starting => 'Запуск локальной службы',
-      ReadinessState.recovering => 'Восстановление локального пространства',
-      ReadinessState.storageBlocked => 'Локальное хранилище заблокировано',
-      ReadinessState.incompatible => 'Несовместимая версия локальной службы',
-      ReadinessState.stopping => 'Завершение работы локальной службы',
-      ReadinessState.unavailable => 'Локальная служба недоступна',
-      ReadinessState.ready => throw StateError(
-        'Ready requires the workspace shell',
-      ),
-    };
+    final title = workspaceBusy
+        ? 'Рабочее пространство было занято при запуске'
+        : switch (state) {
+            ReadinessState.starting => 'Запуск ServerDeck',
+            ReadinessState.recovering =>
+              'Восстановление локального пространства',
+            ReadinessState.storageBlocked =>
+              'Локальное хранилище заблокировано',
+            ReadinessState.incompatible =>
+              'Компоненты или данные ServerDeck несовместимы',
+            ReadinessState.stopping => 'Завершение работы ServerDeck',
+            ReadinessState.unavailable => 'ServerDeck недоступен',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
     final retryAvailable =
+        !workspaceBusy &&
         onRetry != null &&
         switch (state) {
           ReadinessState.storageBlocked ||
@@ -55,12 +63,14 @@ class ReadinessView extends StatelessWidget {
       ReadinessState.unavailable => DeckTone.unavailable,
       _ => DeckTone.running,
     };
-    final stage = retryInProgress
+    final stage = workspaceBusy
+        ? 'Этот экземпляр не открывал данные.'
+        : retryInProgress
         ? 'Ожидаем результат текущей попытки.'
         : switch (state) {
             ReadinessState.starting ||
             ReadinessState.recovering => 'Ожидаем результат запуска.',
-            ReadinessState.stopping => 'Ожидаем завершения работы службы.',
+            ReadinessState.stopping => 'Ожидаем завершения работы ServerDeck.',
             ReadinessState.unavailable => 'Локальное пространство недоступно.',
             ReadinessState.incompatible => 'Требуется совместимая версия.',
             ReadinessState.storageBlocked => 'Доступ к хранилищу заблокирован.',
@@ -68,20 +78,22 @@ class ReadinessView extends StatelessWidget {
               'Ready requires the workspace shell',
             ),
           };
-    final nextStep = switch (state) {
-      ReadinessState.starting => 'Дождитесь готовности локального пространства. Данные появятся после проверки доступа.',
-      ReadinessState.recovering =>
-        'Дождитесь завершения восстановления локального пространства.',
-      ReadinessState.stopping =>
-        'Дождитесь завершения текущей службы перед новым запуском.',
-      ReadinessState.unavailable =>
-        'Проверьте доступность локальной службы и повторите запуск.',
-      ReadinessState.incompatible => 'Используйте совместимые версии клиента и локальной службы, затем повторите запуск.',
-      ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
-      ReadinessState.ready => throw StateError(
-        'Ready requires the workspace shell',
-      ),
-    };
+    final nextStep = workspaceBusy
+        ? 'Используйте уже запущенное приложение. Если оно завершено, закройте это окно и запустите ServerDeck снова.'
+        : switch (state) {
+            ReadinessState.starting => 'Дождитесь готовности локального пространства. Данные появятся после проверки доступа.',
+            ReadinessState.recovering =>
+              'Дождитесь завершения восстановления локального пространства.',
+            ReadinessState.stopping =>
+              'Дождитесь завершения ServerDeck перед новым запуском.',
+            ReadinessState.unavailable =>
+              'Повторите проверку состояния ServerDeck.',
+            ReadinessState.incompatible => 'Проверьте целостность комплекта ServerDeck и поддерживаемый формат данных. Исходные данные сохранены.',
+            ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -116,7 +128,7 @@ class ReadinessView extends StatelessWidget {
                             tone: tone,
                             pending: pending,
                           ),
-                          if (reason != null) ...[
+                          if (reason != null && !workspaceBusy) ...[
                             const SizedBox(height: BrandSpacing.space16),
                             Text(_reasonMessage(reason!)),
                           ],
@@ -158,13 +170,14 @@ class ReadinessView extends StatelessWidget {
 }
 
 String _reasonMessage(ErrorCode reason) => switch (reason) {
-  ErrorCode.unsupported => 'Эта функция локальной службы пока недоступна.',
-  ErrorCode.unauthorized => 'Не удалось подтвердить доступ к локальной службе.',
-  ErrorCode.forbidden => 'Локальная служба не разрешила это действие.',
-  ErrorCode.incompatible => 'Версии клиента и локальной службы несовместимы.',
+  ErrorCode.unsupported => 'Эта функция ServerDeck пока недоступна.',
+  ErrorCode.unauthorized => 'Не удалось подтвердить доступ к ServerDeck.',
+  ErrorCode.forbidden => 'ServerDeck не разрешил это действие.',
+  ErrorCode.incompatible =>
+    'Компоненты приложения или формат данных несовместимы.',
   ErrorCode.notReady => 'Локальное пространство ещё не готово.',
   ErrorCode.storageBlocked => 'Доступ к локальному хранилищу заблокирован. Требуется проверка локального пространства.',
-  ErrorCode.validation => 'Локальная служба отклонила некорректный запрос.',
+  ErrorCode.validation => 'ServerDeck отклонил некорректный запрос.',
   ErrorCode.notFound => 'Запрошенные локальные данные не найдены.',
   ErrorCode.alreadyExists => 'Такие локальные данные уже существуют.',
   ErrorCode.revisionConflict =>
@@ -173,7 +186,7 @@ String _reasonMessage(ErrorCode reason) => switch (reason) {
     'Запрос повтора отличается от исходного действия.',
   ErrorCode.resourceLimit =>
     'Достигнуто ограничение ресурсов локального пространства.',
-  ErrorCode.timeout => 'Время ожидания ответа локальной службы истекло.',
-  ErrorCode.serviceUnavailable => 'Не удалось связаться с локальной службой.',
-  ErrorCode.internal => 'Локальная служба не смогла завершить действие.',
+  ErrorCode.timeout => 'Время ожидания ответа ServerDeck истекло.',
+  ErrorCode.serviceUnavailable => 'ServerDeck сейчас недоступен.',
+  ErrorCode.internal => 'ServerDeck не смог завершить действие.',
 };

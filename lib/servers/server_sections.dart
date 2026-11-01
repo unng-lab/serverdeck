@@ -7,7 +7,6 @@ import 'package:serverdeck_protocol/models.dart';
 
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
-import '../theme/motion.dart';
 import '../ui/deck_components.dart';
 import 'metrics_history.dart';
 
@@ -723,39 +722,11 @@ class ServerLogRecordDialog extends StatelessWidget {
           ),
         ],
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 240),
-        child: DeckBoundedTextView(
-          text: '${record['message']}',
-          style: BrandTypography.log,
-        ),
-      ),
+      child: DeckLogMessage(message: '${record['message']}', height: 240),
       actions: [TextButton(onPressed: onClose, child: const Text('Закрыть'))],
     );
   }
 }
-
-/// The existing cancellable route; the owner retains every revoke operation.
-Future<bool> showServerConfirmationDialog({
-  required BuildContext context,
-  required ProfileView profile,
-  required String title,
-  required Widget child,
-  required String confirmLabel,
-}) async =>
-    await showMotionDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => ServerConfirmationDialog.revoke(
-        profile: profile,
-        title: title,
-        child: child,
-        confirmLabel: confirmLabel,
-        onCancel: () => Navigator.pop(context, false),
-        onConfirm: () => Navigator.pop(context, true),
-      ),
-    ) ??
-    false;
 
 /// Complete confirmation presentation; the owner retains route and consent.
 class ServerConfirmationDialog extends StatelessWidget {
@@ -766,47 +737,22 @@ class ServerConfirmationDialog extends StatelessWidget {
     required this.confirmLabel,
     required this.onCancel,
     required this.onConfirm,
-  }) : _profile = null;
+  });
 
-  const ServerConfirmationDialog.revoke({
-    super.key,
-    required ProfileView profile,
-    required this.title,
-    required this.child,
-    required this.confirmLabel,
-    required this.onCancel,
-    required this.onConfirm,
-  }) : _profile = profile;
-
-  final ProfileView? _profile;
   final String title, confirmLabel;
   final Widget child;
   final VoidCallback onCancel;
   final VoidCallback? onConfirm;
 
   @override
-  Widget build(BuildContext context) {
-    final profile = _profile;
-    final address = profile == null
-        ? null
-        : profile.address.contains(':') && !profile.address.startsWith('[')
-        ? '[${profile.address}]'
-        : profile.address;
-    return DeckDialogLayout(
-      title: title,
-      target: profile == null
-          ? null
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [Text(profile.name), Text('$address:${profile.port}')],
-            ),
-      child: child,
-      actions: [
-        TextButton(onPressed: onCancel, child: const Text('Отмена')),
-        FilledButton(onPressed: onConfirm, child: Text(confirmLabel)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => DeckDialogLayout(
+    title: title,
+    child: child,
+    actions: [
+      TextButton(onPressed: onCancel, child: const Text('Отмена')),
+      FilledButton(onPressed: onConfirm, child: Text(confirmLabel)),
+    ],
+  );
 }
 
 /// Presentation guard only. The service still owns challenge validity and CAS.

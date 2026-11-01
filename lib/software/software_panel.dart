@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
+
+import '../bootstrap/engine_client.dart';
 
 import '../automation/automation_panel.dart';
 import '../profiles/profile_controller.dart';
@@ -18,7 +19,7 @@ class SoftwarePanel extends StatefulWidget {
     required this.client,
   });
   final ProfileController profiles;
-  final TrustedApiClient? client;
+  final EngineClient? client;
 
   @override
   State<SoftwarePanel> createState() => _SoftwarePanelState();
@@ -47,7 +48,7 @@ class _SoftwarePanelState extends State<SoftwarePanel> {
                 ),
               if (!owner.loaded && owner.error == null)
                 const Text(
-                  'Список серверов недоступен: локальная служба не готова',
+                  'Список серверов недоступен: ServerDeck ещё не готов',
                 ),
               if (owner.loaded)
                 for (final row in owner.profiles)

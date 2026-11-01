@@ -1,5 +1,8 @@
 # Research: адаптивный дизайн ServerDeck
 
+**Unit-only reset**: ссылки на удалённые по указанию пользователя тесты/fixtures/harness
+сохранены как исторические пути без гиперссылок. Их старые результаты не текущая приёмка.
+
 **Дата**: 2026-10-25. **Пакет**: [003 — Дизайн и доступность](spec.md).
 
 Документ фиксирует решения Phase 0 для визуального внедрения в существующий Flutter-клиент. Исследование кода и SDK не является приёмкой реализации. Фактические проверки приложения и независимое ревью фиксируются отдельно после изменений.
@@ -110,7 +113,7 @@ Global Logs/Jobs получают точное объяснение отсутс
 
 **Decision**: после спецификации запускать `lychee "specs/**/*.md"`, после Flutter изменений — `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, `flutter test`; далее независимый review/fix loop по [AGENTS.md](../../AGENTS.md). Проверки HTML не заменяют эти gates. На момент этого исследования перечисленные обязательные проверки изменения приложения не выполнялись.
 
-Сохранить regression coverage существующих [theme tests](../../test/theme/brand_theme_test.dart), [shell tests](../../test/widget/foundation_shell_test.dart), [profile list tests](../../test/widget/profile_list_test.dart), [accessibility forms tests](../../test/widget/accessibility_test.dart) и [reduced-motion tests](../../test/widget/reduced_motion_test.dart). Добавить измеримые сценарии выбранных breakpoint boundaries, phone labels/targets при 200%, смены темы/размера без потери draft/filter/controller identity, keyboard focus/selection, честного shell context и graph text values. Для remote observations использовать synthetic controllers/fixtures; оформление не требует соединения с пользовательским сервером.
+Сохранить regression coverage существующих theme tests (исторический путь: `../../test/theme/brand_theme_test.dart`), shell tests (исторический путь: `../../test/widget/foundation_shell_test.dart`), profile list tests (исторический путь: `../../test/widget/profile_list_test.dart`), accessibility forms tests (исторический путь: `../../test/widget/accessibility_test.dart`) и reduced-motion tests (исторический путь: `../../test/widget/reduced_motion_test.dart`). Добавить измеримые сценарии выбранных breakpoint boundaries, phone labels/targets при 200%, смены темы/размера без потери draft/filter/controller identity, keyboard focus/selection, честного shell context и graph text values. Для remote observations использовать synthetic controllers/fixtures; оформление не требует соединения с пользовательским сервером.
 
 **Rationale**: существующий dirty worktree включает несвязанные изменения и незавершённые сценарии других пакетов; их прежние результаты не доказывают 003 и не должны быть затёрты. В документах сохраняется различие «исследовано», «запланировано», «реализовано» и «проверено»; независимое ревью пакета предшествует handoff в реализацию.
 

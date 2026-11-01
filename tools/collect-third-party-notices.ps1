@@ -49,7 +49,7 @@ function Add-NoticeText {
     $sourceItems[$Id] = [ordered]@{ id = $Id; sha256 = $hash; source = $SourceUrl; text = $text }
 }
 $resolvedPackages = @{}
-$contexts = [ordered]@{ root = ''; serverdeck_locald = 'packages/serverdeck_locald'; serverdeck_protocol = 'packages/serverdeck_protocol'; serverdeck_windows = 'packages/serverdeck_windows' }
+$contexts = [ordered]@{ root = ''; serverdeck_engine = 'packages/serverdeck_engine'; serverdeck_mcp = 'packages/serverdeck_mcp'; serverdeck_protocol = 'packages/serverdeck_protocol'; serverdeck_windows = 'packages/serverdeck_windows' }
 foreach ($context in $contexts.GetEnumerator()) {
     $packageRoot = Join-Path $WorkspaceRoot $context.Value
     $config = Get-Content -LiteralPath (Join-Path $packageRoot '.dart_tool/package_config.json') -Raw | ConvertFrom-Json
@@ -84,7 +84,7 @@ foreach ($context in $contexts.GetEnumerator()) {
     }
     $localBinding=@($config.packages | Where-Object name -CEQ 'isar_community')
     if ($localBinding.Count -gt 0 -or
-        ($context.Key -in @('root','serverdeck_locald') -and
+        ($context.Key -in @('root','serverdeck_engine') -and
             (Test-Path -LiteralPath (Join-Path $WorkspaceRoot 'third_party/isar_community')))) {
         $binding=Get-ServerDeckBindingSource -WorkspaceRoot $WorkspaceRoot -PackageConfig (Join-Path $packageRoot '.dart_tool/package_config.json')
         $id='isar_community@'+$binding.packageVersion
@@ -99,6 +99,7 @@ Add-NoticeText 'sdk/flutter-3.47.7/LICENSE' (Join-Path $SdkDirectory 'LICENSE') 
 Add-NoticeText 'sdk/dart-3.13.5/LICENSE' (Join-Path $SdkDirectory 'bin/cache/dart-sdk/LICENSE') 'https://github.com/dart-lang/sdk'
 Add-NoticeText 'sdk/sky_engine/LICENSE' (Join-Path $SdkDirectory 'bin/cache/pkg/sky_engine/LICENSE') 'https://github.com/flutter/engine/tree/deb287481e3ce9468f3434937ced4240a70539ca'
 Add-NoticeText 'fonts/Noto/OFL.txt' (Join-Path $WorkspaceRoot 'assets/brand/fonts/OFL.txt') 'https://openfontlicense.org/open-font-license-official-text/'
+Add-NoticeText 'fonts/NotoSansSC/OFL-NotoSansSC.txt' (Join-Path $WorkspaceRoot 'assets/brand/fonts/OFL-NotoSansSC.txt') 'https://openfontlicense.org/open-font-license-official-text/'
 if ($boundNative) {
     Add-NoticeText 'native/THIRD_PARTY_NATIVE_NOTICES.txt' (Join-Path $boundNative.directory 'THIRD_PARTY_NATIVE_NOTICES.txt') 'native/native-notice-inventory.json'
 } else {

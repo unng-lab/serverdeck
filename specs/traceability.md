@@ -1,5 +1,13 @@
 # Трассировка сервиса и его расширений
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
 [Сам сервис](001-service-foundation/spec.md) · [Состав](service-overview.md) · [Каталог](business-requirements.md) · [Очередь](README.md)
 
 Каждый из 132 общих FR имеет одного владельца. LOCAL и FR-SVC дополняют их. ID не зависят от номера каталога: сохранённые FR-001-LOCAL относятся к нынешнему 002, FR-002-LOCAL/AC-002 — к основе 001. Перенос не даёт статуса реализации и не возвращает историю старого сервиса.
@@ -287,3 +295,22 @@
 | FR-MCP-014 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
 | FR-MCP-015 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
 | FR-MCP-016 | [021](021-mcp-control/spec.md) | AC-MCP-3A/B/C/D; cross-cutting SC-MCP-001–006 |
+
+
+## Действующая архитектура — поправка 2026-10-30
+
+Новая спецификация/номер не создаются. [Существующая001](001-service-foundation/spec.md)
+пересмотрена: один desktop/mobile app со встроенным доменным движком вместо
+обязательного locald. [План](001-service-foundation/plan.md), T253–T272 и
+[engine](001-service-foundation/contracts/embedded-engine.md) задают новый host;
+[adoption/return](001-service-foundation/contracts/embedded-migration.md) сохраняет
+текущий ServerDeckNext без двух writers и plaintext fallback. Прежний hard cutover
+относится только к сервису до ServerDeckNext. [MCP](021-mcp-control/contracts/embedded-host.md)
+сохраняет tools/grants через обновлённый мост к работающему app. Close desktop окна
+оставляет app в tray; explicit exit завершает engine/MCP; remote outcome не подменяется.
+Термин locald в прежних функциональных обязанностях означает теперь доменный engine,
+а отдельный process/mandatory daemon/idle-grace более не является требованием.
+Native/integration/manual/SSH/container gates не запускаются в текущем scope: только
+static/unit/widget, без заявления native/platform qualification. [Matrix](001-service-foundation/contracts/embedded-platforms.md)
+отделяет первый Windows этап от будущих Linux/macOS/mobile/Web. Backend не обязательный.
+003 и его поставка не меняются этой подготовкой; прежняя история задач сохраняется.

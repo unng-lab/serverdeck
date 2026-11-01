@@ -174,8 +174,112 @@ abstract final class BrandTheme {
         size: BrandGeometry.iconSize,
         color: colors['text'],
       ),
+      tooltipTheme: TooltipThemeData(
+        textStyle: BrandTypography.caption.copyWith(color: colors['text']),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors['raised'],
+          border: Border.all(color: colors['control']),
+          borderRadius: BorderRadius.circular(BrandGeometry.radiusControl),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: colors['surface'],
+        surfaceTintColor: Colors.transparent,
+        elevation: brightness == Brightness.dark ? 0 : 4,
+        textStyle: BrandTypography.body.copyWith(color: colors['text']),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(BrandGeometry.radiusControl),
+          side: BorderSide(color: colors['control']),
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(colors['surface']),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: WidgetStatePropertyAll(
+            brightness == Brightness.dark ? 0 : 4,
+          ),
+          side: WidgetStatePropertyAll(BorderSide(color: colors['control'])),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(BrandGeometry.radiusControl),
+            ),
+          ),
+        ),
+      ),
+      menuButtonTheme: MenuButtonThemeData(
+        style: _button(colors, _ButtonKind.text),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              colors[states.contains(WidgetState.disabled)
+                  ? 'disabled'
+                  : states.contains(WidgetState.selected)
+                  ? 'accent'
+                  : states.contains(WidgetState.focused)
+                  ? 'focus'
+                  : 'control'],
+        ),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              colors[states.contains(WidgetState.disabled)
+                  ? 'disabled'
+                  : states.contains(WidgetState.selected)
+                  ? 'onAccent'
+                  : 'control'],
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              colors[states.contains(WidgetState.disabled)
+                  ? 'raised'
+                  : states.contains(WidgetState.selected)
+                  ? 'accent'
+                  : 'raised'],
+        ),
+        trackOutlineColor: WidgetStatePropertyAll(colors['control']),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          textStyle: const WidgetStatePropertyAll(BrandTypography.button),
+          minimumSize: const WidgetStatePropertyAll(Size(44, 44)),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) =>
+                colors[states.contains(WidgetState.disabled)
+                    ? 'disabled'
+                    : 'text'],
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) =>
+                colors[states.contains(WidgetState.disabled)
+                    ? 'raised'
+                    : states.contains(WidgetState.selected)
+                    ? 'selected'
+                    : states.contains(WidgetState.hovered)
+                    ? 'hover'
+                    : 'surface'],
+          ),
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color:
+                  colors[states.contains(WidgetState.focused)
+                      ? 'focus'
+                      : 'control'],
+              width: states.contains(WidgetState.focused) ? 2 : 1,
+            ),
+          ),
+        ),
+      ),
       checkboxTheme: CheckboxThemeData(
         side: WidgetStateBorderSide.resolveWith((states) {
+          if (states.contains(WidgetState.focused) &&
+              !states.contains(WidgetState.disabled)) {
+            return BorderSide(color: colors['focus'], width: 2);
+          }
           if (states.contains(WidgetState.selected) &&
               !states.contains(WidgetState.disabled)) {
             return BorderSide.none;
@@ -290,6 +394,13 @@ abstract final class BrandTheme {
         outline: colors['control'],
         outlineVariant: colors['border'],
         surfaceTint: Colors.transparent,
+        inverseSurface: colors['raised'],
+        onInverseSurface: colors['text'],
+        inversePrimary: colors['accent'],
+        errorContainer: colors['surface'],
+        onErrorContainer: colors['error'],
+        tertiaryContainer: colors['selected'],
+        onTertiaryContainer: colors['text'],
       ),
     );
   }

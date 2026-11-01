@@ -74,6 +74,82 @@ and matching release digest. No MCP/SSH bridge route can invoke either CLI.
 
 For the repository release, actual exact-version catalogs and source-bound
 runtime acceptance results must be materialized in the owned Docker/runner
-workflow for both databases. They have not yet been generated or qualified for
-the current worktree. Do not substitute this schema or a generated digest for
-the full T028/T188 acceptance evidence.
+workflow for both databases. Metadata catalogs have now been generated and
+retained in [run39963036237](https://github.com/unng-lab/serverdeck/actions/runs/39963036237)
+from source31b2626. PostgreSQL16.15 has17 package pins; ClickHouse26.8.34.13 has3.
+Both singleton and paired resolution orders passed without package writes.
+Installation remains unqualified; this metadata does not replace full T028/T188
+acceptance evidence.
+
+The explicit preparation entry point is now:
+
+```sh
+bash tools/test-executor-container.sh prepare-recipes
+```
+
+It uses the exact versions/settings/notices in
+[preparation-request.json](preparation-request.json), the four fixed public
+sources in [apt.sources.list](../ci/apt.sources.list), Ubuntu's packaged archive
+keyring and the public ClickHouse key from its
+[official installation instructions](https://packages.clickhouse.com/).
+The downloaded public key is pinned by SHA256 and primary fingerprint in
+[prepare_recipes.py](../ci/prepare_recipes.py); a changed key is refused.
+Version discovery was read from public package indexes; it is not signature or
+dependency qualification. The actual APT generator must independently accept
+the signed metadata and exact versions. Missing versions fail; there is no
+fallback to the newest candidate.
+
+The manual [recipe preparation workflow](../../.github/workflows/recipe-catalog.yml)
+runs only this mode on a disposable Ubuntu runner. It does not run the full
+test suite, install PostgreSQL/ClickHouse, enroll a controller or start the
+executor. The Docker fixture still requires systemd for the supported environment.
+The default mode of the existing executor check script remains the separate core
+test path.
+
+When that new workflow is not registered on the default branch, the existing
+[MCP workflow](../../.github/workflows/mcp.yml) also exposes explicit
+`workflow_dispatch` input `scope=prepare-recipes` on the selected source ref.
+Only its recipe-preparation job is admitted in that mode; all three automatic
+check jobs are skipped. Default/manual checks and ordinary push/PR behavior
+remain the checks path. This permits metadata production before the separately
+authorized full qualification phase.
+
+Successful preparation retains a new `.local/recipe-catalog-<nonce>` artifact:
+catalog, exact request/sources/public keyring, signed indexes and their original
+attributes, package baseline, program/lock input hashes, preparation manifest and
+matching build descriptor. Only the fixed public preparation directory is copied;
+SSH material, enrollment/spool and GnuPG working state are excluded. Owned Docker
+resources are removed before success is printed. The artifact records
+packageInstallation=false, recipeAcceptance=false and fullAcceptance=false.
+Preparation source hashes include the invoked prepare-apt CLI and Dockerfile,
+in addition to runtime modules, the helper, request, sources, bridge and lock.
+The successful retained artifact is `recipe-catalog-preparation` from that run
+(artifact12504989083, hosted expiry2026-11-06). The local copy and its manifest
+are retained under `.local/recipe-runner-artifacts-39963036237`; this directory
+is not part of the source distribution. Later install/recovery
+qualification must bind these actual bytes and their still-valid signed indexes;
+retaining an expired snapshot does not waive APT expiry checks.
+
+The owned preparation helper requests the administrator CLI's optional
+`--diagnostic-codes` on failure. It may forward only bounded registered public
+source identifiers and line numbers (`APT_PREPARE_LOCATION`), never exception
+text, local variables, input values or arbitrary stderr. Ordinary CLI diagnostics
+remain unchanged unless that explicit option is supplied. Source positions are
+diagnostic evidence only; they cannot satisfy signature/dependency acceptance.
+The Docker-only helper applies the same registered-source-position policy to
+its own failures with `RECIPE_PREPARE_LOCATION`, including artifact retention.
+Signed index retention streams at most1MiB per read, accepts at most512MiB per
+index (the existing verification limit) and1GiB in total. Before/after custody,
+exact byte count and SHA256 must match the verified metadata. This public export
+budget is separate from the executor's private journal quota; increasing export
+capacity neither changes accepted package transactions nor bypasses verification.
+
+For python3-apt2.7.7, a newly marked package can report both `marked_install`
+and `marked_upgrade`. The [libapt state predicates](https://raw.githubusercontent.com/Debian/apt/2.8.0/apt-pkg/depcache.h)
+overlap for new installations; the
+[Ubuntu python-apt source](https://archive.ubuntu.com/ubuntu/pool/main/p/python-apt/python-apt_2.7.7ubuntu5.3.tar.xz)
+maps them directly. Catalog and runtime preparation share the same new-install
+guard: actual installed/conffile state, new-install mark, destructive flags,
+protected packages and candidate trust still govern admission. The overlapping
+upgrade flag alone cannot classify a fresh addition as an existing-package
+upgrade. Real resolver/gate qualification remains required.

@@ -130,14 +130,17 @@ void _writeNewProtectedFile(
       throw const FileSystemException('STORAGE_BLOCKED');
     }
   } finally {
+    var closeConfirmed = true;
     if (handle != null) {
-      CloseHandle(handle);
+      closeConfirmed = CloseHandle(handle).value;
     }
     buffer.asTypedList(bytes.length).fillRange(0, bytes.length, 0);
     calloc.free(buffer);
     calloc.free(written);
     calloc.free(input);
     attributes.close();
+    if (!closeConfirmed)
+      throw const FileSystemException('PHYSICAL_CLOSE_UNCONFIRMED');
   }
 }
 
@@ -233,7 +236,7 @@ Future<void> copyProtectedFile(
         buffer.asTypedList(65536).fillRange(0, 65536, 0);
         attributes.close();
         if (target != null && !CloseHandle(target).value)
-          throw const FileSystemException('STORAGE_BLOCKED');
+          throw const FileSystemException('PHYSICAL_CLOSE_UNCONFIRMED');
       }
     });
     requireSafePath(localAppData, targetPath);
@@ -313,7 +316,7 @@ class ProtectedSnapshotReader {
         return ProtectedSnapshotReader._(handle, maxBytes);
       } catch (_) {
         if (!CloseHandle(handle).value) {
-          throw const FileSystemException('STORAGE_BLOCKED');
+          throw const FileSystemException('PHYSICAL_CLOSE_UNCONFIRMED');
         }
         rethrow;
       }
@@ -360,7 +363,7 @@ class ProtectedSnapshotReader {
   void close() {
     if (_closed) return;
     if (!CloseHandle(_handle).value) {
-      throw const FileSystemException('STORAGE_BLOCKED');
+      throw const FileSystemException('PHYSICAL_CLOSE_UNCONFIRMED');
     }
     _closed = true;
   }
@@ -460,7 +463,7 @@ void _replaceRetainedFile(String source, String destination, String sid) {
       }
     } finally {
       if (!CloseHandle(handle).value) {
-        throw const FileSystemException('STORAGE_BLOCKED');
+        throw const FileSystemException('PHYSICAL_CLOSE_UNCONFIRMED');
       }
     }
   });

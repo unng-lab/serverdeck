@@ -1,5 +1,13 @@
 # Runtime, bootstrap and protected storage v1 — 001.1
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-engine.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [API](local-api.md), [model](../data-model.md).
 
 ## Paths, ownership, native primitives
@@ -80,7 +88,7 @@ Lease/watchdog/grace используют monotonic elapsed deadlines. При з
 
 Runtime: Windows 11 x64, загруженный user profile, DPAPI, writable fixed-volume LOCALAPPDATA и VC++ 2015–2022 x64 runtime. Native loader проверяется до workspace writes. Build: pinned Flutter, PowerShell 7.4+, Git, VS2022 Build Tools Desktop C++/Windows SDK. Сеть нужна для получения SDK/packages, не для runtime.
 
-`tools/run-foundation.ps1 -Configuration Debug|Release`: проверить SDK commit/hash/pins; выполнить root/package dependency resolution с lock enforcement; запустить locald generator, dart compile exe и flutter build windows; создать dev manifest с buildId/sha256 UI exe/locald exe/libisar.dll/app-root; собрать единый layout и запустить UI. Использовать bundled Dart из pinned Flutter, не случайный PATH. Manifest format1: buildId=Git commit+configuration+SHA256 sorted lockfile hashes, configuration, testOnly flag, absolute appRoot и sha256 каждого исполняемого файла. Flutter runtime/data, brand assets/fonts, locald.exe, pinned libisar.dll, notices находятся в layout. DLL загружается из absolute allowlisted app-root, не cwd/PATH/download. UI/locald отвергают manifest mismatch. SHA не подпись издателя; production signing/updater/installer относятся к005.
+`tools/run-serverdeck.ps1 -Configuration Debug|Release`: проверяет pinned SDK и lockfiles root/engine/MCP/protocol/Windows, запускает engine record generator и только Flutter Windows build с --no-pub, копирует выбранный pinned Isar/notices и генерирует executor descriptor. Создаёт manifest4/API1.1/schema3 для serverdeck.exe/libisar.dll/executor-release.json, absolute appRoot и buildId Git commit+configuration+SHA256 ordinal-sorted пяти lockfile hashes. Flutter runtime/data/assets/fonts/plugin DLL/notices остаются в layout. Отдельные locald/MCP build entry и run-foundation alias удалены; старые layouts с отдельными exe не переименовываются и не мигрируются. Native selection/source/receipt guards сохраняются, но старая квалификация не переносится на новые исходники. Build/launch не выполняются в текущем RAM/static scope. SHA не является подписью издателя; signing/updater/installer относятся к005. Точный контракт — [embedded engine](embedded-engine.md).
 
 До завершения T233 private development builds получают native DLL из root Flutter dependency isar_community_flutter_libs 3.3.2 cache/source, явно копируют в layout и фиксируют hash; distributionReady=false. [Native artifact contract](native-artifact.md) определяет замену этого build input на собственный квалифицированный артефакт той же bindingVersion3.3.2. После активации используется только этот provider, отсутствующий или неквалифицированный артефакт блокирует сборку без cache/PATH/download fallback. Pure Dart locald зависит только от Isar core/generator, не от Flutter plugin package; ни MethodChannel, ни Flutter plugin registration ему не требуются. Runtime helper ничего не скачивает. Locks/manifest не содержат секретов. Отсутствующий DLL/runtime даёт prerequisite error, без альтернативной БД. Граф новой DLL не выдаётся за происхождение прежней.
 

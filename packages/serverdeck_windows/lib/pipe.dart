@@ -8,6 +8,7 @@ import 'package:win32/win32.dart';
 
 import 'security.dart';
 import 'kernel_security.dart';
+import 'embedded_pipe_policy.dart';
 
 final _kernel = DynamicLibrary.open('kernel32.dll');
 final _queryPipe = DynamicLibrary.open('ntdll.dll')
@@ -121,7 +122,7 @@ final _serverPid = _kernel
 const _clientRights =
     0x120083; // read/write data and attributes, READ_CONTROL, SYNCHRONIZE.
 final _pipeName = RegExp(
-  r'^\\\\\.\\pipe\\ServerDeckNext\.v1\.[a-f0-9]{64}\.[0-7]$',
+  r'^\\\\\.\\pipe\\ServerDeckNext\.embedded-v1\.[a-f0-9]{64}\.[0-7]$',
 );
 
 /// Owned by a single Dart pipe worker. Never expose its handle to UI code.
@@ -133,6 +134,7 @@ class NativePipe {
   final Set<int> _cancellations = {};
   bool _closing = false, _closed = false, _reading = false, _writing = false;
   bool _draining = false;
+  bool _cleanupFailed = false;
   RetainedProcessIdentity? _peer;
   Future<void>? _closeFuture;
 
@@ -168,7 +170,9 @@ class NativePipe {
       return NativePipe._(created, true);
     } catch (_) {
       if (created != null && created.isValid) {
-        CloseHandle(created);
+        if (!CloseHandle(created).value) {
+          throw NativePipeCreationFailure._(NativePipe._(created, true));
+        }
       }
       rethrow;
     } finally {
@@ -201,7 +205,9 @@ class NativePipe {
       return NativePipe._(opened, false);
     } catch (_) {
       if (opened != null && opened.isValid) {
-        CloseHandle(opened);
+        if (!CloseHandle(opened).value) {
+          throw NativePipeCreationFailure._(NativePipe._(opened, false));
+        }
       }
       rethrow;
     } finally {
@@ -249,7 +255,7 @@ class NativePipe {
   /// Waits for the peer to consume buffered replies without a synchronous
   /// FlushFileBuffers call that would block this worker's cancellation loop.
   Future<void> drainOutput({Duration deadline = const Duration(seconds: 5)}) {
-    if (!server || _closing || _closed || deadline <= Duration.zero) {
+    if (_cleanupFailed || _closing || _closed || deadline <= Duration.zero) {
       throw StateError('SERVICE_UNAVAILABLE');
     }
     if (_draining || _active.length >= 3) throw StateError('RESOURCE_LIMIT');
@@ -283,16 +289,17 @@ class NativePipe {
           }
           throw StateError('SERVICE_UNAVAILABLE');
         }
-        if (status != 0 ||
-            io.ref.information < 40 ||
-            info[9] != 1 ||
-            info[8] != 3 ||
-            info[7] > info[6]) {
+        if (status != 0 || io.ref.information < 40) {
           throw StateError('SERVICE_UNAVAILABLE');
         }
         // An accepted write may still be starting its native isolate. Empty
         // kernel quota alone must not report it drained before native issuance.
-        if (info[7] == info[6] && !_writing) return;
+        if (embeddedPipeOutputEmpty(
+          info.asTypedList(10),
+          server: server,
+          writing: _writing,
+        ))
+          return;
       } finally {
         calloc.free(info);
         calloc.free(io);
@@ -323,7 +330,15 @@ class NativePipe {
       if (!success || processId.value == 0) {
         throw StateError('IDENTITY_UNAVAILABLE');
       }
-      return _peer = RetainedProcessIdentity.open(processId.value);
+      try {
+        return _peer = RetainedProcessIdentity.open(processId.value);
+      } catch (e) {
+        // A normally vanished peer is isolated to this connection. Only an
+        // unconfirmed partial factory close poisons physical cleanup/reuse.
+        if (e is StateError && e.message == 'PHYSICAL_CLOSE_UNCONFIRMED')
+          _cleanupFailed = true;
+        rethrow;
+      }
     } finally {
       calloc.free(processId);
     }
@@ -335,7 +350,7 @@ class NativePipe {
     int count,
     Duration? deadline,
   ) {
-    if (_closing || _closed || _active.length >= 3) {
+    if (_cleanupFailed || _closing || _closed || _active.length >= 3) {
       throw StateError('SERVICE_UNAVAILABLE');
     }
     final operation = _perform(kind, bytes, count, deadline);
@@ -404,15 +419,16 @@ class NativePipe {
       timer?.cancel();
       if (cancellation != null) {
         _cancellations.remove(cancellation.address);
-        CloseHandle(cancellation);
+        if (!CloseHandle(cancellation).value) _cleanupFailed = true;
       }
-      if (event != null) CloseHandle(event);
+      if (event != null && !CloseHandle(event).value) _cleanupFailed = true;
       buffer
           .asTypedList(count == 0 ? 1 : count)
           .fillRange(0, count == 0 ? 1 : count, 0);
       calloc.free(buffer);
       calloc.free(overlapped);
       calloc.free(transferred);
+      if (_cleanupFailed) throw StateError('SERVICE_UNAVAILABLE');
     }
   }
 
@@ -540,7 +556,7 @@ class NativePipe {
   }
 
   Future<void> disconnect() async {
-    if (!server || _closed || _closing) {
+    if (_cleanupFailed || !server || _closed || _closing) {
       throw StateError('SERVICE_UNAVAILABLE');
     }
     _closing = true;
@@ -549,7 +565,10 @@ class NativePipe {
     }
     CancelIoEx(handle, null);
     await Future.wait(_active.toList());
-    _peer?.close();
+    if (_peer != null && !_peer!.close()) {
+      _cleanupFailed = true;
+      throw StateError('SERVICE_UNAVAILABLE');
+    }
     _peer = null;
     final result = DisconnectNamedPipe(handle);
     if (!result.value && result.error.toInt() != 233) {
@@ -569,9 +588,24 @@ class NativePipe {
     }
     CancelIoEx(handle, null);
     await Future.wait(_active.toList());
-    _peer?.close();
-    _peer = null;
-    _closed = true;
-    CloseHandle(handle);
+    if (_peer != null && !_peer!.close()) _cleanupFailed = true;
+    if (!_cleanupFailed) _peer = null;
+    _closed = CloseHandle(handle).value;
+    if (!_closed || _cleanupFailed) throw StateError('SERVICE_UNAVAILABLE');
   }
+}
+
+/// A failed close during native creation is still an owned failure, not a bare
+/// startup exception. Never retry an unconfirmed HANDLE which might be reused.
+final class NativePipeCreationFailure implements Exception {
+  NativePipeCreationFailure._(this._owned) {
+    _owned._cleanupFailed = true;
+    _owned._closing = true;
+    _owned._closeFuture = Future.error(StateError('SERVICE_UNAVAILABLE'))
+      ..ignore();
+  }
+  final NativePipe _owned;
+  Future<void> close() => _owned.close();
+  @override
+  String toString() => 'NativePipeCreationFailure(SERVICE_UNAVAILABLE)';
 }

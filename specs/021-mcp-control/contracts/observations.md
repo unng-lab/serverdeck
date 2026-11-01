@@ -1,5 +1,13 @@
 # Shared remote observations
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [tasks](../tasks.md), [connections](connections.md),
 [MCP](mcp.md), [observability](../../009-observability/spec.md),
 [managed resources](plans.md).

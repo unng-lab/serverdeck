@@ -1,65 +1,14 @@
 # Quickstart: проверка003
 
-## Current unit-widget commands
+## Текущие команды 003.4
 
-Текущий scope и merge/source-preview gate определены
-[решением этапа](plan.md#unit-widget-stage-2026-10-27), Constitution4.0.0/VII
-и AGENTS.md. Этот блок имеет приоритет над native/integration/capture/cold
-командами ниже: они сохраняются для будущей квалификации и сейчас не разрешены.
-Новый native/full run требует отдельного указания пользователя.
+Основа — Flutter Material 3 / BrandTheme / Deck; [компоненты и подключение](../../docs/design/components/README.md). `flutter run -d windows -t tool/component_catalog.dart` запускает отдельный каталог без движка. Для диагностического программного рендера в среде без подходящего GPU одновременно передаются `--no-enable-impeller --enable-software-rendering`; один software flag несовместим с Impeller.
 
-Использовать закреплённые Flutter3.47.7 / Dart3.13.5/framework
-`abaf9c523780a608bd46686fd5e53740a07077f8` и locked dependencies.
-Из root сначала восстановить locked dependencies всех пакетов, которые
-обходит root analysis. MCP restore создаёт package configuration для анализа
-и не добавляет MCP tests в выбранный suite:
+Исходники текущего атласа находятся в `docs/design/source/`; собрать — `python tools/build-design-atlas.py`. Проверить references/токены/реестр — `tools/check-design-references.ps1` или `python tools/validate-design.py --json`. Проверить все HTML-композиции — `node tools/test-design-components.cjs`. Flutter regression suite — `flutter test test/widget/components`; полный gate — format/analyze/test и lychee по AGENTS.md.
 
-```powershell
-. ./tools/foundation-sdk.ps1
-Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
-foreach ($package in @('serverdeck_protocol','serverdeck_windows','serverdeck_locald','serverdeck_mcp')) {
-  Push-Location (Join-Path 'packages' $package)
-  try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
-  finally { Pop-Location }
-}
-```
+HTML interactions отдельно проверяет `node tools/test-component-interactions.cjs`: независимые server/job fixtures, sort/null/selection/filter, validation/recovery, JSON copy, дата, consent и меню с клавиатуры. Это проверка автономного дизайна, не native-клиента. После изменения реестра синхронизировать карточки через `python tools/generate-component-metadata.py` и `dart format tool/component_catalog/names.dart`.
 
-После restore, из root:
-
-```powershell
-$env:SERVERDECK_NATIVE_CONTROL_RED = '0'
-dart format --output=none --set-exit-if-changed .
-flutter analyze
-flutter test --reporter expanded
-Push-Location packages/serverdeck_protocol
-try { dart analyze; dart test --reporter expanded } finally { Pop-Location }
-Push-Location packages/serverdeck_windows
-try { dart analyze } finally { Pop-Location }
-Push-Location packages/serverdeck_locald
-try {
-  dart analyze
-  dart test test/server_peer_coordination_test.dart --reporter expanded
-} finally { Pop-Location }
-lychee "specs/**/*.md"
-```
-
-Фиксировать exit каждой команды отдельно: PowerShell `try/finally` сам по себе
-не проверяет exit предыдущего Dart process. Root `flutter test` означает
-обычный unit/contract/widget suite в `test/`, без `integration_test` и без
-capture dart-defines; ожидаемый opt-in capture skip не является выполненным
-capture. Полный protocol suite и выбранный locald queue test используют pure
-fixtures. Полный `dart test` locald/Windows/MCP, portable SSH suite с loopback/
-ssh-keygen и любые FFI/DPAPI/service/process/pipe fixtures в текущий gate не
-входят. SDK/Flutter test runner — prerequisites unit tooling, а не разрешение
-product-native execution.
-
-Push/PR и default manual profile выбирают `unit-widget-checks`; native jobs
-сохраняются только за explicit manual `profile=native-full`, который сейчас
-не dispatch-ится. `foundation.yml` остаётся отдельным ручным full-product
-профилем с незакрытым acceptance marker и также не запускается. После реальных
-проверок — fresh independent policy/spec/workflow review с frozen inputs.
-CI, packaging/install и release evidence записываются только по своим actual
-receipts; старые partial/failed native результаты не становятся успешными.
+Полная отдельная съёмка production-компонентов: `flutter test test/widget/components/capture_test.dart --dart-define=COMPONENT_CAPTURE_DIR=.local/design-003/003.4/<новый-каталог>`. Используется новый непустой подпуть этапа; существующее evidence не перезаписывается. Runner загружает bundled Noto, проверяет все объявленные в реестре состояния × обе темы × четыре frames × 100%/200%, пишет PNG и manifest. Обычный запуск тестов не создаёт файлов. Scope — synthetic presentation, без реальных серверов и native authority. Исторические инструкции ниже относятся к 003.1–003.3; отсутствие старого test/capture tooling в текущем checkout не заменяется вымышленным выполнением этих команд.
 
 Это воспроизводимый validation guide [плана](plan.md), а не отчёт о выполненных проверках. Fixture helpers/tests, отмеченные ниже как новые, создаются задачами реализации. Запускать из корня репозитория; пользовательские профили/серверы не нужны.
 
@@ -77,14 +26,7 @@ $env:SERVERDECK_FLUTTER_ROOT = 'H:/flutter/flutter'
 flutter pub get --offline
 ```
 
-Если SDK identity или offline pinned dependency resolution не совпали, зафиксировать failure и исправить среду; не подменять SDK/version и не объявлять check passed. Preflight helper проверяется в explicit package context. В отдельном checkout сначала создать его generated package configuration:
-
-```powershell
-Push-Location packages/serverdeck_protocol
-try { dart pub get --offline --enforce-lockfile } finally { Pop-Location }
-```
-
-Затем из корня:
+Если SDK identity или offline pinned dependency resolution не совпали, зафиксировать failure и исправить среду; не подменять SDK/version и не объявлять check passed. Preflight helper проверяется в его уже существующем explicit package context:
 
 ```powershell
 dart --packages=packages/serverdeck_protocol/.dart_tool/package_config.json tools/unit-coverage-zero.dart --references lib/theme/brand_theme.dart

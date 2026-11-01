@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart';
-import 'package:serverdeck_windows/operational_auth_client.dart';
+
+import '../bootstrap/engine_client.dart';
 
 import '../theme/motion.dart';
 import '../theme/brand_tokens.dart';
@@ -12,7 +13,7 @@ import 'server_sections.dart';
 /// Remote operations use the same service as MCP through a verified owner RPC.
 class ServerPanel extends StatefulWidget {
   const ServerPanel({super.key, required this.client, required this.profile});
-  final TrustedApiClient client;
+  final EngineClient client;
   final ProfileView profile;
   @override
   State<ServerPanel> createState() => _ServerPanelState();
@@ -98,16 +99,19 @@ class _ServerPanelState extends State<ServerPanel> {
     super.dispose();
   }
 
-  Future<bool> _confirm(String title, Widget content, String action) {
-    final profile = widget.profile;
-    return showServerConfirmationDialog(
-      context: context,
-      profile: profile,
-      title: title,
-      child: content,
-      confirmLabel: action,
-    );
-  }
+  Future<bool> _confirm(String title, Widget content, String action) async =>
+      await showMotionDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => ServerConfirmationDialog(
+          title: title,
+          child: content,
+          confirmLabel: action,
+          onCancel: () => Navigator.pop(context, false),
+          onConfirm: () => Navigator.pop(context, true),
+        ),
+      ) ??
+      false;
 
   Future<void> _trust() async {
     final owner = model;

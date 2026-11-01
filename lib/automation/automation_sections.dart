@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:serverdeck_protocol/automation/job_observation.dart';
 import 'package:serverdeck_protocol/automation/profile_records.dart';
 import 'package:serverdeck_protocol/models.dart';
 
@@ -392,8 +393,7 @@ class _PlanSummary extends StatelessWidget {
   final List<ProfileView> serverProfiles;
   final AutomationProfileRecord? automationProfile;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => DeckPlanSummary.content(
     children: [
       AutomationServerTargets(
         serverIds: [if (plan['serverId'] is String) plan['serverId'] as String],
@@ -532,12 +532,14 @@ class AutomationJsonView extends StatelessWidget {
   final Object? value;
 
   @override
-  Widget build(BuildContext context) => ExpansionTile(
-    title: DeckFocusLabel(child: Text(title)),
+  Widget build(BuildContext context) => DeckExpander(
+    title: Text(title),
     tilePadding: EdgeInsets.zero,
     childrenPadding: const EdgeInsets.all(BrandSpacing.space12),
     expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [SelectableText(_pretty(value), style: BrandTypography.log)],
+    children: [
+      DeckCode(label: 'Содержимое', text: _pretty(value), allowCopy: false),
+    ],
   );
 }
 
@@ -549,7 +551,7 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      OutlinedButton(onPressed: onPressed, child: Text(label));
+      DeckButton(onPressed: onPressed, child: Text(label));
 }
 
 class AutomationStatusSection extends StatelessWidget {
@@ -940,15 +942,27 @@ class AutomationProfileDetailSection extends StatelessWidget {
                 children: [
                   if (_rows(_object(comparison!['result'])['changes']).isEmpty)
                     const Text('Изменений в полученном сравнении нет'),
-                  for (final change in _rows(
-                    _object(comparison!['result'])['changes'],
-                  ))
-                    DeckKeyValue(
-                      label: _value(change['path']),
-                      value:
-                          'Было: ${_value(change['before'])}\nСтало: ${_value(change['after'])}',
-                      selectable: true,
-                    ),
+                  DeckDiff(
+                    entries: [
+                      for (final change in _rows(
+                        _object(comparison!['result'])['changes'],
+                      ))
+                        DeckDifference(
+                          label: _value(change['path']),
+                          before: change.containsKey('before')
+                              ? _value(change['before'])
+                              : null,
+                          after: change.containsKey('after')
+                              ? _value(change['after'])
+                              : null,
+                          change: !change.containsKey('before')
+                              ? DeckChange.added
+                              : !change.containsKey('after')
+                              ? DeckChange.removed
+                              : DeckChange.changed,
+                        ),
+                    ],
+                  ),
                   if (_object(comparison!['result'])['truncated'] == true)
                     const DeckStatus(
                       label: 'Сравнение неполное: часть изменений не получена',
@@ -1112,10 +1126,31 @@ class AutomationPlanSection extends StatelessWidget {
   );
 }
 
+List<Widget> _jobObservationFields(LocalJobObservationView? view) =>
+    view == null
+    ? const []
+    : [
+        DeckKeyValue(
+          label: 'Наблюдение',
+          value: switch (view.state) {
+            JobObservationState.attached => 'Подключено',
+            JobObservationState.detached => 'Отключено',
+            JobObservationState.stale => 'Данные устарели',
+          },
+        ),
+        DeckKeyValue(
+          label: 'Последний ответ',
+          value: view.lastSequence == null
+              ? 'Не получен'
+              : '#${view.lastSequence} · ${_time(view.observedAt?.toIso8601String())}',
+        ),
+      ];
+
 class AutomationJobsSection extends StatelessWidget {
   const AutomationJobsSection({
     super.key,
     required this.jobs,
+    required this.jobObservations,
     required this.events,
     required this.loaded,
     required this.hasMore,
@@ -1131,11 +1166,14 @@ class AutomationJobsSection extends StatelessWidget {
     required this.onCancel,
     required this.onReconcile,
     this.job,
+    this.jobObservation,
     this.serverId,
   });
 
   final List<Map<String, Object?>> jobs, events;
   final Map<String, Object?>? job;
+  final Map<String, LocalJobObservationView> jobObservations;
+  final LocalJobObservationView? jobObservation;
   final String? serverId;
   final bool loaded, hasMore, canCancel, canReconcile;
   final int droppedEvents;
@@ -1171,35 +1209,42 @@ class AutomationJobsSection extends StatelessWidget {
               message: 'Заданий на этом сервере пока нет',
               tone: DeckTone.neutral,
             ),
-          for (final row in jobs)
-            Builder(
-              builder: (context) {
-                final entry = _object(row['job']);
-                return DeckSurface(
-                  enabled: actions.select,
-                  selected: job?['id'] == entry['id'],
-                  onTap: () => onSelect(entry['id'] as String),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (jobs.isNotEmpty)
+            DeckCollection<Map<String, Object?>>(
+              rows: jobs.map((row) => _object(row['job'])).toList(),
+              idOf: (row) => row['id'] as String,
+              selectedIds: {if (job?['id'] case final String id) id},
+              columns: [
+                DeckColumn(
+                  id: 'state',
+                  label: 'Состояние',
+                  value: (row) => _jobState(row['state']),
+                  builder: (context, row) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DeckStatus(
-                        label: _jobState(entry['state']),
-                        tone: _jobTone(entry['state']),
+                        label: _jobState(row['state']),
+                        tone: _jobTone(row['state']),
                       ),
-                      DeckKeyValue(
-                        label: 'Задание',
-                        value: _value(entry['id']),
-                        selectable: true,
-                      ),
-                      if (entry['updatedAt'] != null)
-                        DeckKeyValue(
-                          label: 'Обновлено',
-                          value: _time(entry['updatedAt']),
-                        ),
+                      ..._jobObservationFields(jobObservations[row['id']]),
                     ],
                   ),
-                );
-              },
+                ),
+                DeckColumn(
+                  id: 'id',
+                  label: 'Задание',
+                  value: (row) => _value(row['id']),
+                ),
+                DeckColumn(
+                  id: 'updated',
+                  label: 'Обновлено',
+                  value: (row) =>
+                      row['updatedAt'] == null ? null : _time(row['updatedAt']),
+                ),
+              ],
+              onOpen: actions.select
+                  ? (row) => onSelect(row['id'] as String)
+                  : null,
             ),
           if (hasMore)
             _ActionButton('Ещё задания', actions.read ? onMore : null),
@@ -1212,6 +1257,7 @@ class AutomationJobsSection extends StatelessWidget {
                     label: _jobState(job!['state']),
                     tone: _jobTone(job!['state']),
                   ),
+                  ..._jobObservationFields(jobObservation),
                   if (job!['state'] == 'unknown')
                     const DeckNotice(
                       title: 'Исход не подтверждён',
@@ -1798,7 +1844,7 @@ class AutomationProfileEditorDialog extends StatelessWidget {
             onChanged: onBodyChanged,
             minLines: 8,
             maxLines: 16,
-            decoration: InputDecoration(errorText: error, errorMaxLines: 20),
+            decoration: InputDecoration(errorText: error),
             style: BrandTypography.log.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),

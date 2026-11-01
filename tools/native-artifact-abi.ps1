@@ -11,7 +11,7 @@ function Get-NativeArtifactAbiEvidence {
     $pe=[BitConverter]::ToInt32($bytes,60)
     if ($pe -lt 64 -or $pe -gt $bytes.Length-26 -or [BitConverter]::ToUInt32($bytes,$pe) -ne 0x4550 -or
         [BitConverter]::ToUInt16($bytes,$pe+4) -ne 0x8664 -or [BitConverter]::ToUInt16($bytes,$pe+24) -ne 0x20b) { throw 'Native ABI is not PE32+ x64.' }
-    $binding=Get-ServerDeckBindingSource -WorkspaceRoot $NativeIsarRepository -PackageConfig 'packages/serverdeck_locald/.dart_tool/package_config.json'
+    $binding=Get-ServerDeckBindingSource -WorkspaceRoot $NativeIsarRepository -PackageConfig 'packages/serverdeck_engine/.dart_tool/package_config.json'
     $bindingRoot=$binding.root
     if ($binding.bindingVersion -cne $recipe.bindingVersion) { throw 'Native ABI binding version mismatch.' }
     $bindings=Join-Path $bindingRoot 'lib/src/native/bindings.dart'

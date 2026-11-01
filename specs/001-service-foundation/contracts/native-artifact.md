@@ -1,5 +1,13 @@
 # Native artifact provenance and qualification — T232/T233
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-engine.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plan](../plan.md), [tasks](../tasks.md), [runtime](runtime-storage.md). Constitution VIII / FR-SVC-001/019 / T045/T207. This is a build/distribution contract; storage schema1, Local API1.0, Dart Isar/core/generator/flutter libs3.3.2, crypto custody and user behavior remain unchanged.
 
 ## Decision and activation
@@ -229,27 +237,27 @@ The bundle path guard rejects both the exact `.local/native-isar` root and all i
 
 `native-artifact-abi.ps1` validates the complete candidate, PE32+x64, safe Windows library loading and all93 symbols of the resolved Isar3.3.2 bindings, including direct core finalizer lookups. Bind the generated bindings and core files by hash; compare the complete ABI evidence again after the suites. Check Isar version and pinned MDBX tag against recipe, free the DLL handle in finally and verify DLL bytes remain unchanged. This input check is part of compatibility, not a runtime selection override.
 
-Each phase has a fresh named log, recorded elapsed duration and exact SHA256. Preserve separate normal-bundles/Debug and Release before later fault targets replace standard output; validate all three binary hashes against their testOnly=false manifests, safe complete directory copies and identical199-file notice trees. Rebind only retained manifest appRoot. The available suite must report all14 names in the exact current controller order, and the compatibility inputs bind both its result and all14 logs. Require the runtime diagnostic success marker and an unchanged source snapshot, candidate manifest and ABI inputs. Preserve failures and refuse partial success.
+Each phase retains a named log/duration/hash. Debug and Release retained bundles must have format4 metadata, exact current five-lock transcript buildId, matching appRoot/configuration/testOnly=false, actual app/Isar/optional executor hashes and no old separate exe. Keep complete safe bundle copies and matching199-file native notice trees. Rebind only a retained manifest's absolute appRoot to its retained location; no workspace data/schema migration is allowed. Compare recorded native input, preserved normal-bundle digests and restoration records as before; no destructive cleanup or process termination is authorized.
 
 After the candidate scope has finished and restored both normal output directories with verified digests, write an immutable fresh compatibility-receipt.json with state `compatibility-passed-unreviewed`. Its six evidence bindings cover source-snapshot.json, abi.json, normal-bundles.json, compatibility-inputs.json, context.json and bundle-preservation.json; those records bind phase logs, suite evidence and retained bundles. Flags distributionReady/fullAcceptance/activated remain false. A failed phase writes a separate failure record with phase/completed evidence; it never emits a successful receipt. Full independent review and subsequent qualified-provider/activation work are mandatory separate gates. This controller does not select an active artifact, publish binaries, alter task completion or establish full001.1 acceptance.
 
 ### Compatibility evidence validation before selection
 
-`Get-NativeArtifactCompatibility` in native-artifact-compatibility.ps1 accepts only an owned qualification directory's compatibility-receipt.json. Validate the exact six evidence names/order/hashes, unreviewed false readiness flags, finished preserved context, recorded source inventory/tree digest, fourteen ordered phase/log bindings, fourteen ordered current available results/logs and their exclusions, diagnostics marker, current ABI evidence, retained normal bundle manifests/binaries/notices and bound restoration records. Prior normal outputs may legitimately be rebuilt after restoration; the validator checks the immutable restoration record and retained inputs, rather than demanding that mutable normal outputs forever equal their former hashes. It does not activate anything or establish independent-review approval.
+`Get-NativeArtifactCompatibility` validates only the current embedded source profile in an owned compatibility-receipt.json: six evidence names/order/hashes, false readiness flags, finished preserved context, recorded source inventory/tree digest, sixteen ordered phase/log bindings, fourteen required runtime child phases and their fifteen evidence references, diagnostics marker, actual ABI, two retained format4 bundles and notices, preservation/restoration and source/receipt recheck. Phase policy is pure metadata; it never runs or proves those native scenarios. Exact current profile is specified in the T319 amendment below.
 
-Default use is a read-only audit returning currentSourceMatches. This allows historical evidence to remain inspectable; false never means eligible for selection. Every activation/normal qualified-selection caller must pass RequireCurrentSource, which refuses an outdated source snapshot before expensive evidence validation. Recompute the source snapshot at the end to reject changes during validation. New tooling/spec/code inputs require a new current compatibility invocation before activation. The shared bundle tree helper moved unchanged from native-artifact.ps1 into this module; provider imports it normally.
+Default use returns currentSourceMatches for audit of the current-format profile. There is no older architecture/shortened evidence parser, even when source differs. Every activation/qualified-selection caller must still pass RequireCurrentSource; false source equality never means eligible. Recompute source snapshot at completion and rehash the receipt, then revalidate the whole chain on later selection. No raw machine/environment/secret data is an approval.
 
 `test-native-artifact-compatibility.ps1 -Receipt <historical-complete-receipt> -AlternateAvailableResult <other-complete-suite-result>` validates real retained evidence and eleven baseline refusals: outdated source, claimed activation, artifact traversal, evidence traversal, changed phase log, missing phase, reordered phase, coherently rehashed broken recorded source digest, substitution of another successful suite, rewritten native payload/inventory/tree and changed copied provenance manifest. For a historical thirteen-phase receipt it additionally coherently rebinds the copied source snapshot, context and inputs to the current source and requires refusal of the old available scope, yielding twelve refusals. A historical fourteen-phase receipt uses the eleven baseline cases. Original receipts/artifacts remain untouched and all fixtures are retained. Normal qualified provider selection and activation follow the next section and require their own acceptance evidence; these refusal tests do not establish successful activation.
 
 Require exactly one absolute AVAILABLE_ACCEPTANCE_RESULT marker in the bound available phase log, normalized to the same owned result referenced by availableEvidence. A coherently rehashed alternate successful suite must refuse. For both retained notice copies, hash native/native-artifact.json against the original artifact manifest; require the exact196 non-DLL payload inventory with matching names/hashes/lengths and independently hash every physical payload. Verify the combined notice text hash and unchanged full native aggregate. The regression uses an actual older successful suite and coherently updates all enclosing hashes in copied-fixture substitutions. These checks establish structural links before independent approval; they do not change the original completed receipt or claim current qualification.
 
-The current available scope appends `ui-normal-owner-recovery` after `ui-unknown-inflight`:14 canonical ordered phases and15 evidence references (result plus14 logs). A current-source receipt with only the old13 phases must fail. Historical inspection may accept the original canonical13-phase order with14 references only when currentSourceMatches=false, or the canonical14-phase order with15 references. Both layouts still require exact phase names/order, the bound RESULT marker, passed typed flags, exclusions and all other receipt/ABI/bundle/source checks. This does not qualify or reactivate a historical result. The top-level qualification controller still has14 phases; its single available-native-ui phase now contains14 child phases.
+The required runtime evidence has14 ordered child phases and15 references (result plus logs), including ui-normal-owner-recovery after ui-unknown-inflight. The old13-child/14-reference alternative is removed, regardless of source equality. All typed passed flags, bound marker, hashes, exclusions, ABI/bundle/receipt checks remain mandatory. The top-level profile now has16 phases because engine and MCP analyses/unit phases replace the deleted locald pair. Runtime IDs remain evidence labels, not permission to execute deleted harness or to claim current native qualification.
 
 ### Reviewed qualification and local build activation
 
 `activate-native-isar.ps1 -CompatibilityReceipt <current-complete-receipt> -ReviewEvidence <completed-independent-review-record>` is explicit build-only activation. native-artifact-activation.ps1 requires current-source compatibility, a completed separate-subagent review record, matching receipt/source hashes, zero findings and ready conclusions for controller, qualified normal provider and activation workflow. The record is a primary agent's faithful summary of an actual completed review, not emitted by the test controller and not a cryptographic identity attestation. Developer-owned local build files are trusted inputs; this is no product user authorization mechanism. No binaries/source/installer publication or full product acceptance is authorized by this command.
 
-Review JSON is bounded1MiB under `.local/audits/t233-compatibility-clean-review-GUID.json`, schema1/kind summary-of-completed-independent-compatibility-review, reviewer `/root/<subagent>`, integer findingCount=0, boolean currentCompatibilityResultVerified=true, ready controllerReadiness/qualifiedNormalProviderReadiness/activationWorkflowReadiness, exact compatibilityReceipt/compatibilityReceiptSha256/sourceSnapshotSha256, and false distributionReady/fullAcceptance/activated. scope must include native-artifact.ps1, native-artifact-compatibility.ps1, native-artifact-activation.ps1, activate-native-isar.ps1, native-artifact-abi.ps1, test-native-isar.ps1, run-foundation.ps1 and this contract, with actual source hashes. Optional task/quickstart journal hashes are historical and do not invalidate approval; qualification source snapshot already excludes those mutable journals. Missing decisions/verdicts, a source-only review or an earlier receipt cannot approve activation.
+Review JSON is bounded1MiB under `.local/audits/t233-compatibility-clean-review-GUID.json`, schema1/kind summary-of-completed-independent-compatibility-review, reviewer `/root/<subagent>`, integer findingCount=0, boolean currentCompatibilityResultVerified=true, ready controllerReadiness/qualifiedNormalProviderReadiness/activationWorkflowReadiness, exact compatibilityReceipt/compatibilityReceiptSha256/sourceSnapshotSha256, and false distributionReady/fullAcceptance/activated. scope must include native-artifact.ps1, native-artifact-compatibility.ps1, native-artifact-activation.ps1, activate-native-isar.ps1, native-artifact-abi.ps1, test-native-isar.ps1, run-serverdeck.ps1 and this contract, with actual source hashes. Optional task/quickstart journal hashes are historical and do not invalidate approval; qualification source snapshot already excludes those mutable journals. Missing decisions/verdicts, a source-only review or an earlier receipt cannot approve activation.
 
 Create a fresh immutable qualification-receipt-GUID.json beside the compatibility receipt, state reviewed-compatibility-qualified/approvalScope native-build-compatibility-only, with exact compatibility/review hashes, artifact/DLL/source bindings and false distributionReady/fullAcceptance. Revalidate it before publication. Preserve any previous bounded regular active.json bytes in the qualification directory, prepare a fresh sibling and atomically replace only `.local/native-isar/active.json`. Keep an immutable `.local/native-isar-activation-established.json` requirement marker before the final pointer replacement; even interrupted publication then requires repair/retry rather than cache fallback. Failed/prepared records remain local evidence; no cleanup. Activation inside a running candidate scope is forbidden. Supported workflow remains sequential.
 
@@ -289,3 +297,47 @@ Once packages/serverdeck_mcp is present, cold runner dependency preparation incl
 ## Pinned repository binding source
 
 Once the runtime is selected from third_party/isar_community, qualification resolves its package_config rootUri relative to that package_config file, accepts only the exact plain repository vendor directory and package identity isar_community3.3.2+serverdeck.1, and keeps native ABI/export/version checks at3.3.2. An arbitrary path, hosted-source substitution, changed identity, reparse traversal or missing input is refused. The full retained vendor tree (runtime, manifests, analysis configuration, LICENSE and provenance) enters the existing source snapshot, so any change invalidates qualification without changing receipt phase order. Third-party notice collection includes the local runtime's exact retained LICENSE and provenance with its actual root/locald resolution contexts; it cannot silently drop the runtime merely because its lock source is path. No native DLL promotion, compatibility approval, activation or release gate is waived.
+
+
+## T319 — current embedded manifest/source-phase gate (2026-10-31)
+
+This amendment replaces the obsolete normal-bundle format1/locald gate and
+historical shortened acceptance branch. It does not mint qualification receipts,
+remove native requirements or change the native artifact/qualification schema1
+container, candidate-context binding, separate-review requirement or activation
+state machine. Old contents no longer satisfy the current exact profile.
+
+The sixteen ordered top-level phases are abi, root-format, root-analyze,
+root-tests, serverdeck_protocol-analyze/tests, serverdeck_windows-analyze/tests,
+serverdeck_engine-analyze/tests, serverdeck_mcp-analyze/tests, bundle-Debug,
+bundle-Release, available-native-ui, runtime-diagnostics (each pair expands to
+its two named phases). Every record has exact string name and matching .txt log,
+typed passed=true and lowercase64hex logSha256. Missing/reordered/duplicate/failed
+or old locald phases refuse before any evidence can become qualified. The real
+reader still hashes every referenced log; pure policy success alone is not proof.
+There is no reduced13-child historical evidence option. Fourteen runtime child
+IDs, their actual result/log/marker/exclusion checks, ABI and independent review
+requirements remain unchanged and unexecuted by this task.
+
+For each retained bundle, check the actual manifest file <=16KiB before reading.
+ConvertTo-EmbeddedBundleManifest accepts only exact format4/product/API1.1/schema3/
+normalfalse/root/config/hash fields, including integer types. It reconstructs
+expected buildId from canonical commit/config and exactly five recorded source
+lock hashes, obtained by current Get-EmbeddedBundleLockPaths. Missing current
+locks, old locald locks, wrong selected DLL hash, old extra exe or case aliases
+refuse. Copy validated scalar hashes before returning. New composer and retained
+validator share the same target construction, field/hash/UTF8 limits; unpaired
+UTF16 root input refuses with a fixed error. Actual file hashes and legacy-exe
+absence are separately checked by the filesystem reader. Metadata is neither
+native authorization nor proof of actual execution. No version/role/provider
+selector is caller-controlled and no fallback alias is supplied.
+
+RAM acceptance extends the manifest suite by8cases: retained JSON/map Debug and
+Release, old formats/scalar types/extra fields, testOnly/type errors, mismatched
+source locks/DLL/root, case-colliding hash keys and malformed Unicode, immutable
+input snapshots, and phase missing/legacy/reorder/failed/type/log/hash refusals.
+Static AST/review checks actual reader-to-policy wiring and preserved physical
+hash/ABI/current-source/review gates. No native provider, ABI, filesystem fixture,
+collector/build/activation/UI/process runtime is executed. Other obsolete native
+qualification procedure/producer documentation and full T271/T276 cleanup remain
+open; this current gate change is not whole native qualification readiness.

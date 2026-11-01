@@ -1,3 +1,5 @@
+. "$PSScriptRoot/embedded-bundle.ps1"
+. "$PSScriptRoot/native-compatibility-policy.ps1"
 . "$PSScriptRoot/native-artifact-abi.ps1"
 . "$PSScriptRoot/native-artifact-source-snapshot.ps1"
 
@@ -71,27 +73,15 @@ function Get-NativeArtifactCompatibility {
     $inputs=Read-NativeIsarArtifactJson (Join-Path $root 'compatibility-inputs.json')
     if ($inputs.schemaVersion -ne 1 -or $inputs.artifactManifestSha256 -cne $record.artifactManifestSha256 -or
         $inputs.dllSha256 -cne $record.dllSha256 -or $inputs.sourceSnapshotSha256 -cne $record.sourceSnapshotSha256) { throw 'Native compatibility inputs mismatch.' }
-    $phases=@('abi','root-format','root-analyze','root-tests','serverdeck_protocol-analyze','serverdeck_protocol-tests',
-        'serverdeck_windows-analyze','serverdeck_windows-tests','serverdeck_locald-analyze','serverdeck_locald-tests',
-        'bundle-Debug','bundle-Release','available-native-ui','runtime-diagnostics')
-    if ($inputs.phases.Count -ne 14) { throw 'Native compatibility phase inventory incomplete.' }
-    for ($index=0;$index -lt 14;$index++) {
-        $phase=$inputs.phases[$index]
-        if ($phase.name -cne $phases[$index] -or $phase.passed -isnot [bool] -or $phase.passed -ne $true -or
-            $phase.log -cne ($phases[$index] + '.txt')) { throw 'Native compatibility phase identity/order invalid.' }
+    Assert-NativeCompatibilityPhases @($inputs.phases)
+    foreach ($phase in $inputs.phases) {
         Assert-NativeCompatibilityHash (Join-Path $root $phase.log) $phase.logSha256
     }
     $availableNames=@('compiled-core-storage','compiled-commit-recovery','compiled-api-commit-recovery','compiled-initialization-recovery',
         'compiled-secret-markers','normal-prerequisites','compiled-bootstrap-owner-loss','ui-two-window','ui-three-window',
         'ui-observer-crash','ui-loss-recovery','ui-credential-lifecycle','ui-unknown-inflight')
-    # The old canonical scope is retained for historical inspection only.
-    # A current-source receipt must include the newly accepted owner UI case.
-    if ($inputs.availableEvidence.Count -eq 14 -and -not $sourceMatches) {
-        $availablePhaseCount=13
-    } else {
-        $availableNames += 'ui-normal-owner-recovery'
-        $availablePhaseCount=14
-    }
+    $availableNames += 'ui-normal-owner-recovery'
+    $availablePhaseCount=14
     if ($inputs.availableEvidence.Count -ne ($availablePhaseCount + 1) -or $inputs.availableEvidence[0].file -cnotmatch
         '^\.local/available-acceptance-[a-f0-9]{32}/result\.json$') { throw 'Native compatibility available evidence invalid.' }
     $resultMarkers=@(Get-Content -LiteralPath (Join-Path $root 'available-native-ui.txt') | Where-Object {$_ -cmatch '^AVAILABLE_ACCEPTANCE_RESULT='})
@@ -127,10 +117,19 @@ function Get-NativeArtifactCompatibility {
         if ($bundle.configuration -cne $configuration -or $bundle.directory -cne ('normal-bundles/' + $configuration)) { throw 'Native compatibility bundle identity invalid.' }
         $directory=Join-Path $root $bundle.directory
         if ((Get-NativeIsarSnapshotDigest (Get-NativeArtifactBundleSnapshot $directory)) -cne $bundle.treeSha256) { throw 'Native compatibility retained bundle changed.' }
-        $manifest=Read-NativeIsarArtifactJson (Join-Path $directory 'foundation.manifest.json')
-        if ($manifest.format -ne 1 -or $manifest.configuration -cne $configuration -or $manifest.testOnly -isnot [bool] -or
-            $manifest.testOnly -ne $false -or $manifest.appRoot -cne $directory -or $manifest.sha256.'libisar.dll' -cne $record.dllSha256) { throw 'Native compatibility normal manifest invalid.' }
-        foreach ($name in @('serverdeck.exe','locald.exe','libisar.dll')) { Assert-NativeCompatibilityHash (Join-Path $directory $name) $manifest.sha256.$name }
+        $manifestPath=Join-Path $directory 'foundation.manifest.json'
+        Assert-NativeIsarPlainPath $manifestPath
+        if ((Get-Item -LiteralPath $manifestPath -Force).Length -gt 16384) { throw 'Native compatibility manifest oversized.' }
+        $lockHashes=[ordered]@{}
+        foreach ($name in Get-EmbeddedBundleLockPaths) {
+            if (-not $sourceHashes.ContainsKey($name)) { throw 'Native compatibility lock source missing.' }
+            $lockHashes[$name]=$sourceHashes[$name]
+        }
+        $manifest=ConvertTo-EmbeddedBundleManifest -InputObject (Read-NativeIsarArtifactJson $manifestPath) -Configuration $configuration -AppRoot $directory -DllSha256 $record.dllSha256 -LockHashes $lockHashes
+        foreach ($name in $manifest.sha256.Keys) { Assert-NativeCompatibilityHash (Join-Path $directory $name) $manifest.sha256[$name] }
+        foreach ($legacy in @('locald.exe','mcp.exe')) {
+            if (Test-Path -LiteralPath (Join-Path $directory $legacy)) { throw 'Native compatibility legacy executable present.' }
+        }
         $notices=Join-Path $directory 'notices'
         $noticeTree=Get-NativeArtifactBundleSnapshot $notices
         if ($noticeTree.Count -ne 199 -or (Get-NativeIsarSnapshotDigest $noticeTree) -cne $bundle.noticeTreeSha256) { throw 'Native compatibility notices changed.' }

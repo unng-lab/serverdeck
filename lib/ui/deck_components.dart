@@ -4,6 +4,12 @@ import 'package:flutter/services.dart';
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
 
+export 'deck_controls.dart';
+export 'deck_collections.dart';
+export 'deck_patterns.dart';
+export 'deck_history.dart';
+export 'deck_page.dart';
+
 /// Presentation meaning supplied by the owner of the operation/observation.
 enum DeckTone {
   neutral,
