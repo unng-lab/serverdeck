@@ -1,5 +1,13 @@
 # Durable automation records v1
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Model](../data-model.md), [MCP](mcp.md), [executor](executor.md), [tasks](../tasks.md).
 
 This fixes the storage/wire representation of existing job/approval/history requirements for T002/T007/T021–T027. Individual DTO parsing never grants live permission, admits a job, updates desired state or proves a host outcome. The schema2 loader and coordinator must additionally validate all references, exact plan/body digests, current admission policy, quotas and atomic transitions. No generic JSON payload is an executable or an authority object.
@@ -94,3 +102,22 @@ Full retained graph validation additionally enforces creation and owner decision
 Shared immutable structural DTOs and transition checks live in packages/serverdeck_protocol/lib/automation/job_records.dart (T002); complete reference resolution, live policy, atomic CAS/event allocation/receipt/admission and safe GC are locald automation/store.dart and jobs/authority services (T007/T021–T027). Full Plan/Desired input/resource derivation belongs to trusted plan/compiler validation; the partial identity fields above are never enough to admit an effect. No automation collection may be loaded as opaque or discarded by schema2 startup because its validator is missing.
 
 Tests must cover exact fields/enums/ranges/timestamps, owner/null initiator vs object grant origin (including owner approval of G), authority tuple/reference mismatch, state/outcome/cancel combinations and every allowed/forbidden edge, same-plan single job, ordered/unique event sequences and overflow, blocked/expired/stale/current-policy separation, cross-workspace references, immutable input/output copies, byte/depth limits and rejection of private free text in structured history. Stable acknowledgement replay after later profile labels/head/archive, grant replacement, approval consumption and job completion must preserve the original result across restart; current state is read separately. T007 tests must prove no expiry at30days or later, exactly10000receipt admission boundary/no partial commit, retained replay at quota, pinned reference refusal to GC and RESOURCE_LIMIT at pinned entity quotas. DTO tests prove structural validation only; actual Isar transaction/restart/concurrency and executor/systemd Docker/VM acceptance remain separately required.
+
+
+## Runtime observation view beside a job — T384
+
+LocalJobObservationView is not an Isar/schema3 record and is never nested inside
+AutomationJobRecord or an authorityRef. Existing format3 data includes it beside
+the job in jobs_get/jobs_list and owner equivalents. Closed exact fields:
+generation UUIDv4, attemptId UUIDv4, state attached|detached|stale, lastSequence
+nullable0..int64max remote sequence, observedAt nullable canonical UTCms. Sequence
+and timestamp are both null or both present; attached/stale require a sample.
+The consumer must match generation and job.hostAttemptId before accepting it.
+This structural check grants no access, proof, consent or reusable permission.
+
+The engine keeps opaque observer bindings and private current target/host tuple
+checks, a1250entry bound and5s monotonic freshness; none are persisted or exposed
+as capabilities. Reopen has no observation sample even for a retained terminal
+job. All existing durable IDs, transitions/outcomes/receipts, unknown occupancy
+and current-authorization rules above remain unchanged. See existing embedded-host
+and001 embedded-engine contracts for the full lifecycle and recovery acceptance.

@@ -3,7 +3,9 @@ import 'package:serverdeck_protocol/profile_validation.dart';
 import 'package:serverdeck_windows/profile_input.dart';
 
 import '../theme/motion.dart';
+import '../theme/brand_tokens.dart';
 import '../shell/form_keyboard.dart';
+import '../ui/deck_components.dart';
 
 enum CredentialChoice { keep, remove, password, privateKey }
 
@@ -113,47 +115,94 @@ class CredentialInputState extends State<CredentialInput> {
     super.dispose();
   }
 
+  Widget _keyInstruction() => Builder(
+    builder: (context) {
+      final theme = Theme.of(context);
+      final decorator = context
+          .findAncestorWidgetOfExactType<InputDecorator>()!;
+      final states = <WidgetState>{
+        if (!decorator.decoration.enabled) WidgetState.disabled,
+        if (decorator.isFocused) WidgetState.focused,
+        if (decorator.isHovering) WidgetState.hovered,
+        if (decorator.decoration.error != null ||
+            decorator.decoration.errorText != null)
+          WidgetState.error,
+      };
+      // A custom helper does not inherit InputDecorator's helperStyle. Retain
+      // its Material3 typography/role and effective theme/state overrides.
+      // Keep the instruction opaque when the editor is locked, like its value.
+      final style = theme.textTheme.bodySmall!
+          .copyWith(color: theme.colorScheme.onSurfaceVariant)
+          .merge(
+            WidgetStateProperty.resolveAs(
+              decorator.decoration.helperStyle,
+              states,
+            ),
+          );
+      return Text(
+        'Для ввода ключа включите показ или выберите файл',
+        style: style.copyWith(color: style.color?.withAlpha(255)),
+        overflow: TextOverflow.visible,
+      );
+    },
+  );
+
   Widget _secret(
     TextEditingController controller,
     String label, {
+    required String id,
     bool multiline = false,
-  }) => SubmitOnEnter(
-    enabled:
-        widget.enabled &&
-        !picking &&
-        !(revealed && multiline) &&
-        widget.onSubmit != null,
-    child: TextFormField(
-      controller: controller,
-      enabled: widget.enabled && !picking,
-      // Flutter's obscured one-line editor strips LF on platform edits. PEM
-      // must remain verbatim: editing uses the explicitly revealed multiline
-      // view, while a picked key can stay hidden throughout.
-      readOnly: multiline && !revealed,
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: multiline && !revealed
-            ? 'Для ввода ключа включите показ или выберите файл'
-            : null,
-        helperMaxLines: 3,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      // Floating InputDecorator labels elide long instructions at200%.
+      // Keep the complete instruction visible, associated with its input.
+      ExcludeSemantics(
+        child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
       ),
-      obscureText: !revealed,
-      onFieldSubmitted: revealed && multiline
-          ? null
-          : (_) => widget.onSubmit?.call(),
-      minLines: revealed && multiline ? 3 : 1,
-      maxLines: revealed && multiline ? 6 : 1,
-      autocorrect: false,
-      enableSuggestions: false,
-      autofillHints: const [],
-      smartDashesType: SmartDashesType.disabled,
-      smartQuotesType: SmartQuotesType.disabled,
-    ),
+      const SizedBox(height: BrandSpacing.space8),
+      Semantics(
+        label: label,
+        child: SubmitOnEnter(
+          enabled:
+              widget.enabled &&
+              !picking &&
+              !(revealed && multiline) &&
+              widget.onSubmit != null,
+          child: TextFormField(
+            key: ValueKey('credential-$id'),
+            controller: controller,
+            enabled: widget.enabled && !picking,
+            // Material's default disabled style reduces value opacity to 0.38.
+            style: Theme.of(context).textTheme.bodyLarge,
+            // Flutter's obscured one-line editor strips LF on platform edits.
+            // PEM must remain verbatim: editing uses the explicitly revealed
+            // multiline view, while a picked key can stay hidden throughout.
+            readOnly: multiline && !revealed,
+            decoration: InputDecoration(
+              helper: multiline && !revealed ? _keyInstruction() : null,
+            ),
+            obscureText: !revealed,
+            onFieldSubmitted: revealed && multiline
+                ? null
+                : (_) => widget.onSubmit?.call(),
+            minLines: revealed && multiline ? 3 : 1,
+            maxLines: revealed && multiline ? 6 : 1,
+            autocorrect: false,
+            enableSuggestions: false,
+            autofillHints: const [],
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+          ),
+        ),
+      ),
+    ],
   );
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => DeckFormSection(
+    title: 'Доступ к серверу',
+    description: 'Существующий секрет не читается в форму. Сохранение не подключает сервер.',
     children: [
       MotionDropdown<CredentialChoice>(
         initialValue: choice,
@@ -169,7 +218,7 @@ class CredentialInputState extends State<CredentialInput> {
                   CredentialChoice.remove => 'Без секрета / удалить',
                   CredentialChoice.password => 'Новый пароль',
                   CredentialChoice.privateKey => 'Новый приватный ключ',
-                }, overflow: TextOverflow.ellipsis),
+                }),
               ),
             )
             .toList(),
@@ -181,30 +230,30 @@ class CredentialInputState extends State<CredentialInput> {
               })
             : null,
       ),
-      if (choice == CredentialChoice.password) _secret(password, 'Пароль'),
+      if (choice == CredentialChoice.password)
+        _secret(password, 'Пароль', id: 'password'),
       if (choice == CredentialChoice.privateKey) ...[
-        _secret(keyInput, 'Приватный ключ', multiline: true),
-        _secret(passphrase, 'Passphrase (необязательно)'),
+        _secret(keyInput, 'Приватный ключ', id: 'private-key', multiline: true),
+        _secret(passphrase, 'Passphrase (необязательно)', id: 'passphrase'),
         OutlinedButton(
           style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
           onPressed: widget.enabled && !picking ? _pick : null,
           child: Text(picking ? 'Чтение ключа' : 'Выбрать файл ключа'),
         ),
+        if (picking)
+          const DeckStatus(label: 'Ожидаем выбор файла ключа', pending: true),
       ],
       if (choice == CredentialChoice.password ||
           choice == CredentialChoice.privateKey)
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Показать введённый секрет'),
+          title: const DeckFocusLabel(child: Text('Показать введённый секрет')),
           value: revealed,
           onChanged: widget.enabled && !picking
               ? (value) => setState(() => revealed = value!)
               : null,
         ),
-      if (error != null) Text(error!),
-      const Text(
-        'Существующий секрет не читается в форму. Сохранение не подключает сервер.',
-      ),
+      if (error != null) DeckNotice(message: error!, tone: DeckTone.error),
     ],
   );
 }

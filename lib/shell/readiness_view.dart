@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:serverdeck_protocol/models.dart' show ErrorCode, ReadinessState;
 
-import '../theme/brand_theme.dart';
+import '../theme/brand_tokens.dart';
+import '../ui/deck_components.dart';
 
 class ReadinessView extends StatelessWidget {
   const ReadinessView({
     super.key,
     required this.state,
     this.reason,
+    this.workspaceBusy = false,
     this.onRetry,
     this.retryInProgress = false,
   });
 
   final ReadinessState state;
   final ErrorCode? reason;
+  final bool workspaceBusy;
   final VoidCallback? onRetry;
   final bool retryInProgress;
 
@@ -22,18 +25,24 @@ class ReadinessView extends StatelessWidget {
     if (state == ReadinessState.ready) {
       throw StateError('Ready requires the workspace shell');
     }
-    final title = switch (state) {
-      ReadinessState.starting => 'Запуск локальной службы',
-      ReadinessState.recovering => 'Восстановление локального пространства',
-      ReadinessState.storageBlocked => 'Локальное хранилище заблокировано',
-      ReadinessState.incompatible => 'Несовместимая версия локальной службы',
-      ReadinessState.stopping => 'Завершение работы локальной службы',
-      ReadinessState.unavailable => 'Локальная служба недоступна',
-      ReadinessState.ready => throw StateError(
-        'Ready requires the workspace shell',
-      ),
-    };
+    final title = workspaceBusy
+        ? 'Рабочее пространство было занято при запуске'
+        : switch (state) {
+            ReadinessState.starting => 'Запуск ServerDeck',
+            ReadinessState.recovering =>
+              'Восстановление локального пространства',
+            ReadinessState.storageBlocked =>
+              'Локальное хранилище заблокировано',
+            ReadinessState.incompatible =>
+              'Компоненты или данные ServerDeck несовместимы',
+            ReadinessState.stopping => 'Завершение работы ServerDeck',
+            ReadinessState.unavailable => 'ServerDeck недоступен',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
     final retryAvailable =
+        !workspaceBusy &&
         onRetry != null &&
         switch (state) {
           ReadinessState.storageBlocked ||
@@ -41,8 +50,50 @@ class ReadinessView extends StatelessWidget {
           ReadinessState.unavailable => true,
           _ => false,
         };
-    final theme = Theme.of(context);
-    final colors = theme.extension<BrandColors>()!;
+    final pending =
+        retryInProgress ||
+        {
+          ReadinessState.starting,
+          ReadinessState.recovering,
+          ReadinessState.stopping,
+        }.contains(state);
+    final tone = switch (state) {
+      ReadinessState.storageBlocked => DeckTone.error,
+      ReadinessState.incompatible => DeckTone.warning,
+      ReadinessState.unavailable => DeckTone.unavailable,
+      _ => DeckTone.running,
+    };
+    final stage = workspaceBusy
+        ? 'Этот экземпляр не открывал данные.'
+        : retryInProgress
+        ? 'Ожидаем результат текущей попытки.'
+        : switch (state) {
+            ReadinessState.starting ||
+            ReadinessState.recovering => 'Ожидаем результат запуска.',
+            ReadinessState.stopping => 'Ожидаем завершения работы ServerDeck.',
+            ReadinessState.unavailable => 'Локальное пространство недоступно.',
+            ReadinessState.incompatible => 'Требуется совместимая версия.',
+            ReadinessState.storageBlocked => 'Доступ к хранилищу заблокирован.',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
+    final nextStep = workspaceBusy
+        ? 'Используйте уже запущенное приложение. Если оно завершено, закройте это окно и запустите ServerDeck снова.'
+        : switch (state) {
+            ReadinessState.starting => 'Дождитесь готовности локального пространства. Данные появятся после проверки доступа.',
+            ReadinessState.recovering =>
+              'Дождитесь завершения восстановления локального пространства.',
+            ReadinessState.stopping =>
+              'Дождитесь завершения ServerDeck перед новым запуском.',
+            ReadinessState.unavailable =>
+              'Повторите проверку состояния ServerDeck.',
+            ReadinessState.incompatible => 'Проверьте целостность комплекта ServerDeck и поддерживаемый формат данных. Исходные данные сохранены.',
+            ReadinessState.storageBlocked => 'Проверьте доступность защищённого локального хранилища, затем повторите запуск.',
+            ReadinessState.ready => throw StateError(
+              'Ready requires the workspace shell',
+            ),
+          };
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -54,73 +105,58 @@ class ReadinessView extends StatelessWidget {
             ),
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(BrandSpacing.space24),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: Semantics(
                     liveRegion: true,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            style: theme.textTheme.titleLarge,
-                            textAlign: TextAlign.center,
+                    child: DeckSurface(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
-                        ),
-                        if (reason != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: BrandSpacing.space16),
+                          DeckStatus(
+                            label: stage,
+                            tone: tone,
+                            pending: pending,
+                          ),
+                          if (reason != null && !workspaceBusy) ...[
+                            const SizedBox(height: BrandSpacing.space16),
+                            Text(_reasonMessage(reason!)),
+                          ],
+                          const SizedBox(height: BrandSpacing.space16),
                           Text(
-                            _reasonMessage(reason!),
-                            textAlign: TextAlign.center,
+                            retryInProgress
+                                ? 'Текущая попытка уже выполняется. Дождитесь результата.'
+                                : nextStep,
                           ),
-                        ],
-                        if (state == ReadinessState.starting ||
-                            state == ReadinessState.recovering) ...[
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Ожидаем результат запуска.',
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                        if (retryAvailable) ...[
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed: retryInProgress ? null : onRetry,
-                            style: ButtonStyle(
-                              minimumSize: const WidgetStatePropertyAll(
-                                Size(48, 48),
-                              ),
-                              shape: WidgetStatePropertyAll(
-                                RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                          if (retryAvailable) ...[
+                            const SizedBox(height: BrandSpacing.space24),
+                            DeckActions(
+                              children: [
+                                FilledButton(
+                                  onPressed: retryInProgress ? null : onRetry,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  child: const Text(
+                                    'Повторить запуск',
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
-                              ),
-                              side: WidgetStateProperty.resolveWith(
-                                (states) => BorderSide(
-                                  color: states.contains(WidgetState.focused)
-                                      ? colors['focus']
-                                      : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            child: const Text(
-                              'Повторить запуск',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          if (retryInProgress) ...[
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Ожидаем результат текущей попытки.',
-                              textAlign: TextAlign.center,
+                              ],
                             ),
                           ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -134,13 +170,14 @@ class ReadinessView extends StatelessWidget {
 }
 
 String _reasonMessage(ErrorCode reason) => switch (reason) {
-  ErrorCode.unsupported => 'Эта функция локальной службы пока недоступна.',
-  ErrorCode.unauthorized => 'Не удалось подтвердить доступ к локальной службе.',
-  ErrorCode.forbidden => 'Локальная служба не разрешила это действие.',
-  ErrorCode.incompatible => 'Версии клиента и локальной службы несовместимы.',
+  ErrorCode.unsupported => 'Эта функция ServerDeck пока недоступна.',
+  ErrorCode.unauthorized => 'Не удалось подтвердить доступ к ServerDeck.',
+  ErrorCode.forbidden => 'ServerDeck не разрешил это действие.',
+  ErrorCode.incompatible =>
+    'Компоненты приложения или формат данных несовместимы.',
   ErrorCode.notReady => 'Локальное пространство ещё не готово.',
   ErrorCode.storageBlocked => 'Доступ к локальному хранилищу заблокирован. Требуется проверка локального пространства.',
-  ErrorCode.validation => 'Локальная служба отклонила некорректный запрос.',
+  ErrorCode.validation => 'ServerDeck отклонил некорректный запрос.',
   ErrorCode.notFound => 'Запрошенные локальные данные не найдены.',
   ErrorCode.alreadyExists => 'Такие локальные данные уже существуют.',
   ErrorCode.revisionConflict =>
@@ -149,7 +186,7 @@ String _reasonMessage(ErrorCode reason) => switch (reason) {
     'Запрос повтора отличается от исходного действия.',
   ErrorCode.resourceLimit =>
     'Достигнуто ограничение ресурсов локального пространства.',
-  ErrorCode.timeout => 'Время ожидания ответа локальной службы истекло.',
-  ErrorCode.serviceUnavailable => 'Не удалось связаться с локальной службой.',
-  ErrorCode.internal => 'Локальная служба не смогла завершить действие.',
+  ErrorCode.timeout => 'Время ожидания ответа ServerDeck истекло.',
+  ErrorCode.serviceUnavailable => 'ServerDeck сейчас недоступен.',
+  ErrorCode.internal => 'ServerDeck не смог завершить действие.',
 };

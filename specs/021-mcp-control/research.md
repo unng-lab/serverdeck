@@ -1,5 +1,7 @@
 # Research decisions — 021
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
 **Date**: 2026-10-21. Research only; no runtime acceptance claimed. Spec Kit Plan delegated read-only technical research to ansible_research; conclusions below incorporated into contracts.
 
 ## MCP transport

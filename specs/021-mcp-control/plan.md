@@ -1,5 +1,25 @@
 # Implementation Plan: MCP и Ansible
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Последнее указание пользователя — unit only**: все прежние собственные тесты,
+fixtures и harness удаляются; пишутся только unit-тесты под эту задачу. Дизайн,
+widget/visual/integration/native/реальные SSH/container проверки сейчас не выполняются.
+Исторические результаты ниже остаются историей, не текущим gate. Изменение не
+разрешает потерять функции, данные, права или проверки целевого поведения в новых units.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](../001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
+**Поправка 2026-10-30**: [основа001](../001-service-foundation/spec.md)
+заменяет обязательный locald встроенным engine. [Adoption/return](../001-service-foundation/contracts/embedded-migration.md)
+сохраняет нынешний ServerDeckNext; hard cutover исключает только сервис до него.
+[MCP app host](../021-mcp-control/contracts/embedded-host.md) заменяет autolaunch/identity,
+сохраняя tools/grants. Scope проверок — static/unit/widget без native claims.
+
 **Feature**: 021-mcp-control | **Date**: 2026-10-21 | **Spec**: [spec.md](spec.md)
 **Status**: Design review3 completed with no findings; ready for staged implementation. Implement started; runtime/acceptance not complete.
 
@@ -55,7 +75,7 @@ Delegation is explicit owner consent to declared targets/effects within exact di
 - packages/serverdeck_windows/lib/: bridge verified image role, existing pipe identity/OS custody.
 - executor/{serverdeck_executor/,tests/,packaging/,requirements.lock}: root-owned Linux bridge/supervisor/compiler, protocol/locks/receipts/Ansible.
 - lib/{automation/,access/,servers/}: UI grants/revisions/approval/jobs/state/logs, existing shell integration.
-- tools/{build-mcp.ps1,test-mcp.ps1,test-mcp-vm.ps1}: build/validation only owned synthetic fixtures.
+- tools/{run-serverdeck.ps1,test-unit.ps1}: single-executable source build and RAM-only validation; no standalone MCP build or native fixtures.
 
 ## Boundaries and contracts
 
@@ -126,3 +146,43 @@ the existing immutable preflight runtimeVersion, while observed values preserve
 verbatim Unicode on wire and in retained evidence. Enrollment metadata is a
 protected HMAC-bound sidecar, never a replacement for current native/grant/target
 or per-step plan/delegation authority.
+
+
+## Текущая проверка
+
+Только новые unit tests текущей задачи и обязательные format/analyze/review.
+`./tools/test-unit.ps1` запускает весь текущий root/package scope. Прежний
+>80% gate отменён; не восстанавливать coverage pipeline или старые fixtures.
+
+## История: отменённый MVP unit verification
+
+Весь остаток этого раздела superseded последним указанием пользователя.
+Сохранён для истории; команды/границы/метрики не являются текущим gate.
+
+The 2026-10-23 user instruction supersedes historical integration acceptance
+plans for these MVP tasks. Preserve existing integration tests as optional
+historical tooling; do not run them, remove them to improve a percentage, or use
+their hits toward unit coverage. Unit tests run through an explicit reviewed
+selection, without real OS process/pipe/credential stores, external network,
+real Isar databases or Docker. Pure validation, state machines, serializers,
+policy decisions and mocked I/O failures are in scope.
+
+Measure statement/line execution for every authored runtime source in app lib/,
+packages/serverdeck_{protocol,windows,locald,mcp}/{lib,bin}/ and Python
+executor/serverdeck_executor/. Dart generated *.g.dart and non-runtime tooling,
+third-party libraries and test code are outside the denominator. Collect fresh
+unit-only Dart VM and Python coverage, merge overlapping source-line hits once,
+and require covered*5 > executable*4. Publish per-module denominators/hits and
+total; a missing or stale report, missing runtime file or empty denominator fails
+closed. An unloaded file must contribute its actual executable lines with zero
+hits, or explicitly fail completeness until instrumentation supplies that census.
+Do not round80% up or average module percentages. No coverage-ignore annotations
+or new production authority bypasses may be added to meet the threshold.
+
+Record selected tests, source fingerprints and collection commands with results.
+Add useful unit cases for public behavior and failure boundaries; if isolation
+needs a production change, retain existing authority and typed-service contracts.
+Run mandatory format/analyze/root Flutter checks as applicable. Isolated widget
+component tests with mocked services contribute to unit coverage; full application
+journeys and native/service interactions do not. Independent review checks both
+test behavior and the denominator/selection before reporting the gate passed.

@@ -66,3 +66,102 @@ API major1/storage schema1/credential wrapper1/receipt-key wrapper1. Стары�
 ## Native build artifact — T232/T233
 
 [Native artifact contract](contracts/native-artifact.md) defines build-only recipe, immutable candidate, dependency graph, source archive, qualification receipt and active pointer. These are tooling entities outside the user's Isar database: no row, credential envelope, workspace schema or Local API version change. State progression is prepared → built/unqualified → qualified → active; failure preserves the previous active artifact. Hash/source/test-snapshot mismatch invalidates qualification and blocks copying. The receipt records passed phases and exclusions separately; fullAcceptance=false does not become full product readiness.
+
+
+## Поправка 2026-10-30: embedded runtime и действующий schema3
+
+Предыдущие schema1 модели — история001.1; действующий storage уже включает schema3
+по021. Смена host не создаёт schema4. Сохраняются все поля/IDs/indexes/generated
+schemas foundation records, host_trust_records, automation_records и protected
+artifacts021. Источник в packages/serverdeck_locald/lib/storage/{records,
+host_trust_records,automation_records}.dart; при extraction переносить без layout drift.
+
+Новые entities только runtime: EngineHost(generation UUID, phase, capabilities,
+lease); OwnerSession/GrantedSession(opaque authority, generation, grant revision);
+ReadInterest(target revision tuple/readKind/existing operation handle/interests); LocalJobObservation
+(attemptId, attached/detached/stale, last sequence). Не сериализуются как действующие
+permissions после restart. Phase starting→ready→suspending/ready→stopping→closed либо
+CloseBlocked. Remote job.state не заменяется observer state; queued/running/unknown/
+terminal variants021 сохраняются. Unknown удерживает occupancy, missing remote
+attempt не not-started. Постоянные согласия/expiry/revoke/enrollment/history сохраняются,
+одноразовые permits не воскресают. Windows SID/entropy/receipt key не ротируются.
+Лимиты и lifecycle в [контракте](contracts/embedded-engine.md), adoption/return —
+[миграция](contracts/embedded-migration.md).
+
+## Целевой формат без compatibility
+
+После уточнения пользователя поддерживается только schema3. Старые schema1/2
+описания выше — история исходной001, не production reader/upgrade path. В новый
+engine переносятся только target-schema3 DTO/registry/parsers и semantic invariants.
+Legacy migration journals/rollback модели не переносятся. Direct open существующего
+целевого store сохраняет текущие ID/revisions/protected artifacts, не означает
+совместимость со старыми runtime/binary. Неизвестный формат не меняется и не сбрасывается.
+## T323 persistence dependency — 2026-10-31
+
+The [transactional storage contract](contracts/embedded-engine.md#t323t369t373--transactional-storage-dependency-2026-10-31)
+adds no persisted entity, schema version, migration, wire field or credential
+format. StoredRow remains nativeId + exact payload + nullable entityId over the
+same16 families. Provider, owned open attempt, handle and scoped transaction are
+ephemeral engine dependencies, not domain authority. Transaction state is
+active → committed/aborted; calls after settlement fail. Failed/unknown open or
+close retains the existing writer reservation and custody; it is not a reusable
+closed handle. Semantic graph/cross-reference/receipt validation remains the
+existing StateStore/snapshot model, independent of storage mechanics.
+
+
+## LocalJobObservation — T384 runtime refinement
+
+This refines the runtime entity above without changing persistent schema3.
+The public closed object has exactly generation(UUIDv4), attemptId(UUIDv4),
+state(attached|detached|stale), lastSequence(nullable remote int64>=0),
+observedAt(nullable UTCms receipt timestamp). lastSequence and observedAt are
+both null before any accepted root status and otherwise both non-null; attached
+and stale require a sample. The sequence is executor sequence, never the durable
+job event nextSequence. This object contains no permission or one-time challenge.
+
+An engine-owned entry also binds jobId/workspace/current generation, immutable
+hostAttemptId/hostId, and the actual executor session's current target revision,
+connection/access/trust tuple and registry digest. Opaque per-driver bindings
+have private constructors/owner identity and are never serialized. Replacement
+or removal invalidates old bindings. One entry per retained job, cap1250, at most
+one current observer. A missing current server or changed tuple invalidates a
+sample; no sample means detached, a retained invalidated sample means stale.
+Retired jobs may be pruned only after absence from the validated store graph.
+
+No observation row, timestamp, sequence floor or callback binding survives
+restart as authority. Reopen recreates detached views with null sequence/time
+for every retained job; validated queued intent becomes cancelled/none, while
+running/cancel-requested/reconciling become unknown/uncertain. Existing unknown
+and terminal records stay unchanged. These durable transitions use the existing
+StateStore writer and do not use observation state to decide occupancy.
+
+
+## JobControlContinuation — T391 runtime only
+
+Owned by TrustedJobService's JobControlContinuations component. It is never a
+schema3 row, wire object, grant, approval or recovered permission. Entry key is
+the retained job ID with immutable hostAttemptId and current service generation/
+epoch. Each entry has nullable cancel/reconcile slots; a slot captures private
+identity token, kind, immutable existing JobMutationCommand, actual verified
+actor reference and absolute monotonic deadline from that invocation's start.
+No role, origin, deadline or callback token comes from caller JSON. The latest
+registered invocation replaces only the same-kind pending slot. Consumed or
+superseded actors are not fallback credentials.
+
+One mutex serializes control admission through readback/registration and the
+pump's metadata/slot actions. At most33 owned/queued mutex interests including
+one coalesced pump:32 existing job operations plus that pump. Admission capacity
+is reserved before any metadata effect; cancelled/expired unstarted waiters are
+removed. Native work already begun remains charged until actual settlement.
+Pending entries belong only to the existing at-most250 nonterminal jobs; at most
+500 pending actor references, no per-alias list. Terminal/absent entries and
+associated stop-ACK facts are pruned even if an old physical driver is still
+charged; its completion cannot recreate a ticket. One service timer covers the
+earliest pending deadline; retired callbacks and generations cannot act.
+
+A cached correlated stop ACK is data only, bound to the same immutable attempt.
+It can suppress a duplicate stable root cancel intent, never prove terminal,
+release occupancy or permit a step. It is discarded at reopen/retirement and
+is not reconstructed from durable cancelRequested. The driver remains the sole
+owner of actual transport/proof work; positive physical completion, not removal
+of response interest, makes room for another driver.

@@ -224,7 +224,7 @@ final class HostTrustRecord extends PublicHostTrustRecord {
   String toString() => 'HostTrustRecord';
 }
 
-/// Format3 only. The legacy LocalError/ErrorCode parser is deliberately intact.
+/// Format3 error envelope using the shared error categories and retry advice.
 final class TrustedLocalError {
   factory TrustedLocalError(String code, {String? field}) {
     if (!codes.contains(code) ||
@@ -297,7 +297,7 @@ final class TrustedLocalError {
   String toString() => 'TrustedLocalError($code)';
 }
 
-/// Closed format3 response. Existing validateResponseEnvelope stays format2.
+/// Closed target format3 response; there is no older response parser.
 void validateTrustedResponseEnvelope(Map<String, Object?> value) {
   requireFields(value, {'v', 'id', 'generation'}, {'result', 'error'});
   requireUuid(value['id']);

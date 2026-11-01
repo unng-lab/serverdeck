@@ -8,36 +8,22 @@ enum ReadinessState {
   unavailable,
 }
 
-enum Capability {
-  readinessRead('readiness.read'),
-  profilesRead('profiles.read'),
-  profilesWrite('profiles.write'),
-  settingsRead('settings.read'),
-  settingsWrite('settings.write'),
-  mutationsRead('mutations.read');
-
-  const Capability(this.wireName);
-  final String wireName;
-}
-
 enum ApiMethod {
-  readinessGet('readiness.get', Capability.readinessRead, false),
-  sessionPing('session.ping', null, false),
-  sessionClose('session.close', null, false),
-  profilesList('profiles.list', Capability.profilesRead, true),
-  profilesGet('profiles.get', Capability.profilesRead, true),
-  profilesCreate('profiles.create', Capability.profilesWrite, true),
-  profilesUpdate('profiles.update', Capability.profilesWrite, true),
-  profilesDelete('profiles.delete', Capability.profilesWrite, true),
-  settingsGet('settings.get', Capability.settingsRead, true),
-  settingsUpdate('settings.update', Capability.settingsWrite, true),
-  mutationsGet('mutations.get', Capability.mutationsRead, true),
-  mutationsRecent('mutations.recent', Capability.mutationsRead, true);
+  readinessGet('readiness.get'),
+  sessionPing('session.ping'),
+  sessionClose('session.close'),
+  profilesList('profiles.list'),
+  profilesGet('profiles.get'),
+  profilesCreate('profiles.create'),
+  profilesUpdate('profiles.update'),
+  profilesDelete('profiles.delete'),
+  settingsGet('settings.get'),
+  settingsUpdate('settings.update'),
+  mutationsGet('mutations.get'),
+  mutationsRecent('mutations.recent');
 
-  const ApiMethod(this.wireName, this.capability, this.requiresReady);
+  const ApiMethod(this.wireName);
   final String wireName;
-  final Capability? capability;
-  final bool requiresReady;
   bool get isMutation => const {
     profilesCreate,
     profilesUpdate,
@@ -73,39 +59,6 @@ enum ErrorCode {
 
   const ErrorCode(this.wireName);
   final String wireName;
-}
-
-class ReadinessView {
-  const ReadinessView({
-    required this.state,
-    required this.reason,
-    required this.workspaceId,
-    required this.generation,
-  });
-  final ReadinessState state;
-  final ErrorCode? reason;
-  final String? workspaceId;
-  final String generation;
-  Map<String, Object?> toJson() => {
-    'state': state == ReadinessState.storageBlocked
-        ? 'storage-blocked'
-        : state.name,
-    'reason': reason?.wireName,
-    'product': 'serverdeck-next',
-    'apiMajor': 1,
-    'apiMinor': 0,
-    'workspaceSlot': 'default',
-    'workspaceId': workspaceId,
-    'generation': generation,
-    'storageSchema': 1,
-    'features': {
-      'profiles': true,
-      'ssh': false,
-      'jobs': false,
-      'backend': false,
-    },
-    'clientPlatform': 'windows-x64',
-  };
 }
 
 /// Ephemeral request input only. Never returned as a read projection.
@@ -225,38 +178,6 @@ class MutationResult {
   };
 }
 
-class ApiRequest {
-  const ApiRequest({
-    required this.id,
-    required this.sessionId,
-    required this.method,
-    required this.params,
-  });
-  final String id, sessionId, method;
-  final Map<String, Object?> params;
-  Map<String, Object?> toJson() => {
-    'v': 1,
-    'id': id,
-    'sessionId': sessionId,
-    'method': method,
-    'params': params,
-  };
-  factory ApiRequest.mutationStatus({
-    required String queryId,
-    required String sessionId,
-    required String mutationRequestId,
-  }) {
-    if (queryId == mutationRequestId)
-      throw ArgumentError('INVALID_STATUS_CORRELATION');
-    return ApiRequest(
-      id: queryId,
-      sessionId: sessionId,
-      method: 'mutations.get',
-      params: {'requestId': mutationRequestId},
-    );
-  }
-}
-
 class ApiResponse {
   const ApiResponse.success({
     required this.id,
@@ -276,58 +197,6 @@ class ApiResponse {
     'generation': generation,
     if (result != null) 'result': result,
     if (error != null) 'error': error,
-  };
-}
-
-class ServerHello {
-  const ServerHello({required this.generation, required this.serverNonce});
-  final String generation, serverNonce;
-  Map<String, Object?> toJson() => {
-    'hello': {
-      'product': 'serverdeck-next',
-      'apiMajor': 1,
-      'apiMinor': 0,
-      'workspaceSlot': 'default',
-      'generation': generation,
-      'serverNonce': serverNonce,
-    },
-  };
-}
-
-class Authenticate {
-  const Authenticate({
-    required this.clientNonce,
-    required this.clientBuildId,
-    required this.requestedCapabilities,
-    required this.proof,
-  });
-  final String clientNonce, clientBuildId, proof;
-  final List<String> requestedCapabilities;
-  Map<String, Object?> toJson() => {
-    'authenticate': {
-      'clientNonce': clientNonce,
-      'clientBuildId': clientBuildId,
-      'requestedCapabilities': requestedCapabilities,
-      'proof': proof,
-    },
-  };
-}
-
-class Authenticated {
-  const Authenticated({
-    required this.sessionId,
-    required this.capabilities,
-    required this.proof,
-  });
-  final String sessionId, proof;
-  final List<String> capabilities;
-  Map<String, Object?> toJson() => {
-    'authenticated': {
-      'sessionId': sessionId,
-      'capabilities': capabilities,
-      'idleLeaseSeconds': 60,
-      'proof': proof,
-    },
   };
 }
 

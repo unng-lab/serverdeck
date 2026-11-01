@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:serverdeck_protocol/models.dart';
 
 import '../bootstrap/bootstrap_controller.dart';
-import '../bootstrap/local_api_client.dart';
+import '../bootstrap/engine_client.dart';
 
 /// A service-owned snapshot projection. Drafts and mutations live separately.
 class ProfileController extends ChangeNotifier {

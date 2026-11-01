@@ -1,15 +1,12 @@
 <!--
 Sync Impact Report (temporary; remove before committing)
-Version: 3.0.0 -> 3.0.1
-Modified principle: III, clarification of secret protection versus ordinary metadata.
-Reason: user confirmed OS protection of all access secrets (SSH keys/passwords/passphrase),
-and rejected application encryption of the whole workspace. This corrects an expanded
-interpretation rather than changing the intended protection of access secrets.
-Added/removed sections: none. Original ratification date and other principles retained.
-Affected: 001 Spec/Plan/Tasks/contracts, 002 Specify, shared requirements and acceptance.
-Transition: replace experimental encrypted aggregate; retain completed task evidence
-as history, require new checks/review before implementation handoff and acceptance.
-TODOs: none. This amendment does not claim that replacement code is implemented.
+Version: 4.3.0 -> 4.4.0; amended I/V and technology constraints.
+Reason: explicit user request to replace the separately installed server executor
+with direct SSH execution, updating code and specifications through Spec Kit.
+Affected packages: 001/006/021 and their consumers; completed history is retained.
+No templates changed; original ratification and static/unit scope retained.
+Application implementation is a subsequent authorized workflow stage, not part
+of this constitution edit. No unresolved governance placeholders.
 -->
 
 # ServerDeck Constitution
@@ -24,9 +21,25 @@ TODOs: none. This amendment does not claim that replacement code is implemented.
 пользователя; ограничение записи только клиентским репозиторием не применяется.
 
 Локальные SSH-инвентарь и журнал MUST работать без облачного backend или API
-провайдера. Flutter UI, локальный Dart-сервис и отдельный backend MUST иметь
-описанные обязанности и границы. UI MUST обращаться к данным локального сервиса
-через его контракт. Каждая функция MUST указывать компоненты и место реализации.
+провайдера. Flutter UI, встроенный Dart-движок и отдельный необязательный backend
+MUST иметь описанные обязанности и границы. Доменный движок MUST быть отделён
+от Flutter-виджетов; UI и MCP MUST обращаться через его авторизованный контракт.
+Desktop/mobile MUST NOT требовать отдельного locald или настройки локальной службы.
+Целевая реализация MUST NOT содержать legacy runtime/API/bootstrap, compatibility
+fallback, переходные facades и migration старых форматов. Используемая доменная
+логика переносится, заменённые точки входа/код удаляются в той же задаче.
+Desktop MUST иметь один app executable, включая MCP stdio mode, без отдельного
+mcp.exe. Нативные библиотеки и платформенные адаптеры допустимы внутри поставки.
+Каждая функция MUST указывать компоненты и место реализации.
+
+Управляемые серверные операции MUST выполняться встроенным движком напрямую
+по SSH. Отдельно устанавливаемые ServerDeck executor, supervisor, bridge,
+серверный API и Ansible/control node MUST NOT требоваться. Повторная упаковка
+прежнего executor в автоматически устанавливаемый агент также запрещена.
+Приложение MAY передавать ограниченные одноразовые команды и использовать
+штатные средства ОС, блокировки, transient units и записи результатов.
+Такие артефакты MUST иметь определённые права, пределы и жизненный цикл;
+они MUST NOT превращаться в отдельный постоянно работающий компонент.
 
 ### II. Минимальные полномочия и явное согласие
 
@@ -53,9 +66,11 @@ fixtures MUST использовать синтетические данные.
 и индексы MUST храниться без шифрования приложения с ограничением доступа
 по правам ОС. Конфиденциальность скопированной базы метаданных не обещается.
 Спецификация MUST определять охват защиты, доступ к ключам,
-восстановление и ограничения. Для новой реализации действует hard cutover:
-импорт старых БД и секретов, миграция старого сервиса и plaintext bridge исключены.
-Будущие обновления новой реализации MUST сохранять её собственные данные.
+восстановление и ограничения. Исторический hard cutover исключает импорт данных
+сервиса до новой реализации ServerDeckNext. Переход текущего ServerDeckNext
+с locald на встроенный движок MUST сохранять его данные, credentials и trust
+по поправке 001 от 2026-10-30, без plaintext bridge и без импорта более старого сервиса.
+Обновления MUST сохранять собственные данные текущей реализации.
 Недоступность защиты MUST блокировать доступ
 с сохранением данных, без plaintext fallback, скрытого сброса и замены ключа.
 
@@ -79,12 +94,13 @@ Unknown, unsupported, denied, stale, dropped и incomplete MUST отличать
 До реальных заданий MUST быть определены неизменяемые входы, версия рецепта,
 один писатель на хост, идемпотентность, порядок событий, отмена и восстановление
 после сбоя. Неопределённый исход MUST сохранять защиту от конфликтующей записи
-до reconciliation. Успех Ansible MUST NOT заменять проверку требуемых версии,
+до reconciliation. Успешный exit удалённой команды MUST NOT заменять проверку требуемых версии,
 состояния службы и работоспособности результата.
 
 Межкомпонентные интерфейсы MUST описывать протокол, схемы, версии и ошибки.
 Изменения контрактов и хранения внутри новой реализации MUST определять
-совместимость и миграции. Совместимость с заменяемым сервисом не требуется.
+совместимость и миграции. Совместимость с сервисом до ServerDeckNext не требуется;
+переход от текущего locald регулируется поправкой 001 от 2026-10-30.
 Несовместимые версии MUST отклоняться явно, без скрытой потери данных.
 Контракты MUST определять конкуренцию, повторы и восстановление, где применимо.
 
@@ -116,8 +132,14 @@ MUST NOT требоваться вне согласованного scope.
 Flutter-изменения MUST проходить `dart format --output=none --set-exit-if-changed .`,
 `flutter analyze` и `flutter test`. Изменения спецификаций MUST проходить
 `lychee "specs/**/*.md"`. Изменения locald и backend MUST проходить проверки
-затронутых компонентов. Изменения Windows-поведения MUST проверяться нативно;
-для других заявленных платформ MUST проверяться затронутые платформенные сценарии.
+затронутых компонентов. Для текущего разрешённого scope 001/021 локально и в CI
+допустимы только static/unit проверки по текущей задаче. Все прежние тесты/fixtures/
+harness удаляются; новые unit tests проверяют целевое поведение. Дизайн, widget/visual
+проверки сейчас не выполняются и не являются текущими gates. Native/integration/real-SSH/container,
+ручной native dispatch, Computer Use и desktop UI automation запрещены.
+Адресные тесты допустимы только после падения полного применимого набора.
+Такие проверки MUST NOT объявляться доказательством нативной платформенной
+приёмки; непроверенные механизмы и платформы MUST явно обозначаться.
 
 GitHub Actions MUST выполнять применимые автоматизированные проверки PR и релизов.
 Неуспешные обязательные checks MUST блокировать merge или выпуск.
@@ -159,14 +181,24 @@ SDK, зависимости и инструменты MUST быть зафикс
 
 ## Technology and Security Constraints
 
-- Клиент использует Flutter/Dart; Local API связывает UI и Dart locald,
-  который владеет основной Isar БД. Изменение этих решений MUST оформляться
-  в плане; нарушение принципов требует поправки к конституции.
+- Клиент использует Flutter/Dart; контракт движка связывает UI/MCP и встроенную
+  доменную библиотеку, которая единолично владеет основной Isar БД, SSH и заданиями.
+  Local API сохраняется на внешней границе MCP; UI не требует IPC к locald.
+  Перенос текущей реализации и совместимость описывает поправка 001 от 2026-10-30.
+- Прямое SSH-исполнение MUST использовать существующее подтверждённое SSH-доверие
+  и credentials; отдельного enrollment executor нет. Системные изменения требуют
+  root либо noninteractive sudo; приложение MUST NOT изменять sudoers, скрыто
+  устанавливать зависимости или подменять отказ интерактивным prompt.
+  Конкретные поддержанные команды, prerequisites и recovery определяют 001/006/021.
+  Переход MUST сохранять текущие профили, секреты, trust, grants и историю;
+  старые планы и bindings MUST NOT автоматически давать право на новый способ исполнения.
 - Backend находится в отдельном публичном репозитории. Его стек, требования
   к среде и роль в конкретных функциях MUST определяться соответствующей спекой.
-- Windows — первая платформа локальных SSH-функций. Поддержка macOS, Linux
-  и Android MUST заявляться по проверенным функциям и механизмам защиты,
+- Windows — первая платформа локальных SSH-функций. Поддержка macOS, Linux,
+  Android и iOS/iPadOS MUST заявляться по проверенным функциям и механизмам защиты,
   без переноса доказательств между платформами.
+- Web не получает прямой TCP/SSH. Постоянный удалённый MCP и Web требуют будущего
+  необязательного узла управления; его реализация и deploy не входят в текущую поправку 001.
 - Этот файл действует в клиентском репозитории. Общие правила для backend
   MUST быть отдельно приняты в его репозитории; эта поправка не изменяет его файлы.
 
@@ -207,4 +239,4 @@ SDK, зависимости и инструменты MUST быть зафикс
 обязанностей. Первоначальная дата принятия сохраняется; дата поправки обновляется.
 Временный Sync Impact Report удаляется перед commit после проверки поправки.
 
-**Version**: 3.0.1 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-11
+**Version**: 4.4.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-11-01

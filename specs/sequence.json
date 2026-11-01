@@ -1,6 +1,6 @@
 {
-  "version": 5,
-  "date": "2026-10-21",
+  "version": 6,
+  "date": "2026-10-25",
   "baseline": "new implementation; preserve completed foundation history; MCP-first extension 021",
   "packages": [
     {
@@ -222,7 +222,10 @@
           "local_requirements": [
             "FR-003-LOCAL-01",
             "FR-003-LOCAL-02",
-            "FR-003-LOCAL-03"
+            "FR-003-LOCAL-03",
+            "FR-003-LOCAL-08",
+            "FR-003-LOCAL-09",
+            "FR-003-LOCAL-10"
           ],
           "acceptance": [
             "AC-003-1A",
@@ -238,7 +241,9 @@
           ],
           "local_requirements": [
             "FR-003-LOCAL-04",
-            "FR-003-LOCAL-05"
+            "FR-003-LOCAL-05",
+            "FR-003-LOCAL-11",
+            "FR-003-LOCAL-12"
           ],
           "acceptance": [
             "AC-003-2A",
@@ -252,7 +257,9 @@
           "requirements": [],
           "local_requirements": [
             "FR-003-LOCAL-06",
-            "FR-003-LOCAL-07"
+            "FR-003-LOCAL-07",
+            "FR-003-LOCAL-13",
+            "FR-003-LOCAL-14"
           ],
           "acceptance": [
             "AC-003-3A",

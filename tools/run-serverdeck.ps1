@@ -1,60 +1,73 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+    [ValidateSet('Debug', 'Release', IgnoreCase = $false)][string]$Configuration = 'Debug',
     [switch]$BuildOnly,
-    [string]$Python = 'python',
-    [ValidateSet('', 'integration_test/bootstrap_test.dart', 'integration_test/foundation_test.dart',
-        'integration_test/loss_recovery_test.dart', 'integration_test/credential_journey_test.dart',
-        'integration_test/unknown_inflight_test.dart', 'integration_test/runtime_diagnostics_test.dart',
-        'integration_test/owner_recovery_test.dart', 'integration_test/foreign_user_test.dart',
-        'integration_test/mcp_test.dart')]
-    [string]$IntegrationTarget = ''
+    [string]$Python = 'python'
 )
 . "$PSScriptRoot/foundation-sdk.ps1"
 . "$PSScriptRoot/native-artifact.ps1"
+. "$PSScriptRoot/embedded-bundle.ps1"
+function Assert-EmbeddedBuildOutput {
+    param([Parameter(Mandatory)][string]$Root)
+    Assert-NativeIsarPlainPath $Root
+    # Validate existing children before Flutter/custom writers can follow them.
+    # PowerShell does not follow directory symlinks during this enumeration.
+    if (Test-Path -LiteralPath $Root -PathType Container) {
+        foreach ($entry in Get-ChildItem -LiteralPath $Root -Recurse -Force) {
+            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Build output contains a reparse point.' }
+            Assert-NativeIsarPlainPath $entry.FullName
+        }
+    }
+    foreach ($name in @('serverdeck.exe', 'libisar.dll', 'executor-release.json', 'foundation.manifest.json', 'notices')) {
+        Assert-NativeIsarPlainPath (Join-Path $Root $name)
+    }
+    foreach ($legacy in @('locald.exe', 'mcp.exe')) {
+        if (Test-Path -LiteralPath (Join-Path $Root $legacy)) { throw 'Incompatible build output: use a clean embedded layout.' }
+    }
+}
 $initialNativeSelection = Get-NativeArtifactBuildSelection
 if ($env:SERVERDECK_NATIVE_QUALIFICATION_CONTEXT -and -not $initialNativeSelection.preserveNormalBundles) {
     throw 'Candidate bundle build requires a preserved normal-bundle scope.'
 }
+$layout = [IO.Path]::GetFullPath((Join-Path $FoundationRoot "build/windows/x64/runner/$Configuration"))
+Assert-EmbeddedBuildOutput $layout
 Push-Location $FoundationRoot
 try {
     Invoke-FoundationCommand $FoundationFlutter @('pub', 'get', '--enforce-lockfile')
-    foreach ($name in @('serverdeck_protocol', 'serverdeck_windows')) {
+    foreach ($name in Get-CurrentPackageNames) {
         Push-Location (Join-Path 'packages' $name)
         try { Invoke-FoundationCommand $FoundationDart @('pub', 'get', '--enforce-lockfile') }
         finally { Pop-Location }
     }
-    $flutterBuildArguments = @('build', 'windows', ('--' + $Configuration.ToLowerInvariant()))
-    if ($IntegrationTarget) { $flutterBuildArguments += @('--target', $IntegrationTarget) }
+    Push-Location (Join-Path $FoundationRoot 'packages/serverdeck_engine')
+    try { Invoke-FoundationCommand $FoundationDart @('run', 'build_runner', 'build', '--delete-conflicting-outputs') }
+    finally { Pop-Location }
+    $flutterBuildArguments = @('build', 'windows', ('--' + $Configuration.ToLowerInvariant()), '--no-pub')
     Invoke-FoundationCommand $FoundationFlutter $flutterBuildArguments
-    $layout = Join-Path $FoundationRoot "build/windows/x64/runner/$Configuration"
-    & "$PSScriptRoot/build-locald.ps1" -OutputDirectory $layout
-    & "$PSScriptRoot/build-mcp.ps1" -OutputDirectory $layout
+    # A stale multi-executable layout is never relabelled as an embedded bundle.
+    # Do not delete or migrate existing output or terminate its possible owner.
+    Assert-EmbeddedBuildOutput $layout
     $nativeSelection = Get-NativeArtifactBuildSelection
     Copy-NativeArtifactLibrary -Selection $nativeSelection -Bundle $layout
     Copy-NativeArtifactBundleNotices -Bundle $layout
-    Invoke-FoundationCommand $Python @('tools/build-executor-release.py', '--output', (Join-Path $layout 'executor-release.json'))
-    $lockPaths = @('pubspec.lock', 'packages/serverdeck_locald/pubspec.lock',
-        'packages/serverdeck_mcp/pubspec.lock', 'packages/serverdeck_protocol/pubspec.lock',
-        'packages/serverdeck_windows/pubspec.lock') | Sort-Object
-    $lockTranscript = ($lockPaths | ForEach-Object {
-        $_ + ':' + (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
-    }) -join "`n"
-    $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($lockTranscript))).ToLowerInvariant()
+    $executorOutput = Join-Path $layout 'executor-release.json'
+    Assert-NativeIsarPlainPath $executorOutput
+    Invoke-FoundationCommand $Python @('tools/build-executor-release.py', '--output', $executorOutput)
+    $lockPaths = @(Get-EmbeddedBundleLockPaths)
+    $lockHashes = [ordered]@{}
+    foreach ($path in $lockPaths) { $lockHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
     $commit = (git rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Build commit unavailable.' }
     $hashes = [ordered]@{}
-    foreach ($name in @('serverdeck.exe', 'locald.exe', 'mcp.exe', 'libisar.dll', 'executor-release.json')) {
+    foreach ($name in @('serverdeck.exe', 'libisar.dll', 'executor-release.json')) {
         $hashes[$name] = (Get-FileHash -LiteralPath (Join-Path $layout $name) -Algorithm SHA256).Hash.ToLowerInvariant()
     }
-    $manifest = [ordered]@{
-        format = 3; product = 'serverdeck-next'; buildId = "$commit+$Configuration+$digest"
-        configuration = $Configuration; testOnly = $false
-        appRoot = [IO.Path]::GetFullPath($layout); apiMajor = 1; apiMinor = 1
-        workspaceSchema = 3; sha256 = $hashes
-    }
-    [IO.File]::WriteAllText((Join-Path $layout 'foundation.manifest.json'),
-        ($manifest | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    $manifest = New-EmbeddedBundleManifest -Commit $commit -Configuration $Configuration -AppRoot ([IO.Path]::GetFullPath($layout)) -LockHashes $lockHashes -Hashes $hashes
+    $manifestJson = $manifest | ConvertTo-Json -Depth 5 -Compress
+    $manifestOutput = Join-Path $layout 'foundation.manifest.json'
+    Assert-NativeIsarPlainPath $manifestOutput
+    [IO.File]::WriteAllText($manifestOutput,
+        $manifestJson, [Text.UTF8Encoding]::new($false))
     if (-not $BuildOnly) {
         Start-Process -FilePath (Join-Path $layout 'serverdeck.exe') -WorkingDirectory $layout -WindowStyle Hidden | Out-Null
     }

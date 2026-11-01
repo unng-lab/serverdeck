@@ -28,3 +28,7 @@ foundation-evidence/
 *.dump
 .agents/*
 !.agents/skills/
+
+# Local generated proof, previews, tool caches and temporary files.
+/output/
+/tmp/

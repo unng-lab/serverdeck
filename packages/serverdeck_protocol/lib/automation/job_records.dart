@@ -4,6 +4,7 @@ import '../codec.dart';
 import '../validation.dart';
 import 'models.dart' show AutomationRevisionKey, requireAutomationRevision;
 import 'values.dart';
+import 'direct_ssh_dispatch.dart';
 
 const _int64max = 9223372036854775807;
 const automationSafeCodes = {
@@ -64,13 +65,14 @@ void _document(
   Map<String, Object?> value,
   Set<String> fields, {
   int maximum = 256 * 1024,
+  Set<String> optional = const {},
 }) {
   try {
     StrictCodec().encode(value, maxBytes: maximum);
   } on FormatException {
     invalidAutomationValue();
   }
-  requireFields(value, fields);
+  requireFields(value, fields, optional);
 }
 
 bool _same(Object? left, Object? right) =>
@@ -208,27 +210,32 @@ final class AutomationJobRecord extends _Record {
     'cancelRequested',
     'updatedAt',
     'outcome',
+    'sshDispatch',
   };
   factory AutomationJobRecord.fromJson(Map<String, Object?> value) {
-    _document(value, {
-      'workspaceId',
-      'id',
-      'requestId',
-      'immutablePlanId',
-      'planDigest',
-      'profileId',
-      'profileRevision',
-      'profileDigest',
-      'grantId',
-      'authorityRef',
-      'hostAttemptId',
-      'state',
-      'nextSequence',
-      'cancelRequested',
-      'createdAt',
-      'updatedAt',
-      'outcome',
-    });
+    _document(
+      value,
+      {
+        'workspaceId',
+        'id',
+        'requestId',
+        'immutablePlanId',
+        'planDigest',
+        'profileId',
+        'profileRevision',
+        'profileDigest',
+        'grantId',
+        'authorityRef',
+        'hostAttemptId',
+        'state',
+        'nextSequence',
+        'cancelRequested',
+        'createdAt',
+        'updatedAt',
+        'outcome',
+      },
+      optional: const {'sshDispatch'},
+    );
     for (final name in [
       'workspaceId',
       'id',
@@ -265,6 +272,22 @@ final class AutomationJobRecord extends _Record {
     } else if (value['outcome'] != null) {
       invalidAutomationValue();
     }
+    if (value['sshDispatch'] != null) {
+      final dispatch = DirectSshDispatch.fromJson(
+        _object(value['sshDispatch']),
+      );
+      if ((grantId == null) != (dispatch.grantRevision == null) ||
+          dispatch.authorizedAt.isBefore(
+            automationTimestamp(value['createdAt']),
+          ) ||
+          dispatch.authorizedAt.isAfter(
+            automationTimestamp(value['updatedAt']),
+          ) ||
+          state == 'queued' ||
+          state == 'succeeded' && dispatch.state != 'completed') {
+        invalidAutomationValue();
+      }
+    }
     return AutomationJobRecord._(value);
   }
   String get workspaceId => _value['workspaceId'] as String;
@@ -277,6 +300,10 @@ final class AutomationJobRecord extends _Record {
   String get state => _value['state'] as String;
   int get nextSequence => _value['nextSequence'] as int;
   bool get cancelRequested => _value['cancelRequested'] as bool;
+  bool get hasSshDispatchField => _value.containsKey('sshDispatch');
+  DirectSshDispatch? get sshDispatch => _value['sshDispatch'] == null
+      ? null
+      : DirectSshDispatch.fromJson(_object(_value['sshDispatch']));
   DateTime get createdAt => automationTimestamp(_value['createdAt']);
   DateTime get updatedAt => automationTimestamp(_value['updatedAt']);
   late final AutomationRevisionKey profileKey = AutomationRevisionKey.fromJson({
@@ -304,6 +331,28 @@ final class AutomationJobRecord extends _Record {
         state == next.state &&
             !_same(_value['outcome'], next._value['outcome']))
       invalidAutomationValue();
+    final before = sshDispatch, after = next.sshDispatch;
+    if (before == null) {
+      if (after != null &&
+          (after.state != 'authorized' ||
+              next.state != 'running' ||
+              next.cancelRequested))
+        invalidAutomationValue();
+    } else {
+      if (after == null) invalidAutomationValue();
+      if (before.token == after.token) {
+        before.validateTransitionTo(after);
+      } else if (before.state != 'completed' ||
+          after.state != 'authorized' ||
+          after.stepId == before.stepId ||
+          after.authorizedAt.isBefore(before.authorizedAt) ||
+          state != 'running' ||
+          next.state != 'running' ||
+          cancelRequested ||
+          next.cancelRequested) {
+        invalidAutomationValue();
+      }
+    }
   }
 
   /// The caller must supply an already fully validated immutable plan. These

@@ -9,3 +9,5 @@ native/isar-3.3.2/Cargo.lock -text
 native/isar-3.3.2/licenses/** -text
 # Preserve exact upstream license bytes, including their original whitespace.
 executor/licenses/** -text -whitespace
+# Preserve the exact upstream font license, including its whitespace.
+assets/brand/fonts/OFL-NotoSansSC.txt -text -whitespace

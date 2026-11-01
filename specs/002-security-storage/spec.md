@@ -1,5 +1,19 @@
 # Feature Specification: Аудит защиты секретов доступа и восстановление
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Уточнение2026-10-30, без обратной совместимости**: действующий
+[контракт](../001-service-foundation/contracts/embedded-migration.md) исключает legacy runtime/API/bootstrap,
+upgrade1/2, rollback к старым сборкам и переходные оболочки. Старый код удаляется
+в этой же задаче после переноса используемой логики, а не остаётся «на переход».
+Поддерживается только целевой schema3; несовместимые файлы не изменяются.
+
+**Поправка 2026-10-30**: [основа001](../001-service-foundation/spec.md)
+заменяет обязательный locald встроенным engine. [Adoption/return](../001-service-foundation/contracts/embedded-migration.md)
+сохраняет нынешний ServerDeckNext; hard cutover исключает только сервис до него.
+[MCP app host](../021-mcp-control/contracts/embedded-host.md) заменяет autolaunch/identity,
+сохраняя tools/grants. Scope проверок — static/unit/widget без native claims.
+
 **Feature**: `002-security-storage`
 **Created**: 2026-10-10
 **Status**: Specify — требования для новой реализации; реализация не начата этим документом.

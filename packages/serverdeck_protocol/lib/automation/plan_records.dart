@@ -5,6 +5,7 @@ import 'package:cryptography/dart.dart';
 
 import '../codec.dart';
 import '../validation.dart';
+import '../direct_ssh_runtime.dart';
 import 'models.dart' show AutomationRevisionKey, requireAutomationRevision;
 import 'job_records.dart' show automationSafeCodes;
 import 'observation_records.dart';
@@ -303,8 +304,11 @@ final class AutomationPreflightCapsule {
       'baseObservations',
     });
     if (value['format'] is! int ||
-        value['format'] != 1 ||
+        !const {1, 2}.contains(value['format']) ||
         value['environment'] != 'ubuntu24.04-amd64-systemd') {
+      invalidAutomationValue();
+    }
+    if (value['format'] == 2 && !DirectSshRuntime.matches(value)) {
       invalidAutomationValue();
     }
     final operation = requireUuid(value['operationId']);
@@ -363,6 +367,8 @@ final class AutomationPreflightCapsule {
       digest;
   final List<QualifiedRecipeDescriptor> recipes;
   final Map<String, String> baseObservations;
+  int get format => toJson()['format'] as int;
+  bool get isDirectSsh => format == 2;
   Map<String, Object?> toJson() => jsonDecode(_json) as Map<String, Object?>;
 }
 
@@ -548,6 +554,9 @@ final class AutomationPlanRecord {
       }
       if (status == 'runnable')
         _validateProgram(desired, effects, checks, preflight);
+      if (preflight.isDirectSsh && checks.length > 32) {
+        invalidAutomationValue();
+      }
     }
     final hashInput = Map<String, Object?>.of(value)..remove('digest');
     if (await _hash(hashInput) != planDigest) invalidAutomationValue();
@@ -705,6 +714,29 @@ void _validateProgram(
         final rendered = _digest(
           _object(effects[effectIndex])['renderedDigest'],
         );
+        if (preflight.isDirectSsh && resource != 'system.motd') {
+          final serviceResource = resource.replaceFirst(
+            '.settings',
+            '.service',
+          );
+          final baseline = preflight.baseObservations[serviceResource];
+          if (baseline == null) invalidAutomationValue();
+          final actual = effect(step, 'database_configuration', {
+            'resourceId': resource,
+            'values': step['values'],
+            'renderedDigest': rendered,
+            'serviceResourceId': serviceResource,
+            'baselineServiceFingerprint': baseline,
+          });
+          check(actual, resource, 'file_digest', {'digest': rendered});
+          check(actual, resource, 'settings', {'values': step['values']});
+          check(actual, serviceResource, 'service_state', {'state': 'active'});
+          check(actual, serviceResource, 'service_restarted', {
+            'baselineFingerprint': baseline,
+          });
+          check(actual, serviceResource, 'sql', {'expected': 1});
+          continue;
+        }
         final actual = effect(step, 'config_file', {
           'resourceId': resource,
           'values': step['values'],

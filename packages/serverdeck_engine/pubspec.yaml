@@ -1,0 +1,22 @@
+name: serverdeck_engine
+description: ServerDeck domain engine and platform-neutral security contracts.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: '>=3.13.5 <4.0.0'
+dependencies:
+  serverdeck_protocol:
+    path: ../serverdeck_protocol
+  cryptography: 2.9.0
+  dartssh2: 4.1.0
+  path: 1.9.1
+  xxh3: 1.2.0
+  isar_community:
+    path: ../../third_party/isar_community
+dev_dependencies:
+  test: 1.31.1
+  isar_community_generator: 3.3.2
+  build_runner: 2.10.5
+dependency_overrides:
+  isar_community:
+    path: ../../third_party/isar_community

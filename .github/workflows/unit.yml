@@ -1,0 +1,34 @@
+name: Current task unit checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Flutter SDK
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'sdk')
+          "SERVERDECK_FLUTTER_ROOT=$(Join-Path $env:RUNNER_TEMP 'sdk/flutter')" >> $env:GITHUB_ENV
+      - name: Resolve locked dependencies
+        shell: pwsh
+        run: |
+          . ./tools/foundation-sdk.ps1
+          Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
+          foreach ($package in Get-CurrentPackageNames) {
+            Push-Location (Join-Path $FoundationRoot "packages/$package")
+            try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
+            finally { Pop-Location }
+          }
+      - name: Static analysis and all current-task unit tests
+        shell: pwsh
+        run: ./tools/test-unit.ps1

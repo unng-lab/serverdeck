@@ -1,5 +1,25 @@
 # Immutable plans and resource observations v1
 
+## Direct capsule2: действующий compiled program
+
+Новые SSH-планы используют [direct contract](../../001-service-foundation/contracts/direct-ssh.md),
+включая compound `database_configuration` effect и его exact fields/checks.
+Прежняя схема config_file→отдельный service restart/deferred settings ниже
+описывает только historical capsule1. Для capsule2 source AST config_file БД
+порождает один заранее показанный и разрешённый effect: file write+syntax+restart+
+settings/service/SQL postchecks. Все checks относятся к нему; отдельного pending
+activation/provenance между двумя permits нет. Source motd и service-only effects
+сохраняют прежнюю форму. Парсер dispatch-ит structural validation по capsule
+format; format1 records не переписываются и не допускаются к новому apply.
+
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Model](../data-model.md), [records](records.md), [profiles](profiles.md), [executor](executor.md), [tasks](../tasks.md).
 
 This defines structural metadata for T002/T023 and the inputs shared with the trusted compiler/preflight. Parsing a self-consistent digest is not permission, recipe qualification, trustworthy remote attestation or proof that a compiler rendered correct bytes. Actual plan creation/admission additionally checks current session/origin/target/trust, exact registered release/runtime/compiler/catalog hashes, full compiler output and factual prerequisite evidence (T011/T019/T023/T024/T028). No path/module/SQL string in these records becomes a caller-selected executable.

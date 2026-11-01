@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import traceback
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -19,6 +20,22 @@ from serverdeck_executor.journal import _file, _write_all, secure_directory
 from serverdeck_executor.probes import command, regular_file
 
 ROOT = Path('/etc/serverdeck-executor')
+diagnostic_codes = False
+
+
+def diagnostic_locations(error):
+    """Public source identifiers only; never exception text, locals or inputs."""
+    source = Path(__file__).resolve().parent.parent
+    allowed = {source / 'packaging/prepare-apt.py': 'packaging/prepare-apt.py'}
+    allowed.update({source / 'serverdeck_executor' / name:
+                    'serverdeck_executor/' + name for name in
+                    ('apt.py', 'apt_gate.py', 'codec.py', 'journal.py', 'probes.py')})
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        label = allowed.get(Path(frame.filename))
+        if label is not None and 1 <= frame.lineno <= 99999:
+            result.append('APT_PREPARE_LOCATION ' + label + ':' + str(frame.lineno))
+    return result[-8:]
 
 
 def write_fixed(path, data, mode=0o600, *, exclusive=False):
@@ -63,13 +80,16 @@ def source_bytes(path):
 
 
 def main():
+    global diagnostic_codes
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sources', type=Path, required=True)
     parser.add_argument('--keyring', type=Path, required=True)
     parser.add_argument('--request', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--refresh', action='store_true')
+    parser.add_argument('--diagnostic-codes', action='store_true')
     args = parser.parse_args()
+    diagnostic_codes = args.diagnostic_codes
     require(os.geteuid() == 0 and sys.platform == 'linux' and
             sys.version_info[:2] == (3, 12), 'FORBIDDEN')
     sources = source_bytes(args.sources)
@@ -106,6 +126,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (Exception, KeyboardInterrupt):
+    except (Exception, KeyboardInterrupt) as error:
+        if diagnostic_codes:
+            for location in diagnostic_locations(error):
+                print(location, file=sys.stderr)
         print('APT preparation refused; private root inputs retained.', file=sys.stderr)
         sys.exit(1)

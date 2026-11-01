@@ -1,5 +1,7 @@
 # Data model — 021
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
 [Spec](spec.md), [protocol](contracts/mcp.md), [profiles](contracts/profiles.md), [executor](contracts/executor.md).
 
 Exact durable job/approval/desired/event/receipt representation and structural transition rules are in the [record contract](contracts/records.md). The entity table is a summary; all persisted objects also carry workspaceId. Origin grant null means authenticated owner UI, never caller-selected owner authority.

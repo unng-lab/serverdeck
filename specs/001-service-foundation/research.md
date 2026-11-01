@@ -53,3 +53,145 @@ Rationale: upstream Windows build lacks a committed Cargo.lock and uses an unloc
 Alternatives considered: retaining the published asset without its resolved graph does not meet native notice coverage; resolving today cannot prove yesterday's DLL provenance. No source behavior/schema change is needed to produce a new artifact with its own complete provenance.
 
 Actual research evidence: standalone Rust/Cargo1.88.0 version commands succeeded; checked official distribution archives and PyPI libclang18.1.1 wheel were extracted locally without global installation. New cargo generate-lockfile and metadata --locked for Windows x64 succeeded with67packages, exact lockSHA90065515cd9feae9f8d7b21f09e506bd87e32dccc1252a2c1627ad627f7ad260. These are preparation/resolution results, not a DLL build or compatibility test. Installed VS17.14.36811.4/VCTools14.44.35207 and registry-located WindowsSDK10.0.26100.0 are build prerequisites. New source/native licenses, runtime linked material and corresponding sources still require collection/qualification.
+
+
+## Поправка встроенного host — исследование 2026-10-30
+
+Read-only audit основного checkout и layout003; native/SSH/container/UI не запускались.
+Отдельный исследователь без истории подтвердил следующие реальные границы:
+
+| Источник кода | Факт | Решение |
+| --- | --- | --- |
+| root pubspec.yaml, lib/app.dart/bootstrap/ | UI зависит от Windows и безусловного TrustedNativeBootstrapHost | in-process gateway вместо обязательного daemon bootstrap |
+| locald/bootstrap/trusted_services.dart | reusable root не владеет discovery/store, требует hasNativePublicationGate | сохранить композицию, выделить host authority, не подставлять true |
+| api/operational_sessions.dart, operational_auth.dart | native gate требует genuine TrustedPipePeer/locald role | private owner capability и verified MCP session, не role DTO |
+| storage/workspace.dart, state_store.dart, key_custody.dart | Windows mutex/SID/ACL/protection imports | нейтральные ports, прежний Windows encoding |
+| bootstrap/native_runtime.dart, trusted_entry.dart | Isar load проверяет locald.exe/Windows x64 ABI | verified app identity в runtime и bundle согласованно |
+| MCP/bootstrap.dart | bridge может запускать locald | connection-only bridge, закрытое app даёт отказ |
+| storage/migration_journal.dart, workspace_migration.dart | trusted schema3 и recovery1→2→3 уже существуют | schema3 adoption на месте, не новый importer |
+| automation/jobs.dart, remote/ssh_executor.dart | recovery nonterminal в unknown; close channel не cancel remote effect | observer отдельно, no replay apply |
+| executor/jobs.py, runner.py, journal.py | durable admission/commitment и systemd-run | reuse conservative lifecycle; crash устойчивость реально не проверена |
+
+Пути locald выше относительно packages/serverdeck_locald/lib/, executor относительно
+executor/serverdeck_executor/. Источники означают просмотр кода, не выполненные tests.
+
+Decision: embedded domain library и platform ports; rationale — выбранный пользователем
+один app с reuse логики. Отклонены постоянный daemon, отдельная MCP БД, wholesale rewrite,
+обязательное облако и Web TCP fallback. Пользователь отдельно выбрал tray при close,
+explicit exit завершает. Schema3 не меняется ради hosting boundary. Mobile baseline
+foregroundOnly, отдельные платформенные поставки; официальные источники и ограничения
+в [matrix](contracts/embedded-platforms.md). Backend не менялся, 003 не модифицировался.
+
+
+## Pinned native semantic preflight — implementation evidence 2026-10-30
+
+Existing requirement: inspect schema3 semantic rows/custody before writable open,
+without a legacy migrator, private writable-copy bootstrap or new storage format.
+Implementation reads the required bounded native layout in pure Dart and feeds
+the existing logical graph/custody loader; Isar is not initialized by the reader.
+Source recipe `native/isar-3.3.2/recipe.json` pins Isar4c2cd02d and MDBX924581bd.
+Archive SHA256 and exact extracted bytes were checked for object/id.rs,
+object/isar_object.rs, schema/collection_schema.rs, schema/schema_manager.rs,
+index/index_key.rs, index/index_key_builder.rs, index/mod.rs and MDBX
+layout-dxb.h, pnl.h, meta.c, options.h. These define ID sign-bit/little-endian,
+u16/u24 String fields, index hash byte order and default descending32bit free PNL.
+The already pinned pure Dart xxh3:1.2.0 is now direct runtime dependency; a literal
+upstream hello vector validates the index encoding independently of fixture hash.
+No source modification/build/native dispatch or claim of positive native
+qualification was made. Other ABI/layouts fail closed. Read-only preflight,
+post-open exact row equality and only-then lookup recovery are separate phases.
+## T323 actual mutation tests: persistence boundary — 2026-10-31
+
+Decision: extract the fixed transactional row dependency of the existing
+StateStore, with the production pinned Isar adapter and a test/support-only RAM
+provider. The existing checked open algorithm remains common; preflight bytes
+become a provider row source followed by the actual semantic/custody inspector.
+See the [contract](contracts/embedded-engine.md#t323t369t373--transactional-storage-dependency-2026-10-31).
+
+Rationale: source inspection found direct IsarCollection reads/writes in
+foundation_writes, automation_profile_writes, automation_plan_writes,
+owner_grant_writes and automation_delta, and IsarRowSource reloads in
+automation_store_view. Existing RAM read repositories cannot exercise actual
+mutation CAS/receipt/readback. Both native byte parsing and actual post-open
+semantic validation already exist and must be preserved as distinct checks.
+
+Alternatives considered: fake StateStore private fields/writer methods or
+scripted successful handlers would not prove actual domain transactions;
+unchecked attach/fromSnapshot constructors would bypass owner/open custody;
+running native Isar/realFS would violate the authorized unit-only scope. A new
+storage format, database replacement or runtime memory fallback is unnecessary
+and outside this extraction. No external technology research or dependency
+upgrade is needed: the adapter uses only the current SDK and record classes.
+
+This records a design decision, not successful implementation or executed tests.
+
+
+### T384 observation/recovery decision record
+
+Decision: local observation is runtime data beside the durable job, projected
+through existing jobs_get/jobs_list and owner jobs.get/jobs.list result data.
+The existing format3 result schema already accepts a data object. The immutable
+job record and executor wire are unchanged. A separate transport/method or a
+persisted observer state would confuse local reachability with remote outcome;
+neither is introduced. Consumers require the new observation field from the
+current embedded engine; no old-engine fallback is supplied.
+
+Decision: a sample becomes attached only after validated current-session status;
+use the existing EngineClock, a5s monotonic freshness threshold and read-time
+classification. No background timer, socket, query or write is started by reading
+the overlay. Five seconds matches the existing proof/RPC budget and is distinct
+from the1s driver poll; it is never permission or a new operation deadline.
+Stop/terminal status detaches the observer while preserving the last sample.
+Identity invalidation or an aged active sample is stale, without changing job
+state. New generation/reopen starts detached without remote sequence or permits.
+
+Decision: reuse retained-job cap1250, one runtime entry and at most one current
+opaque observer binding per job. Do not evict active samples to erase ordering.
+No root challenge, credential, key, grant secret, plan body or raw remote text is
+retained in this projection. Store only the bounded identity, sequence/time and
+small state/step/epoch/check comparison facts needed to reject reversed status.
+
+Source finding: jobs.dart currently accepts a reconcile result's boolean type
+but does not require childrenStopped=true, and resets its subsequent status
+sequence floor to0. A structurally terminal later reply can therefore release
+local occupancy despite missing stopped-child proof or older evidence. T386
+must use the existing021 evidence rather than treating intent/ACK as completion.
+No Python/native execution was performed to establish this source finding.
+
+
+### T391 accepted-control continuation decisions
+
+Source evidence: _drive returns false when _drivers already owns a job; current
+completion removes that entry but does not activate the already accepted control.
+An accepted unknown→reconciling can therefore outlive the old driver without an
+observer. Do not interpret false as cancellation, terminal proof or a new submit.
+
+Decision: serialize only control metadata/registration/activation bookkeeping
+with one local FIFO mutex. Existing metadata is already one writer; a second
+root execution queue or persistent scheduler would add authority and lifecycle
+that this task does not authorize. The mutex is released before root I/O and is
+never held while waiting for the prior driver, so a new intent can be durable
+while that driver physically drains.
+
+Decision: two coalesced slots per active job preserve separate cancel/apply-scope
+and reconcile/read-scope actors. A read actor must never inherit the cancel
+method. Latest successfully registered invocation per kind replaces an older
+pending one, without falling back to that old actor. Same-ID explicit replay is
+a fresh authorized observation invocation with its own original30s budget;
+polling an operation handle is not and cannot extend it. Neither restarts apply.
+
+Decision: cancel control is one stop intent plus at most one status query. Unknown
+still needs explicit reconciliation for terminal. An existing live apply driver
+may deliver the durable cancel flag using its own current proof; its correlated
+stop ACK can satisfy pending cancellation without a second root stop request.
+Pending reconcile gets a turn after at most one preceding cancel activation;
+continued aliases cannot starve it. A completed reconcile with uncertain outcome
+is not automatically repeated.
+
+Decision: dispatcher revalidates the stored receipt/current actor and rearms
+unknown→reconciling through the existing queued progress writer if needed before
+a previously accepted reconcile can run. This adds no receipt, request or permit.
+An older reconcile may finish its own cycle as unknown before another pending
+one activates; private tickets are not permanent phase authority. T390 still
+prevents old apply/cancel from overwriting reconciling, and all terminal acceptance
+still requires T386 current stopped-child/status/postcheck proof.

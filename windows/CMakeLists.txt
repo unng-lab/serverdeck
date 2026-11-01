@@ -57,6 +57,12 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# An eager runner plugin import would initialize its Flutter dependency before
+# MCP can isolate SDK logging. Keep generated/third-party sources untouched.
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  target_link_options(${BINARY_NAME} PRIVATE "/DELAYLOAD:${plugin}_plugin.dll")
+endforeach()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can

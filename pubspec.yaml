@@ -5,6 +5,10 @@ version: 0.1.0+1
 environment:
   sdk: '>=3.13.5 <4.0.0'
 dependencies:
+  serverdeck_mcp:
+    path: packages/serverdeck_mcp
+  serverdeck_engine:
+    path: packages/serverdeck_engine
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -16,9 +20,9 @@ dependencies:
   cryptography: 2.9.0
   isar_community_flutter_libs: 3.3.2
 dev_dependencies:
+  test: 1.31.1
+  analyzer: 13.3.0
   flutter_test:
-    sdk: flutter
-  integration_test:
     sdk: flutter
 dependency_overrides:
   isar_community:
@@ -27,6 +31,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/fonts/OFL.txt
+    - assets/brand/fonts/OFL-NotoSansSC.txt
+    - assets/brand/fonts/NotoSansSC-SOURCE.json
     - assets/brand/logos/logo-dark.png
     - assets/brand/logos/logo-light.png
     - assets/brand/logos/mark-dark.png
@@ -42,3 +48,6 @@ flutter:
       fonts:
         - asset: assets/brand/fonts/NotoSansMono-Regular.ttf
           weight: 400
+    - family: Noto Sans SC
+      fonts:
+        - asset: assets/brand/fonts/NotoSansSC-Variable.ttf

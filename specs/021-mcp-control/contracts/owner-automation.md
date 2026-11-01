@@ -1,5 +1,13 @@
 # Shared native owner automation projection — 021
 
+**Direct SSH amendment 2026-11-01**: [действующий контракт](../../001-service-foundation/contracts/direct-ssh.md). Новое выполнение использует прямой SSH без устанавливаемого executor/Ansible/enrollment. Прежние описания этих компонентов ниже относятся только к historical format1; они не разрешают его исполнение или fallback. Остальные правила данных, прав и лимитов сохраняются. При конфликте в исполнительной архитектуре действует поправка.
+
+**Hosting amendment 2026-10-30**: [действующий контракт](embedded-host.md).
+Прежние locald process/UI IPC/image identity/idle-grace заменены embedded app host;
+domain/storage/wire/permissions сохраняются, кроме явно перечисленных изменений.
+Native/integration проверки ниже не запускаются в текущем static/unit/widget scope.
+Старые evidence не являются приёмкой новой архитектуры.
+
 [Plans](plans.md), [job admission](job-admission.md), [MCP](mcp.md),
 [operational client](operational-client.md).
 
@@ -115,3 +123,15 @@ remain in the shared service and need the separate job-cancel action.
 Installed format3 startup/client activation and final
 UI/native/full-feature qualification remain open. Presence of these widgets and
 selected source analysis does not establish product readiness.
+
+
+### Retained cancellation envelope consistency — T395
+
+The existing CANCELLED result uses the shared McpToolResult allowlist with local
+boundary and retry none. Capture/validate that bounded immutable envelope before
+marking the owner handle cancelled. Then drop response interest while retaining
+actual native/service work through its physical completion; accepted control
+continuations keep their original invocation budget and current actor checks.
+A later native result cannot replace the cancelled response or start a new submit,
+permit or automatic stop. This closes the parser/producer mismatch without a new
+protocol variant or changing the durable job/receipt state.
