@@ -98,3 +98,7 @@ Native/integration/manual/SSH/container gates не запускаются в т�
 static/unit/widget, без заявления native/platform qualification. [Matrix](001-service-foundation/contracts/embedded-platforms.md)
 отделяет первый Windows этап от будущих Linux/macOS/mobile/Web. Backend не обязательный.
 003 и его поставка не меняются этой подготовкой; прежняя история задач сохраняется.
+
+## Общие UI-компоненты в профильных пакетах
+
+Пакет [003.4](003-design-system/component-library.md) — общий источник семейств C01–C30 и их поведения. Все остальные 20 spec.md имеют предметный UI-раздел с C IDs, состояниями/ограничениями и AC-UI критериями. [Контракт применения](003-design-system/contracts/feature-adoption.md) обязателен при следующем планировании и реализации UI: готовые элементы переиспользуются, предметные owners/права/лимиты остаются в своём пакете. Принятый каталог не означает реализацию будущих сервисов или прохождение отложенного UI/native gate.

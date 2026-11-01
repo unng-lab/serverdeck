@@ -556,3 +556,11 @@ retires connections/pending control. Fresh probe/confirm and explicit connection
 reconcile recover the same attempt; no previous plan/authority is revived. Native
 owner/probe/receipt and ten-second metadata limits remain unchanged. Static/RAM
 positive and negative acceptance is specified in direct contract section2.
+
+## UI-компоненты и приёмка (003.4)
+
+[UI-раздел спецификации](spec.md) обязателен для следующих UI-задач этого пакета; [общий контракт](../003-design-system/contracts/feature-adoption.md) задаёт интеграцию. Presentation остаётся в существующих feature adapters `lib/`, переиспользует `lib/ui/deck_components.dart`, `BrandTheme` и допустимые стандартные Material controls. Catalog/demo owners не импортируются в runtime.
+
+Для каждой композиции зафиксировать C ID/вариант, существующий owner/controller и его данные/callbacks, применимые состояния, границу identity/readiness и критерий AC-UI-001-01–03. Сохранение sort/query/selection/draft при theme/resize локально; смена цели/отзыв/утрата готовности обрабатываются действующим owner. Permission/retry/recovery/store/SSH и их лимиты остаются в сервисных контрактах, без новых UI-side owners.
+
+Если существующего варианта недостаточно, сначала расширить каталог/контракт 003 с проверкой reuse, затем подключить его. Этим дополнением не создаются новые endpoints, схемы/миграции, зависимости или runtime actions. Новые поля передаются через действующие модели только в рамках предметных требований пакета. Текущий ограниченный validation gate сохраняется; UI/native qualification выполняется только в соответствующем разрешённом этапе, его pending-статус не означает прохождение проверки.

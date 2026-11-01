@@ -5158,3 +5158,11 @@ checks/review; первоначальный green unit результат не �
 ## Phase 58: Согласование direct-SSH контракта перед source checkpoint
 
 - [x] T444 [US3] Устранить два противоречия, найденные `commit_all_fixed_review`: в `contracts/direct-ssh.md` §7 закрепить уже используемые worker/snapshot/terminal proof `Type=oneshot` и `RemainAfterExit=yes`; в §5 заменить прежнюю отдельную DB restart последовательность на уже установленный §3/DB activation compound effect write→syntax→restart→postchecks с одним permit. Production-поведение и завершённая история задач не меняются; FR-SSH-004/005/008/009, AC-SSH-03/07/08/10. Проверяемый критерий: единственный согласованный тип unit и порядок DB activation в контракте, совпадающие с `remote/direct_ssh_worker.dart`, `remote/direct_ssh_step_snapshot.dart`, `remote/direct_ssh_terminal.dart` и T425.
+
+## UI-компоненты и приёмка (003.4)
+
+Следующая очередь относится только к уже объявленным UI-сценариям [спецификации](spec.md) и [контракту применения](../003-design-system/contracts/feature-adoption.md). Она не открывает новые backend возможности и не стирает completed tasks. Если mapping соответствующего сценария уже выполнен, приложить его фактическое evidence вместо повторной реализации; текущий gate не расширяется.
+
+- [ ] T462 Зафиксировать в плане mapping всех строк UI-раздела: C ID/вариант, конкретный owner/adapter, данные/события и применимые состояния/N/A. Отсутствующий вариант оформить сначала в 003. FR-UI-001-01–03 / AC-UI-001-01.
+- [ ] T463 В соответствующем разрешённом UI-этапе собрать перечисленные композиции из готовых Deck/Material+BrandTheme элементов, сохранив validation, identity/readiness/revision guards и сервисные callbacks. Не переносить I/O/credentials/retry/authority в widgets. После T462; AC-UI-001-01,02.
+- [ ] T464 Проверить предметные normal/failure/boundary пути и применимые UI gates 003; записать commands/scope/evidence и N/A, пройти обязательный independent review/fix loop. При unit-only gate UI/native evidence оставить явно pending до отдельной квалификации. После T463; AC-UI-001-02,03.

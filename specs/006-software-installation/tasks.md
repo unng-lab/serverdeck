@@ -33,3 +33,13 @@ T001 → T002 → T003 → T004 → T005 → T006 → T007 → T008.
 проверяться параллельно в одном suite; одни source files меняются последовательно.
 MVP — read-only каталог/blocked reasons без изменения сервера; выпуск всей
 поправки требует обоих продуктов, проверки failure paths и completed review.
+
+## UI-компоненты и приёмка (003.4)
+
+Следующая очередь относится только к уже объявленным UI-сценариям [спецификации](spec.md) и [контракту применения](../003-design-system/contracts/feature-adoption.md). Она не открывает новые backend возможности и не стирает completed tasks. Если mapping соответствующего сценария уже выполнен, приложить его фактическое evidence вместо повторной реализации; текущий gate не расширяется.
+
+- [ ] T022 Зафиксировать в плане mapping всех строк UI-раздела: C ID/вариант, конкретный owner/adapter, данные/события и применимые состояния/N/A. Отсутствующий вариант оформить сначала в 003. FR-UI-006-01–03 / AC-UI-006-01.
+- [ ] T023 В соответствующем разрешённом UI-этапе собрать перечисленные композиции из готовых Deck/Material+BrandTheme элементов, сохранив validation, identity/readiness/revision guards и сервисные callbacks. Не переносить I/O/credentials/retry/authority в widgets. После T022; AC-UI-006-01,02.
+- [ ] T024 Проверить предметные normal/failure/boundary пути и применимые UI gates 003; записать commands/scope/evidence и N/A, пройти обязательный independent review/fix loop. При unit-only gate UI/native evidence оставить явно pending до отдельной квалификации. После T023; AC-UI-006-02,03.
+
+- [x] T025 Уточнить UI-поправку 006 по send/result proof: disconnect до возможной отправки не означает unknown, после possible send без correlated result — unknown, доказанный terminal сохраняется. Три случая закреплены в AC-UI-006-02; actual UI assertions остаются будущей T024. Исправление [review round1](../003-design-system/reviews/2026-11-01-feature-ui-adoption-round1.md), без изменения direct-SSH контракта.

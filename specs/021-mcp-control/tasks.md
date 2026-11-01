@@ -2471,3 +2471,11 @@ recipes —006; эти задачи фиксируют integration/authority par
 Зависимости: T214 → T215/T216 → T217 → T218; общий adapter001T406 обязателен
 дляT215, job path001T413 и recipes006 обязательны дляT217. T215/T216 имеют
 независимые unit cases, но правки общих DTO выполняются последовательно.
+
+## UI-компоненты и приёмка (003.4)
+
+Следующая очередь относится только к уже объявленным UI-сценариям [спецификации](spec.md) и [контракту применения](../003-design-system/contracts/feature-adoption.md). Она не открывает новые backend возможности и не стирает completed tasks. Если mapping соответствующего сценария уже выполнен, приложить его фактическое evidence вместо повторной реализации; текущий gate не расширяется.
+
+- [ ] T408 Зафиксировать в плане mapping всех строк UI-раздела: C ID/вариант, конкретный owner/adapter, данные/события и применимые состояния/N/A. Отсутствующий вариант оформить сначала в 003. FR-UI-021-01–03 / AC-UI-021-01.
+- [ ] T409 В соответствующем разрешённом UI-этапе собрать перечисленные композиции из готовых Deck/Material+BrandTheme элементов, сохранив validation, identity/readiness/revision guards и сервисные callbacks. Не переносить I/O/credentials/retry/authority в widgets. После T408; AC-UI-021-01,02.
+- [ ] T410 Проверить предметные normal/failure/boundary пути и применимые UI gates 003; записать commands/scope/evidence и N/A, пройти обязательный independent review/fix loop. При unit-only gate UI/native evidence оставить явно pending до отдельной квалификации. После T409; AC-UI-021-02,03.
