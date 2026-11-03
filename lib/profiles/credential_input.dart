@@ -1,259 +1,196 @@
-import 'package:flutter/material.dart';
-import 'package:serverdeck_protocol/profile_validation.dart';
-import 'package:serverdeck_windows/profile_input.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
-import '../theme/motion.dart';
-import '../theme/brand_tokens.dart';
-import '../shell/form_keyboard.dart';
-import '../ui/deck_components.dart';
+import 'package:pointycastle/digests/sha256.dart';
 
-enum CredentialChoice { keep, remove, password, privateKey }
+import '../domain/models.dart';
+import 'credential_parser.dart';
+import 'key_parse_worker.dart';
 
-class CredentialInput extends StatefulWidget {
-  const CredentialInput({
-    super.key,
-    required this.creating,
-    required this.enabled,
-    this.pickKey = pickPrivateKey,
-    this.onSubmit,
-    this.readReadyEpoch,
-  });
-  final bool creating, enabled;
-  final Future<String?> Function() pickKey;
-  final VoidCallback? onSubmit;
-  final int? Function()? readReadyEpoch;
-  @override
-  State<CredentialInput> createState() => CredentialInputState();
+abstract interface class SecretProtector {
+  Future<Uint8List> protect(Uint8List bytes, String purpose);
 }
 
-class CredentialInputState extends State<CredentialInput> {
-  final password = TextEditingController(),
-      keyInput = TextEditingController(),
-      passphrase = TextEditingController();
-  late CredentialChoice choice = widget.creating
-      ? CredentialChoice.remove
-      : CredentialChoice.keep;
-  bool revealed = false, picking = false;
-  String? error;
-  int _pickerEpoch = 0;
+/// Owned encrypted material, copied into a record before disposal. No projection.
+final class PreparedCredential {
+  PreparedCredential._(this.kind, this._ciphertext, this.inspection);
+  final AuthKind kind;
+  final Uint8List _ciphertext;
+  final KeyInspection? inspection;
+  bool _disposed = false;
+  Uint8List get ciphertext {
+    if (_disposed) throw StateError('Credential cleared');
+    return _ciphertext.asUnmodifiableView();
+  }
+
+  void dispose() {
+    _ciphertext.fillRange(0, _ciphertext.length, 0);
+    _disposed = true;
+  }
 
   @override
-  void didUpdateWidget(covariant CredentialInput oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled && !widget.enabled) _pickerEpoch++;
-  }
+  String toString() => 'PreparedCredential(redacted)';
+}
 
-  Map<String, Object?> action() => normalizeCredential(switch (choice) {
-    CredentialChoice.keep => {'action': 'keep'},
-    CredentialChoice.remove => {'action': 'remove'},
-    CredentialChoice.password => {
-      'action': 'replace',
-      'kind': 'password',
-      'password': password.text,
-    },
-    CredentialChoice.privateKey => {
-      'action': 'replace',
-      'kind': 'privateKey',
-      'privateKey': keyInput.text,
-      'passphrase': passphrase.text.isEmpty ? null : passphrase.text,
-    },
-  }, creating: widget.creating);
+/// Preparation is outside a database transaction. Callers recheck their fence
+/// and authorization at commit, then dispose both input and prepared material.
+final class CredentialPreparer {
+  const CredentialPreparer(this.protector, this.inspector);
+  final SecretProtector protector;
+  final KeyInspector inspector;
 
-  void clear() {
-    _pickerEpoch++;
-    password.clear();
-    keyInput.clear();
-    passphrase.clear();
-    revealed = false;
-  }
-
-  void resetChoice() {
-    clear();
-    setState(
-      () => choice = widget.creating
-          ? CredentialChoice.remove
-          : CredentialChoice.keep,
-    );
-  }
-
-  Future<void> _pick() async {
-    if (!widget.enabled || picking) return;
-    final readyEpoch = widget.readReadyEpoch?.call();
-    if (widget.readReadyEpoch != null && readyEpoch == null) return;
-    bool current() =>
-        mounted &&
-        widget.enabled &&
-        (widget.readReadyEpoch == null ||
-            widget.readReadyEpoch!() == readyEpoch);
-    final epoch = ++_pickerEpoch;
-    setState(() {
-      picking = true;
-      error = null;
-    });
+  Future<PreparedCredential> prepare(
+    AuthenticationInput input, {
+    required String credentialId,
+    CredentialCancellation? cancellation,
+  }) async {
+    if (!isCanonicalUuid(credentialId)) {
+      throw const OperationFailure(
+        FailureCode.invalidArgument,
+        field: OperationField.authentication,
+      );
+    }
+    cancellation?.check();
+    final plaintext = switch (input) {
+      PasswordInput() => Uint8List.fromList(utf8.encode(input.password)),
+      PrivateKeyInput() => Uint8List.fromList(input.bytes),
+    };
+    Uint8List? encrypted;
     try {
-      final key = await widget.pickKey();
-      if (!current() || epoch != _pickerEpoch) return;
-      if (key != null) keyInput.text = key;
-    } on Object {
-      if (current() && epoch == _pickerEpoch)
-        setState(
-          () => error = 'Не удалось прочитать ключ: выберите файл UTF-8 размером не более 64 КиБ',
+      KeyInspection? inspection;
+      if (input is PrivateKeyInput) {
+        inspection = await inspector.inspect(
+          plaintext,
+          passphrase: input.passphrase,
+          cancellation: cancellation,
         );
+        cancellation?.check();
+      }
+      try {
+        encrypted = await protector.protect(
+          plaintext,
+          'credential.v1:$credentialId',
+        );
+        if (encrypted.isEmpty || encrypted.length > 2 * 1024 * 1024) {
+          throw const OperationFailure(FailureCode.protectionUnavailable);
+        }
+      } catch (_) {
+        throw const OperationFailure(FailureCode.protectionUnavailable);
+      }
+      cancellation?.check();
+      // Own our copy even if an adapter returns a shared buffer.
+      return PreparedCredential._(
+        input is PasswordInput ? AuthKind.password : AuthKind.privateKey,
+        Uint8List.fromList(encrypted),
+        inspection,
+      );
     } finally {
-      // A retired picker still owns the pending native dialog. Release the
-      // busy flag when it finishes, without publishing its result or error.
-      if (mounted) setState(() => picking = false);
+      plaintext.fillRange(0, plaintext.length, 0);
+      encrypted?.fillRange(0, encrypted.length, 0);
     }
   }
+}
 
-  @override
-  void dispose() {
-    clear();
-    password.dispose();
-    keyInput.dispose();
-    passphrase.dispose();
-    super.dispose();
+final class ValidatedProfileFields {
+  const ValidatedProfileFields({
+    required this.displayName,
+    required this.originalHost,
+    required this.normalizedHost,
+    required this.port,
+    required this.username,
+    required this.endpointId,
+  });
+  final String displayName, originalHost, normalizedHost, username, endpointId;
+  final int port;
+}
+
+final _dnsLabel = RegExp(r'^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$');
+final _forbiddenUser = RegExp(r'[\s\p{Cc}\p{Cf}]', unicode: true);
+
+ValidatedProfileFields validateProfileFields(ProfileDraft draft) =>
+    validateProfileValues(
+      displayName: draft.displayName,
+      host: draft.host,
+      port: draft.port,
+      username: draft.username,
+    );
+
+ValidatedProfileFields validateProfileValues({
+  required String displayName,
+  required String host,
+  int? port,
+  required String username,
+}) {
+  final effectivePort = port ?? 22;
+  final name = displayName.trim();
+  if (!isWellFormedUnicode(name) || name.isEmpty || name.runes.length > 100) {
+    throw const OperationFailure(
+      FailureCode.invalidArgument,
+      field: OperationField.displayName,
+    );
   }
-
-  Widget _keyInstruction() => Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final decorator = context
-          .findAncestorWidgetOfExactType<InputDecorator>()!;
-      final states = <WidgetState>{
-        if (!decorator.decoration.enabled) WidgetState.disabled,
-        if (decorator.isFocused) WidgetState.focused,
-        if (decorator.isHovering) WidgetState.hovered,
-        if (decorator.decoration.error != null ||
-            decorator.decoration.errorText != null)
-          WidgetState.error,
-      };
-      // A custom helper does not inherit InputDecorator's helperStyle. Retain
-      // its Material3 typography/role and effective theme/state overrides.
-      // Keep the instruction opaque when the editor is locked, like its value.
-      final style = theme.textTheme.bodySmall!
-          .copyWith(color: theme.colorScheme.onSurfaceVariant)
-          .merge(
-            WidgetStateProperty.resolveAs(
-              decorator.decoration.helperStyle,
-              states,
-            ),
-          );
-      return Text(
-        'Для ввода ключа включите показ или выберите файл',
-        style: style.copyWith(color: style.color?.withAlpha(255)),
-        overflow: TextOverflow.visible,
-      );
-    },
+  final normalized = normalizeHost(host);
+  if (effectivePort < 1 || effectivePort > 65535) {
+    throw const OperationFailure(
+      FailureCode.invalidArgument,
+      field: OperationField.port,
+    );
+  }
+  if (!isWellFormedUnicode(username) ||
+      username.isEmpty ||
+      username.runes.length > 255 ||
+      _forbiddenUser.hasMatch(username)) {
+    throw const OperationFailure(
+      FailureCode.invalidArgument,
+      field: OperationField.username,
+    );
+  }
+  final digest = SHA256Digest().process(
+    utf8.encode(jsonEncode([normalized, effectivePort])),
   );
-
-  Widget _secret(
-    TextEditingController controller,
-    String label, {
-    required String id,
-    bool multiline = false,
-  }) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      // Floating InputDecorator labels elide long instructions at200%.
-      // Keep the complete instruction visible, associated with its input.
-      ExcludeSemantics(
-        child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
-      ),
-      const SizedBox(height: BrandSpacing.space8),
-      Semantics(
-        label: label,
-        child: SubmitOnEnter(
-          enabled:
-              widget.enabled &&
-              !picking &&
-              !(revealed && multiline) &&
-              widget.onSubmit != null,
-          child: TextFormField(
-            key: ValueKey('credential-$id'),
-            controller: controller,
-            enabled: widget.enabled && !picking,
-            // Material's default disabled style reduces value opacity to 0.38.
-            style: Theme.of(context).textTheme.bodyLarge,
-            // Flutter's obscured one-line editor strips LF on platform edits.
-            // PEM must remain verbatim: editing uses the explicitly revealed
-            // multiline view, while a picked key can stay hidden throughout.
-            readOnly: multiline && !revealed,
-            decoration: InputDecoration(
-              helper: multiline && !revealed ? _keyInstruction() : null,
-            ),
-            obscureText: !revealed,
-            onFieldSubmitted: revealed && multiline
-                ? null
-                : (_) => widget.onSubmit?.call(),
-            minLines: revealed && multiline ? 3 : 1,
-            maxLines: revealed && multiline ? 6 : 1,
-            autocorrect: false,
-            enableSuggestions: false,
-            autofillHints: const [],
-            smartDashesType: SmartDashesType.disabled,
-            smartQuotesType: SmartQuotesType.disabled,
-          ),
-        ),
-      ),
-    ],
+  return ValidatedProfileFields(
+    displayName: name,
+    originalHost: host,
+    normalizedHost: normalized,
+    port: effectivePort,
+    username: username,
+    endpointId: digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
   );
+}
 
-  @override
-  Widget build(BuildContext context) => DeckFormSection(
-    title: 'Доступ к серверу',
-    description: 'Существующий секрет не читается в форму. Сохранение не подключает сервер.',
-    children: [
-      MotionDropdown<CredentialChoice>(
-        initialValue: choice,
-        isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Секрет доступа'),
-        items: CredentialChoice.values
-            .where((v) => !widget.creating || v != CredentialChoice.keep)
-            .map(
-              (v) => DropdownMenuItem(
-                value: v,
-                child: Text(switch (v) {
-                  CredentialChoice.keep => 'Сохранить существующий',
-                  CredentialChoice.remove => 'Без секрета / удалить',
-                  CredentialChoice.password => 'Новый пароль',
-                  CredentialChoice.privateKey => 'Новый приватный ключ',
-                }),
-              ),
-            )
-            .toList(),
-        onChanged: widget.enabled && !picking
-            ? (value) => setState(() {
-                clear();
-                choice = value!;
-                error = null;
-              })
-            : null,
-      ),
-      if (choice == CredentialChoice.password)
-        _secret(password, 'Пароль', id: 'password'),
-      if (choice == CredentialChoice.privateKey) ...[
-        _secret(keyInput, 'Приватный ключ', id: 'private-key', multiline: true),
-        _secret(passphrase, 'Passphrase (необязательно)', id: 'passphrase'),
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-          onPressed: widget.enabled && !picking ? _pick : null,
-          child: Text(picking ? 'Чтение ключа' : 'Выбрать файл ключа'),
-        ),
-        if (picking)
-          const DeckStatus(label: 'Ожидаем выбор файла ключа', pending: true),
-      ],
-      if (choice == CredentialChoice.password ||
-          choice == CredentialChoice.privateKey)
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const DeckFocusLabel(child: Text('Показать введённый секрет')),
-          value: revealed,
-          onChanged: widget.enabled && !picking
-              ? (value) => setState(() => revealed = value!)
-              : null,
-        ),
-      if (error != null) DeckNotice(message: error!, tone: DeckTone.error),
-    ],
+String normalizeHost(String input) {
+  const failure = OperationFailure(
+    FailureCode.invalidArgument,
+    field: OperationField.host,
   );
+  if (input.isEmpty ||
+      input.length > 253 ||
+      !isWellFormedUnicode(input) ||
+      RegExp(r'[\s\x00-\x20\x7f%/\\@?#]').hasMatch(input))
+    throw failure;
+  if (input.startsWith('[') && input.endsWith(']')) {
+    final ipv6 = InternetAddress.tryParse(input.substring(1, input.length - 1));
+    if (ipv6 == null || ipv6.type != InternetAddressType.IPv6) throw failure;
+    return InternetAddress.fromRawAddress(
+      ipv6.rawAddress,
+      type: ipv6.type,
+    ).address.toLowerCase();
+  }
+  if (input.contains('[') || input.contains(']')) throw failure;
+  final ip = InternetAddress.tryParse(input);
+  if (ip != null)
+    return InternetAddress.fromRawAddress(
+      ip.rawAddress,
+      type: ip.type,
+    ).address.toLowerCase();
+  if (input.contains(':')) throw failure;
+  final dns = input.endsWith('.')
+      ? input.substring(0, input.length - 1)
+      : input;
+  if (dns
+      .split('.')
+      .any((p) => p.isEmpty || p.length > 63 || !_dnsLabel.hasMatch(p)))
+    throw failure;
+  return dns.toLowerCase();
 }

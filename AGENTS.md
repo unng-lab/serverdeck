@@ -13,6 +13,40 @@
   `lychee "specs/**/*.md"`. Fix broken links before committing.
 - Do not report checks as passed unless they were actually run successfully.
 
+## Test Scope
+
+- Tests are unit-only. Functional widget tests use fake dependencies; native unit
+  tests exercise individual adapters with synthetic inputs and temporary files.
+- Do not add or run integration/e2e/release smoke/VM/process-kill tests or make them
+  completion gates. Do not load real Isar in the Flutter unit suite or launch the
+  product, Explorer, or other logon sessions from tests.
+- Build, formatting, static analysis, manifest/import audits, and link checks are
+  allowed. Unit results do not prove full application integration on a clean OS.
+- Historical integration tools and evidence are excluded from current acceptance.
+
+## Functional Tests and Shared Component Design Tests
+
+- Feature tasks test the data shown to the user, state transitions, validation,
+  callbacks, authorization, privacy and recovery. Functional widget tests may
+  assert text, semantics, enabled actions and owner/controller behavior.
+- Do not add or run screen-layout/design acceptance in feature tasks: no pixel
+  coordinates, relative positioning, spacing, widget sizes, colors/typography,
+  golden screenshots, overflow checks or theme/viewport/text-scale matrices for
+  feature screens. Do not make those checks a pending feature acceptance gate.
+- Design/layout tests belong exclusively to the shared C01–C30 components in
+  `specs/001-design-system` and `test_design/components/`. Test the reusable
+  elements on synthetic inputs, not the complete feature screen compositions.
+  The HTML design suite also checks only component cards, not the 98 screens.
+- `flutter test` runs the ordinary functional suite in `test/`. Shared design
+  checks run separately with `tools/test-design-components.ps1` (or
+  `flutter test test_design/components`) when the shared components/theme/catalog
+  are changed in the design scope. Component captures remain explicit opt-in.
+- `tools/check-test-boundaries.ps1` checks ordinary tests for accidental layout,
+  capture or shared-design-suite coupling; the normal unit gate runs this check.
+- Reuse C IDs in feature specs/plans/tasks; test feature data/actions without
+  duplicating the common component's design tests. Historical design evidence
+  remains history and does not impose screen-layout checks on future tasks.
+
 ## Independent Review and Fix Loop
 
 - After changing application code and successfully completing the mandatory

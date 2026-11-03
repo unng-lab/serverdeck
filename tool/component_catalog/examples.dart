@@ -10,7 +10,6 @@ import 'package:serverdeck/ui/deck_components.dart';
 import 'job_example.dart';
 
 import 'package:serverdeck/shell/foundation_shell.dart';
-import 'package:serverdeck_protocol/models.dart' show ReadinessState;
 
 class CatalogRow {
   const CatalogRow(this.id, this.name, this.value);

@@ -1,0 +1,39 @@
+name: Desktop build and native unit checks
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Flutter
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4') { throw 'SDK checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:RUNNER_TEMP 'sdk')
+          (Join-Path $env:RUNNER_TEMP 'sdk/flutter/bin') >> $env:GITHUB_PATH
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build single EXE and audit imports
+        shell: pwsh
+        run: ./tools/build-release.ps1
+      - name: Application unit checks
+        shell: pwsh
+        run: |
+          python -m pip install -r tools/unit-requirements.txt
+          ./tools/test-unit.ps1
+      - name: Native unit tests
+        shell: pwsh
+        run: ./tools/test-release.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ServerDeck
+          path: |
+            output/release/ServerDeck.exe
+            output/release-evidence/

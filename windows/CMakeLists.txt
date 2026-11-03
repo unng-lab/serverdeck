@@ -41,7 +41,8 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
   target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
   target_compile_options(${TARGET} PRIVATE /EHsc)
-  target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
+  target_compile_options(${TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+  target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=1")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()
 
@@ -56,12 +57,6 @@ add_subdirectory("runner")
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
-
-# An eager runner plugin import would initialize its Flutter dependency before
-# MCP can isolate SDK logging. Keep generated/third-party sources untouched.
-foreach(plugin ${FLUTTER_PLUGIN_LIST})
-  target_link_options(${BINARY_NAME} PRIVATE "/DELAYLOAD:${plugin}_plugin.dll")
-endforeach()
 
 
 # === Installation ===

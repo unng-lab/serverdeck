@@ -1,0 +1,182 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
+
+final _storeId = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+);
+
+class StoreFailure implements Exception {
+  const StoreFailure(this.code);
+  final String code;
+  @override
+  String toString() => code;
+}
+
+class StoreManifest {
+  const StoreManifest(this.storeId, {this.formatVersion = 2});
+  final String storeId;
+  final int formatVersion;
+  String get relativeDirectory => 'stores/$storeId';
+  Uint8List encode() => Uint8List.fromList(
+    utf8.encode(
+      jsonEncode({
+        'publicationVersion': 1,
+        'formatVersion': formatVersion,
+        'storeId': storeId,
+        'relativeDirectory': relativeDirectory,
+      }),
+    ),
+  );
+
+  static StoreManifest decode(List<int> bytes) {
+    try {
+      final value = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      final id = value['storeId'];
+      if (value['publicationVersion'] is! int ||
+          value['publicationVersion'] != 1 ||
+          value['formatVersion'] is! int ||
+          !{1, 2}.contains(value['formatVersion']) ||
+          id is! String ||
+          !_storeId.hasMatch(id) ||
+          value['relativeDirectory'] != 'stores/$id') {
+        throw const StoreFailure('INCOMPATIBLE_STORE');
+      }
+      return StoreManifest(id, formatVersion: value['formatVersion'] as int);
+    } catch (_) {
+      throw const StoreFailure('INCOMPATIBLE_STORE');
+    }
+  }
+}
+
+String newStoreId() {
+  final random = Random.secure();
+  final bytes = List.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+      '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+}
+
+/// Native startup has secured the root ACL. Refuse links before any DB open.
+Future<void> rejectLinks(String path) async {
+  final absolute = File(path).absolute.path;
+  var current = Directory(absolute);
+  while (true) {
+    if (await FileSystemEntity.type(current.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw const StoreFailure('STORAGE_IO');
+    }
+    final parent = current.parent;
+    if (parent.path == current.path) break;
+    current = parent;
+  }
+}
+
+Future<StoreManifest?> preflightStore(Directory data) async {
+  await rejectLinks(data.path);
+  final current = File('${data.path}/CURRENT.json');
+  await rejectLinks(current.path);
+  if (await current.exists()) {
+    if (await current.length() > 4096) {
+      throw const StoreFailure('INCOMPATIBLE_STORE');
+    }
+    final manifest = StoreManifest.decode(await current.readAsBytes());
+    final selected = Directory('${data.path}/${manifest.relativeDirectory}');
+    await rejectLinks(selected.path);
+    if (!await selected.exists() ||
+        !await File('${selected.path}/serverdeck.isar').exists()) {
+      throw const StoreFailure('MISSING_STORE');
+    }
+    await for (final entry in selected.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      await rejectLinks(entry.path);
+    }
+    return manifest;
+  }
+  if (await data.exists()) {
+    // Never guess which orphan or staging directory contains the user's data.
+    await for (final entry in data.list(followLinks: false)) {
+      if (entry is Directory &&
+          entry.path == '${data.path}${Platform.pathSeparator}stores') {
+        if (await entry.list(followLinks: false).isEmpty) continue;
+      }
+      throw const StoreFailure('UNPUBLISHED_STORE');
+    }
+  }
+  return null;
+}
+
+/// Only the live owner that created this UUID may resume it. A new process
+/// still uses preflightStore and rejects unpublished directories.
+Future<void> validatePendingPublication(
+  Directory data,
+  StoreManifest pending,
+) async {
+  await rejectLinks(data.path);
+  if (!await data.exists()) return;
+  final stage = 'staging-${pending.storeId}';
+  await for (final entry in data.list(followLinks: false)) {
+    await rejectLinks(entry.path);
+    final name = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
+    if (entry is! Directory || (name != 'stores' && name != stage)) {
+      throw const StoreFailure('UNPUBLISHED_STORE');
+    }
+    if (name == 'stores') {
+      await for (final candidate in entry.list(followLinks: false)) {
+        await rejectLinks(candidate.path);
+        final id = candidate.uri.pathSegments.where((s) => s.isNotEmpty).last;
+        if (candidate is! Directory || id != pending.storeId) {
+          throw const StoreFailure('UNPUBLISHED_STORE');
+        }
+      }
+    }
+    await for (final candidate in entry.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      await rejectLinks(candidate.path);
+    }
+  }
+}
+
+/// Copies only the selected closed store into this live owner's staging UUID.
+/// Publication/flush remain native; the original directory is never opened or written.
+Future<void> copyStoreDirectory(String sourcePath, String targetPath) async {
+  final source = Directory(sourcePath).absolute;
+  final target = Directory(targetPath).absolute;
+  await rejectLinks(source.path);
+  await rejectLinks(target.path);
+  final sourceParts = source.uri.pathSegments
+      .where((p) => p.isNotEmpty)
+      .toList();
+  await target.create(recursive: true);
+  await for (final entry in source.list(recursive: true, followLinks: false)) {
+    await rejectLinks(entry.path);
+    final parts = entry.absolute.uri.pathSegments
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.length <= sourceParts.length ||
+        !List.generate(
+          sourceParts.length,
+          (i) => parts[i] == sourceParts[i],
+        ).every((v) => v)) {
+      throw const StoreFailure('STORAGE_IO');
+    }
+    final destination =
+        '${target.path}/${parts.skip(sourceParts.length).join('/')}';
+    await rejectLinks(destination);
+    if (entry is Directory) {
+      await Directory(destination).create(recursive: true);
+    } else if (entry is File) {
+      await Directory(destination).parent.create(recursive: true);
+      await entry.copy(destination);
+    } else {
+      throw const StoreFailure('STORAGE_IO');
+    }
+  }
+}

@@ -6,10 +6,13 @@ project(runner LANGUAGES CXX)
 # work.
 #
 # Any new source files that you add to the application should be added here.
-add_executable(${BINARY_NAME} WIN32
+add_library(${BINARY_NAME} SHARED
   "flutter_window.cpp"
-  "main.cpp"
-  "mcp_stdio.cpp"
+  "host_main.cpp"
+  "platform_channel.cpp"
+  "../../native/bootstrap/security.cpp"
+  "../../native/bootstrap/instance.cpp"
+  "../../native/bootstrap/mcp_pipe.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
@@ -20,6 +23,9 @@ add_executable(${BINARY_NAME} WIN32
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
+set_target_properties(${BINARY_NAME} PROPERTIES
+  OUTPUT_NAME "serverdeck_host"
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 # Add preprocessor definitions for the build version.
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
@@ -30,18 +36,14 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTT
 
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
-target_compile_definitions(${BINARY_NAME} PRIVATE "_WIN32_WINNT=0x0A00")
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
-target_link_libraries(${BINARY_NAME} PRIVATE delayimp)
-target_link_options(${BINARY_NAME} PRIVATE "/DELAYLOAD:flutter_windows.dll")
-# The Windows SDK exposes CompareObjectHandles through the OneCore import lib.
-target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" "shell32.lib" "comctl32.lib" "OneCore.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE bcrypt advapi32 ole32 shell32 user32 crypt32)
+target_include_directories(${BINARY_NAME} PRIVATE "../../native/include")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
-
-target_compile_options(${BINARY_NAME} PRIVATE /utf-8)

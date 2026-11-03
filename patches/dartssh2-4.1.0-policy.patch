@@ -1,0 +1,394 @@
+--- a/lib/src/ssh_errors.dart
++++ b/lib/src/ssh_errors.dart
+@@ -146,3 +146,24 @@
+     return 'SSHSocketError($error)';
+   }
+ }
++
++/// Server requests unsupported additional authentication factors.
++class SSHUnsupportedAuthError with SSHMessageError implements SSHAuthError {
++  @override
++  final String message = 'Additional authentication factors are unsupported';
++}
++
++/// Fixed scheduling failures from the application's bounded crypto owner.
++enum SSHSignatureFailure { stopping, exhausted, timeout, cancelled }
++
++class SSHSignatureVerificationError with SSHMessageError implements SSHError {
++  final SSHSignatureFailure reason;
++  SSHSignatureVerificationError(this.reason);
++  @override
++  String get message => 'Host signature verification ${reason.name}';
++}
++
++class SSHResourceLimitError with SSHMessageError implements SSHError {
++  @override
++  final String message = 'SSH receive buffer limit exceeded';
++}
+--- a/lib/src/ssh_client.dart
++++ b/lib/src/ssh_client.dart
+@@ -169,15 +169,15 @@
+   /// Crypto algorithms available for the client.
+   final SSHAlgorithms algorithms;
+ 
+-  /// Function called when the first host key is received. The callback receives
+-  /// the host key type and fingerprint, and should return true to accept the key
+-  /// or false to reject it and close the connection. If this is null, all host
+-  /// keys are accepted automatically. Warning: the signature check alone only
+-  /// proves the peer owns the key it presented, not that it is the expected host.
+-  /// Leaving this null exposes the connection to man-in-the-middle attacks. Supply
+-  /// this callback and verify the fingerprint against a known-hosts entry or a
+-  /// trusted certificate store.
++  /// ServerDeck requires this callback before starting transport. It receives
++  /// the negotiated type, SHA256 fingerprint and exact verified public key blob.
++  /// No credentials are sent until the callback explicitly accepts the key.
+   final SSHHostkeyVerifyHandler? onVerifyHostKey;
++
++  /// Verified changed-key notification, never permission to continue rekey.
++  final SSHHostkeyChangedHandler? onHostKeyChanged;
++
++  final SSHHostSignatureVerifier? onVerifyHostSignature;
+ 
+   /// List of identities (key pairs or external signers) to use for
+   /// authentication. Set this field to enable authentication with public key.
+@@ -286,6 +286,8 @@
+     this.printTrace,
+     this.algorithms = const SSHAlgorithms(),
+     this.onVerifyHostKey,
++    this.onHostKeyChanged,
++    this.onVerifyHostSignature,
+     this.identities,
+     this.hostbasedIdentities,
+     this.hostName,
+@@ -304,6 +306,19 @@
+     this.pipelineChannelRequests = false,
+     String ident = 'DartSSH_2.0',
+   }) : ident = _validateIdent(ident) {
++    if (onVerifyHostKey == null ||
++        onHostKeyChanged == null ||
++        disableHostkeyVerification ||
++        onUserInfoRequest != null ||
++        onChangePasswordRequest != null ||
++        hostbasedIdentities != null ||
++        agentHandler != null ||
++        (onPasswordRequest != null
++            ? identities != null
++            : identities?.length != 1)) {
++      throw ArgumentError(
++          'ServerDeck requires verified host keys and exactly one password/key method');
++    }
+     _transport = SSHTransport(
+       socket,
+       isServer: false,
+@@ -311,6 +326,8 @@
+       printTrace: printTrace,
+       algorithms: algorithms,
+       onVerifyHostKey: onVerifyHostKey,
++      onHostKeyChanged: onHostKeyChanged,
++      onVerifyHostSignature: onVerifyHostSignature,
+       onReady: _handleTransportReady,
+       onMessage: _handlePacket,
+       disableHostkeyVerification: disableHostkeyVerification,
+@@ -1139,7 +1156,8 @@
+         'Authentication partially succeeded with '
+         '${_currentAuthMethod?.name}',
+       );
+-      _resetAuthStateForNextFactor();
++      _authenticated.completeError(SSHUnsupportedAuthError());
++      return;
+     } else {
+       _markCurrentAuthMethodAttempted();
+     }
+@@ -1554,9 +1572,7 @@
+       _preferredAuthMethods.add(SSHAuthMethod.hostbased);
+     }
+ 
+-    _authMethodsLeft
+-      ..addAll(_preferredAuthMethods)
+-      ..add(SSHAuthMethod.none);
++    _authMethodsLeft.addAll(_preferredAuthMethods);
+ 
+     _tryNextAuthMethod();
+   }
+@@ -1741,16 +1757,6 @@
+     }
+   }
+ 
+-  void _resetAuthStateForNextFactor() {
+-    _exhaustedAuthMethods.clear();
+-    // OpenSSH resets public-key attempt state after partial success so the
+-    // next authentication factor may use publickey again. Hostbased keys are
+-    // consumed as they are tried and are intentionally not replenished.
+-    _identitiesLeft
+-      ..clear()
+-      ..addAll(identities ?? const <SSHIdentity>[]);
+-  }
+-
+   Future<SSHChannelController> _openSessionChannel() {
+     final localChannelId = _channelIdAllocator.allocate();
+ 
+--- a/lib/src/ssh_transport.dart
++++ b/lib/src/ssh_transport.dart
+@@ -42,6 +42,21 @@
+ typedef SSHHostkeyVerifyHandler = FutureOr<bool> Function(
+   String type,
+   Uint8List fingerprint,
++  Uint8List exactHostKeyBlob,
++);
++
++typedef SSHHostkeyChangedHandler = FutureOr<void> Function(
++  String type,
++  Uint8List fingerprint,
++  Uint8List exactHostKeyBlob,
++);
++
++/// CPU verifier hook; the application installs an owned, bounded worker pool.
++typedef SSHHostSignatureVerifier = FutureOr<bool> Function(
++  SSHHostkeyType negotiatedType,
++  Uint8List keyBytes,
++  Uint8List signatureBytes,
++  Uint8List exchangeHash,
+ );
+ 
+ Uint8List _hostkeyFingerprint(Uint8List hostkey) {
+@@ -98,6 +113,11 @@
+   /// Function called when the hostkey has been received. Returns true if the
+   /// hostkey is valid, false to reject key and disconnect.
+   final SSHHostkeyVerifyHandler? onVerifyHostKey;
++
++  /// Notification only: a changed verified rekey is always rejected.
++  final SSHHostkeyChangedHandler? onHostKeyChanged;
++
++  final SSHHostSignatureVerifier? onVerifyHostSignature;
+ 
+   /// Function called when the transport is ready to send data.
+   final SSHTransportReadyHandler? onReady;
+@@ -147,6 +167,8 @@
+     this.printTrace,
+     this.algorithms = const SSHAlgorithms(),
+     this.onVerifyHostKey,
++    this.onHostKeyChanged,
++    this.onVerifyHostSignature,
+     this.onReady,
+     this.onPacket,
+     this.onMessage,
+@@ -249,6 +271,7 @@
+   /// only latches whether verification ever succeeded, not which key it
+   /// succeeded for.
+   Uint8List? _verifiedHostkeyFingerprint;
++  Uint8List? _verifiedHostkeyBlob;
+ 
+   /// Host key type verified during the first key exchange, checked alongside
+   /// [_verifiedHostkeyFingerprint] on rekey.
+@@ -633,7 +656,13 @@
+   }
+ 
+   /// Callback triggered when new raw bytes are received from the socket.
++  static const maxBufferedBytes = 1024 * 1024;
+   void _onSocketData(Uint8List data) {
++    if (isClosed) return;
++    if (data.length > maxBufferedBytes - _buffer.length) {
++      closeWithError(SSHResourceLimitError());
++      return;
++    }
+     _buffer.add(data);
+     _hasNewData = true;
+     _scheduleProcessData();
+@@ -1381,33 +1410,94 @@
+     return writer.takeBytes();
+   }
+ 
+-  /// Verifies the server's public host key signature against the computed exchange hash.
+-  bool _verifyHostkey({
++  /// Bounded linear-time format checks; no expensive public-key math here.
++  static bool isHostSignatureEncodingValid({
++    required SSHHostkeyType negotiatedType,
+     required Uint8List keyBytes,
+     required Uint8List signatureBytes,
+     required Uint8List exchangeHash,
+   }) {
+-    switch (_hostkeyType) {
+-      case SSHHostkeyType.ed25519:
+-        final publicKey = SSHEd25519PublicKey.decode(keyBytes);
+-        final signature = SSHEd25519Signature.decode(signatureBytes);
+-        return publicKey.verify(exchangeHash, signature);
+-      case SSHHostkeyType.rsaSha1:
+-      case SSHHostkeyType.rsaSha256:
+-      case SSHHostkeyType.rsaSha512:
+-        final publicKey = SSHRsaPublicKey.decode(keyBytes);
+-        final signature = SSHRsaSignature.decode(signatureBytes);
+-        return publicKey.verify(exchangeHash, signature);
+-      case SSHHostkeyType.ecdsa256:
+-      case SSHHostkeyType.ecdsa384:
+-      case SSHHostkeyType.ecdsa521:
+-        final publicKey = SSHEcdsaPublicKey.decode(keyBytes);
+-        final signature = SSHEcdsaSignature.decode(signatureBytes);
+-        return publicKey.verify(exchangeHash, signature);
+-      case null:
+-        throw StateError('No hostkey type negotiated');
+-      default:
+-        throw UnimplementedError('Unsupported hostkey type: $_hostkeyType');
++    if (keyBytes.isEmpty ||
++        keyBytes.length > 16384 ||
++        signatureBytes.isEmpty ||
++        signatureBytes.length > 16384 ||
++        !const [32, 48, 64].contains(exchangeHash.length)) return false;
++    try {
++      late SSHHostKey publicKey;
++      late SSHSignature signature;
++      switch (negotiatedType) {
++        case SSHHostkeyType.ed25519:
++          final key = SSHEd25519PublicKey.decode(keyBytes);
++          final sig = SSHEd25519Signature.decode(signatureBytes);
++          if (key.key.length != 32 || sig.signature.length != 64) return false;
++          publicKey = key;
++          signature = sig;
++          break;
++        case SSHHostkeyType.rsaSha256:
++        case SSHHostkeyType.rsaSha512:
++          final key = SSHRsaPublicKey.decode(keyBytes);
++          final sig = SSHRsaSignature.decode(signatureBytes);
++          if (sig.type != negotiatedType.name ||
++              key.e < BigInt.from(3) ||
++              !key.e.isOdd ||
++              key.n <= key.e ||
++              !key.n.isOdd) return false;
++          publicKey = key;
++          signature = sig;
++          break;
++        case SSHHostkeyType.ecdsa256:
++        case SSHHostkeyType.ecdsa384:
++        case SSHHostkeyType.ecdsa521:
++          final key = SSHEcdsaPublicKey.decode(keyBytes);
++          final sig = SSHEcdsaSignature.decode(signatureBytes);
++          if (key.type != negotiatedType.name ||
++              sig.type != negotiatedType.name ||
++              key.type != 'ecdsa-sha2-${key.curveId}') return false;
++          publicKey = key;
++          signature = sig;
++          break;
++        default:
++          return false; // Includes legacy RSA/SHA1.
++      }
++      // Re-encode to reject trailing fields and noncanonical mpint encodings.
++      return constantTimeEquals(publicKey.encode(), keyBytes) &&
++          constantTimeEquals(signature.encode(), signatureBytes);
++    } catch (_) {
++      return false;
++    }
++  }
++
++  /// Pure verifier shared with the application's owned crypto worker.
++  static bool verifyHostSignature({
++    required SSHHostkeyType negotiatedType,
++    required Uint8List keyBytes,
++    required Uint8List signatureBytes,
++    required Uint8List exchangeHash,
++  }) {
++    if (!isHostSignatureEncodingValid(
++        negotiatedType: negotiatedType,
++        keyBytes: keyBytes,
++        signatureBytes: signatureBytes,
++        exchangeHash: exchangeHash)) return false;
++    try {
++      switch (negotiatedType) {
++        case SSHHostkeyType.ed25519:
++          return SSHEd25519PublicKey.decode(keyBytes)
++              .verify(exchangeHash, SSHEd25519Signature.decode(signatureBytes));
++        case SSHHostkeyType.rsaSha256:
++        case SSHHostkeyType.rsaSha512:
++          return SSHRsaPublicKey.decode(keyBytes)
++              .verify(exchangeHash, SSHRsaSignature.decode(signatureBytes));
++        case SSHHostkeyType.ecdsa256:
++        case SSHHostkeyType.ecdsa384:
++        case SSHHostkeyType.ecdsa521:
++          return SSHEcdsaPublicKey.decode(keyBytes)
++              .verify(exchangeHash, SSHEcdsaSignature.decode(signatureBytes));
++        default:
++          return false;
++      }
++    } catch (_) {
++      return false;
+     }
+   }
+ 
+@@ -1874,11 +1964,25 @@
+ 
+     if (!disableHostkeyVerification) {
+       printDebug?.call('SSHTransport._verifyHostkey');
+-      final verified = _verifyHostkey(
+-        keyBytes: hostkey,
+-        signatureBytes: hostSignature,
+-        exchangeHash: exchangeHash,
+-      );
++      final encodingValid = isHostSignatureEncodingValid(
++          negotiatedType: _hostkeyType!,
++          keyBytes: hostkey,
++          signatureBytes: hostSignature,
++          exchangeHash: exchangeHash);
++      final verifier = onVerifyHostSignature;
++      final verified = encodingValid &&
++          (verifier == null
++              ? verifyHostSignature(
++                  negotiatedType: _hostkeyType!,
++                  keyBytes: hostkey,
++                  signatureBytes: hostSignature,
++                  exchangeHash: exchangeHash)
++              : await verifier(
++                  _hostkeyType!,
++                  Uint8List.fromList(hostkey),
++                  Uint8List.fromList(hostSignature),
++                  Uint8List.fromList(exchangeHash)));
++      if (isClosed) return; // A cancelled/closed handshake never resumes late.
+       if (!verified) throw SSHHostkeyError('Signature verification failed');
+     }
+ 
+@@ -1894,9 +1998,8 @@
+       // the same key the user (or [onVerifyHostKey]) already approved.
+       // OpenSSH rejects a host key change during rekey; do the same.
+       final verifiedFingerprint = _verifiedHostkeyFingerprint;
+-      if (verifiedFingerprint == null ||
+-          _verifiedHostkeyType != _hostkeyType ||
+-          !constantTimeEquals(verifiedFingerprint, fingerprint)) {
++      final verifiedBlob = _verifiedHostkeyBlob;
++      if (verifiedBlob == null || !constantTimeEquals(verifiedBlob, hostkey)) {
+         closeWithError(
+           SSHHostkeyError(
+             'Host key changed during rekey: was $_verifiedHostkeyType '
+@@ -1905,6 +2008,11 @@
+             '${utf8.decode(fingerprint, allowMalformed: true)}',
+           ),
+         );
++        await onHostKeyChanged?.call(
++          _hostkeyType!.name,
++          Uint8List.fromList(fingerprint),
++          Uint8List.fromList(hostkey),
++        );
+         return;
+       }
+       _sendNewKeys();
+@@ -1917,9 +2025,14 @@
+     // bracket it in the debug log rather than leaving a silent gap.
+     printDebug?.call('SSHTransport.onVerifyHostKey');
+     final userVerified = onVerifyHostKey != null
+-        ? await Future.value(onVerifyHostKey!(_hostkeyType!.name, fingerprint))
+-        : true;
++        ? await Future.value(onVerifyHostKey!(
++            _hostkeyType!.name,
++            Uint8List.fromList(fingerprint),
++            Uint8List.fromList(hostkey),
++          ))
++        : false;
+     printDebug?.call('SSHTransport.onVerifyHostKey = $userVerified');
++    if (isClosed) return;
+ 
+     if (!userVerified) {
+       closeWithError(SSHHostkeyError('Hostkey verification failed'));
+@@ -1928,6 +2041,7 @@
+ 
+     _hostkeyVerified = true;
+     _verifiedHostkeyFingerprint = fingerprint;
++    _verifiedHostkeyBlob = Uint8List.fromList(hostkey);
+     _verifiedHostkeyType = _hostkeyType;
+     _sendNewKeys();
+     _applyLocalKeys();

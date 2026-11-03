@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/ui/deck_components.dart';
@@ -10,15 +9,6 @@ import 'component_catalog/documentation.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // The shared Windows runner forwards close to Dart. This isolated entrypoint
-  // has no engine/jobs to drain and must still close through the native host.
-  const window = MethodChannel('serverdeck/desktop');
-  window.setMethodCallHandler((call) async {
-    if (call.method == 'action' &&
-        (call.arguments == 'closeWindow' || call.arguments == 'exit')) {
-      await window.invokeMethod<void>('finishExit');
-    }
-  });
   runApp(const ComponentCatalogApp());
 }
 

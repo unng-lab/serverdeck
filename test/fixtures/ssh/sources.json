@@ -1,0 +1,36 @@
+{
+  "source": "public dartssh2-4.1.0 MIT fixtures; never real user credentials",
+  "archiveSHA256": "39359aceafcf5940b868249e3c9c6d86e4e0f989eec7417d033c943157c84c51",
+  "files": {
+    "ed25519.txt": {
+      "archivePath": "test/fixtures/ssh-ed25519/id_ed25519",
+      "sha256": "f8b7e952e3d18cce01f2cf67a78eee8f9a7928249dc71f2b7ebe21e889ce61ed"
+    },
+    "rsa2048.txt": {
+      "archivePath": "test/fixtures/ssh-rsa/id_rsa.openssh",
+      "sha256": "dc7cead57cb886b38a04c175243b848b0a7df255f7191fc89a5d7cf58e3c8513"
+    },
+    "ecdsa.txt": {
+      "archivePath": "test/fixtures/ecdsa-sha2-nistp256/id_ecdsa",
+      "sha256": "5e8ad284b31d64bc1236d1f65bb925a801ad2d460a280d3b23901f80596c5adf"
+    },
+    "rsa-pkcs1.txt": {
+      "archivePath": "test/fixtures/ssh-rsa/id_rsa",
+      "sha256": "b3ef6c2b8ab736dcd533f56d8db7a94a3db4cb64736d73844c6f575e06444898"
+    },
+    "public-key.txt": {
+      "archivePath": "test/fixtures/ssh-ed25519/id_ed25519.pub",
+      "sha256": "54e4fe536e84c39f6c99d1d46509b955a29c60e476fcf6f0d9fb4aed31714c6d"
+    },
+    "ed25519-encrypted.txt": {
+      "derivedFrom": "ed25519.txt",
+      "method": "dartssh2 4.1.0 OpenSSHKeyPair.toPem, bcrypt rounds=1, passphrase=serverdeck-unit-passphrase; offline synthetic unit vector",
+      "sha256": "081e54013018c5873ff7d3da600a3437d0218f5d0772b16731d31bb3b138023b"
+    },
+    "rsa2048-encrypted.txt": {
+      "derivedFrom": "rsa2048.txt",
+      "method": "dartssh2 4.1.0 OpenSSHKeyPair.toPem, bcrypt rounds=1, passphrase=serverdeck-unit-passphrase; offline synthetic unit vector",
+      "sha256": "9d9adfb7befee953cb4e1f1580a78999015d545641bb2f9ea9cb70b44172719b"
+    }
+  }
+}

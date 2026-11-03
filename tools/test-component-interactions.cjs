@@ -55,9 +55,26 @@ const base=pathToFileURL(path.resolve(__dirname,'../docs/design/ServerDeck-desig
  await select('C28');await preview.locator('[data-date]').fill('2026-02-31');await action('Проверить дату').click();assert(await preview.locator('[data-form-errors]').isVisible());await preview.locator('[data-date]').fill('2026-02-28');await action('Проверить дату').click();assert(!(await preview.locator('[data-form-errors]').isVisible()));checks.push('C28 rejects normalized invalid date');
  await select('C24');assert(await preview.locator('[data-plan-confirm]').isDisabled());await preview.locator('[data-plan-consent]').check();assert(await preview.locator('[data-plan-confirm]').isEnabled());checks.push('C24 explicit consent guard');
  await select('C15');await preview.locator('[data-context-region]').focus();await page.keyboard.press('Shift+F10');assert(await preview.getByRole('menu').isVisible());await page.keyboard.press('ArrowDown');assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Редактировать');await page.keyboard.press('Escape');assert(!(await preview.getByRole('menu').isVisible()));assert(await preview.locator('[data-context-region]').evaluate(node=>node===document.activeElement));checks.push('C15 context keyboard/arrow/Escape focus return');
+ await select('C17');assert.equal(await preview.locator('[data-screen-id]').count(),0);assert.equal(await preview.locator('[data-shell-slot]').count(),1);for(const width of [1100,800,390,360]){await page.setViewportSize({width,height:800});for(const label of ['Серверы','ПО','Журналы','Задания','Настройки']){const nav=preview.getByRole('button',{name:label,exact:true}).filter({visible:true}).first();assert(await nav.isVisible());assert.equal(await nav.getAttribute('title'),label);assert.equal(await nav.locator('svg[aria-hidden="true"]').count(),1);}await preview.getByRole('button',{name:'Журналы',exact:true}).filter({visible:true}).first().click();assert.match(await preview.locator('[data-shell-slot]').innerText(),/Журналы/);}checks.push('C17 generic shared shell slots/navigation, explicit names/tooltips/icons across shared frames; no feature screen renderer');
  await select('C23');for(const [state,text] of Object.entries({success:'Завершено',error:'Ошибка',cancelled:'Отменено',unknown:'Исход неизвестен'})){await page.locator('#component-state').selectOption(state);assert((await preview.innerText()).includes(text));}checks.push('C23 terminal outcomes');
  await select('C02');const button=action('Создать профиль');await button.hover();assert(await button.evaluate(node=>node.matches(':hover')));await page.mouse.down();assert(await button.evaluate(node=>node.matches(':active')));await page.mouse.up();await page.locator('#component-state').selectOption('focus');assert(await button.evaluate(node=>node===document.activeElement));await page.locator('#component-state').selectOption('disabled');assert(await button.isDisabled());checks.push('C02 real hover/pressed/focus/disabled');
+ for(const theme of ['light','dark']){
+  await page.goto(`${base}?component=C17&theme=${theme}`);await page.waitForFunction(()=>document.body.dataset.ready==='true');
+  assert.equal(await page.locator('#theme-button span').innerText(),theme==='light'?'Тёмная':'Светлая');
+  assert(await preview.locator('img.product-logo').evaluate((img,theme)=>img.src===window.SERVERDECK_ASSETS[`assets/logos/logo-${theme}.svg`],theme));
+  assert(await preview.locator('img.logo-mark').evaluate((img,theme)=>img.src===window.SERVERDECK_ASSETS[`assets/logos/mark-${theme}.svg`],theme));
+ }
+ checks.push('C17 direct light/dark links initialize matching artwork and next-theme label');
+ await select('C03');
+ const draft=preview.getByRole('textbox',{name:'Имя сервера',exact:true});
+ await draft.fill('theme-preserved-draft');
+ for(let i=0;i<2;i++){await page.locator('#theme-button').click();assert.equal(await draft.inputValue(),'theme-preserved-draft');}
+ await select('C06');
+ const selection=preview.locator('[data-row-select]:not(:disabled)').first();await selection.check();
+ await page.locator('#theme-button').click();assert(await selection.isChecked());
+ checks.push('C03/C06 theme switch preserves edited draft and row selection');
  assert.deepEqual(errors,[]);
+ fs.mkdirSync(path.resolve(__dirname,'../output/design-components-2026-11-01'),{recursive:true});
  const report={scope:'Offline HTML synthetic interactions; not native Flutter',checks,errors};fs.writeFileSync(path.resolve(__dirname,'../output/design-components-2026-11-01/browser-interactions.json'),JSON.stringify(report,null,2));
  await browser.close();console.log(JSON.stringify(report));
 })().catch(error=>{console.error(error);process.exitCode=1;});

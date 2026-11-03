@@ -6,7 +6,8 @@ const preview=document.getElementById('component-preview');
 const query=new URLSearchParams(location.search);
 let componentId=registry.components.some(c=>c.id===query.get('component'))?query.get('component'):'C06';
 let componentState='default';
-let currentView=query.get('view')==='components'?'components':'screens';
+let shellSection='Серверы';
+let currentView='components';
 const action=(label,variant='outlined')=>UI.button(label,{variant,attributes:`data-component-action="${UI.escape(label)}"`});
 const row=(label,description='',trailing='')=>UI.list([{title:label,description,trailing}]);
 const field=(label,value='atlas-web',type='text')=>UI.field(label,`<input type="${type}" value="${UI.escape(value)}" aria-label="${UI.escape(label)}">`);
@@ -39,7 +40,7 @@ function sample(id){
     case'C14':return ['Информационный диалог','Редактирование профиля','Подтверждение удаления'].map((title,i)=>`${UI.surface(title,`<div class="panel-body"><p>atlas-web · 192.0.2.14</p>${i===1?field('Имя профиля'):i===2?UI.notice('Удаление локального профиля','На сервере ничего не изменится.',{tone:'warning'}):'<p>Параметры доступны только локально.</p>'}${UI.button('Открыть '+title,{attributes:`data-open-dialog="dialog-${i}"`})}</div>`)}<dialog id="dialog-${i}" data-catalog-dialog><h2>${title}</h2><p>atlas-web · 192.0.2.14</p>${i===1?field('Новое имя профиля'):i===2?'<p>Будут удалены только локальные параметры.</p>':'<p>Информационное сообщение</p>'}<div class="sample-actions">${UI.button('Отмена',{attributes:'data-close-dialog'})}${UI.button(i===2?'Удалить профиль':'Готово',{variant:i===2?'danger':'filled',attributes:'data-close-dialog'})}</div></dialog>`).join('');
     case'C15':return `<p>Меню: вторичная кнопка мыши или Shift+F10; Escape возвращает фокус.</p><div class="sample-actions"><button type="button" class="button" data-open-menu aria-haspopup="menu" aria-expanded="false">Действия</button><div tabindex="0" data-context-region>Контекстное меню</div><button type="button" class="button" title="Обновить данные" aria-label="Обновить данные" data-component-action="Обновить">↻</button></div><div role="menu" data-sample-menu hidden>${['Открыть','Редактировать','Удалить профиль'].map(label=>UI.button(label,{attributes:`role="menuitem" data-component-action="${label}"`})).join('')}</div>`;
     case'C16':return `<nav class="breadcrumb" aria-label="Путь"><span>Серверы</span><span>/</span><span>atlas-web</span></nav><nav class="tabs" aria-label="Разделы сервера">${['Обзор','Журнал','Параметры'].map((label,i)=>`<button class="tab ${i===0?'active':''}" type="button" data-sample-tab>${label}</button>`).join('')}</nav>`;
-    case'C17':return window.SERVERDECK_ATLAS.renderApp(window.SERVERDECK_ATLAS.screens.find(screen=>screen.id===window.SERVERDECK_ATLAS.state.screenId)||window.SERVERDECK_ATLAS.screens[4]);
+    case'C17':{const theme=document.documentElement.dataset.theme==='light'?'light':'dark';const navigation=()=>['Серверы','ПО','Журналы','Задания','Настройки'].map(label=>`<button type="button" class="${label===shellSection?'active':''}" data-shell-section="${label}" aria-label="${label}" title="${label}" aria-current="${label===shellSection?'page':'false'}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>${label}</span></button>`).join('');return `<div class="app-shell" data-component="C17"><aside class="app-sidebar"><img class="product-logo" src="${window.SERVERDECK_ASSETS[`assets/logos/logo-${theme}.svg`]}" alt="ServerDeck"><img class="logo-mark" src="${window.SERVERDECK_ASSETS[`assets/logos/mark-${theme}.svg`]}" alt="ServerDeck"><nav class="app-nav" aria-label="Разделы общего каркаса">${navigation()}</nav></aside><div class="app-main"><header class="app-topbar"><span>Общий каркас · C17</span>${status('Готово')}</header><div class="content"><header class="page-header"><div class="page-heading"><h1>${shellSection}</h1><p>Синтетическая цель · 192.0.2.14</p></div></header>${UI.surface('Слот содержимого',`<div class="panel-body" data-shell-slot>Пример слота: ${shellSection}. Предметный экран здесь не создаётся.${action('Локальное действие')}</div>`)}</div></div><nav class="bottom-nav" aria-label="Разделы общего каркаса">${navigation()}</nav></div>`;}
     case'C18':return `<dl class="description-list"><dt>Сервер</dt><dd>atlas-web</dd><dt>Адрес</dt><dd><code>192.0.2.14:22</code></dd><dt>Источник</dt><dd>SSH · последнее разрешённое наблюдение</dd><dt>Время наблюдения</dt><dd>2026-11-01 10:42:18 UTC</dd></dl>${action('Скопировать адрес')}`;
     case'C19':return `<details ${componentState==='expanded'?'open':''}><summary class="button">Технические сведения</summary><div class="panel-body"><p>Параметры и исходные идентификаторы доступны по запросу.</p><code>server-demo-014 · revision 3</code></div></details>`;
     case'C20':return UI.list([{title:'10:42:18 UTC · INFO · nginx',description:'Конфигурация успешно проверена'},{title:'10:42:15 UTC · WARN · nginx',description:'Повторное соединение с upstream'},{title:'Разрыв потока',description:'Пропущены 3 записи; полнота журнала не гарантирована'}]);
@@ -61,10 +62,10 @@ function renderComponent(){
   document.getElementById('component-id').textContent=componentId;
   document.getElementById('component-title').textContent=component.name;
   document.getElementById('component-description').textContent=component.description;
-  document.getElementById('component-usage').textContent=`${component.sourceScreenIds.length} связанных композиций. В Flutter: ${component.implementationPaths.join(', ')||'Material 3 + Deck, реализация по задачам 003.4'}. Данные, действия и полномочия передаёт экран. HTML — дизайн-пример, а не доказательство готовности Flutter.`;
+  document.getElementById('component-usage').textContent=`В Flutter: ${component.implementationPaths.join(', ')||'Material 3 + Deck'}. Данные, действия и полномочия передаёт экран. HTML — дизайн-пример, а не доказательство готовности Flutter.`;
   document.getElementById('component-state').innerHTML=component.applicableStates.map(state=>`<option value="${UI.escape(state)}" ${state===componentState?'selected':''}>${UI.escape(state)}</option>`).join('');
   const section=(title,values)=>`<section><h2>${UI.escape(title)}</h2><p>${values.map(UI.escape).join('<br>')}</p></section>`;
-  document.getElementById('component-contract').innerHTML=`<h2>Контракт ${componentId}</h2><div class="component-doc-grid">${section('Источники screen IDs',component.sourceScreenIds)}${section('Анатомия',component.anatomy)}${section('Варианты',component.variants)}${section('Параметры',component.parameters)}${section('События',component.events)}${section('Ограничения',component.limitations)}${section('Критерии приёмки',component.acceptanceCriteria)}${section('Неприменимость',Object.entries(component.notApplicableReasons).map(([key,value])=>`${key}: ${value}`))}</div><h2>Пример подключения</h2><pre class="sample-code">${UI.escape(component.usageExample)}</pre><p>Работающий пример: <code>${UI.escape(component.runnableExamplePath)}</code></p>`;
+  document.getElementById('component-contract').innerHTML=`<h2>Контракт ${componentId}</h2><div class="component-doc-grid">${section('Анатомия',component.anatomy)}${section('Варианты',component.variants)}${section('Параметры',component.parameters)}${section('События',component.events)}${section('Ограничения',component.limitations)}${section('Критерии приёмки',component.acceptanceCriteria)}${section('Неприменимость',Object.entries(component.notApplicableReasons).map(([key,value])=>`${key}: ${value}`))}</div><h2>Пример подключения</h2><pre class="sample-code">${UI.escape(component.usageExample)}</pre><p>Работающий пример: <code>${UI.escape(component.runnableExamplePath)}</code></p>`;
   preview.dataset.demoState=componentState;
   preview.innerHTML=`<div class="sample-stack" data-component="${componentId}">${componentState==='pending'?UI.notice('Действие выполняется','Повторная отправка заблокирована. Следующий результат передаст владелец.',{tone:'info'}):componentState==='error'?UI.notice('Не удалось выполнить действие','Проверьте введённые значения и контекст. Автоматического повтора нет.',{tone:'error'}):''}${['stale','partial','unknown'].includes(componentState)?UI.notice(({stale:'Данные устарели',partial:'Данные получены не полностью',unknown:'Состояние неизвестно'})[componentState],'Качество и предыдущий снимок переданы владельцем; новых наблюдений нет.',{tone:'warning'}):''}${sample(componentId)}</div><p class="component-result" role="status" aria-live="polite"></p>`;
   UI.enhance(preview);
@@ -81,9 +82,7 @@ function renderComponent(){
 function selectView(view){
   currentView=view;
   gallery.hidden=view!=='components';
-  document.getElementById('atlas-layout').hidden=view==='components';
   document.querySelectorAll('[data-design-view]').forEach(control=>control.setAttribute('aria-pressed',String(control.dataset.designView===view)));
-  document.getElementById('open-preview').hidden=view==='components';
   if(view==='components')renderComponent();
   const url=new URL(location.href);url.searchParams.set('view',view);url.searchParams.set('component',componentId);history.replaceState(null,'',url);
 }
@@ -95,7 +94,6 @@ document.addEventListener('click',event=>{
   if(button.hasAttribute('data-component-action')){
     preview.querySelector('.component-result').textContent=`Демонстрация: «${button.dataset.componentAction}». Реальные операции не выполняются.`;
   }
-  if(componentId==='C17'&&currentView==='components'&&button.hasAttribute('data-nav'))renderComponent();
   if(button.hasAttribute('data-sample-tab')){preview.querySelectorAll('[data-sample-tab]').forEach(tab=>tab.classList.toggle('active',tab===button));}
 });
 document.getElementById('component-state').addEventListener('change',event=>{componentState=event.target.value;renderComponent();});
@@ -146,9 +144,10 @@ preview.addEventListener('keydown',event=>{
 });
 preview.addEventListener('click',async event=>{
   // Catalog collections have their own synthetic owner; do not route clicks into the hidden screen atlas.
-  if(componentId!=='C17')event.stopPropagation();
+  event.stopPropagation();
   const button=event.target.closest('button');
   if(button?.disabled)return;
+  if(button?.hasAttribute('data-shell-section')){shellSection=button.dataset.shellSection;renderComponent();return;}
   if(button?.hasAttribute('data-list-select')){button.setAttribute('aria-pressed',String(button.getAttribute('aria-pressed')!=='true'));}
   if(button?.hasAttribute('data-open-dialog'))preview.querySelector('#'+button.dataset.openDialog)?.showModal();
   if(button?.hasAttribute('data-close-dialog'))button.closest('dialog')?.close();
@@ -171,5 +170,16 @@ preview.addEventListener('click',async event=>{
   if(event.target.closest('[data-plan-confirm]'))resultText('План подтверждён локально. Запросы не отправлены.');
   updateSelection();
 });
+function applyTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  document.getElementById('theme-button').querySelector('span').textContent=theme==='dark'?'Светлая':'Тёмная';
+  preview.querySelectorAll('img.product-logo,img.logo-mark').forEach(img=>{
+    img.src=window.SERVERDECK_ASSETS[`assets/logos/${img.classList.contains('logo-mark')?'mark':'logo'}-${theme}.svg`];
+  });
+  const url=new URL(location.href);url.searchParams.set('theme',theme);history.replaceState(null,'',url);
+}
+applyTheme(query.get('theme')==='light'?'light':'dark');
 selectView(currentView);
 window.SERVERDECK_COMPONENT_GALLERY={select: id=>{componentId=id;selectView('components');},registry};
+document.getElementById('theme-button').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='light'?'dark':'light'));
+document.body.dataset.ready='true';

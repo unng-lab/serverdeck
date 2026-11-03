@@ -1,0 +1,5 @@
+#pragma code_page(65001)
+#include "@CMAKE_CURRENT_SOURCE_DIR@/../windows/runner/resource.h"
+
+// The bootstrap is the process module used by the window class and Windows shell.
+IDI_APP_ICON ICON "@CMAKE_CURRENT_SOURCE_DIR@/../windows/runner/resources/app_icon.ico"

@@ -1,35 +1,28 @@
 name: serverdeck
-description: Local Windows server workspace.
+description: ServerDeck brand and shared component library.
 publish_to: none
-version: 0.2.0+10
+version: 0.1.0+1
 environment:
   sdk: '>=3.13.5 <4.0.0'
 dependencies:
-  serverdeck_mcp:
-    path: packages/serverdeck_mcp
-  serverdeck_engine:
-    path: packages/serverdeck_engine
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  serverdeck_protocol:
-    path: packages/serverdeck_protocol
-  serverdeck_windows:
-    path: packages/serverdeck_windows
-  cryptography: 2.9.0
-  isar_community_flutter_libs: 3.3.2
+  pointycastle: 4.0.0
+  dartssh2:
+    path: third_party/dartssh2
+  isar_community: 3.4.1
+  isar_community_flutter_libs: 3.4.1
 dev_dependencies:
-  test: 1.31.1
-  analyzer: 13.3.0
   flutter_test:
     sdk: flutter
-dependency_overrides:
-  isar_community:
-    path: third_party/isar_community
+  isar_community_generator: 3.4.1
+  build_runner: 2.16.2
 flutter:
   uses-material-design: true
   assets:
+    - assets/mcp/tools.json
     - assets/brand/fonts/OFL.txt
     - assets/brand/fonts/OFL-NotoSansSC.txt
     - assets/brand/fonts/NotoSansSC-SOURCE.json

@@ -1,13 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:serverdeck_protocol/models.dart' show ReadinessState, ErrorCode;
 
 import '../theme/brand_assets.dart';
 import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
 import '../ui/deck_components.dart';
-import 'readiness_view.dart';
+
+enum ReadinessState { ready, unavailable }
 
 enum FoundationSection {
   servers('Серверы', Icons.dns_outlined),
@@ -23,7 +23,7 @@ enum FoundationSection {
 
 enum _NavigationLayout { phone, rail, sidebar }
 
-/// Navigation is local UI state; service readiness gates every private child.
+/// C17 presentation shell. State and content are supplied by the caller.
 class FoundationShell extends StatefulWidget {
   const FoundationShell({
     super.key,
@@ -31,8 +31,6 @@ class FoundationShell extends StatefulWidget {
     this.requestedSection = FoundationSection.servers,
     this.navigationEpoch = 0,
     this.onSectionChanged,
-    this.reason,
-    this.workspaceBusy = false,
     this.onRetry,
     this.retryInProgress = false,
     this.servers,
@@ -41,19 +39,22 @@ class FoundationShell extends StatefulWidget {
     this.targetName,
     this.targetAddress,
     this.recoveryAction,
+    this.status,
+    this.fallbackContent,
   });
 
   final FoundationSection requestedSection;
   final int navigationEpoch;
   final ValueChanged<FoundationSection>? onSectionChanged;
   final ReadinessState state;
-  final ErrorCode? reason;
-  final bool workspaceBusy;
   final VoidCallback? onRetry;
   final bool retryInProgress;
   final Widget? servers, settings, software;
   final String? targetName, targetAddress;
   final Widget? recoveryAction;
+
+  /// Optional owner-provided status and content for otherwise empty sections.
+  final Widget? status, fallbackContent;
 
   @override
   State<FoundationShell> createState() => _FoundationShellState();
@@ -294,35 +295,16 @@ class _FoundationShellState extends State<FoundationShell> {
 
   Widget _content() {
     if (widget.state != ReadinessState.ready) {
-      return ReadinessView(
-        state: widget.state,
-        reason: widget.reason,
-        workspaceBusy: widget.workspaceBusy,
-        onRetry: widget.onRetry,
-        retryInProgress: widget.retryInProgress,
+      return DeckCollectionState(
+        state: DeckDataState.unavailable,
+        onRetry: widget.retryInProgress ? null : widget.onRetry,
       );
     }
     return switch (_section) {
-      FoundationSection.servers =>
-        widget.servers ??
-            const _Unavailable('Управление профилями пока недоступно'),
-      FoundationSection.settings =>
-        widget.settings ?? const _Unavailable('Настройки пока недоступны'),
-      FoundationSection.software =>
-        widget.software ??
-            const _Unavailable(
-              'Управление ПО будет доступно после подключения к серверу',
-            ),
-      FoundationSection.logs => _SectionGuide(
-        message: 'Общий список журналов пока недоступен',
-        nextStep: 'Журнал доступен в карточке сервера при действующем доступе и доверии к SSH-ключу.',
-        onServers: () => _select(FoundationSection.servers),
-      ),
-      FoundationSection.jobs => _SectionGuide(
-        message: 'Общий список заданий пока недоступен',
-        nextStep: 'Задания и их результаты доступны в карточке сервера при действующем доступе и доверии.',
-        onServers: () => _select(FoundationSection.servers),
-      ),
+      FoundationSection.servers => widget.servers ?? const SizedBox.shrink(),
+      FoundationSection.settings => widget.settings ?? const SizedBox.shrink(),
+      FoundationSection.software => widget.software ?? const SizedBox.shrink(),
+      _ => widget.fallbackContent ?? const SizedBox.shrink(),
     };
   }
 
@@ -399,10 +381,11 @@ class _FoundationShellState extends State<FoundationShell> {
                       ? '$name · $address'
                       : null,
                   status: ready
-                      ? const DeckStatus(
-                          label: 'Локальная служба готова',
-                          tone: DeckTone.available,
-                        )
+                      ? widget.status ??
+                            const DeckStatus(
+                              label: 'Пример готов',
+                              tone: DeckTone.available,
+                            )
                       : null,
                   focusNode: _featureFocus,
                   child: _content(),
@@ -413,40 +396,5 @@ class _FoundationShellState extends State<FoundationShell> {
         ),
       );
     },
-  );
-}
-
-class _SectionGuide extends StatelessWidget {
-  const _SectionGuide({
-    required this.message,
-    required this.nextStep,
-    required this.onServers,
-  });
-  final String message, nextStep;
-  final VoidCallback onServers;
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.symmetric(vertical: BrandSpacing.space16),
-    child: DeckNotice(
-      message: message,
-      nextStep: nextStep,
-      tone: DeckTone.neutral,
-      actions: [
-        OutlinedButton(onPressed: onServers, child: const Text('К серверам')),
-      ],
-    ),
-  );
-}
-
-class _Unavailable extends StatelessWidget {
-  const _Unavailable(this.message);
-  final String message;
-  @override
-  Widget build(BuildContext context) => Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Text(message, textAlign: TextAlign.center),
-    ),
   );
 }

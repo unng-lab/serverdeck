@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/brand_tokens.dart';
 import '../theme/brand_theme.dart';
@@ -158,42 +159,75 @@ class _DeckTextFieldState extends State<DeckTextField> {
   }
 
   @override
-  Widget build(BuildContext context) => DeckFieldFrame(
-    label: widget.label,
-    child: TextFormField(
-      controller: widget.controller,
-      initialValue: widget.controller == null ? widget.initialValue : null,
-      focusNode: widget.focusNode,
-      onChanged: widget.onChanged,
-      onFieldSubmitted: widget.onFieldSubmitted,
-      validator: widget.validator,
-      autovalidateMode: widget.autovalidateMode,
-      enabled: widget.enabled,
-      readOnly: widget.readOnly,
-      obscureText: widget.secret && !_revealed,
-      enableSuggestions: !widget.secret,
-      autocorrect: !widget.secret,
-      maxLines: widget.secret ? 1 : widget.maxLines,
-      keyboardType: widget.keyboardType,
-      style: (widget.style ?? BrandTypography.body).copyWith(
-        color: Theme.of(context)
-            .extension<BrandColors>()![widget.enabled ? 'text' : 'disabled'],
-      ),
-      decoration: InputDecoration(
-        prefixText: widget.prefixText,
-        suffixText: widget.suffixText,
-        helper: widget.helper == null ? null : Text(widget.helper!),
-        errorMaxLines: 20,
-        errorText: widget.error,
-        suffixIcon: widget.secret
-            ? IconButton(
-                tooltip: _revealed ? 'Скрыть пароль' : 'Показать пароль',
-                onPressed: widget.enabled
-                    ? () => setState(() => _revealed = !_revealed)
-                    : null,
-                icon: Icon(_revealed ? Icons.visibility_off : Icons.visibility),
-              )
-            : null,
+  Widget build(BuildContext context) => Shortcuts(
+    shortcuts: widget.secret
+        ? const <ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.keyC, control: true):
+                DoNothingAndStopPropagationIntent(),
+            SingleActivator(LogicalKeyboardKey.keyX, control: true):
+                DoNothingAndStopPropagationIntent(),
+            SingleActivator(LogicalKeyboardKey.insert, control: true):
+                DoNothingAndStopPropagationIntent(),
+            SingleActivator(LogicalKeyboardKey.delete, shift: true):
+                DoNothingAndStopPropagationIntent(),
+            SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+                DoNothingAndStopPropagationIntent(),
+            SingleActivator(LogicalKeyboardKey.keyX, meta: true):
+                DoNothingAndStopPropagationIntent(),
+          }
+        : const <ShortcutActivator, Intent>{},
+    child: DeckFieldFrame(
+      label: widget.label,
+      child: TextFormField(
+        controller: widget.controller,
+        initialValue: widget.controller == null ? widget.initialValue : null,
+        focusNode: widget.focusNode,
+        onChanged: widget.onChanged,
+        onFieldSubmitted: widget.onFieldSubmitted,
+        validator: widget.validator,
+        autovalidateMode: widget.autovalidateMode,
+        enabled: widget.enabled,
+        readOnly: widget.readOnly,
+        obscureText: widget.secret && !_revealed,
+        enableSuggestions: !widget.secret,
+        autocorrect: !widget.secret,
+        enableIMEPersonalizedLearning: !widget.secret,
+        contextMenuBuilder: (context, state) =>
+            AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: state.contextMenuAnchors,
+              buttonItems: state.contextMenuButtonItems
+                  .where(
+                    (item) =>
+                        !widget.secret ||
+                        (item.type != ContextMenuButtonType.copy &&
+                            item.type != ContextMenuButtonType.cut),
+                  )
+                  .toList(),
+            ),
+        maxLines: widget.secret ? 1 : widget.maxLines,
+        keyboardType: widget.keyboardType,
+        style: (widget.style ?? BrandTypography.body).copyWith(
+          color: Theme.of(context)
+              .extension<BrandColors>()![widget.enabled ? 'text' : 'disabled'],
+        ),
+        decoration: InputDecoration(
+          prefixText: widget.prefixText,
+          suffixText: widget.suffixText,
+          helper: widget.helper == null ? null : Text(widget.helper!),
+          errorMaxLines: 20,
+          errorText: widget.error,
+          suffixIcon: widget.secret
+              ? IconButton(
+                  tooltip: _revealed ? 'Скрыть пароль' : 'Показать пароль',
+                  onPressed: widget.enabled
+                      ? () => setState(() => _revealed = !_revealed)
+                      : null,
+                  icon: Icon(
+                    _revealed ? Icons.visibility_off : Icons.visibility,
+                  ),
+                )
+              : null,
+        ),
       ),
     ),
   );

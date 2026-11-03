@@ -25,25 +25,21 @@ def build():
             assets[key] = url
             css = css.replace(key, url)
             template = template.replace(key, url)
-    bootstrap = 'window.SERVERDECK_SCREENS=' + json.dumps(
-        json.loads((DESIGN / 'screens.json').read_text(encoding='utf-8-sig')), ensure_ascii=False
-    ) + ';window.SERVERDECK_ASSETS=' + json.dumps(assets) + ';'
+    bootstrap = 'window.SERVERDECK_ASSETS=' + json.dumps(assets) + ';'
     registry = DESIGN / 'components/registry.json'
     if registry.exists():
         bootstrap += 'window.SERVERDECK_COMPONENT_REGISTRY=' + registry.read_text(encoding='utf-8') + ';'
     def script(text):
         return '<script>' + text.replace('</script', '<\\/script') + '</script>'
     scripts = script(bootstrap)
-    for name in ['design-system.js', 'content-renderers.js']:
+    for name in ['design-system.js']:
         scripts += script((SOURCE / name).read_text(encoding='utf-8'))
-    scripts += script('document.addEventListener("DOMContentLoaded",()=>{\n' +
-                      (SOURCE / 'app.js').read_text(encoding='utf-8') + '\n});')
     scripts += script('document.addEventListener("DOMContentLoaded",()=>{\n' +
                       (SOURCE / 'component-gallery.js').read_text(encoding='utf-8') + '\n});')
     template = template.replace('<link rel="stylesheet" href="style.css">', '<style>' + css + '</style>')
     template = template.replace('<!-- ATLAS_SCRIPTS -->', scripts)
     (DESIGN / 'ServerDeck-design.html').write_text(template, encoding='utf-8')
-    print('Built docs/design/ServerDeck-design.html (offline; 98 references + component gallery)')
+    print('Built docs/design/ServerDeck-design.html (offline; C01–C30 only)')
 
 
 if __name__ == '__main__':

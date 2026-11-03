@@ -6,106 +6,6 @@
       "id": "C01",
       "name": "Основы",
       "description": "Основы: палитра ролей, типографика, интервалы, геометрия, focus, motion, иконки и логотип",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "07-profile-create",
-        "08-profile-edit",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "12-credential-input",
-        "13-mutation-conflict",
-        "14-software-inventory",
-        "15-software-detail",
-        "16-install-catalog",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "21-local-registrations",
-        "22-server-logs",
-        "23-log-record",
-        "24-resource-metrics",
-        "25-hardware",
-        "26-resource-alerts",
-        "27-job-list",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "33-profile-authoring",
-        "34-profile-revisions",
-        "35-plan-parameters",
-        "36-ai-grants",
-        "37-ai-grant-form",
-        "38-mcp-client-config",
-        "39-delegations",
-        "40-executor-binding",
-        "41-services",
-        "42-service-detail",
-        "43-timers",
-        "44-system-settings",
-        "45-power",
-        "46-users",
-        "47-user-edit",
-        "48-sessions-directories",
-        "49-backups",
-        "50-backup-plan",
-        "51-restore-review",
-        "52-backup-schedule",
-        "53-files",
-        "54-file-search",
-        "55-config-editor",
-        "56-diagnostics-report",
-        "57-updates",
-        "58-package-sources",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "62-storage",
-        "63-volume-management",
-        "64-storage-danger",
-        "65-advanced-storage",
-        "66-network",
-        "67-network-edit",
-        "68-firewall",
-        "69-network-recovery",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "73-container-stack-plan",
-        "74-virtual-machines",
-        "75-vm-management",
-        "76-security-events",
-        "77-security-policy",
-        "78-security-remediation",
-        "79-sensitive-diagnostics",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "82-os-images",
-        "83-subscriptions",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "96-adoption-limited",
-        "97-management-access-blocked",
-        "98-retention-preview"
-      ],
       "variants": [
         "палитра ролей",
         "типографика",
@@ -135,10 +35,6 @@
         "success": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.",
         "cancelled": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/theme/brand_theme.dart",
         "lib/theme/brand_tokens.dart",
@@ -148,15 +44,14 @@
         "C01-default"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart",
-        "test/widget/components/foundations_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart",
+        "test_design/components/foundations_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Палитра ролей",
         "шесть ролей текста",
@@ -186,117 +81,12 @@
         "target/focus/contrast сохраняются"
       ],
       "usageExample": "MaterialApp(theme: BrandTheme.dark, home: MyScreen());",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C02",
       "name": "Кнопки",
       "description": "Кнопки: основная, вторичная, текстовая, опасная, icon-only, группа действий",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "07-profile-create",
-        "08-profile-edit",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "12-credential-input",
-        "13-mutation-conflict",
-        "14-software-inventory",
-        "15-software-detail",
-        "16-install-catalog",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "21-local-registrations",
-        "22-server-logs",
-        "23-log-record",
-        "24-resource-metrics",
-        "25-hardware",
-        "26-resource-alerts",
-        "27-job-list",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "33-profile-authoring",
-        "34-profile-revisions",
-        "35-plan-parameters",
-        "36-ai-grants",
-        "37-ai-grant-form",
-        "38-mcp-client-config",
-        "39-delegations",
-        "40-executor-binding",
-        "41-services",
-        "42-service-detail",
-        "43-timers",
-        "44-system-settings",
-        "45-power",
-        "46-users",
-        "47-user-edit",
-        "48-sessions-directories",
-        "49-backups",
-        "50-backup-plan",
-        "51-restore-review",
-        "52-backup-schedule",
-        "53-files",
-        "54-file-search",
-        "55-config-editor",
-        "56-diagnostics-report",
-        "57-updates",
-        "58-package-sources",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "62-storage",
-        "63-volume-management",
-        "64-storage-danger",
-        "65-advanced-storage",
-        "66-network",
-        "67-network-edit",
-        "68-firewall",
-        "69-network-recovery",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "73-container-stack-plan",
-        "74-virtual-machines",
-        "75-vm-management",
-        "76-security-events",
-        "77-security-policy",
-        "78-security-remediation",
-        "79-sensitive-diagnostics",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "82-os-images",
-        "83-subscriptions",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "96-adoption-limited",
-        "97-management-access-blocked",
-        "98-retention-preview"
-      ],
       "variants": [
         "основная",
         "вторичная",
@@ -325,10 +115,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_controls.dart"
       ],
@@ -341,15 +127,14 @@
         "C02-pending"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Label",
         "icon",
@@ -379,42 +164,12 @@
         "disabled не активен"
       ],
       "usageExample": "DeckButton(kind: DeckButtonKind.primary, onPressed: onCreate, child: const Text('Создать'));",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C03",
       "name": "Поля",
       "description": "Поля: текст, многострочное, число, пароль с явным показом/скрытием, read-only, prefix/suffix, helper/error",
-      "sourceScreenIds": [
-        "07-profile-create",
-        "08-profile-edit",
-        "12-credential-input",
-        "26-resource-alerts",
-        "33-profile-authoring",
-        "35-plan-parameters",
-        "37-ai-grant-form",
-        "39-delegations",
-        "44-system-settings",
-        "47-user-edit",
-        "50-backup-plan",
-        "52-backup-schedule",
-        "55-config-editor",
-        "63-volume-management",
-        "67-network-edit",
-        "73-container-stack-plan",
-        "75-vm-management",
-        "79-sensitive-diagnostics",
-        "82-os-images",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync"
-      ],
       "variants": [
         "текст",
         "многострочное",
@@ -444,10 +199,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_controls.dart"
       ],
@@ -461,14 +212,13 @@
         "C03-pending"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Полная подпись",
         "input",
@@ -501,42 +251,12 @@
         "reveal только явно"
       ],
       "usageExample": "DeckTextField(label: 'Адрес', controller: address, validator: validateAddress, onChanged: onAddressChanged);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C04",
       "name": "Выбор значения",
       "description": "Выбор значения: select, checkbox, radio, switch, segmented single choice",
-      "sourceScreenIds": [
-        "07-profile-create",
-        "08-profile-edit",
-        "12-credential-input",
-        "26-resource-alerts",
-        "33-profile-authoring",
-        "35-plan-parameters",
-        "37-ai-grant-form",
-        "39-delegations",
-        "44-system-settings",
-        "47-user-edit",
-        "50-backup-plan",
-        "52-backup-schedule",
-        "55-config-editor",
-        "63-volume-management",
-        "67-network-edit",
-        "73-container-stack-plan",
-        "75-vm-management",
-        "79-sensitive-diagnostics",
-        "82-os-images",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync"
-      ],
       "variants": [
         "select",
         "checkbox",
@@ -564,10 +284,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/theme/brand_theme.dart"
       ],
@@ -580,14 +296,13 @@
         "C04-selected"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Select",
         "checkbox",
@@ -612,50 +327,12 @@
         "disabled не вызывает событие"
       ],
       "usageExample": "CheckboxListTile(value: selected, onChanged: onChanged, title: const Text('Доступные'));",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C05",
       "name": "Поиск и фильтры",
       "description": "Поиск и фильтры: строка поиска, выбор фильтра, chip активного фильтра, очистка, панель инструментов",
-      "sourceScreenIds": [
-        "05-server-list",
-        "14-software-inventory",
-        "16-install-catalog",
-        "21-local-registrations",
-        "22-server-logs",
-        "25-hardware",
-        "27-job-list",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "36-ai-grants",
-        "41-services",
-        "43-timers",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "53-files",
-        "54-file-search",
-        "57-updates",
-        "58-package-sources",
-        "62-storage",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "80-capability-catalog",
-        "98-retention-preview"
-      ],
       "variants": [
         "строка поиска",
         "выбор фильтра",
@@ -683,10 +360,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_controls.dart"
       ],
@@ -705,14 +378,13 @@
         "C05-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Поисковое поле",
         "clear",
@@ -739,49 +411,12 @@
         "очистка возвращает исходную порцию"
       ],
       "usageExample": "DeckSearch(controller: query, onChanged: onQueryChanged, filters: filters);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C06",
       "name": "Таблица",
       "description": "Таблица: заголовки и ячейки, сортировка, выбор строк, действия, пустое/ошибка/загрузка, узкий вариант",
-      "sourceScreenIds": [
-        "05-server-list",
-        "14-software-inventory",
-        "16-install-catalog",
-        "21-local-registrations",
-        "25-hardware",
-        "27-job-list",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "36-ai-grants",
-        "41-services",
-        "43-timers",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "53-files",
-        "54-file-search",
-        "57-updates",
-        "58-package-sources",
-        "62-storage",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "80-capability-catalog",
-        "98-retention-preview"
-      ],
       "variants": [
         "заголовки и ячейки",
         "сортировка",
@@ -810,10 +445,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_collections.dart"
       ],
@@ -834,16 +465,14 @@
         "C06-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/adoption_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Header/cells",
         "stable ID",
@@ -878,52 +507,12 @@
         "row action не меняет selection"
       ],
       "usageExample": "DeckCollection<Map<String, String>>(rows: rows, idOf: (r) => r['id']!, columns: [DeckColumn(id: 'name', label: 'Имя', value: (r) => r['name'])], onOpen: onOpen);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C07",
       "name": "Список",
       "description": "Список: строка с названием/описанием/leading/trailing, разделитель, выбор, раскрытие, адаптивная карточка",
-      "sourceScreenIds": [
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "14-software-inventory",
-        "16-install-catalog",
-        "21-local-registrations",
-        "25-hardware",
-        "27-job-list",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "36-ai-grants",
-        "41-services",
-        "43-timers",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "53-files",
-        "54-file-search",
-        "57-updates",
-        "58-package-sources",
-        "62-storage",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "98-retention-preview"
-      ],
       "variants": [
         "строка с названием/описанием/leading/trailing",
         "разделитель",
@@ -951,10 +540,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart",
         "lib/ui/deck_collections.dart"
@@ -969,16 +554,14 @@
         "C07-empty"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/adoption_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Leading",
         "title",
@@ -1006,49 +589,12 @@
         "раскрытие показывает переданные детали"
       ],
       "usageExample": "DeckListItem(title: item.name, description: item.description, selected: isSelected, onTap: onSelect);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C08",
       "name": "Навигация набора",
       "description": "Навигация набора: страницы, размер страницы, счётчик, «Показать ещё»",
-      "sourceScreenIds": [
-        "05-server-list",
-        "14-software-inventory",
-        "16-install-catalog",
-        "21-local-registrations",
-        "25-hardware",
-        "27-job-list",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "36-ai-grants",
-        "41-services",
-        "43-timers",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "53-files",
-        "54-file-search",
-        "57-updates",
-        "58-package-sources",
-        "62-storage",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "80-capability-catalog",
-        "98-retention-preview"
-      ],
       "variants": [
         "страницы",
         "размер страницы",
@@ -1075,10 +621,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_collections.dart",
         "lib/ui/deck_page.dart"
@@ -1093,15 +635,14 @@
         "C08-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Назад/далее",
         "page counter",
@@ -1133,33 +674,12 @@
         "изменение размера сбрасывает page=0"
       ],
       "usageExample": "DeckPagination(page: page, hasMore: hasMore, total: total, onPageChanged: loadPage);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C09",
       "name": "Карточка",
       "description": "Карточка/поверхность: обычная, интерактивная, выбранная, ошибка; секция и заголовок с действиями",
-      "sourceScreenIds": [
-        "04-empty-workspace",
-        "06-server-overview",
-        "15-software-detail",
-        "17-recipe-detail",
-        "23-log-record",
-        "34-profile-revisions",
-        "38-mcp-client-config",
-        "42-service-detail",
-        "56-diagnostics-report",
-        "61-transactional-update",
-        "81-ha-overview",
-        "83-subscriptions",
-        "88-sync-conflict",
-        "96-adoption-limited"
-      ],
       "variants": [
         "обычная",
         "интерактивная",
@@ -1186,10 +706,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart"
       ],
@@ -1203,14 +719,13 @@
         "C09-error"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Surface",
         "padding",
@@ -1235,32 +750,12 @@
         "focus не скрывает error"
       ],
       "usageExample": "DeckSurface(selected: isSelected, error: hasError, onTap: onOpen, child: const Text('Объект'));",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C10",
       "name": "Статус",
       "description": "Статус/badge/chip: все DeckTone, счётчик, текст + символ, pending",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "11-host-key-changed",
-        "13-mutation-conflict",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "69-network-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "95-restore-blocked"
-      ],
       "variants": [
         "все DeckTone",
         "счётчик",
@@ -1287,10 +782,6 @@
         "partial": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.",
         "cancelled": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart"
       ],
@@ -1303,14 +794,13 @@
         "C10-success"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Символ",
         "подпись",
@@ -1334,45 +824,12 @@
         "reduced motion оставляет понятный pending"
       ],
       "usageExample": "const DeckStatus(label: 'Неизвестно', tone: DeckTone.unknown);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C11",
       "name": "Сообщения",
       "description": "Сообщения: inline notice, banner, локальное краткое уведомление, ошибка с повтором",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "13-mutation-conflict",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "40-executor-binding",
-        "45-power",
-        "51-restore-review",
-        "59-package-change-plan",
-        "60-software-removal",
-        "64-storage-danger",
-        "69-network-recovery",
-        "78-security-remediation",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "inline notice",
         "banner",
@@ -1399,10 +856,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart"
       ],
@@ -1417,14 +870,13 @@
         "C11-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Inline notice",
         "title",
@@ -1450,29 +902,12 @@
         "retry только явный и разрешённый owner"
       ],
       "usageExample": "DeckNotice(title: 'Не удалось прочитать', message: reason, actions: [DeckButton(onPressed: retryRead, child: const Text('Повторить чтение'))]);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C12",
       "name": "Состояние области",
       "description": "Состояние области: loading indicator, skeleton, empty, no-results, error, unavailable, stale/partial",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "11-host-key-changed",
-        "13-mutation-conflict",
-        "69-network-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "95-restore-blocked"
-      ],
       "variants": [
         "loading indicator",
         "skeleton",
@@ -1502,10 +937,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_collections.dart",
         "lib/ui/deck_page.dart"
@@ -1525,15 +956,14 @@
         "C12-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Indicator/skeleton",
         "empty/no-results",
@@ -1557,42 +987,12 @@
         "Каждое состояние имеет отдельный смысл и допустимое следующее действие"
       ],
       "usageExample": "DeckCollectionState(state: DeckDataState.noResults, onClearSearch: clearQuery);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C13",
       "name": "Форма",
       "description": "Форма: секция полей, labels/helper/error, validation summary, панель отправки/отмены",
-      "sourceScreenIds": [
-        "07-profile-create",
-        "08-profile-edit",
-        "12-credential-input",
-        "26-resource-alerts",
-        "33-profile-authoring",
-        "35-plan-parameters",
-        "37-ai-grant-form",
-        "39-delegations",
-        "44-system-settings",
-        "47-user-edit",
-        "50-backup-plan",
-        "52-backup-schedule",
-        "55-config-editor",
-        "63-volume-management",
-        "67-network-edit",
-        "73-container-stack-plan",
-        "75-vm-management",
-        "79-sensitive-diagnostics",
-        "82-os-images",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync"
-      ],
       "variants": [
         "секция полей",
         "labels/helper/error",
@@ -1619,10 +1019,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart"
       ],
@@ -1636,14 +1032,13 @@
         "C13-error"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Form sections",
         "labels/helper/errors",
@@ -1670,35 +1065,12 @@
         "draft сохраняется"
       ],
       "usageExample": "Form(key: formKey, child: DeckFormSection(title: 'Параметры', children: fields));",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C14",
       "name": "Диалог",
       "description": "Диалог: информационный, редактирование, подтверждение, опасное действие; title/body/actions",
-      "sourceScreenIds": [
-        "09-profile-delete",
-        "10-host-trust",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "40-executor-binding",
-        "45-power",
-        "51-restore-review",
-        "59-package-change-plan",
-        "60-software-removal",
-        "64-storage-danger",
-        "78-security-remediation",
-        "89-new-workspace-recovery",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "информационный",
         "редактирование",
@@ -1725,10 +1097,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart"
       ],
@@ -1741,14 +1109,13 @@
         "C14-pending"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Dialog title",
         "target",
@@ -1762,125 +1129,19 @@
         "Открытие/закрытие route и confirm принадлежат owner"
       ],
       "limitations": [
-        "Общий layout не хранит consent",
-        "private-session и showMotionDialog сохраняются"
+        "Общий layout не хранит consent и не управляет авторизацией. Вызывающий host владеет lifecycle, закрытием dialog route и проверкой полномочий; каталог использует стандартный showDialog без продуктовой private session."
       ],
       "acceptanceCriteria": [
         "Info/edit/confirm/danger представлены",
         "Escape/backdrop не подтверждают"
       ],
       "usageExample": "DeckDialogLayout(title: 'Подтверждение', target: Text(target), child: Text(effects), actions: actions);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C15",
       "name": "Меню",
       "description": "Меню/подсказка: dropdown/context menu, tooltip для icon-only, disabled с причиной",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "07-profile-create",
-        "08-profile-edit",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "12-credential-input",
-        "13-mutation-conflict",
-        "14-software-inventory",
-        "15-software-detail",
-        "16-install-catalog",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "21-local-registrations",
-        "22-server-logs",
-        "23-log-record",
-        "24-resource-metrics",
-        "25-hardware",
-        "26-resource-alerts",
-        "27-job-list",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "33-profile-authoring",
-        "34-profile-revisions",
-        "35-plan-parameters",
-        "36-ai-grants",
-        "37-ai-grant-form",
-        "38-mcp-client-config",
-        "39-delegations",
-        "40-executor-binding",
-        "41-services",
-        "42-service-detail",
-        "43-timers",
-        "44-system-settings",
-        "45-power",
-        "46-users",
-        "47-user-edit",
-        "48-sessions-directories",
-        "49-backups",
-        "50-backup-plan",
-        "51-restore-review",
-        "52-backup-schedule",
-        "53-files",
-        "54-file-search",
-        "55-config-editor",
-        "56-diagnostics-report",
-        "57-updates",
-        "58-package-sources",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "62-storage",
-        "63-volume-management",
-        "64-storage-danger",
-        "65-advanced-storage",
-        "66-network",
-        "67-network-edit",
-        "68-firewall",
-        "69-network-recovery",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "73-container-stack-plan",
-        "74-virtual-machines",
-        "75-vm-management",
-        "76-security-events",
-        "77-security-policy",
-        "78-security-remediation",
-        "79-sensitive-diagnostics",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "82-os-images",
-        "83-subscriptions",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "96-adoption-limited",
-        "97-management-access-blocked",
-        "98-retention-preview"
-      ],
       "variants": [
         "dropdown/context menu",
         "tooltip для icon-only",
@@ -1906,10 +1167,6 @@
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "selected": "Меню сообщает выбор событием, accordion хранит раскрытие; persistent selection не вводится."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart",
         "lib/theme/brand_theme.dart"
@@ -1922,14 +1179,13 @@
         "C15-disabled"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Dropdown/context menu",
         "enabled/disabled item reason",
@@ -1954,37 +1210,12 @@
         "tooltip имеет accessible name"
       ],
       "usageExample": "DeckContextMenu(entries: const [DeckMenuEntry('Открыть')], onSelected: onAction, child: row);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C16",
       "name": "Вкладки и локальные переходы",
       "description": "Вкладки и локальные переходы: tab bar, breadcrumb, назад, selected/disabled",
-      "sourceScreenIds": [
-        "15-software-detail",
-        "17-recipe-detail",
-        "23-log-record",
-        "26-resource-alerts",
-        "34-profile-revisions",
-        "38-mcp-client-config",
-        "42-service-detail",
-        "44-system-settings",
-        "52-backup-schedule",
-        "56-diagnostics-report",
-        "61-transactional-update",
-        "79-sensitive-diagnostics",
-        "83-subscriptions",
-        "84-settings",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "96-adoption-limited"
-      ],
       "variants": [
         "tab bar",
         "breadcrumb",
@@ -2011,10 +1242,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -2027,14 +1254,13 @@
         "C16-selected"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Tabs",
         "selected",
@@ -2060,117 +1286,12 @@
         "disabled callbacks отсутствуют"
       ],
       "usageExample": "DeckTabs(labels: const ['Обзор', 'Журнал'], selected: selectedTab, onSelected: onTabChanged);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C17",
       "name": "Каркас страницы",
       "description": "Каркас страницы: sidebar/rail/phone navigation, topbar, заголовок, контекст цели, body/actions",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "07-profile-create",
-        "08-profile-edit",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "12-credential-input",
-        "13-mutation-conflict",
-        "14-software-inventory",
-        "15-software-detail",
-        "16-install-catalog",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "21-local-registrations",
-        "22-server-logs",
-        "23-log-record",
-        "24-resource-metrics",
-        "25-hardware",
-        "26-resource-alerts",
-        "27-job-list",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "33-profile-authoring",
-        "34-profile-revisions",
-        "35-plan-parameters",
-        "36-ai-grants",
-        "37-ai-grant-form",
-        "38-mcp-client-config",
-        "39-delegations",
-        "40-executor-binding",
-        "41-services",
-        "42-service-detail",
-        "43-timers",
-        "44-system-settings",
-        "45-power",
-        "46-users",
-        "47-user-edit",
-        "48-sessions-directories",
-        "49-backups",
-        "50-backup-plan",
-        "51-restore-review",
-        "52-backup-schedule",
-        "53-files",
-        "54-file-search",
-        "55-config-editor",
-        "56-diagnostics-report",
-        "57-updates",
-        "58-package-sources",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "62-storage",
-        "63-volume-management",
-        "64-storage-danger",
-        "65-advanced-storage",
-        "66-network",
-        "67-network-edit",
-        "68-firewall",
-        "69-network-recovery",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "73-container-stack-plan",
-        "74-virtual-machines",
-        "75-vm-management",
-        "76-security-events",
-        "77-security-policy",
-        "78-security-remediation",
-        "79-sensitive-diagnostics",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "82-os-images",
-        "83-subscriptions",
-        "84-settings",
-        "85-settings-form",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "96-adoption-limited",
-        "97-management-access-blocked",
-        "98-retention-preview"
-      ],
       "variants": [
         "sidebar/rail/phone navigation",
         "topbar",
@@ -2198,10 +1319,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_page.dart",
         "lib/shell/foundation_shell.dart"
@@ -2214,15 +1331,13 @@
         "C17-unavailable"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/adoption_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Sidebar/rail/phone navigation",
         "topbar",
@@ -2249,100 +1364,12 @@
         "ready loss скрывает private context"
       ],
       "usageExample": "FoundationShell(state: readiness, servers: servers, software: software, settings: settings, targetName: targetName);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C18",
       "name": "Подробности",
       "description": "Подробности: пары ключ–значение, группы метаданных, selectable value, copy с результатом",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "04-empty-workspace",
-        "05-server-list",
-        "06-server-overview",
-        "09-profile-delete",
-        "10-host-trust",
-        "11-host-key-changed",
-        "13-mutation-conflict",
-        "14-software-inventory",
-        "15-software-detail",
-        "16-install-catalog",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "21-local-registrations",
-        "23-log-record",
-        "24-resource-metrics",
-        "25-hardware",
-        "26-resource-alerts",
-        "27-job-list",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "34-profile-revisions",
-        "36-ai-grants",
-        "38-mcp-client-config",
-        "40-executor-binding",
-        "41-services",
-        "42-service-detail",
-        "43-timers",
-        "44-system-settings",
-        "45-power",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "51-restore-review",
-        "52-backup-schedule",
-        "53-files",
-        "54-file-search",
-        "56-diagnostics-report",
-        "57-updates",
-        "58-package-sources",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "62-storage",
-        "64-storage-danger",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "69-network-recovery",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "78-security-remediation",
-        "79-sensitive-diagnostics",
-        "80-capability-catalog",
-        "81-ha-overview",
-        "83-subscriptions",
-        "84-settings",
-        "86-client-update",
-        "87-metadata-sync",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "95-restore-blocked",
-        "96-adoption-limited",
-        "97-management-access-blocked",
-        "98-retention-preview"
-      ],
       "variants": [
         "пары ключ–значение",
         "группы метаданных",
@@ -2369,10 +1396,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_components.dart",
         "lib/ui/deck_patterns.dart"
@@ -2388,14 +1411,13 @@
         "C18-partial"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Label/value",
         "selectable machine value",
@@ -2419,62 +1441,12 @@
         "unknown value честно подписан"
       ],
       "usageExample": "DeckKeyValue(label: 'Адрес', value: address, selectable: true);\nDeckCopyButton(value: address, label: 'Скопировать адрес');",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C19",
       "name": "Раскрываемая область",
       "description": "Раскрываемая область: accordion/expander, дополнительные технические детали",
-      "sourceScreenIds": [
-        "07-profile-create",
-        "08-profile-edit",
-        "09-profile-delete",
-        "10-host-trust",
-        "12-credential-input",
-        "15-software-detail",
-        "17-recipe-detail",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "23-log-record",
-        "33-profile-authoring",
-        "34-profile-revisions",
-        "35-plan-parameters",
-        "37-ai-grant-form",
-        "38-mcp-client-config",
-        "39-delegations",
-        "40-executor-binding",
-        "42-service-detail",
-        "45-power",
-        "47-user-edit",
-        "50-backup-plan",
-        "51-restore-review",
-        "55-config-editor",
-        "56-diagnostics-report",
-        "59-package-change-plan",
-        "60-software-removal",
-        "61-transactional-update",
-        "63-volume-management",
-        "64-storage-danger",
-        "67-network-edit",
-        "73-container-stack-plan",
-        "75-vm-management",
-        "78-security-remediation",
-        "82-os-images",
-        "83-subscriptions",
-        "85-settings-form",
-        "88-sync-conflict",
-        "89-new-workspace-recovery",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "96-adoption-limited",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "accordion/expander",
         "дополнительные технические детали"
@@ -2500,10 +1472,6 @@
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "selected": "Меню сообщает выбор событием, accordion хранит раскрытие; persistent selection не вводится."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -2516,14 +1484,13 @@
         "C19-expanded"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Expandable title",
         "focus",
@@ -2546,23 +1513,12 @@
         "скрытые mandatory effects не допускаются"
       ],
       "usageExample": "DeckExpander(title: const Text('Детали'), children: details);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C20",
       "name": "Журнал",
       "description": "Журнал: строка события, время/уровень/источник, bounded message, детали записи",
-      "sourceScreenIds": [
-        "22-server-logs",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel"
-      ],
       "variants": [
         "строка события",
         "время/уровень/источник",
@@ -2589,10 +1545,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_page.dart"
       ],
@@ -2607,14 +1559,13 @@
         "C20-partial"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Event time",
         "level",
@@ -2641,23 +1592,12 @@
         "missing source честный"
       ],
       "usageExample": "DeckLogMessage(message: record.message, source: source, eventTime: eventTime, observedAt: observedAt);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C21",
       "name": "Числовой показатель",
       "description": "Числовой показатель: значение/единица/лимит, неизвестное, stale/partial, описание",
-      "sourceScreenIds": [
-        "04-empty-workspace",
-        "06-server-overview",
-        "24-resource-metrics",
-        "81-ha-overview"
-      ],
       "variants": [
         "значение/единица/лимит",
         "неизвестное",
@@ -2684,10 +1624,6 @@
         "success": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.",
         "cancelled": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -2698,14 +1634,13 @@
         "C21-partial"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Label",
         "value",
@@ -2728,23 +1663,12 @@
         "stale/partial подписаны"
       ],
       "usageExample": "DeckMetric(label: 'CPU', value: value, unit: '%', contextLabel: quality);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C22",
       "name": "График истории",
       "description": "График истории: несколько различимых series, gap, legend, текстовая альтернатива",
-      "sourceScreenIds": [
-        "04-empty-workspace",
-        "06-server-overview",
-        "24-resource-metrics",
-        "81-ha-overview"
-      ],
       "variants": [
         "несколько различимых series",
         "gap",
@@ -2771,10 +1695,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_history.dart"
       ],
@@ -2789,15 +1709,14 @@
         "C22-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart",
-        "test/widget/components/history_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart",
+        "test_design/components/history_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Series",
         "pattern/symbol",
@@ -2820,38 +1739,12 @@
         "0/1/120, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию"
       ],
       "usageExample": "DeckHistory(points: points, source: source, observedAt: observedAt, stale: stale);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C23",
       "name": "Прогресс",
       "description": "Прогресс/шаги: determinate/indeterminate, шаги задания, running/success/error/cancel/unknown",
-      "sourceScreenIds": [
-        "09-profile-delete",
-        "10-host-trust",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "40-executor-binding",
-        "45-power",
-        "51-restore-review",
-        "59-package-change-plan",
-        "60-software-removal",
-        "64-storage-danger",
-        "78-security-remediation",
-        "89-new-workspace-recovery",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "determinate/indeterminate",
         "шаги задания",
@@ -2877,10 +1770,6 @@
         "stale": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.",
         "partial": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -2893,14 +1782,13 @@
         "C23-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Determinate/indeterminate",
         "step list",
@@ -2923,35 +1811,12 @@
         "no auto retry"
       ],
       "usageExample": "DeckProgress(label: outcomeLabel, tone: tone, value: progress, steps: steps);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C24",
       "name": "План и подтверждение",
       "description": "План и подтверждение: цель, последствия, ограничения, срок, scope, обязательные предупреждения",
-      "sourceScreenIds": [
-        "09-profile-delete",
-        "10-host-trust",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "40-executor-binding",
-        "45-power",
-        "51-restore-review",
-        "59-package-change-plan",
-        "60-software-removal",
-        "64-storage-danger",
-        "78-security-remediation",
-        "89-new-workspace-recovery",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "цель",
         "последствия",
@@ -2980,10 +1845,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -2999,14 +1860,13 @@
         "C24-unavailable"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Target",
         "effects",
@@ -3031,24 +1891,12 @@
         "изменённый/unknown plan не повторяется"
       ],
       "usageExample": "DeckPlanSummary(target: target, effects: effects, scope: scope, deadline: deadline, actions: permittedActions);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C25",
       "name": "Сравнение",
       "description": "Сравнение: before/after, добавлено/изменено/удалено, конфликт, недоступная сторона",
-      "sourceScreenIds": [
-        "34-profile-revisions",
-        "55-config-editor",
-        "59-package-change-plan",
-        "88-sync-conflict",
-        "98-retention-preview"
-      ],
       "variants": [
         "before/after",
         "добавлено/изменено/удалено",
@@ -3075,10 +1923,6 @@
         "success": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.",
         "cancelled": "Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -3087,14 +1931,13 @@
         "C25-empty"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Field/line name",
         "before",
@@ -3117,31 +1960,12 @@
         "added/removed/changed/unchanged/conflict не смешиваются"
       ],
       "usageExample": "const DeckDiff(entries: [DeckDifference(label: 'workers', before: '2', after: '4', change: DeckChange.changed)]);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C26",
       "name": "Машинный текст",
       "description": "Машинный текст: JSON/конфигурация/команда, mono, read-only/edit, validation, copy, bounded scroll",
-      "sourceScreenIds": [
-        "15-software-detail",
-        "17-recipe-detail",
-        "22-server-logs",
-        "23-log-record",
-        "34-profile-revisions",
-        "38-mcp-client-config",
-        "42-service-detail",
-        "56-diagnostics-report",
-        "61-transactional-update",
-        "83-subscriptions",
-        "88-sync-conflict",
-        "96-adoption-limited"
-      ],
       "variants": [
         "JSON/конфигурация/команда",
         "mono",
@@ -3170,10 +1994,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -3186,14 +2006,13 @@
         "C26-error"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Label",
         "bounded mono text/editor",
@@ -3219,23 +2038,12 @@
         "invalid JSON остаётся в draft"
       ],
       "usageExample": "Form(key: formKey, child: DeckCode(label: 'JSON', controller: json, readOnly: false, validator: validateJson));",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C27",
       "name": "Путь и дерево",
       "description": "Путь и дерево: breadcrumb пути, папка/файл, раскрытие узла, выбор, недоступный узел",
-      "sourceScreenIds": [
-        "53-files",
-        "54-file-search",
-        "62-storage",
-        "65-advanced-storage"
-      ],
       "variants": [
         "breadcrumb пути",
         "папка/файл",
@@ -3263,10 +2071,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -3281,14 +2085,13 @@
         "C27-unavailable"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "concept-only",
       "anatomy": [
         "Path breadcrumb",
         "node",
@@ -3315,40 +2118,12 @@
         "причина видна"
       ],
       "usageExample": "DeckPathTree(path: path, nodes: nodes, expandedIds: expanded, onExpansionChanged: onExpanded, onSelected: onSelected);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Только offline дерево/путь: existing origin отсутствует; новых runtime файловых операций нет.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C28",
       "name": "Время",
       "description": "Время: дата/время наблюдения и события, срок, ввод даты/времени и часового пояса",
-      "sourceScreenIds": [
-        "09-profile-delete",
-        "10-host-trust",
-        "18-install-preflight",
-        "19-plan-approval",
-        "20-adoption-review",
-        "22-server-logs",
-        "24-resource-metrics",
-        "28-job-detail",
-        "29-job-unknown",
-        "30-job-cancel",
-        "40-executor-binding",
-        "45-power",
-        "51-restore-review",
-        "59-package-change-plan",
-        "60-software-removal",
-        "64-storage-danger",
-        "78-security-remediation",
-        "89-new-workspace-recovery",
-        "93-protected-effect-blocked",
-        "94-plan-invalidated",
-        "97-management-access-blocked"
-      ],
       "variants": [
         "дата/время наблюдения и события",
         "срок",
@@ -3374,10 +2149,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_page.dart"
       ],
@@ -3390,14 +2161,13 @@
         "C28-error"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Date/time fields",
         "zone choice",
@@ -3422,49 +2192,12 @@
         "нормализуемая неверная дата отклоняется"
       ],
       "usageExample": "DeckDateTimeInput(dateController: date, timeController: time, zone: zone, onZoneChanged: onZoneChanged, dateValidator: validateDate);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C29",
       "name": "Группа выбранных объектов",
       "description": "Группа выбранных объектов: количество, групповые действия, очистка, частичная доступность",
-      "sourceScreenIds": [
-        "05-server-list",
-        "14-software-inventory",
-        "16-install-catalog",
-        "21-local-registrations",
-        "25-hardware",
-        "27-job-list",
-        "31-recent-operations",
-        "32-automation-profiles",
-        "36-ai-grants",
-        "41-services",
-        "43-timers",
-        "46-users",
-        "48-sessions-directories",
-        "49-backups",
-        "53-files",
-        "54-file-search",
-        "57-updates",
-        "58-package-sources",
-        "62-storage",
-        "65-advanced-storage",
-        "66-network",
-        "68-firewall",
-        "70-dns-service",
-        "71-shares-remote-access",
-        "72-containers",
-        "74-virtual-machines",
-        "76-security-events",
-        "77-security-policy",
-        "80-capability-catalog",
-        "98-retention-preview"
-      ],
       "variants": [
         "количество",
         "групповые действия",
@@ -3491,10 +2224,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_collections.dart"
       ],
@@ -3515,15 +2244,14 @@
         "C29-unknown"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/collections_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/collections_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Selected count",
         "group actions",
@@ -3550,40 +2278,12 @@
         "удалённый ID очищен"
       ],
       "usageExample": "DeckSelectionBar(count: selected.length, onClear: clearSelection, actions: groupActions);",
-      "runnableExamplePath": "tool/component_catalog/job_example.dart",
-      "adoptionScope": "Общая коллекция внедрена в профили и задания; групповой выбор/действия показываются в независимом job fixture, нового глобального runtime списка нет.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/job_example.dart"
     },
     {
       "id": "C30",
       "name": "Сводка возможностей",
       "description": "Сводка возможностей/ограничений: доступно/не поддерживается/неизвестно, причина и следующий шаг",
-      "sourceScreenIds": [
-        "01-startup",
-        "02-service-unavailable",
-        "03-storage-blocked",
-        "11-host-key-changed",
-        "13-mutation-conflict",
-        "15-software-detail",
-        "17-recipe-detail",
-        "23-log-record",
-        "34-profile-revisions",
-        "38-mcp-client-config",
-        "42-service-detail",
-        "56-diagnostics-report",
-        "61-transactional-update",
-        "69-network-recovery",
-        "83-subscriptions",
-        "88-sync-conflict",
-        "90-sync-offline",
-        "91-sync-revoked",
-        "92-sync-commit-unknown",
-        "95-restore-blocked",
-        "96-adoption-limited"
-      ],
       "variants": [
         "доступно/не поддерживается/неизвестно",
         "причина и следующий шаг"
@@ -3608,10 +2308,6 @@
         "success": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.",
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
-      "designEvidence": [
-        "docs/design/source/components.css",
-        "docs/design/source/component-gallery.js"
-      ],
       "implementationPaths": [
         "lib/ui/deck_patterns.dart"
       ],
@@ -3626,14 +2322,13 @@
         "C30-error"
       ],
       "testPaths": [
-        "test/widget/components/catalog_test.dart",
-        "test/widget/components/interactions_test.dart",
-        "test/widget/components/state_fixtures_test.dart",
-        "test/widget/components/review_round2_test.dart"
+        "test_design/components/catalog_test.dart",
+        "test_design/components/interactions_test.dart",
+        "test_design/components/state_fixtures_test.dart",
+        "test_design/components/review_round2_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
-      "adoptionStatus": "adopted",
       "anatomy": [
         "Capability title",
         "available/unsupported/unknown",
@@ -3655,2115 +2350,7 @@
         "неизвестное не выдаётся за доступное"
       ],
       "usageExample": "DeckCapability(title: 'SMART', reason: 'Источник не поддерживается', tone: DeckTone.unavailable);",
-      "runnableExamplePath": "tool/component_catalog/examples.dart",
-      "adoptionScope": "Существующие композиции: общие Deck primitives и Material controls с BrandTheme; новые concept-only варианты остаются в offline каталоге.",
-      "codeEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
+      "runnableExamplePath": "tool/component_catalog/examples.dart"
     }
-  ],
-  "screens": [
-    {
-      "screenId": "01-startup",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/shell/readiness_view.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "02-service-unavailable",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/shell/readiness_view.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "03-storage-blocked",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/shell/readiness_view.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "04-empty-workspace",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C07",
-        "C09",
-        "C15",
-        "C17",
-        "C18",
-        "C21",
-        "C22"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/profile_list.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "05-server-list",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/profile_list.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "06-server-overview",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C07",
-        "C09",
-        "C15",
-        "C17",
-        "C18",
-        "C21",
-        "C22"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/servers/server_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "07-profile-create",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/profile_form.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "08-profile-edit",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/profile_form.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "09-profile-delete",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/profile_delete.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "10-host-trust",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/servers/server_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "11-host-key-changed",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "12-credential-input",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/credential_input.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "13-mutation-conflict",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/mutation_status.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "14-software-inventory",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "15-software-detail",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "16-install-catalog",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/software/software_panel.dart",
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "17-recipe-detail",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "18-install-preflight",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "19-plan-approval",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "20-adoption-review",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "21-local-registrations",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "22-server-logs",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C15",
-        "C17",
-        "C20",
-        "C26",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/servers/server_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "23-log-record",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/servers/server_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "24-resource-metrics",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C15",
-        "C17",
-        "C18",
-        "C21",
-        "C22",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "25-hardware",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "26-resource-alerts",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "27-job-list",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "28-job-detail",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C15",
-        "C17",
-        "C18",
-        "C20",
-        "C23",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "29-job-unknown",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C15",
-        "C17",
-        "C18",
-        "C20",
-        "C23",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "30-job-cancel",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C15",
-        "C17",
-        "C18",
-        "C20",
-        "C23",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "31-recent-operations",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/profiles/recovery_view.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "32-automation-profiles",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "33-profile-authoring",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "34-profile-revisions",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C25",
-        "C26",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "35-plan-parameters",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "36-ai-grants",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "37-ai-grant-form",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "38-mcp-client-config",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "39-delegations",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "40-executor-binding",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/servers/server_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "41-services",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "42-service-detail",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "43-timers",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "44-system-settings",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "45-power",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "46-users",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "47-user-edit",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "48-sessions-directories",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "49-backups",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "50-backup-plan",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "51-restore-review",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "52-backup-schedule",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "53-files",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C27",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "54-file-search",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C27",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "55-config-editor",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19",
-        "C25"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "56-diagnostics-report",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "57-updates",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "58-package-sources",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "59-package-change-plan",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C25",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "60-software-removal",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "61-transactional-update",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "62-storage",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C27",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "63-volume-management",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "64-storage-danger",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "65-advanced-storage",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C27",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "66-network",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "67-network-edit",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "68-firewall",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "69-network-recovery",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "70-dns-service",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "71-shares-remote-access",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "72-containers",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "73-container-stack-plan",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "74-virtual-machines",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "75-vm-management",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "76-security-events",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "77-security-policy",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "78-security-remediation",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "79-sensitive-diagnostics",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "80-capability-catalog",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "81-ha-overview",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C07",
-        "C09",
-        "C15",
-        "C17",
-        "C18",
-        "C21",
-        "C22"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "82-os-images",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "83-subscriptions",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "84-settings",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/settings/settings_view.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "85-settings-form",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C17",
-        "C19"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/settings/settings_form.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "86-client-update",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "87-metadata-sync",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C03",
-        "C04",
-        "C13",
-        "C15",
-        "C16",
-        "C17",
-        "C18"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "88-sync-conflict",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C25",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "89-new-workspace-recovery",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "90-sync-offline",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "91-sync-revoked",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "92-sync-commit-unknown",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "93-protected-effect-blocked",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "94-plan-invalidated",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "existing",
-      "productionPaths": [
-        "lib/automation/automation_panel.dart"
-      ],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "95-restore-blocked",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C10",
-        "C11",
-        "C12",
-        "C15",
-        "C17",
-        "C18",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "96-adoption-limited",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C09",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C26",
-        "C30"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "97-management-access-blocked",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C11",
-        "C14",
-        "C15",
-        "C17",
-        "C18",
-        "C19",
-        "C23",
-        "C24",
-        "C28"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    },
-    {
-      "screenId": "98-retention-preview",
-      "componentIds": [
-        "C01",
-        "C02",
-        "C05",
-        "C06",
-        "C07",
-        "C08",
-        "C15",
-        "C17",
-        "C18",
-        "C25",
-        "C29"
-      ],
-      "kind": "concept",
-      "productionPaths": [],
-      "verificationEvidence": [
-        "specs/003-design-system/component-evidence.md",
-        "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md"
-      ]
-    }
-  ],
-  "acceptance": {
-    "date": "2026-11-01",
-    "review": "specs/003-design-system/reviews/2026-11-01-component-library-code-round4.md",
-    "evidence": "specs/003-design-system/component-evidence.md",
-    "scope": "C01–C30 shared presentation/catalog; 98 design references,35 existing origins/63 concepts; no new backend capabilities or native pixel/control-click acceptance"
-  }
+  ]
 }

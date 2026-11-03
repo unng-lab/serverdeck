@@ -16,11 +16,6 @@ class ComponentDocumentation extends StatelessWidget {
     return DeckFormSection(
       title: 'Контракт $id',
       children: [
-        DeckKeyValue(
-          label: 'Источники screen IDs',
-          value: lines('sourceScreenIds'),
-          selectable: true,
-        ),
         DeckKeyValue(label: 'Анатомия', value: lines('anatomy')),
         DeckKeyValue(label: 'Варианты', value: lines('variants')),
         DeckKeyValue(

@@ -22,13 +22,21 @@ jobs:
       - name: Resolve locked dependencies
         shell: pwsh
         run: |
-          . ./tools/foundation-sdk.ps1
-          Invoke-FoundationCommand $FoundationFlutter @('pub','get','--enforce-lockfile')
-          foreach ($package in Get-CurrentPackageNames) {
-            Push-Location (Join-Path $FoundationRoot "packages/$package")
-            try { Invoke-FoundationCommand $FoundationDart @('pub','get','--enforce-lockfile') }
-            finally { Pop-Location }
-          }
-      - name: Static analysis and all current-task unit tests
+          $env:PATH = "$env:SERVERDECK_FLUTTER_ROOT/bin;$env:PATH"
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed' }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install unit schema validator
+        run: python -m pip install -r tools/unit-requirements.txt
+      - name: Functional checks
         shell: pwsh
-        run: ./tools/test-unit.ps1
+        run: |
+          $env:PATH = "$env:SERVERDECK_FLUTTER_ROOT/bin;$env:PATH"
+          ./tools/test-unit.ps1
+      - name: Shared component checks
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SERVERDECK_FLUTTER_ROOT/bin;$env:PATH"
+          ./tools/test-design-components.ps1
