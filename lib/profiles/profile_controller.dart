@@ -12,6 +12,7 @@ final class ProfileController extends ChangeNotifier {
     required this.operations,
     required this.actor,
     required this.newId,
+    this.onAction,
     Stream<void>? changes,
     bool poll = true,
   }) {
@@ -25,6 +26,7 @@ final class ProfileController extends ChangeNotifier {
   final AppOperations operations;
   final UiActor actor;
   final String Function() newId;
+  final VoidCallback? onAction;
   List<ProfileView> items = [];
   ProfileDetails? details;
   OperationFailure? error;
@@ -124,6 +126,7 @@ final class ProfileController extends ChangeNotifier {
         await refresh();
         error = failure;
         _notify();
+        onAction?.call();
       }
     }
     return failure;

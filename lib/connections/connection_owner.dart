@@ -10,6 +10,10 @@ import '../profiles/key_envelope.dart';
 import '../profiles/profile_owner.dart';
 import '../runtime/capability.dart';
 import '../runtime/owned_work.dart';
+import '../monitoring/linux_metrics.dart';
+import '../monitoring/monitoring_job.dart';
+import '../monitoring/monitoring_models.dart';
+import '../monitoring/monitoring_port.dart';
 import '../storage/domain_repository.dart';
 import '../storage/records.dart';
 import 'host_signature.dart';
@@ -90,7 +94,11 @@ typedef CreateSshConnection = SshConnection Function(
 /// Canonical attempt/session owner. Lazy accessors resolve the root's gate/state/
 /// trust construction cycle; runtime must finish that graph before admission.
 final class ConnectionOwner
-    implements ConnectionOperations, ProfileConnectionPort, RuntimeCapability {
+    implements
+        ConnectionOperations,
+        ProfileConnectionPort,
+        RuntimeCapability,
+        MonitoringConnectionPort {
   ConnectionOwner({
     required this.actors,
     required this.repository,
@@ -128,12 +136,153 @@ final class ConnectionOwner
   final _live = <_ConnectionEntry>{}, _pending = <Future<void>>{};
   final _quarantine = <String, Set<_ConnectionEntry>>{};
   final _changes = StreamController<void>.broadcast();
+  final _monitoringJobs = <String, void Function(MonitoringReason)>{};
   bool _stopped = false, _disposed = false;
   static const maxLive = 64, cleanupDuration = Duration(seconds: 5);
   @override
   String get id => 'connections';
   int get liveResources => _live.length;
   Stream<void> get changes => _changes.stream;
+
+  /// Private application capability, absent from AppOperations and MCP schemas.
+  /// A caller can cancel before gate admission without waiting for that gate.
+  MonitoringJob beginMonitoring(
+    UiActor actor,
+    String profileId,
+    String sessionId, {
+    required int expectedConnectionRevision,
+    required WorkCancellation cancellation,
+  }) {
+    MonitoringJob rejected(MonitoringReason reason) =>
+        MonitoringJob(Future.value(LinuxSample.failed(reason)), () {});
+    if (_stopped) return rejected(MonitoringReason.stopped);
+    if (_monitoringJobs.length >= 4 || _monitoringJobs.containsKey(profileId)) {
+      return rejected(MonitoringReason.cleanupPending);
+    }
+    final child = WorkCancellation(), result = Completer<LinuxSample>();
+    void fail(MonitoringReason reason) {
+      if (!result.isCompleted) result.complete(LinuxSample.failed(reason));
+      child.cancel();
+    }
+
+    _monitoringJobs[profileId] = fail;
+    final elapsed = Stopwatch()..start();
+    final startedAt = _now?.call();
+    Duration remaining() {
+      final used = startedAt == null ? elapsed.elapsed : _now!() - startedAt;
+      return const Duration(seconds: 5) -
+          (used.isNegative ? Duration.zero : used);
+    }
+
+    final unlisten = cancellation.listen(() => fail(MonitoringReason.paused));
+    final cancelDeadline = _schedule(
+      const Duration(seconds: 5),
+      () => fail(MonitoringReason.timeout),
+    );
+    Future<void> run() async {
+      try {
+        final sample = await _collectMonitoring(
+          actor,
+          profileId,
+          sessionId,
+          expectedConnectionRevision,
+          child,
+          remaining,
+          () => fail(MonitoringReason.disconnected),
+        );
+        if (!result.isCompleted) result.complete(sample);
+      } on WorkCancelled {
+        fail(MonitoringReason.paused);
+      } on OperationFailure catch (error) {
+        fail(
+          error.code == FailureCode.shuttingDown
+              ? MonitoringReason.stopped
+              : MonitoringReason.disconnected,
+        );
+      } catch (_) {
+        fail(MonitoringReason.invalidResponse);
+      } finally {
+        unlisten();
+        cancelDeadline();
+        elapsed.stop();
+        if (identical(_monitoringJobs[profileId], fail)) {
+          _monitoringJobs.remove(profileId);
+        }
+      }
+    }
+
+    _track(run());
+    return MonitoringJob(result.future, () => fail(MonitoringReason.paused));
+  }
+
+  Future<LinuxSample> _collectMonitoring(
+    UiActor actor,
+    String profileId,
+    String sessionId,
+    int expectedRevision,
+    WorkCancellation cancellation,
+    Duration Function() remaining,
+    void Function() disconnected,
+  ) async {
+    cancellation.check();
+    _ConnectionEntry? captured;
+    Future<LinuxSample>? pending;
+    void Function()? unlistenParent;
+    void check(_ConnectionEntry e) {
+      cancellation.check();
+      _check(e, auth: true);
+      if (e.actor is! OwnerActor ||
+          e.state != ConnectionState.connected ||
+          e.sessionId != sessionId ||
+          e.connectionRevision != expectedRevision ||
+          (e.transport?.isClosed ?? true)) {
+        throw const OperationFailure(FailureCode.conflict);
+      }
+    }
+
+    try {
+      await getGate().prepare(actor, (context) {
+        _validateProfile(profileId);
+        final e = _entries[profileId];
+        if (e == null) throw const OperationFailure(FailureCode.conflict);
+        captured = e;
+        context.linearize(() {
+          check(e);
+          final transport = e.transport;
+          if (transport is! MonitoringSshConnection) {
+            pending = Future.value(
+              const LinuxSample.failed(MonitoringReason.sourceUnavailable),
+            );
+          } else {
+            final budget = remaining();
+            if (budget <= Duration.zero) {
+              pending = Future.value(
+                const LinuxSample.failed(MonitoringReason.timeout),
+              );
+            } else {
+              unlistenParent = e.cancellation.listen(disconnected);
+              cancellation.check();
+              pending = (transport as MonitoringSshConnection)
+                  .collectMonitoring(cancellation, timeout: budget);
+            }
+          }
+          pending?.ignore(); // Observe adapter errors even if response auth fails first.
+          return _view(e);
+        }, fence: e.fence);
+      });
+      final sample = await pending!;
+      return await getGate().prepare(
+        actor,
+        (context) => context.read(() {
+          check(captured!);
+          return sample;
+        }),
+      );
+    } finally {
+      unlistenParent?.call();
+    }
+  }
+
   static void Function() _timer(Duration duration, void Function() callback) {
     final timer = Timer(duration, callback);
     return timer.cancel;
@@ -275,10 +424,50 @@ final class ConnectionOwner
     Actor actor,
     String profileId, {
     required int expectedRevision,
+  }) => _connect(actor, profileId, expectedRevision: expectedRevision);
+
+  @override
+  Future<MonitoringConnectResult> connectForMonitoring(
+    UiActor actor,
+    String profileId, {
+    required int expectedRevision,
+    required WorkCancellation cancellation,
+  }) async {
+    var cancelledBeforeAdmission = false;
+    final operation = await _connect(
+      actor,
+      profileId,
+      expectedRevision: expectedRevision,
+      autoCancellation: cancellation,
+      onAutoCancelled: () => cancelledBeforeAdmission = true,
+    );
+    return MonitoringConnectResult(
+      operation,
+      cancelledBeforeAdmission: cancelledBeforeAdmission,
+    );
+  }
+
+  Future<OperationResult<ConnectionView>> _connect(
+    Actor actor,
+    String profileId, {
+    required int expectedRevision,
+    WorkCancellation? autoCancellation,
+    void Function()? onAutoCancelled,
   }) async {
     _ConnectionEntry? started;
     final result = await getGate().submit(actor, (context) {
       _admit();
+      void checkAuto() {
+        if (autoCancellation?.isCancelled ?? false) {
+          onAutoCancelled?.call();
+          throw const OperationFailure(FailureCode.conflict);
+        }
+        if (autoCancellation != null && generation(profileId) != 0) {
+          throw const OperationFailure(FailureCode.conflict);
+        }
+      }
+
+      checkAuto();
       if (expectedRevision < 1 || expectedRevision > 9007199254740991)
         throw const OperationFailure(
           FailureCode.invalidArgument,
@@ -301,6 +490,7 @@ final class ConnectionOwner
         );
       return context.linearize(
         () {
+          checkAuto();
           _pruneTerminalBindings();
           final records = repository.read((r) {
             final p = r.profile(profileId)!;
@@ -980,6 +1170,9 @@ final class ConnectionOwner
   @override
   Future<void> stopAdmission() async {
     _stopped = true;
+    for (final cancel in List.of(_monitoringJobs.values)) {
+      cancel(MonitoringReason.stopped);
+    }
   }
 
   @override

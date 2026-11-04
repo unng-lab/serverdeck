@@ -22,7 +22,7 @@ enum SyntheticAuthReply { success, failure, partial }
 
 /// Deterministic protocol fixture over memory streams; never opens a socket.
 /// Its deliberately narrow codec accepts the pinned client's one-packet writes,
-/// X25519, Ed/RSA-SHA256 host keys, AES128-CTR/HMAC-SHA256 and no channels or remote execution.
+/// X25519, Ed/RSA-SHA256 host keys, AES128-CTR/HMAC-SHA256 and opt-in synthetic channel packets (never remote execution).
 final class MemoryAuthPeer implements SSHSocket {
   MemoryAuthPeer({
     required SSHKeyPair hostKey,
@@ -57,6 +57,13 @@ final class MemoryAuthPeer implements SSHSocket {
   int pings = 0, exchanges = 0;
   bool authenticated = false, lastAuthSignatureValid = false;
   Object? codecFailure;
+  // Optional protocol fixture extension; default auth tests still reject channels.
+  void Function(Uint8List)? onChannelPacket;
+  void sendChannelPacket(Uint8List packet) {
+    if (!authenticated) throw StateError('Synthetic peer is not authenticated');
+    _send(packet);
+  }
+
   @override
   Stream<Uint8List> get stream => _incoming.stream;
   @override
@@ -233,6 +240,12 @@ final class MemoryAuthPeer implements SSHSocket {
       case 7: // Client extension information is irrelevant to this narrow fixture.
         break;
       default:
+        if (payload.first >= 90 &&
+            payload.first <= 100 &&
+            onChannelPacket != null) {
+          onChannelPacket!(Uint8List.fromList(payload));
+          break;
+        }
         throw StateError('Unexpected synthetic message ${payload.first}');
     }
   }

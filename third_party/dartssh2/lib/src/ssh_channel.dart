@@ -37,6 +37,11 @@ class SSHChannelController {
 
   final Future<void> Function()? onFlush;
 
+  /// Optional bounded synchronous consumer, before asynchronous stream buffering.
+  /// Used only by the application monitoring channel; ordinary streams unchanged.
+  final void Function(SSHChannelData)? onData;
+  final void Function()? onAbort;
+
   SSHChannelController({
     required this.localId,
     required this.localMaximumPacketSize,
@@ -46,6 +51,8 @@ class SSHChannelController {
     required this.remoteMaximumPacketSize,
     required this.sendMessage,
     this.onFlush,
+    this.onData,
+    this.onAbort,
     this.printDebug,
   }) {
     if (remoteInitialWindowSize > 0) {
@@ -127,8 +134,13 @@ class SSHChannelController {
   var _hasSentClose = false;
 
   final _done = Completer<void>();
+  bool _boundedReplyExpected = false;
 
   Future<bool> sendExec(String command) {
+    if (onData != null) {
+      _terminalState.throwIfTerminated();
+      _boundedReplyExpected = true;
+    }
     return _sendRequest(
       SSH_Message_Channel_Request.exec(
         recipientChannel: remoteId,
@@ -247,6 +259,9 @@ class SSHChannelController {
   }
 
   void handleMessage(SSHMessage message) {
+    // Retired bounded channels retain their protocol ID until peer CLOSE only.
+    // In particular never queue unsolicited replies or replenish their window.
+    if (onData != null && _done.isCompleted) return;
     if (message is SSH_Message_Channel_Data) {
       _handleDataMessage(message.data);
     } else if (message is SSH_Message_Channel_Extended_Data) {
@@ -298,6 +313,9 @@ class SSHChannelController {
       error ?? SSHStateError('Channel destroyed before receiving reply'),
       stackTrace,
     );
+    // done alone also denotes orderly peer CLOSE. Bounded consumers must retain
+    // this local-abort distinction even after a successful exec ACK/status.
+    onAbort?.call();
   }
 
   Future<bool> _sendRequest(SSHMessage request) async {
@@ -368,7 +386,12 @@ class SSHChannelController {
     }
 
     _localWindow -= data.length;
-    _remoteStream.add(SSHChannelData(data, type: type));
+    final consumer = onData;
+    if (consumer == null) {
+      _remoteStream.add(SSHChannelData(data, type: type));
+    } else {
+      consumer(SSHChannelData(data, type: type));
+    }
     _sendWindowAdjustIfNeeded();
   }
 
@@ -407,11 +430,25 @@ class SSHChannelController {
 
   void _handleRequestSuccessMessage() {
     printDebug?.call('SSHChannel._handleRequestSuccessMessage');
+    if (onData != null) {
+      if (!_boundedReplyExpected) {
+        destroy();
+        return;
+      }
+      _boundedReplyExpected = false;
+    }
     _requestReplyQueue.add(true);
   }
 
   void _handleRequestFailureMessage() {
     printDebug?.call('SSHChannel._handleRequestFailureMessage');
+    if (onData != null) {
+      if (!_boundedReplyExpected) {
+        destroy();
+        return;
+      }
+      _boundedReplyExpected = false;
+    }
     _requestReplyQueue.add(false);
   }
 
@@ -478,7 +515,7 @@ class SSHChannelController {
     printDebug?.call('SSHChannel._sendWindowAdjustIfNeeded');
 
     if (_done.isCompleted) return;
-    if (_remoteStream.isPaused) return;
+    if (onData == null && _remoteStream.isPaused) return;
 
     final bytesToAdd = localInitialWindowSize - _localWindow;
     if (bytesToAdd <= 0) return;

@@ -37,3 +37,17 @@ Closure during signature/trust waits prevents late NEWKEYS/auth. Pending incomin
 bytes are capped at1MiB; overflow closes with fixed SSHResourceLimitError. Worker
 scheduling failures use fixed SSHSignatureVerificationError reasons. No host key
 size-security floor is added; numeric/format sanity and bounded CPU are enforced.
+
+## 004 bounded monitoring execution
+
+SSHClient.startBoundedExec returns a synchronous cancellable handle, one unresolved
+opening/open/retired monitoring channel per connection. Deadline at most5s begins
+before open. A65536-byte cumulative stdout+all extended-data budget is enforced
+inside channel admission before asynchronous buffering; only stdout retained.
+Ordinary channels retain upstream window/stream behavior. Cancelled pending opens
+retain their waiter/ID; late success closes without exec. Retired channels drop
+messages until peer CLOSE, never refill windows or queue replies. New monitoring
+calls receive cleanupPending until the protocol slot retires. Duplicate ACKs cannot
+accumulate as reply queue entries. All public bounded results use fixed failures,
+not remote exception text. Application adapter must supply only its fixed collector
+and must enforce canonical session/trust/cancellation admission.

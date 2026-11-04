@@ -8,6 +8,8 @@ import 'package:pointycastle/digests/sha256.dart';
 import '../domain/models.dart';
 import '../profiles/key_envelope.dart';
 import '../runtime/owned_work.dart';
+import '../monitoring/linux_metrics.dart';
+import '../monitoring/monitoring_models.dart';
 import 'host_signature.dart';
 import 'private_signer.dart';
 
@@ -139,7 +141,16 @@ abstract interface class SshConnection {
   Future<void> close();
 }
 
-final class StrictSshTransport implements SshConnection {
+/// Optional typed capability; callers cannot supply command text or expose it via MCP.
+abstract interface class MonitoringSshConnection {
+  Future<LinuxSample> collectMonitoring(
+    WorkCancellation cancellation, {
+    Duration timeout = const Duration(seconds: 5),
+  });
+}
+
+final class StrictSshTransport
+    implements SshConnection, MonitoringSshConnection {
   StrictSshTransport({
     required SSHSocket socket,
     required String username,
@@ -286,6 +297,49 @@ final class StrictSshTransport implements SshConnection {
   Future<void> get authenticated => _authenticated.future;
   Future<OperationFailure?> get ended => _ended.future;
   bool get isClosed => _stopped || _client.isClosed;
+
+  @override
+  Future<LinuxSample> collectMonitoring(
+    WorkCancellation cancellation, {
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    try {
+      cancellation.check();
+      _checkAuth();
+      final operation = _client.startBoundedExec(
+        linuxMonitoringCommand,
+        timeout: timeout,
+      );
+      final unlisten = cancellation.listen(operation.cancel);
+      try {
+        final result = await operation.result;
+        cancellation.check();
+        _checkAuth();
+        final reason = switch (result.failure) {
+          SSHBoundedExecFailure.cancelled => MonitoringReason.paused,
+          SSHBoundedExecFailure.timeout => MonitoringReason.timeout,
+          SSHBoundedExecFailure.outputLimit => MonitoringReason.outputLimit,
+          SSHBoundedExecFailure.cleanupPending =>
+            MonitoringReason.cleanupPending,
+          SSHBoundedExecFailure.unavailable =>
+            MonitoringReason.sourceUnavailable,
+          SSHBoundedExecFailure.invalidResponse =>
+            MonitoringReason.invalidResponse,
+          null => null,
+        };
+        if (reason != null) return LinuxSample.failed(reason);
+        return parseLinuxMetrics(result.stdout, exitCode: result.exitCode);
+      } finally {
+        unlisten();
+      }
+    } on WorkCancelled {
+      return const LinuxSample.failed(MonitoringReason.paused);
+    } on OperationFailure {
+      return const LinuxSample.failed(MonitoringReason.disconnected);
+    } catch (_) {
+      return const LinuxSample.failed(MonitoringReason.invalidResponse);
+    }
+  }
 
   void _checkAuth() {
     if (_stopped || _client.isClosed)

@@ -21,6 +21,7 @@ def main():
     changed = metadata["patchedFiles"]
     allowed = {
         "lib/src/ssh_client.dart",
+        "lib/src/ssh_channel.dart",
         "lib/src/ssh_transport.dart",
         "lib/src/ssh_errors.dart",
     }
@@ -50,7 +51,7 @@ def main():
          "--directory=third_party/dartssh2", str(patch)],
         cwd=repo, check=True,
     )
-    print(f"SSH source provenance passed: {len(expected)} files, 3 policy sources.")
+    print(f"SSH source provenance passed: {len(expected)} files, {len(changed)} policy sources.")
 
 
 if __name__ == "__main__":

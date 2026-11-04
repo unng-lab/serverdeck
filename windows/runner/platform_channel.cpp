@@ -148,7 +148,18 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       result->Error("STALE_EPOCH", "Устаревший экземпляр"); return;
     }
     const auto& name = call.method_name();
-    if (name == "credential.pickKey") {
+    if (name == "monitoring.beginRun") {
+      if (exitRequested_ || activationClosed_ || osEnding_ || map.size() != 1)
+        throw std::invalid_argument("INVALID_ARGUMENT");
+      const auto root = std::filesystem::path(args_.dataRoot);
+      const bool allowed = monitoringRun_.Begin(
+        [&] {
+          sd::SecureDirectory(root / L"data");
+          return sd::monitoring::Read(root);
+        },
+        [&](const std::string& bytes) { sd::monitoring::Write(root, bytes); });
+      result->Success(V(M{{V("autoAllowed"), V(allowed)}}));
+    } else if (name == "credential.pickKey") {
       IFileOpenDialog* dialog = nullptr;
       if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog))))
         throw std::runtime_error("KEY_PICKER_FAILED");
@@ -230,6 +241,9 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       const auto* complete = Field(map, "shutdownComplete");
       if (!complete || !std::holds_alternative<bool>(*complete) || !std::get<bool>(*complete) ||
           !activationClosed_ || !exitRequested_) throw std::invalid_argument("INVALID_ARGUMENT");
+      monitoringRun_.Finish([&](const std::string& bytes) {
+        sd::monitoring::Write(std::filesystem::path(args_.dataRoot), bytes);
+      });
       result->Success();
       PostMessageW(window_, WM_APP + 43, 0, 0);
     } else if (name == "secret.protect" || name == "secret.unprotect") {

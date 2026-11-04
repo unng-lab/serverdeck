@@ -118,6 +118,16 @@ class NativePlatform implements RuntimePlatform {
 
   Future<T?> _invoke<T>(String method, [Map<String, Object?>? extra]) =>
       _channel.invokeMethod<T>(method, {'ownerEpoch': epoch, ...?extra});
+
+  /// Native publication must succeed before the caller admits auto connections.
+  Future<bool> beginMonitoringRun() async {
+    final reply = await _invoke<Object?>('monitoring.beginRun');
+    if (reply is! Map || reply['autoAllowed'] is! bool) {
+      throw const FormatException('Invalid monitoring run classification');
+    }
+    return reply['autoAllowed'] as bool;
+  }
+
   @override
   Future<PlatformSnapshot> snapshot({String? runtimeState}) async =>
       PlatformSnapshot.decode(

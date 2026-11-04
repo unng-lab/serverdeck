@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../shell/foundation_shell.dart';
@@ -8,12 +10,22 @@ import '../profiles/profile_controller.dart';
 import '../profiles/profile_view.dart';
 import '../mcp/settings_controller.dart';
 import '../mcp/settings_view.dart';
+import '../monitoring/monitoring_owner.dart';
+import 'native_platform.dart';
 
 /// C17 shell with C01/C02/C10/C11/C12 content; feature slots are supplied by 003.
 class RuntimeView extends StatefulWidget {
-  const RuntimeView({super.key, required this.runtime, this.features});
+  const RuntimeView({
+    super.key,
+    required this.runtime,
+    this.features,
+    this.monitoring,
+  });
   final RuntimeCoordinator runtime;
   final FeatureRuntime? features;
+
+  /// Optional owner injection for isolated activation tests/composition.
+  final MonitoringOwner? monitoring;
   @override
   State<RuntimeView> createState() => _RuntimeViewState();
 }
@@ -22,11 +34,39 @@ class _RuntimeViewState extends State<RuntimeView> {
   RuntimeCoordinator get runtime => widget.runtime;
   ProfileController? _profiles;
   McpSettingsController? _settings;
+  FoundationSection _section = FoundationSection.servers;
+  MonitoringOwner? get _monitoring =>
+      widget.monitoring ?? widget.features?.monitoring;
+  @override
+  void initState() {
+    super.initState();
+    runtime.addListener(_runtimeChanged);
+    _syncMonitoring();
+  }
+
+  void _syncMonitoring() => _monitoring?.setActive(
+    runtime.acceptsOperations &&
+        runtime.window != WindowState.trayHidden &&
+        _section == FoundationSection.servers,
+  );
+  void _runtimeChanged() {
+    _syncMonitoring();
+    if (mounted) setState(() {});
+  }
+
   @override
   void didUpdateWidget(covariant RuntimeView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.runtime != widget.runtime) {
+      oldWidget.runtime.removeListener(_runtimeChanged);
+      runtime.addListener(_runtimeChanged);
+    }
+    final oldMonitoring =
+        oldWidget.monitoring ?? oldWidget.features?.monitoring;
+    if (oldMonitoring != _monitoring) oldMonitoring?.setActive(false);
     if (oldWidget.features != widget.features || !runtime.acceptsOperations)
       _release();
+    _syncMonitoring();
   }
 
   void _release() {
@@ -44,6 +84,7 @@ class _RuntimeViewState extends State<RuntimeView> {
       actor: f.actors.ui,
       newId: FeatureRuntime.newId,
       changes: f.connections.changes,
+      onAction: () => unawaited(f.monitoring.reconcile()),
     );
     _settings ??= McpSettingsController(
       owner: f.grants,
@@ -106,10 +147,15 @@ class _RuntimeViewState extends State<RuntimeView> {
         : content;
     return FoundationShell(
       state: ReadinessState.ready,
+      onSectionChanged: (section) {
+        _section = section;
+        _syncMonitoring();
+      },
       servers: runtime.acceptsOperations && _profiles != null
           ? ProfileViewPanel(
               controller: _profiles!,
               pickKey: widget.features!.platform.pickPrivateKey,
+              monitoring: _monitoring,
             )
           : body,
       software: body,
@@ -139,6 +185,8 @@ class _RuntimeViewState extends State<RuntimeView> {
 
   @override
   void dispose() {
+    runtime.removeListener(_runtimeChanged);
+    _monitoring?.setActive(false);
     _release();
     super.dispose();
   }

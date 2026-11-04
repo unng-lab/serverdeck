@@ -20,6 +20,7 @@ import '../profiles/key_parse_worker.dart';
 import '../profiles/profile_owner.dart';
 import '../storage/domain_repository.dart';
 import '../trust/trust_owner.dart';
+import '../monitoring/monitoring_owner.dart';
 import 'capability.dart';
 import 'native_platform.dart';
 
@@ -38,6 +39,7 @@ final class FeatureRuntime implements RuntimeCapability {
     required this.repository,
     required this.signer,
     required this.isRunning,
+    this.monitoringAutoAllowed = false,
   }) {
     actors = ActorAuthority(platform.epoch);
     parser = CancellableKeyParser();
@@ -105,7 +107,15 @@ final class FeatureRuntime implements RuntimeCapability {
       utcNow: utcNow,
     );
     operations = OwnedAppOperations(profiles, connections, trust);
+    monitoring = MonitoringOwner(
+      operations: operations,
+      actor: actors.ui,
+      connections: connections,
+      startupAutoAllowed: monitoringAutoAllowed,
+      utcNow: utcNow,
+    );
     _capabilities = [
+      monitoring,
       pipe,
       grants,
       profiles,
@@ -120,6 +130,7 @@ final class FeatureRuntime implements RuntimeCapability {
   final DomainRepository repository;
   final ReceiptSigner signer;
   final bool Function() isRunning;
+  final bool monitoringAutoAllowed;
   late final ActorAuthority actors;
   late final CanonicalOperationState state;
   late final DomainCommandGate gate;
@@ -132,6 +143,7 @@ final class FeatureRuntime implements RuntimeCapability {
   late final GrantOwner grants;
   late final McpPipeAdapter pipe;
   late final OwnedAppOperations operations;
+  late final MonitoringOwner monitoring;
   late McpRouter router;
   late final List<RuntimeCapability> _capabilities;
   bool _stopped = false, _initialized = false;

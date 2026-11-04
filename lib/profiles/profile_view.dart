@@ -6,6 +6,8 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import '../domain/models.dart';
 import '../domain/error_presentation.dart';
 import '../ui/deck_components.dart';
+import '../monitoring/monitoring_owner.dart';
+import '../monitoring/monitoring_view.dart';
 import 'profile_controller.dart';
 import 'profile_form.dart';
 
@@ -14,8 +16,10 @@ class ProfileViewPanel extends StatefulWidget {
     super.key,
     required this.controller,
     required this.pickKey,
+    this.monitoring,
   });
   final ProfileController controller;
+  final MonitoringOwner? monitoring;
   final Future<Uint8List?> Function() pickKey;
   @override
   State<ProfileViewPanel> createState() => _ProfileViewPanelState();
@@ -268,6 +272,29 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
     );
   }
 
+  Widget _server(ProfileView p, ProfileController c) {
+    final header = DeckListItem(
+      title: p.displayName,
+      description: '${p.username}@${p.host}:${p.port}',
+      selected: c.selected == p.profileId,
+      onTap: () => unawaited(c.select(p.profileId)),
+      trailing: c.trusts[p.profileId]?.changed == true
+          ? const DeckStatus(
+              label: 'Ключ сервера изменился',
+              tone: DeckTone.warning,
+            )
+          : null,
+    );
+    final monitoring = widget.monitoring;
+    return monitoring == null
+        ? header
+        : MonitoringServerPanel(
+            owner: monitoring,
+            profileId: p.profileId,
+            header: header,
+          );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.controller,
@@ -287,6 +314,8 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
             child: const Text('Добавить сервер'),
           ),
           children: [
+            if (widget.monitoring != null)
+              MonitoringControls(owner: widget.monitoring!),
             DeckSearch(
               controller: _search,
               onChanged: (v) => setState(() => _query = v),
@@ -315,19 +344,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 title: 'Серверов пока нет',
                 message: 'Добавьте SSH-профиль для подключения.',
               ),
-            for (final p in visible)
-              DeckListItem(
-                title: p.displayName,
-                description: '${p.username}@${p.host}:${p.port}',
-                selected: c.selected == p.profileId,
-                onTap: () => unawaited(c.select(p.profileId)),
-                trailing: c.trusts[p.profileId]?.changed == true
-                    ? const DeckStatus(
-                        label: 'Ключ сервера изменился',
-                        tone: DeckTone.warning,
-                      )
-                    : null,
-              ),
+            for (final p in visible) _server(p, c),
             if (c.details != null) _details(c.details!),
           ],
         ),

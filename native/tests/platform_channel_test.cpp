@@ -231,6 +231,42 @@ int main() {
       catch (const std::runtime_error&) { failed = true; }
       if (!failed || starts != 2 || stops != 2 || shell.registered || HandleCount() != beforeHandles) return 24;
     }
+    // Dedicated monitoring methods use the same epoch boundary and validated exit.
+    {
+      Messenger marker;
+      PlatformChannelHooks isolated;
+      isolated.startWorker = [](std::function<void()>) { return std::thread{}; };
+      isolated.createTray = [](HWND) { return true; };
+      isolated.startTrayMonitor = [](HWND, UINT_PTR id, UINT) { return id; };
+      isolated.stopTrayMonitor = [](HWND, UINT_PTR) {};
+      PlatformChannel channel(nullptr, &marker, args, isolated);
+      const M epoch{{V("ownerEpoch"), V(sd::Utf8(args.ownerEpoch))}};
+      if (marker.Call("monitoring.beginRun", {{V("ownerEpoch"), V("stale")}}).error != "STALE_EPOCH") return 36;
+      auto invalid = epoch;
+      invalid[V("path")] = V("arbitrary");
+      if (marker.Call("monitoring.beginRun", invalid).error != "INVALID_ARGUMENT") return 37;
+      const auto first = marker.Call("monitoring.beginRun", epoch);
+      const auto again = marker.Call("monitoring.beginRun", epoch);
+      if (!first.error.empty() || !again.error.empty() ||
+          !std::get<bool>(std::get<M>(first.value).at(V("autoAllowed"))) ||
+          !std::get<bool>(std::get<M>(again.value).at(V("autoAllowed")))) return 38;
+      auto finish = epoch;
+      finish[V("shutdownComplete")] = V(true);
+      if (marker.Call("runtime.finishExit", finish).error != "INVALID_ARGUMENT" ||
+          sd::monitoring::Read(root) != sd::monitoring::running) return 39;
+      LRESULT result = 0;
+      channel.OnMessage(WM_QUERYENDSESSION, 1, 0, &result);
+      if (marker.Call("monitoring.beginRun", epoch).error != "INVALID_ARGUMENT") return 40;
+      if (!marker.Call("runtime.closeActivation", epoch).error.empty()) return 41;
+      {
+        sd::Handle lock(CreateFileW(sd::ExtendedPath(root / L"data/monitoring-run-v1.json").c_str(),
+            GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        if (!lock.valid() || marker.Call("runtime.finishExit", finish).error != "STORAGE_IO" ||
+            sd::monitoring::Read(root) != sd::monitoring::running) return 42;
+      }
+      if (!marker.Call("runtime.finishExit", finish).error.empty() ||
+          sd::monitoring::Read(root) != sd::monitoring::clean) return 43;
+    }
     std::filesystem::remove_all(root);
     return 0;
   } catch (const std::exception& error) { std::cerr << error.what(); return 6; }

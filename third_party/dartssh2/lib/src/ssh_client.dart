@@ -402,6 +402,32 @@ class SSHClient {
   );
 
   final _channels = <int, SSHChannelController>{};
+  SSHBoundedExec? _boundedExec;
+
+  /// One bounded monitoring operation per connection, including retired channels.
+  /// Caller supplies only its compile-time collector command, never user input.
+  SSHBoundedExec startBoundedExec(
+    String command, {
+    Duration timeout = const Duration(seconds: 5),
+  }) {
+    if (_boundedExec != null) {
+      return SSHBoundedExec._failed(SSHBoundedExecFailure.cleanupPending);
+    }
+    if (!_authenticated.isCompleted || isClosed) {
+      return SSHBoundedExec._failed(SSHBoundedExecFailure.unavailable);
+    }
+    if (timeout <= Duration.zero || timeout > const Duration(seconds: 5)) {
+      throw ArgumentError('Invalid bounded execution deadline');
+    }
+    final operation = SSHBoundedExec._(this, command);
+    _boundedExec = operation;
+    operation._start(timeout);
+    return operation;
+  }
+
+  void _retireBounded(int id) {
+    if (_boundedExec?._id == id) _boundedExec = null;
+  }
 
   final _authMethodsLeft = Queue<SSHAuthMethod>();
 
@@ -947,6 +973,8 @@ class SSHClient {
 
   /// Close all channels that are currently open.
   void _closeChannels([Object? error, StackTrace? stackTrace]) {
+    _boundedExec?._fail(SSHBoundedExecFailure.unavailable);
+    _boundedExec = null;
     for (final channel in _channels.values) {
       channel.destroy(error, stackTrace);
       _channelIdAllocator.release(channel.localId);
@@ -1486,6 +1514,7 @@ class SSHClient {
     _requirePendingChannelOpen(message.recipientChannel, 'failure');
 
     _channelIdAllocator.release(message.recipientChannel);
+    _retireBounded(message.recipientChannel);
     _pendingChannelOpens.fail(
       message.recipientChannel,
       SSHChannelOpenError(message.reasonCode, message.description),
@@ -1542,6 +1571,7 @@ class SSHClient {
       channel.handleMessage(message);
       _channels.remove(message.recipientChannel);
       _channelIdAllocator.release(message.recipientChannel);
+      _retireBounded(message.recipientChannel);
     }
   }
 
@@ -1837,19 +1867,25 @@ class SSHClient {
       throw SSHStateError('Channel $localChannelId is already open');
     }
 
+    final bounded = _boundedExec?._id == localChannelId ? _boundedExec : null;
     final channelController = SSHChannelController(
       localId: localChannelId,
-      localInitialWindowSize: _initialWindowSize,
+      localInitialWindowSize: bounded == null ? _initialWindowSize : 65536,
       localMaximumPacketSize: _maximumPacketSize,
       remoteId: remoteChannelId,
       remoteInitialWindowSize: remoteInitialWindowSize,
       remoteMaximumPacketSize: remoteMaximumPacketSize,
       sendMessage: _sendMessage,
       onFlush: flush,
+      onData: bounded?._data,
+      onAbort: bounded == null
+          ? null
+          : () => bounded._fail(SSHBoundedExecFailure.invalidResponse),
       printDebug: printDebug,
     );
 
     _channels[localChannelId] = channelController;
+    bounded?._accept(channelController);
     return channelController;
   }
 
@@ -1858,6 +1894,133 @@ class SSHClient {
     throw SSHStateError(
       'Received channel open $replyType for non-opening channel $id',
     );
+  }
+}
+
+enum SSHBoundedExecFailure {
+  cancelled,
+  timeout,
+  outputLimit,
+  cleanupPending,
+  unavailable,
+  invalidResponse,
+}
+
+final class SSHBoundedExecResult {
+  SSHBoundedExecResult._(Uint8List bytes, this.exitCode, this.failure)
+      : _stdout = bytes;
+  final Uint8List _stdout;
+  Uint8List get stdout => Uint8List.fromList(_stdout);
+  final int? exitCode;
+  final SSHBoundedExecFailure? failure;
+}
+
+/// Cancellable before channel-open or exec ACK. Results contain no remote errors.
+final class SSHBoundedExec {
+  SSHBoundedExec._(this._client, this._command);
+  SSHBoundedExec._failed(SSHBoundedExecFailure failure)
+      : _client = null,
+        _command = '' {
+    _result.complete(SSHBoundedExecResult._(Uint8List(0), null, failure));
+  }
+  final SSHClient? _client;
+  final String _command;
+  final _result = Completer<SSHBoundedExecResult>();
+  final _stdout = BytesBuilder();
+  Timer? _timer;
+  int? _id, _exitCode;
+  int _received = 0;
+  bool _sawStatus = false, _invalidStatus = false;
+  SSHChannelController? _channel;
+  Future<SSHBoundedExecResult> get result => _result.future;
+
+  void _start(Duration timeout) {
+    _timer = Timer(timeout, () => _fail(SSHBoundedExecFailure.timeout));
+    unawaited(_open());
+  }
+
+  Future<void> _open() async {
+    final client = _client!;
+    try {
+      await client.authenticated;
+      if (_result.isCompleted) return;
+      final id = client._channelIdAllocator.allocate();
+      _id = id; // Metadata precedes the first CHANNEL_OPEN write.
+      final channel = await client._openChannel(
+          id,
+          SSH_Message_Channel_Open.session(
+            senderChannel: id,
+            initialWindowSize: 65536,
+            maximumPacketSize: 32768,
+          ));
+      if (_result.isCompleted)
+        return; // Late success was synchronously retired.
+      if (!await channel.sendExec(_command)) {
+        _fail(SSHBoundedExecFailure.unavailable);
+        return;
+      }
+      if (_result.isCompleted) return;
+      await channel.channel.done;
+      if (_result.isCompleted) return;
+      if (_exitCode != 0 || !_sawStatus || _invalidStatus) {
+        _fail(SSHBoundedExecFailure.invalidResponse);
+        return;
+      }
+      _timer?.cancel();
+      _result.complete(
+          SSHBoundedExecResult._(_stdout.takeBytes(), _exitCode, null));
+    } catch (_) {
+      _fail(SSHBoundedExecFailure.invalidResponse);
+      final id = _id;
+      if (id == null ||
+          (!client._pendingChannelOpens.isWaiting(id) &&
+              !client._channels.containsKey(id))) {
+        if (identical(client._boundedExec, this)) client._boundedExec = null;
+      }
+    }
+  }
+
+  void _accept(SSHChannelController channel) {
+    _channel = channel;
+    if (_result.isCompleted) {
+      channel.destroy(); // Cancelled pending-open: close, never execute.
+      return;
+    }
+    channel.channel.setRequestHandler((request) {
+      if (_result.isCompleted) return false;
+      if (request.requestType == SSHChannelRequestType.exitStatus) {
+        if (_sawStatus) _invalidStatus = true;
+        _sawStatus = true;
+        _exitCode = request.exitStatus;
+        return true;
+      }
+      return false;
+    });
+  }
+
+  void _data(SSHChannelData data) {
+    if (_result.isCompleted) return;
+    if (data.bytes.length > 65536 - _received) {
+      _fail(SSHBoundedExecFailure.outputLimit);
+      return; // Never buffer the crossing packet, even before exec ACK.
+    }
+    _received += data.bytes.length;
+    if (!data.isExtendedData) _stdout.add(data.bytes);
+  }
+
+  void cancel() => _fail(SSHBoundedExecFailure.cancelled);
+
+  void _fail(SSHBoundedExecFailure reason) {
+    if (_result.isCompleted) return;
+    _timer?.cancel();
+    _stdout.clear();
+    _result.complete(SSHBoundedExecResult._(Uint8List(0), null, reason));
+    _channel?.destroy();
+    // Keep the ID / one protocol slot until peer CLOSE or open failure. With no
+    // ID allocated there is no protocol resource and no late open can be sent.
+    if (_id == null && identical(_client?._boundedExec, this)) {
+      _client?._boundedExec = null;
+    }
   }
 }
 

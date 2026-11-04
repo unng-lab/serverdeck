@@ -17,6 +17,7 @@ import 'package:serverdeck/domain/models.dart';
 import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/storage/records.dart';
 import 'package:serverdeck/runtime/owned_work.dart';
+import 'package:serverdeck/monitoring/linux_metrics.dart';
 
 import '../fixtures/domain_repository.dart';
 
@@ -98,7 +99,7 @@ final class Raw extends Fake implements SSHSocket {
   }
 }
 
-final class Session implements SshConnection {
+final class Session implements SshConnection, MonitoringSshConnection {
   Session(this.options) {
     auth.future.ignore();
   }
@@ -106,7 +107,20 @@ final class Session implements SshConnection {
   final auth = Completer<void>(), terminal = Completer<OperationFailure?>();
   bool closed = false, failClose = false;
   Completer<void>? holdClose, holdPing;
-  int closes = 0, pings = 0;
+  int closes = 0, pings = 0, collections = 0;
+  Completer<LinuxSample>? collection;
+  WorkCancellation? collectionCancellation;
+  @override
+  Future<LinuxSample> collectMonitoring(
+    WorkCancellation cancellation, {
+    Duration timeout = const Duration(seconds: 5),
+  }) {
+    collections++;
+    collectionCancellation = cancellation;
+    return collection?.future ??
+        Future.value(const LinuxSample(memoryPercent: 25, diskPercent: 50));
+  }
+
   @override
   Future<void> get authenticated => auth.future;
   @override
