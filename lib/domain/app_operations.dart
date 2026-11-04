@@ -183,10 +183,12 @@ final class DomainCommandGate {
   DomainCommandGate({
     required ActorAuthority actors,
     required OperationState state,
+    this.onFailure,
   }) : _actors = actors,
        _state = state;
   final ActorAuthority _actors;
   final OperationState _state;
+  final void Function(Object, StackTrace)? onFailure;
   static const maxQueuedCommands = 64;
   Future<void> _tail = Future.value();
   bool _accepting = true;
@@ -223,8 +225,8 @@ final class DomainCommandGate {
     // It never replaces the canonical admission/boundary/response checks below.
     try {
       _checkNow(actor);
-    } catch (error) {
-      return Future.value(_CommandOutcome.failure(_failure(error)));
+    } catch (error, stack) {
+      return Future.value(_CommandOutcome.failure(_failure(error, stack)));
     }
     if (!_accepting) {
       return Future.value(
@@ -255,8 +257,8 @@ final class DomainCommandGate {
         admitted = true;
         context = CommandContext._(this, actor);
         value = await action(context);
-      } catch (error) {
-        failure = _failure(error);
+      } catch (error, stack) {
+        failure = _failure(error, stack);
       } finally {
         // Expire before response authorization awaits: late callbacks have no lease.
         if (context != null) context._active = false;
@@ -266,8 +268,8 @@ final class DomainCommandGate {
           _checkRuntime(actor);
           await _state.authorize(actor, AuthorizationPoint.response);
           _checkNow(actor);
-        } catch (error) {
-          failure = _failure(error);
+        } catch (error, stack) {
+          failure = _failure(error, stack);
         }
       }
       if (failure != null) {
@@ -284,17 +286,25 @@ final class DomainCommandGate {
               ),
             ),
           );
-        } catch (error) {
-          result.complete(_CommandOutcome.failure(_failure(error)));
+        } catch (error, stack) {
+          result.complete(_CommandOutcome.failure(_failure(error, stack)));
         }
       }
     });
     return result.future;
   }
 
-  OperationFailure _failure(Object error) => error is OperationFailure
-      ? error
-      : const OperationFailure(FailureCode.storageUnavailable, retryable: true);
+  OperationFailure _failure(Object error, StackTrace stack) {
+    try {
+      onFailure?.call(error, stack);
+    } catch (_) {}
+    return error is OperationFailure
+        ? error
+        : const OperationFailure(
+            FailureCode.storageUnavailable,
+            retryable: true,
+          );
+  }
 
   void _checkRuntime(CommandActor actor) {
     if (actor is McpActor && actor.requestCancelled)

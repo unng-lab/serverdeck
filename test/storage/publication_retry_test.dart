@@ -5,7 +5,7 @@ import 'package:serverdeck/storage/workspace_store.dart';
 
 import '../fixtures/fake_store_backend.dart';
 
-import 'package:serverdeck/storage/migrations.dart';
+import 'package:serverdeck/storage/store_manifest.dart';
 
 void main() {
   for (final failure in ['beforeRename', 'afterRename', 'afterCurrent']) {

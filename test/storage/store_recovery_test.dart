@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:serverdeck/storage/migrations.dart';
+import 'package:serverdeck/storage/store_manifest.dart';
 
 void main() {
   late Directory root;
@@ -34,7 +34,7 @@ void main() {
       final value = jsonDecode(
         utf8.decode(StoreManifest(newStoreId()).encode()),
       ) as Map<String, dynamic>;
-      if (mutation == 'future') value['formatVersion'] = 3;
+      if (mutation == 'future') value['formatVersion'] = 4;
       if (mutation == 'traversal') value['relativeDirectory'] = '../outside';
       final bytes = mutation == 'corrupt'
           ? [255, 0]

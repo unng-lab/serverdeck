@@ -1,3 +1,5 @@
+import '../runtime/owned_work.dart';
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -5,8 +7,8 @@ import 'dart:typed_data';
 import 'package:pointycastle/digests/sha256.dart';
 
 import '../domain/models.dart';
-import 'credential_parser.dart';
 import 'key_parse_worker.dart';
+import 'key_envelope.dart';
 
 abstract interface class SecretProtector {
   Future<Uint8List> protect(Uint8List bytes, String purpose);
@@ -43,7 +45,7 @@ final class CredentialPreparer {
   Future<PreparedCredential> prepare(
     AuthenticationInput input, {
     required String credentialId,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
   }) async {
     if (!isCanonicalUuid(credentialId)) {
       throw const OperationFailure(
@@ -60,12 +62,29 @@ final class CredentialPreparer {
     try {
       KeyInspection? inspection;
       if (input is PrivateKeyInput) {
-        inspection = await inspector.inspect(
+        final checked = await inspector.inspect(
           plaintext,
           passphrase: input.passphrase,
           cancellation: cancellation,
         );
+        inspection = KeyInspection(
+          keyType: checked.keyType,
+          bits: checked.bits,
+          encrypted: checked.encrypted,
+          publicKeyBytes: List<int>.unmodifiable(checked.publicKeyBytes),
+        );
         cancellation?.check();
+        final hint = PublicKeyHint.decode(
+          inspection.publicKeyBytes,
+          encrypted: inspection.encrypted,
+        );
+        if (hint.inspection.keyType != inspection.keyType ||
+            hint.inspection.bits != inspection.bits) {
+          throw const OperationFailure(
+            FailureCode.unsupportedKey,
+            field: OperationField.authentication,
+          );
+        }
       }
       try {
         encrypted = await protector.protect(

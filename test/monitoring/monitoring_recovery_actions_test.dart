@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart' show Dialog;
+
 import 'dart:collection';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -34,13 +36,14 @@ void main() {
       const LinuxSample(memoryPercent: 95, diskPercent: 20),
     ]);
     await w.mount(tester);
-    expect(find.text('Порог достигнут'), findsOneWidget);
+    await w.openDetails(tester);
+    expect(find.byTooltip('Порог достигнут'), findsOneWidget);
     w.h.port.holdCollections = true;
     await w.tick(tester, 15);
     await tester.pump();
     expect(find.text('95,0 %'), findsOneWidget);
-    expect(find.text('Порог достигнут'), findsNothing);
-    expect(find.text('Устарело'), findsWidgets);
+    expect(find.byTooltip('Порог достигнут'), findsNothing);
+    expect(find.byTooltip(RegExp('Устарело')), findsWidgets);
     await w.finish(tester);
   });
   testWidgets(
@@ -59,10 +62,14 @@ void main() {
       ]);
       await w.tick(tester, 5);
       await tester.pump();
-      expect(find.text('Частичные данные'), findsOneWidget);
-      expect(find.text('25,0 %'), findsOneWidget);
-      expect(find.text('65,0 %'), findsOneWidget);
-      expect(find.text('Устарело: данные недоступны'), findsOneWidget);
+      await w.openDetails(tester);
+      expect(find.byTooltip('Частичные данные'), findsWidgets);
+      expect(find.text('25,0 %'), findsWidgets);
+      expect(find.text('65,0 %'), findsWidgets);
+      expect(
+        find.byTooltip(RegExp('Устарело: данные недоступны')),
+        findsWidgets,
+      );
       expect(find.text('Сервер вернул непригодные данные.'), findsOneWidget);
     },
   );
@@ -82,7 +89,8 @@ void main() {
     ]);
     await w.tick(tester, 5);
     await tester.pump();
-    expect(find.text('Частичные данные'), findsOneWidget);
+    await w.openDetails(tester);
+    expect(find.byTooltip('Частичные данные'), findsWidgets);
     expect(find.text('RAM: Данные мониторинга недоступны'), findsOneWidget);
     expect(find.text('Диск /: Данные мониторинга недоступны'), findsOneWidget);
     expect(find.text('Сервер вернул непригодные данные.'), findsOneWidget);
@@ -95,7 +103,7 @@ void main() {
       find.textContaining('Проверьте права и доступность sh'),
       findsOneWidget,
     );
-    expect(find.text('Актуально'), findsOneWidget);
+    expect(find.byTooltip(RegExp(r'Процессор \(CPU\):')), findsOneWidget);
   });
   testWidgets('trust warning survives simultaneous monitoring warning', (
     tester,
@@ -114,7 +122,9 @@ void main() {
     );
     await w.mount(tester);
     expect(find.text('Ключ сервера изменился'), findsOneWidget);
-    expect(find.text('Ожидает подтверждения ключа'), findsOneWidget);
+    expect(find.byTooltip('Ключ сервера изменился'), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
+    await w.openDetails(tester);
     expect(
       find.textContaining('подтвердите ключ или введите passphrase'),
       findsOneWidget,
@@ -132,6 +142,7 @@ void main() {
       w.h.add(1, connected: true);
       w.h.port.samples[mid(1)] = Queue.of([LinuxSample.failed(reason)]);
       await w.mount(tester);
+      await w.openDetails(tester);
       final text = switch (reason) {
         MonitoringReason.timeout => 'Замер не завершён',
         MonitoringReason.outputLimit => 'Замер отклонён',
@@ -139,7 +150,7 @@ void main() {
         _ => 'Мониторинг недоступен для этой ОС',
       };
       expect(find.text(text), findsOneWidget);
-      expect(find.text('Нет данных'), findsWidgets);
+      expect(find.text('—'), findsWidgets);
     });
   }
 }

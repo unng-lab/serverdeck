@@ -7,16 +7,19 @@ import 'package:dartssh2/src/hostkey/hostkey_rsa.dart';
 import 'package:dartssh2/src/ssh_message.dart';
 
 import '../domain/models.dart';
+import 'legacy_pem.dart';
 
 final class KeyInspection {
   const KeyInspection({
     required this.keyType,
     required this.bits,
     required this.encrypted,
+    required this.publicKeyBytes,
   });
   final String keyType;
   final int bits;
   final bool encrypted;
+  final List<int> publicKeyBytes;
 }
 
 /// Count UTF-8 bytes without allocating an extra plaintext password buffer.
@@ -58,6 +61,42 @@ final class PublicKeyHint {
   final Uint8List encoded;
   final KeyInspection inspection;
   SSHHostKey toPublicKey() => _decodePublic(Uint8List.fromList(encoded));
+
+  factory PublicKeyHint.decode(List<int> bytes, {required bool encrypted}) {
+    try {
+      if (bytes.isEmpty || bytes.length > 262144) throw _unsupported;
+      final encoded = Uint8List.fromList(bytes),
+          key = _decodePublic(Uint8List.fromList(bytes));
+      final int bits;
+      if (key is SSHRsaPublicKey) {
+        if (key.n.bitLength < 2048 ||
+            !key.n.isOdd ||
+            key.e < BigInt.from(3) ||
+            !key.e.isOdd ||
+            key.e >= key.n)
+          throw _unsupported;
+        bits = key.n.bitLength;
+      } else if (key is SSHEd25519PublicKey && key.key.length == 32) {
+        bits = 256;
+      } else {
+        throw _unsupported;
+      }
+      if (!sameKeyBytes(key.encode(), encoded)) throw _unsupported;
+      return PublicKeyHint._(
+        encoded,
+        KeyInspection(
+          keyType: SSHHostKey.getType(encoded),
+          bits: bits,
+          encrypted: encrypted,
+          publicKeyBytes: List<int>.unmodifiable(encoded),
+        ),
+      );
+    } on OperationFailure {
+      rethrow;
+    } catch (_) {
+      throw _unsupported;
+    }
+  }
 }
 
 SSHHostKey _decodePublic(Uint8List bytes) =>
@@ -67,10 +106,31 @@ SSHHostKey _decodePublic(Uint8List bytes) =>
       _ => throw _unsupported,
     };
 
-PublicKeyHint readPublicKeyHint(Uint8List original) {
+PublicKeyHint readPublicKeyHint(
+  Uint8List original, {
+  required List<int> publicKeyBytes,
+}) {
+  if (original.isEmpty || original.length > 1024 * 1024) throw _unsupported;
+  if (LegacyPem.recognizes(original)) {
+    final pem = LegacyPem.read(original);
+    try {
+      final hint = PublicKeyHint.decode(
+        publicKeyBytes,
+        encrypted: pem.encrypted,
+      );
+      if (hint.inspection.keyType != 'ssh-rsa' ||
+          (!pem.encrypted && !sameKeyBytes(hint.encoded, pem.publicBytes())))
+        throw _unsupported;
+      return hint;
+    } finally {
+      pem.dispose();
+    }
+  }
   final envelope = OpenSshEnvelope.read(original);
   try {
-    return envelope.hint;
+    if (!sameKeyBytes(envelope.hint.encoded, publicKeyBytes))
+      throw _unsupported;
+    return PublicKeyHint.decode(publicKeyBytes, encrypted: envelope.encrypted);
   } finally {
     envelope.dispose();
   }
@@ -169,6 +229,7 @@ final class OpenSshEnvelope {
           keyType: SSHHostKey.getType(publicBlob),
           bits: bits,
           encrypted: cipher != null,
+          publicKeyBytes: List<int>.unmodifiable(publicBlob),
         ),
       );
       final result = OpenSshEnvelope._(

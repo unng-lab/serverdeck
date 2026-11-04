@@ -12,6 +12,7 @@ analyzer:
   exclude:
     - build/**
     - output/**
+    - tmp/**
     - work/**
     - .local/**
     - android/**

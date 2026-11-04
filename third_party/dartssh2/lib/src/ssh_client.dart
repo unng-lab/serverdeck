@@ -409,6 +409,7 @@ class SSHClient {
   SSHBoundedExec startBoundedExec(
     String command, {
     Duration timeout = const Duration(seconds: 5),
+    bool captureStatus = false,
   }) {
     if (_boundedExec != null) {
       return SSHBoundedExec._failed(SSHBoundedExecFailure.cleanupPending);
@@ -419,7 +420,7 @@ class SSHClient {
     if (timeout <= Duration.zero || timeout > const Duration(seconds: 5)) {
       throw ArgumentError('Invalid bounded execution deadline');
     }
-    final operation = SSHBoundedExec._(this, command);
+    final operation = SSHBoundedExec._(this, command, captureStatus);
     _boundedExec = operation;
     operation._start(timeout);
     return operation;
@@ -1907,26 +1908,33 @@ enum SSHBoundedExecFailure {
 }
 
 final class SSHBoundedExecResult {
-  SSHBoundedExecResult._(Uint8List bytes, this.exitCode, this.failure)
-      : _stdout = bytes;
+  SSHBoundedExecResult._(Uint8List bytes, this.exitCode, this.failure,
+      [Uint8List? errors])
+      : _stdout = bytes,
+        _stderr = errors ?? Uint8List(0);
   final Uint8List _stdout;
+  final Uint8List _stderr;
   Uint8List get stdout => Uint8List.fromList(_stdout);
+  Uint8List get stderr => Uint8List.fromList(_stderr);
   final int? exitCode;
   final SSHBoundedExecFailure? failure;
 }
 
 /// Cancellable before channel-open or exec ACK. Results contain no remote errors.
 final class SSHBoundedExec {
-  SSHBoundedExec._(this._client, this._command);
+  SSHBoundedExec._(this._client, this._command, this._captureStatus);
   SSHBoundedExec._failed(SSHBoundedExecFailure failure)
       : _client = null,
+        _captureStatus = false,
         _command = '' {
     _result.complete(SSHBoundedExecResult._(Uint8List(0), null, failure));
   }
   final SSHClient? _client;
   final String _command;
+  final bool _captureStatus;
   final _result = Completer<SSHBoundedExecResult>();
   final _stdout = BytesBuilder();
+  final _stderr = BytesBuilder();
   Timer? _timer;
   int? _id, _exitCode;
   int _received = 0;
@@ -1962,13 +1970,15 @@ final class SSHBoundedExec {
       if (_result.isCompleted) return;
       await channel.channel.done;
       if (_result.isCompleted) return;
-      if (_exitCode != 0 || !_sawStatus || _invalidStatus) {
+      if ((!_captureStatus && _exitCode != 0) ||
+          !_sawStatus ||
+          _invalidStatus) {
         _fail(SSHBoundedExecFailure.invalidResponse);
         return;
       }
       _timer?.cancel();
-      _result.complete(
-          SSHBoundedExecResult._(_stdout.takeBytes(), _exitCode, null));
+      _result.complete(SSHBoundedExecResult._(
+          _stdout.takeBytes(), _exitCode, null, _stderr.takeBytes()));
     } catch (_) {
       _fail(SSHBoundedExecFailure.invalidResponse);
       final id = _id;
@@ -2006,6 +2016,7 @@ final class SSHBoundedExec {
     }
     _received += data.bytes.length;
     if (!data.isExtendedData) _stdout.add(data.bytes);
+    if (data.isExtendedData && _captureStatus) _stderr.add(data.bytes);
   }
 
   void cancel() => _fail(SSHBoundedExecFailure.cancelled);
@@ -2014,6 +2025,7 @@ final class SSHBoundedExec {
     if (_result.isCompleted) return;
     _timer?.cancel();
     _stdout.clear();
+    _stderr.clear();
     _result.complete(SSHBoundedExecResult._(Uint8List(0), null, reason));
     _channel?.destroy();
     // Keep the ID / one protocol slot until peer CLOSE or open failure. With no

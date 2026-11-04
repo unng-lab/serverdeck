@@ -1,3 +1,5 @@
+import 'package:serverdeck/runtime/owned_work.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -19,13 +21,13 @@ final class Protector implements SecretProtector {
 }
 
 final class Inspector implements KeyInspector {
-  Future<KeyInspection> Function(Uint8List, String?, CredentialCancellation?)?
+  Future<KeyInspection> Function(Uint8List, String?, WorkCancellation?)?
   onInspect;
   @override
   Future<KeyInspection> inspect(
     Uint8List bytes, {
     String? passphrase,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
     Duration timeout = const Duration(seconds: 30),
   }) => onInspect!(bytes, passphrase, cancellation);
 }
@@ -98,7 +100,7 @@ void main() {
   );
 
   test('cancellation after key validation prevents protection', () async {
-    final cancel = CredentialCancellation();
+    final cancel = WorkCancellation();
     final inspector = Inspector()
       ..onInspect = (bytes, phrase, cancellation) async {
         expect(cancellation, same(cancel));
@@ -107,6 +109,7 @@ void main() {
           keyType: 'ssh-ed25519',
           bits: 256,
           encrypted: false,
+          publicKeyBytes: <int>[],
         );
       };
     final input = PrivateKeyInput(Uint8List.fromList([1]));
@@ -115,7 +118,7 @@ void main() {
         Protector(),
         inspector,
       ).prepare(input, credentialId: credentialId, cancellation: cancel),
-      throwsA(isA<CredentialCancelled>()),
+      throwsA(isA<WorkCancelled>()),
     );
     input.dispose();
   });
@@ -123,7 +126,7 @@ void main() {
   test(
     'late protection after cancel is discarded and all owned bytes cleared',
     () async {
-      final cancel = CredentialCancellation();
+      final cancel = WorkCancellation();
       final complete = Completer<Uint8List>();
       late Uint8List plain;
       final protector = Protector()
@@ -137,7 +140,7 @@ void main() {
           protector,
           Inspector(),
         ).prepare(input, credentialId: credentialId, cancellation: cancel),
-        throwsA(isA<CredentialCancelled>()),
+        throwsA(isA<WorkCancelled>()),
       );
       cancel.cancel();
       final cipher = Uint8List.fromList([1, 2]);
@@ -184,9 +187,9 @@ void main() {
         preparer.prepare(
           input,
           credentialId: credentialId,
-          cancellation: CredentialCancellation()..cancel(),
+          cancellation: WorkCancellation()..cancel(),
         ),
-        throwsA(isA<CredentialCancelled>()),
+        throwsA(isA<WorkCancelled>()),
       );
       input.dispose();
     },

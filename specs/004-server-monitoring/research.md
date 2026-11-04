@@ -43,3 +43,19 @@ Write failure блокирует auto до успешного retry, без ло
 GNU rendered-manual URL repeatedly returned HTTP429; reference replaced with
 the same upstream manual source (doc/coreutils.texi), verified accessible.
 No requirement/formula changed and no link-check status suppressed.
+
+## US4 research / clarify — 2026-11-04
+
+User answer: preserve history across restart. Other categories clear from current
+004 plus FR-422–426; no further product question required. Retain existing active
+workspace/tray/crash rules; last hour means actual collected samples, not remote backfill.
+Decision: single Isar collection with one bounded payload/profile; no extra daemon.
+Alternative720k individual rows rejected to simplify bounded per-profile codec/pruning.
+Read-only research agent history_storage_research inspected storage/runtime boundaries:
+current format2 full schema set requires direct current format3 guard update to avoid
+implicit schema conversion. This is our design choice under ConstitutionVI, not a
+claim that constitution names version3. Old data rejected intact, never migrated/reset.
+Alternative file cache rejected: duplicates store/security/lifecycle ownership.
+Reuse C22 with explicit720 capacity rather than averaging hour into120 samples;
+keep exact fractional values and explicit segment/gap metadata.
+

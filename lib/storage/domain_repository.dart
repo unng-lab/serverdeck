@@ -1,11 +1,14 @@
 import 'package:isar_community/isar.dart';
 
 import '../domain/models.dart';
+import '../monitoring/monitoring_history.dart';
 import 'records.dart';
 import 'workspace_store.dart';
 
 /// Root/owners only. Returned records are detached; none is a public projection.
 abstract interface class DomainRead {
+  List<JournalSource> journalSources();
+  JournalSource? journalSource(String sourceId);
   AppSettings get settings;
   SecurityState get security;
   List<Profile> profiles();
@@ -17,9 +20,12 @@ abstract interface class DomainRead {
   MutationReceipt? receipt(String clientId, String mutationId);
   List<MutationReceipt> receipts();
   int unexpiredReceiptCount(int utcNow);
+  MonitoringHistoryRecord? history(String profileId);
 }
 
 abstract interface class DomainTransaction implements DomainRead {
+  void putJournalSource(JournalSource value);
+  void deleteJournalSource(String sourceId);
   void putSettings(AppSettings value);
   void putSecurity(SecurityState value);
   void putProfile(Profile value);
@@ -32,9 +38,10 @@ abstract interface class DomainTransaction implements DomainRead {
   void deleteEndpoint(String endpointId);
   void deleteReceipt(String clientId, String mutationId);
   int pruneExpiredReceipts(int utcNow);
+  void putHistory(MonitoringHistoryRecord value);
 }
 
-abstract interface class DomainRepository {
+abstract interface class DomainRepository implements MonitoringHistoryStore {
   T read<T>(T Function(DomainRead records) body);
   Future<T> write<T>(T Function(DomainTransaction records) body);
 }
@@ -43,6 +50,28 @@ abstract interface class DomainRepository {
 final class WorkspaceDomainRepository implements DomainRepository {
   const WorkspaceDomainRepository(this.store);
   final WorkspaceStore store;
+  @override
+  String? loadHistory(String id, int revision) => read((records) {
+    final value = records.history(id);
+    return value?.connectionRevision == revision ? value!.payload : null;
+  });
+  @override
+  Future<void> saveHistory(
+    String id,
+    int revision,
+    String payload,
+    bool Function() canCommit,
+  ) => write((records) {
+    if (!canCommit() || records.profile(id)?.connectionRevision != revision) {
+      return;
+    }
+    final value = records.history(id) ?? MonitoringHistoryRecord();
+    value
+      ..profileId = id
+      ..connectionRevision = revision
+      ..payload = payload;
+    records.putHistory(value);
+  });
   @override
   T read<T>(T Function(DomainRead records) body) =>
       store.readSync((db) => body(_IsarRecords(db)));
@@ -54,6 +83,30 @@ final class WorkspaceDomainRepository implements DomainRepository {
 final class _IsarRecords implements DomainTransaction {
   const _IsarRecords(this.db);
   final Isar db;
+  @override
+  List<JournalSource> journalSources() =>
+      db.journalSources.where().findAllSync();
+  @override
+  JournalSource? journalSource(String sourceId) =>
+      db.journalSources.getBySourceIdSync(sourceId);
+  @override
+  void putJournalSource(JournalSource value) {
+    db.journalSources.putSync(value);
+  }
+
+  @override
+  void deleteJournalSource(String sourceId) {
+    db.journalSources.deleteBySourceIdSync(sourceId);
+  }
+
+  @override
+  MonitoringHistoryRecord? history(String id) =>
+      db.monitoringHistoryRecords.getByProfileIdSync(id);
+  @override
+  void putHistory(MonitoringHistoryRecord value) {
+    db.monitoringHistoryRecords.putSync(value);
+  }
+
   @override
   AppSettings get settings =>
       db.appSettings.getSync(1) ??
@@ -100,6 +153,20 @@ final class _IsarRecords implements DomainTransaction {
 
   @override
   void putProfile(Profile v) {
+    final old = db.profiles.getByProfileIdSync(v.profileId);
+    if (old != null && old.connectionRevision != v.connectionRevision) {
+      db.monitoringHistoryRecords.deleteByProfileIdSync(v.profileId);
+      for (final source
+          in db.journalSources
+              .where()
+              .profileIdEqualTo(v.profileId)
+              .findAllSync()) {
+        source.connectionRevision = v.connectionRevision;
+        source.payload =
+            '{"version":1,"checkpoint":{},"entries":[],"partial":true}';
+        db.journalSources.putSync(source);
+      }
+    }
     db.profiles.putSync(v);
   }
 
@@ -125,6 +192,8 @@ final class _IsarRecords implements DomainTransaction {
 
   @override
   void deleteProfile(String id) {
+    db.journalSources.where().profileIdEqualTo(id).deleteAllSync();
+    db.monitoringHistoryRecords.deleteByProfileIdSync(id);
     db.profiles.deleteByProfileIdSync(id);
   }
 

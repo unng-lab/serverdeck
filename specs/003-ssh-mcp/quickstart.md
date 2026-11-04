@@ -51,3 +51,12 @@ lychee "specs/**/*.md"
 читаются тестами. Независимое read-only review после doc/code checks обязательно.
 Unit/static results не доказывают фактическую связку на чистой ОС/SSH-сервере;
 такая интеграционная проверка не является условием завершения003.
+
+
+## Server workspace functional validation
+Use fake AppOperations/monitoring only: select/search A/B, switch4tabs, save/edit/
+delete/rename, global MCP overlay, fail reads, manual disconnect/network failure,
+changed pin, partial/critical, tooltip accessible names, late admission/save/nonce.
+Future tabs show explicit unavailable state. Run tools/test-unit.ps1 and lychee
+"specs/**/*.md"; common C07/C10/C17/C21 suite separately. No real DB/network/VM,
+screen-layout matrices or product launches from tests. See [contract](contracts/server-workspace.md).

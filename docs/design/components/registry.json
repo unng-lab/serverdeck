@@ -518,7 +518,9 @@
         "разделитель",
         "выбор",
         "раскрытие",
-        "адаптивная карточка"
+        "адаптивная карточка",
+        "compact server row",
+        "selected error row"
       ],
       "applicableStates": [
         "default",
@@ -572,8 +574,7 @@
         "expandable details"
       ],
       "parameters": [
-        "DeckListItem(title, description, leading, trailing, selected, onTap)",
-        "DeckExpander"
+        "DeckListItem(title, description, leading, trailing, selected, onTap, compact=false, error=false, statusLabel)"
       ],
       "events": [
         "onTap",
@@ -760,7 +761,8 @@
         "все DeckTone",
         "счётчик",
         "текст + символ",
-        "pending"
+        "pending",
+        "icon-only tooltip/focus"
       ],
       "applicableStates": [
         "default",
@@ -809,8 +811,7 @@
         "badge/chip count"
       ],
       "parameters": [
-        "DeckStatus(label, tone, pending)",
-        "Material Badge/Chip"
+        "DeckStatus(label, tone, pending, icon, iconOnly=false)"
       ],
       "events": [
         "Не генерирует серверных событий"
@@ -1269,7 +1270,7 @@
         "back"
       ],
       "parameters": [
-        "DeckTabs(labels, selected, onSelected?)",
+        "DeckTabs(labels, icons, selected, onSelected?)",
         "DeckBreadcrumbs",
         "IconButton back"
       ],
@@ -1285,19 +1286,18 @@
         "Tab/breadcrumb/back доступны",
         "disabled callbacks отсутствуют"
       ],
-      "usageExample": "DeckTabs(labels: const ['Обзор', 'Журнал'], selected: selectedTab, onSelected: onTabChanged);",
+      "usageExample": "DeckTabs(labels: const ['Обзор', 'Журнал'], icons: const [Icons.apps_outlined, Icons.description_outlined], selected: selectedTab, onSelected: onTabChanged);",
       "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
       "id": "C17",
       "name": "Каркас страницы",
-      "description": "Каркас страницы: sidebar/rail/phone navigation, topbar, заголовок, контекст цели, body/actions",
+      "description": "Серверный каркас: sidebar selector и контекстная рабочая область",
       "variants": [
-        "sidebar/rail/phone navigation",
-        "topbar",
-        "заголовок",
-        "контекст цели",
-        "body/actions"
+        "server sidebar",
+        "workspace content",
+        "readiness",
+        "owner status/recovery"
       ],
       "applicableStates": [
         "default",
@@ -1339,31 +1339,26 @@
       "designStatus": "ready",
       "codeStatus": "ready",
       "anatomy": [
-        "Sidebar/rail/phone navigation",
-        "topbar",
-        "title",
-        "target",
-        "content slot"
+        "brand",
+        "sidebar slot",
+        "workspace slot",
+        "owner status"
       ],
       "parameters": [
-        "FoundationShell(state, requestedSection, targetName, targetAddress, feature slots)",
-        "DeckPageBody"
+        "FoundationShell(state, sidebar, child, status, recoveryAction, onRetry, retryInProgress)"
       ],
       "events": [
-        "onSectionChanged",
-        "разрешённые callback владельца"
+        "callbacks владельца слотов"
       ],
       "limitations": [
-        "Навигация UI-only",
-        "readiness/private subtree управляет host",
-        "пять разделов"
+        "Навигация и полномочия принадлежат owner",
+        "Нет старого глобального section API"
       ],
       "acceptanceCriteria": [
-        "Порог 520/1060",
-        "context/draft сохраняются на resize",
-        "ready loss скрывает private context"
+        "Current slots сохраняют состояние при rebuild",
+        "Unavailable скрывает приватные sidebar/child inputs"
       ],
-      "usageExample": "FoundationShell(state: readiness, servers: servers, software: software, settings: settings, targetName: targetName);",
+      "usageExample": "FoundationShell(state: readiness, sidebar: serverSelector, child: workspace, status: ownerStatus);",
       "runnableExamplePath": "tool/component_catalog/examples.dart"
     },
     {
@@ -1602,7 +1597,8 @@
         "значение/единица/лимит",
         "неизвестное",
         "stale/partial",
-        "описание"
+        "описание",
+        "compact icon metric"
       ],
       "applicableStates": [
         "default",
@@ -1648,7 +1644,7 @@
         "quality/source/time"
       ],
       "parameters": [
-        "DeckMetric(label, value?, unit, contextLabel, tone)"
+        "DeckMetric(label, value, unit, contextLabel, tone, compact=false, icon)"
       ],
       "events": [
         "Не создаёт событий"

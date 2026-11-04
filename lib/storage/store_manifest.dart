@@ -15,9 +15,9 @@ class StoreFailure implements Exception {
 }
 
 class StoreManifest {
-  const StoreManifest(this.storeId, {this.formatVersion = 2});
+  const StoreManifest(this.storeId);
   final String storeId;
-  final int formatVersion;
+  int get formatVersion => 3;
   String get relativeDirectory => 'stores/$storeId';
   Uint8List encode() => Uint8List.fromList(
     utf8.encode(
@@ -37,13 +37,13 @@ class StoreManifest {
       if (value['publicationVersion'] is! int ||
           value['publicationVersion'] != 1 ||
           value['formatVersion'] is! int ||
-          !{1, 2}.contains(value['formatVersion']) ||
+          value['formatVersion'] != 3 ||
           id is! String ||
           !_storeId.hasMatch(id) ||
           value['relativeDirectory'] != 'stores/$id') {
         throw const StoreFailure('INCOMPATIBLE_STORE');
       }
-      return StoreManifest(id, formatVersion: value['formatVersion'] as int);
+      return StoreManifest(id);
     } catch (_) {
       throw const StoreFailure('INCOMPATIBLE_STORE');
     }
@@ -140,43 +140,6 @@ Future<void> validatePendingPublication(
       followLinks: false,
     )) {
       await rejectLinks(candidate.path);
-    }
-  }
-}
-
-/// Copies only the selected closed store into this live owner's staging UUID.
-/// Publication/flush remain native; the original directory is never opened or written.
-Future<void> copyStoreDirectory(String sourcePath, String targetPath) async {
-  final source = Directory(sourcePath).absolute;
-  final target = Directory(targetPath).absolute;
-  await rejectLinks(source.path);
-  await rejectLinks(target.path);
-  final sourceParts = source.uri.pathSegments
-      .where((p) => p.isNotEmpty)
-      .toList();
-  await target.create(recursive: true);
-  await for (final entry in source.list(recursive: true, followLinks: false)) {
-    await rejectLinks(entry.path);
-    final parts = entry.absolute.uri.pathSegments
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.length <= sourceParts.length ||
-        !List.generate(
-          sourceParts.length,
-          (i) => parts[i] == sourceParts[i],
-        ).every((v) => v)) {
-      throw const StoreFailure('STORAGE_IO');
-    }
-    final destination =
-        '${target.path}/${parts.skip(sourceParts.length).join('/')}';
-    await rejectLinks(destination);
-    if (entry is Directory) {
-      await Directory(destination).create(recursive: true);
-    } else if (entry is File) {
-      await Directory(destination).parent.create(recursive: true);
-      await entry.copy(destination);
-    } else {
-      throw const StoreFailure('STORAGE_IO');
     }
   }
 }

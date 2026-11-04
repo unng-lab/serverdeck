@@ -19,7 +19,7 @@ void main() {
   test(
     'typed transport emits only constant collector and returns parsed values',
     () async {
-      final key = parseOpenSshKey(
+      final key = parsePrivateKey(
         File('test/fixtures/ssh/ed25519.txt').readAsBytesSync(),
       );
       final peer = MemoryAuthPeer(hostKey: key.key);

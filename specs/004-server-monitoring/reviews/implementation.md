@@ -401,3 +401,21 @@ Flutter592passed; boundaries69files; vendor98files/4sources; native10/10unit
 Full goal is complete after T020/T025 bookkeeping and final link check.
 No commits/publication. No product launch, realSSH/Isar, integration/e2e/VM or
 screen-design tests; these results do not prove clean-OS integration.
+
+## Compact presentation refinement — final2026-11-04
+Existing004 updated directly with003 modal/key workflow and001 C21 compact variant. T026–028 completed. No UI timestamp/age/history; internal freshness15s and threshold90% unchanged; source recovery details remain live in003 modal.
+Current mandatory checks: output/current-policy-unit-3.log exit0 (635Flutter+2offline schema units, format/analyze/boundary); shared C21 output/current-policy-components.log115pass/1opt-in capture skip; native current-policy-native.log10/10pass. Final independent full review /root/review_current_packages_implementation_2: no findings, ready. Joint Spec Kit analysis/convergence003/004 clean;004 inventory18FR/16AC/5SC/28tasks, no tasks appended. See003 reviews/profile-workflow.md for detailed evidence and limits.
+Single EXE build/static packaging current-policy-build-3.log exit0, SHA2563cf3ce140461477c8e014c5132ac8544854ced840b76df1d106761de119a0544. No real SSH/Isar/VM/integration or feature design acceptance performed or required. No commit/push.
+
+## Server workspace refinement completion2026-11-04
+T029 completed with003 workspace and001/R015 primitives. Monitoring remains active
+across all server tabs and pauses for owner-bound global MCP settings; compact
+metrics/tooltips and sidebar loss/error/partial/critical states use canonical
+observations, without time/update logs. Collector/scheduler/schema unchanged.
+Final independent review review_server_workspace_implementation_4: no findings,
+ready. Actual checks:657Flutter+2offline schema units, format/analyze/boundary;
+shared118pass/1opt-in skip; links194/0errors; build/static audit exit0. Joint003/004
+analyze/converge clean,00421FR/18AC/6SC/29tasks, no appended tasks. Detailed evidence
+and limits: [журнал003](../../003-ssh-mcp/reviews/server-workspace.md). EXE SHA256
+19334fae0ff971c5d97285ff8404d192eb341a678528eb307fe93ca7bf1d4af7.
+No real SSH/Isar/VM/integration or feature-layout acceptance; no commit/push.

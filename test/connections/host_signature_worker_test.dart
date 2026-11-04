@@ -11,7 +11,7 @@ import 'package:serverdeck/runtime/owned_work.dart';
 
 typedef Vector = (SSHHostkeyType, Uint8List, Uint8List, Uint8List);
 Vector vector([String name = 'ed25519']) {
-  final parsed = parseOpenSshKey(
+  final parsed = parsePrivateKey(
     File('test/fixtures/ssh/$name.txt').readAsBytesSync(),
   );
   try {

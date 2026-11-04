@@ -78,3 +78,33 @@ MVP — US1; полная цель требует все US1–US3 и clean chec
 ## Phase 10: Convergence
 
 - [X] T025 Показывать C11 safe reason/next action с названием каждой отказавшей метрики в lib/monitoring/monitoring_view.dart, сохранив общие причины всего сбора/SSH; regression CPU valid + RAM invalidResponse + disk sourceUnavailable в test/monitoring/monitoring_recovery_actions_test.dart; обновить presentation contract, rerun mandatory checks и fresh independent review per AC-410/FR-407/FR-413 (partial; review_004_complete P2).
+
+
+## Компактное представление — 2026-11-04
+- [X] T026 Обновить lib/monitoring/monitoring_view.dart и C07 composition lib/profiles/profile_view.dart: compactC21 из001/R014, общаясвежесть, безtimestamp/age/log; internalfreshness/critical/partialсохранить, detailedpersourcerecovery вmodal003/T056 (FR-416–418,AC-415/416,SC-405).
+- [X] T027 Functional synthetic widgetunits в test/monitoring/ иfixtures/monitoring_widgets.dart: data/freshness/threshold/sources/actions/modalnavigation, отсутствиеtime-text; nofeaturelayout/golden/overflow (FR-416–418,AC-415/416).
+- [X] T028 Mandatorychecks/shared001units/links иполноеindependentreview current003/004/002; analyze/converge004, actualresults вreviews/implementation.md, singleEXE вместе003 безновогопакета (FR-416–418,SC-405).
+
+
+## Server workspace monitoring presentation
+- [X] T029 Обновить lib/monitoring/monitoring_view.dart до C21 icon-only compact и
+  C10 разных connection/freshness icons с C14 tooltip, detailed source notices
+  вworkspace003. Unit data/freshness/threshold/reasons/semantics/activation,
+  checks/review/converge совместно003 (FR-419–421,AC-417/418,SC-406).
+
+## Phase 11 — US4: persisted hour history
+
+- [X] T030 [US4] Update current format3 storage guards in lib/storage/{records.dart,records.g.dart,store_manifest.dart,workspace_store.dart}; add MonitoringHistoryRecord schema, required MonitoringHistoryStore in lib/monitoring/monitoring_history.dart and lib/storage/domain_repository.dart; atomic profile revision/delete cleanup; fake repository and unit codec/store fences in test/monitoring/monitoring_history_test.dart, test/storage/current_store_format_test.dart (FR-423–426,AC-420–422).
+- [X] T031 [US4] Add bounded owner history load/save/retry,720 rows/192KiB/1h TTL,UTC+monotonic pruning and segment/lifecycle fences in lib/monitoring/monitoring_owner.dart; wire required store in lib/runtime/feature_runtime.dart; fake-clock owner units test/monitoring/monitoring_history_owner_test.dart (FR-423–426,AC-420–422).
+- [X] T032 [US4] Extend shared C22 lib/ui/deck_history.dart maxPoints1..720(default120),periodLabel,finite fractional percent,breakBefore; document001 and synthetic component tests test_design/components/history_hour_test.dart (FR-422,SC-407). No feature design acceptance.
+- [X] T033 [US4] Add C16 Monitoring tab/icon and C22/C11/C02 composition lib/profiles/profile_view.dart,lib/monitoring/monitoring_view.dart; functional fake tests test/monitoring/monitoring_history_actions_test.dart for selected profile,points,empty,retry,no extra collection (FR-422,FR-426,AC-419,AC-422).
+- [X] T034 Run mandatory format/analyze/flutter test,boundary,shared component units and lychee specs/**/*.md; analyze/converge004 and independent review/fix loop; record actual evidence specs/004-server-monitoring/reviews/hour-history.md. No commit/publish (FR-422–426,SC-407).
+
+Dependencies:T030→T031;T032 after001 contract;T031+T032→T033→T034.
+MVP US4 includes persistence and all failure/recovery semantics. Existing completed
+history remains intact. Readiness requires clean independent package review first.
+
+
+## Phase 12: Convergence
+
+- [X] T035 Fence history,historyError,retryHistory by selected profile connectionRevision in lib/monitoring/monitoring_owner.dart,lib/monitoring/monitoring_view.dart,lib/profiles/profile_view.dart; add delayed/failed reconciliation after profile edit fake functional regression test/monitoring/monitoring_history_actions_test.dart; retain rename/reconnect history. FR-425,AC-419/421 (partial; independent review P2). Rerun mandatory/shared/link checks and fresh review.

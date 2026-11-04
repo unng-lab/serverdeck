@@ -35,8 +35,9 @@ final class McpSettingsController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> refresh() =>
-      _refresh ??= _load().whenComplete(() => _refresh = null);
+  Future<void> refresh() => _disposed
+      ? Future<void>.value()
+      : _refresh ??= _load().whenComplete(() => _refresh = null);
   Future<void> _load() async {
     try {
       final result = await owner.list(actor);
@@ -51,7 +52,7 @@ final class McpSettingsController extends ChangeNotifier {
   }
 
   Future<void> _action(Future<void> Function() action) async {
-    if (pending) return;
+    if (_disposed || pending) return;
     pending = true;
     error = null;
     configuration = null;

@@ -1,4 +1,4 @@
-# Storage contract v1/v2
+# Current storage contract — format3
 
 ## Каталоги и authority
 
@@ -30,46 +30,9 @@ DPAPI failure ничего не пишет. Uint8List plaintext живёт то�
 по возможности очищается после использования; GC/runtime не дают гарантии стирания
 всех копий, поэтому такая гарантия не заявляется. Secrets не попадают в diagnostics.
 
-## Store open / format migration
+## Current store open
 
-CURRENT.json UTF-8: `{publicationVersion:1,formatVersion:1|2,storeId,relativeDirectory}`.
-Строгая валидация UUID, relativeDirectory только `stores/<storeId>`, reject absolute/
-traversal/case alias/reparse. CURRENT missing допускает создание только если data
-каталог не содержит существующих store; неоднозначный orphan — ошибка восстановления,
-не новый пустой workspace. Invalid/future format — INCOMPATIBLE_STORE без открытия Isar.
-
-Новая установка создаёт staging store, пишет AppSettings в txn, закрывает и flush
-файлы, публикует каталог и CURRENT через native same-volume atomic replace с flush.
-До публикации store не считается рабочим. Initial failure leaves existing data unchanged.
-
-Native allowlist для первой публикации: `file.flushAtomic` с path
-`data/publish/<storeId>` и bytes CURRENT. Native flush всех файлов
-`data/staging-<storeId>`, rename в `data/stores/<storeId>`, затем atomic CURRENT.
-`data/CURRENT.json` — отдельный allowlisted metadata path для последующих публикаций.
-Произвольные пути не принимаются; версия/поля CURRENT проверяются Dart preflight.
-При transient failure живой owner сохраняет storeId своей начальной публикации и
-продолжает только её. Native publication идемпотентно принимает либо staging, либо
-уже переименованный destination, но не оба. Потеря ack после CURRENT проверяется
-обычным preflight того же storeId. Любой посторонний orphan остаётся ошибкой.
-После process restart in-memory identity потеряна; неизвестные unpublished stores
-не принимаются автоматически и не удаляются.
-
-002 поддерживает logical format 1. 003 требует format 2: под owner lock закрыть
-store, скопировать весь format1 directory в новый staging UUID, открыть копию полным
-schema set2 и мигрировать AppSettings.logicalFormat=2 в txn. После close/flush
-проверить reopen/read invariants, затем atomic replace CURRENT. Старый каталог
-сохранён; ошибка не меняет CURRENT, не стирает источник. Runtime2 открывает только
-CURRENT format2; старый бинарник002 отказывает до открытия format2. Автоматического
-fallback к old store после публикации нет: он потерял бы новые записи. GC/migration
-назад не входит в эти пакеты. Для уже format2 повторная миграция не выполняется.
-
-Все validation/repair failures видны пользователю с retry; при fatal data error
-read/write/MCP admission blocked, не возвращается пустой success. Read retry повторно
-открывает тот же выбранный store, не ищет «подходящую» другую версию.
-
-Любое несовместимое изменение schema set требует нового logical format до open.
-Смешивание старой структуры и новой metadata под тем же format запрещено.
-
+Manifest publicationVersion1/logical format3 — единственный текущий контракт. Формат1 и автоматическое copy/migrate/backfill не поддерживаются по principleVI constitution1.4.0. Неизвестный формат отклоняется до StoreBackend.open; originalCURRENT/source tree не изменяются и не заменяются пустойБД. Модуль store_manifest.dart владеет текущим manifest/preflight/publication guards; StoreBackend не имеет copyStore API. Fresh initialization и retry собственной непубликованной staging остаются обычным recovery текущей операции, не старымформатом.
 
 ## Unit test boundary
 

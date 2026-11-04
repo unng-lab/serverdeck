@@ -152,3 +152,21 @@ MVP runtime: US1+US2+US3 без настоящего SSH/MCP, с synthetic capab
 ## Phase 19 — Bootstrap application icon (2026-11-04)
 
 - [X] T043 Встроить существующий брендовый IDI_APP_ICON101 в запускаемый bootstrap EXE, а не только host DLL: WindowClassRegistrar загружает ресурс process module. Один RC template используется продуктом и isolated native resource unit; проверить group/default/small icon availability, bootstrap build/static audit и independent review. Не менять логотип или дизайн экранов (FR209/214, assets001, user-reported missing taskbar icon).
+
+
+## Current-only storage — 2026-11-04
+- [X] T044 Удалить format1→2 migration/copyStore API/state/helper из lib/storage/workspace_store.dart/migrations.dart; current manifest/preflight module store_manifest.dart принимаеттолькоformat2, imports/callers обновитьнапрямую. Заменитьobsolete migration units current-format rejection/no-write-before-open/fresh/current recovery units иfakebackend. Userdata нестирать; currentpublicationrecoveryсохранить. Checks/freshreview вместе003/T052–066 (ConstitutionVI).
+
+T044 acceptance уточнено review: fresh CURRENT содержит publicationVersion1 и formatVersion2; inputformat1 иunknownformat отвергаются до backend.open илюбыхwrites.
+
+
+## Server workspace runtime composition
+- [X] T045 Обновить lib/runtime/runtime_view.dart до server workspace003/C17 API001:
+  readiness/retry/tray recovery, отдельный MCP settings dialog изsidebar и explicit
+  monitoring activation во всех server tabs/overlay pause. Unit runtime scenarios,
+  checks/fresh joint review без launch/process/VM tests (FR-220/AC-220/SC-220).
+
+- [X] T046 Исправить missing MaterialIcons glyphs: отключить icon tree shaking
+  в tools/build-release.ps1, добавить static full-font equality audit до packaging
+  и isolated Python units в обычный unit runner. Собрать и проверить payload assets,
+  без release smoke/VM; обязательное независимое ревью вместе001/R016,003/T082.

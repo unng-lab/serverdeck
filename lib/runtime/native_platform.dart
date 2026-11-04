@@ -149,16 +149,21 @@ class NativePlatform implements RuntimePlatform {
   Future<void> finishExit() =>
       _invoke<void>('runtime.finishExit', {'shutdownComplete': true});
 
+  // Codec replies may be read-only views. Callers own and wipe these copies.
   Future<Uint8List> protect(Uint8List bytes, String purpose) async =>
-      (await _invoke<Uint8List>('secret.protect', {
-        'bytes': bytes,
-        'purpose': purpose,
-      }))!;
+      Uint8List.fromList(
+        (await _invoke<Uint8List>('secret.protect', {
+          'bytes': bytes,
+          'purpose': purpose,
+        }))!,
+      );
   Future<Uint8List> unprotect(Uint8List bytes, String purpose) async =>
-      (await _invoke<Uint8List>('secret.unprotect', {
-        'bytes': bytes,
-        'purpose': purpose,
-      }))!;
+      Uint8List.fromList(
+        (await _invoke<Uint8List>('secret.unprotect', {
+          'bytes': bytes,
+          'purpose': purpose,
+        }))!,
+      );
   Future<void> flushAtomic(String path, Uint8List bytes) =>
       _invoke<void>('file.flushAtomic', {'path': path, 'bytes': bytes});
 
@@ -178,6 +183,8 @@ class NativePlatform implements RuntimePlatform {
       });
   Future<void> deleteMcpGrant(String clientId) =>
       _invoke<void>('mcp.deleteGrantBlob', {'clientId': clientId});
-  Future<Uint8List?> pickPrivateKey() =>
-      _invoke<Uint8List>('credential.pickKey');
+  Future<Uint8List?> pickPrivateKey() async {
+    final bytes = await _invoke<Uint8List>('credential.pickKey');
+    return bytes == null ? null : Uint8List.fromList(bytes);
+  }
 }

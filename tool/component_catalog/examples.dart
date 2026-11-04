@@ -849,6 +849,11 @@ class _ComponentExampleState extends State<ComponentExample> {
         ),
         DeckTabs(
           labels: const ['Обзор', 'Журнал', 'Параметры'],
+          icons: const [
+            Icons.apps_outlined,
+            Icons.description_outlined,
+            Icons.tune,
+          ],
           selected: tab,
           onSelected: disabled ? null : (v) => setState(() => tab = v),
         ),
@@ -862,22 +867,51 @@ class _ComponentExampleState extends State<ComponentExample> {
         state: widget.state == 'unavailable'
             ? ReadinessState.unavailable
             : ReadinessState.ready,
-        targetName: 'atlas-web',
-        targetAddress: '192.0.2.14',
-        servers: SingleChildScrollView(
+        sidebar: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const DeckSectionHeader(title: 'Локальные профили'),
-              collection(),
+              const DeckSectionHeader(title: 'Серверы'),
+              DeckListItem(
+                compact: true,
+                title: 'atlas-web',
+                description: '192.0.2.14',
+                selected: true,
+                onTap: () {},
+              ),
+              DeckListItem(
+                compact: true,
+                title: 'atlas-backup',
+                description: '192.0.2.15',
+                error: true,
+                statusLabel: 'Связь потеряна',
+                onTap: () {},
+              ),
             ],
           ),
         ),
-        settings: const SingleChildScrollView(
-          child: Text('Настройки · синтетические значения'),
-        ),
-        software: const SingleChildScrollView(
-          child: Text('Каталог ПО · синтетические значения'),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const DeckSectionHeader(
+                title: 'atlas-web',
+                description: '192.0.2.14',
+              ),
+              DeckTabs(
+                labels: const ['ПО', 'Журналы', 'Задания', 'Настройки'],
+                icons: const [
+                  Icons.apps_outlined,
+                  Icons.description_outlined,
+                  Icons.task_alt,
+                  Icons.tune,
+                ],
+                selected: 0,
+                onSelected: (_) {},
+              ),
+              const Text('Синтетическое содержимое выбранного сервера'),
+            ],
+          ),
         ),
       ),
     ),

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:serverdeck/storage/migrations.dart';
+import 'package:serverdeck/storage/store_manifest.dart';
 import 'package:serverdeck/storage/records.dart';
 import 'package:serverdeck/storage/workspace_store.dart';
 

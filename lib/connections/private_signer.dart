@@ -53,14 +53,17 @@ final class PrivateSignRequest {
     this.scheme,
     Uint8List challenge,
     this.passphrase,
+    Uint8List expectedPublicKey,
   ) : file = Uint8List.fromList(file),
+      expectedPublicKey = Uint8List.fromList(expectedPublicKey),
       challenge = Uint8List.fromList(challenge);
-  final Uint8List file, challenge;
+  final Uint8List file, challenge, expectedPublicKey;
   final PrivateSignatureScheme scheme;
   String? passphrase;
   void dispose() {
     file.fillRange(0, file.length, 0);
     challenge.fillRange(0, challenge.length, 0);
+    expectedPublicKey.fillRange(0, expectedPublicKey.length, 0);
     passphrase = null;
   }
 }
@@ -92,6 +95,7 @@ final class PrivateSigner implements RuntimeCapability {
     Uint8List file,
     PrivateSignatureScheme scheme,
     Uint8List challenge, {
+    required Uint8List expectedPublicKey,
     String? passphrase,
     WorkCancellation? cancellation,
     Duration timeout = OwnedWorkerPool.maxDuration,
@@ -102,7 +106,9 @@ final class PrivateSigner implements RuntimeCapability {
       throw const OperationFailure(FailureCode.timeout);
     if (file.isEmpty ||
         file.length > 1024 * 1024 ||
-        challenge.length > maxSignChallengeBytes)
+        challenge.length > maxSignChallengeBytes ||
+        expectedPublicKey.isEmpty ||
+        expectedPublicKey.length > 262144)
       throw _unsupported;
     if (passphrase != null && !isKeyPassphraseBounded(passphrase)) {
       throw const OperationFailure(
@@ -113,7 +119,13 @@ final class PrivateSigner implements RuntimeCapability {
     Uint8List? encoded;
     try {
       encoded = await _pool.run(
-        PrivateSignRequest(file, scheme, challenge, passphrase),
+        PrivateSignRequest(
+          file,
+          scheme,
+          challenge,
+          passphrase,
+          expectedPublicKey,
+        ),
         cancellation: cancellation,
         timeout: timeout,
       );
@@ -187,6 +199,7 @@ Future<PrivateSignWorker> spawnPrivateSignWorker(
         request.scheme,
         request.challenge,
         request.passphrase,
+        request.expectedPublicKey,
       ),
       onExit: port.sendPort,
       onError: port.sendPort,
@@ -201,13 +214,16 @@ Future<PrivateSignWorker> spawnPrivateSignWorker(
 }
 
 void _signEntry(
-  (SendPort, Uint8List, PrivateSignatureScheme, Uint8List, String?) request,
+  (SendPort, Uint8List, PrivateSignatureScheme, Uint8List, String?, Uint8List)
+  request,
 ) {
   ParsedPrivateKey? parsed;
   Uint8List? encoded;
   try {
-    parsed = parseOpenSshKey(request.$2, passphrase: request.$5);
+    parsed = parsePrivateKey(request.$2, passphrase: request.$5);
     final key = parsed.key;
+    if (!sameKeyBytes(key.toPublicKey().encode(), request.$6))
+      throw _unsupported;
     final SSHSignature signature;
     if (request.$3 == PrivateSignatureScheme.ed25519 &&
         key is OpenSSHEd25519KeyPair) {
@@ -240,7 +256,7 @@ void _signEntry(
     request.$1.send(_unsupported);
   } finally {
     parsed?.dispose();
-    for (final bytes in [request.$2, request.$4, encoded]) {
+    for (final bytes in [request.$2, request.$4, request.$6, encoded]) {
       bytes?.fillRange(0, bytes.length, 0);
     }
   }
@@ -300,8 +316,9 @@ final class OwnedPrivateIdentity extends SSHIdentity {
     required this.serverAlgorithms,
     required this.requestPassphrase,
     required this.remainingBudget,
+    required PublicKeyHint publicHint,
     WorkCancellation? cancellation,
-  }) : hint = readPublicKeyHint(file),
+  }) : hint = readPublicKeyHint(file, publicKeyBytes: publicHint.encoded),
        _file = Uint8List.fromList(file) {
     if (credentialRevision < 1 ||
         hint.inspection.keyType != expected.keyType ||
@@ -386,6 +403,7 @@ final class OwnedPrivateIdentity extends SSHIdentity {
         _file,
         _scheme!,
         challenge,
+        expectedPublicKey: hint.encoded,
         passphrase: passphrase,
         cancellation: _cancellation,
         timeout: remainingBudget(),

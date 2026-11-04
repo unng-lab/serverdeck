@@ -1,3 +1,5 @@
+import '../fixtures/key_material.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -23,7 +25,7 @@ Matcher failure(FailureCode code) =>
     isA<OperationFailure>().having((e) => e.code, 'code', code);
 Future<void> turn() => Future<void>.delayed(Duration.zero);
 Uint8List signature() {
-  final key = parseOpenSshKey(fixture());
+  final key = parsePrivateKey(fixture());
   try {
     return key.key.sign(challenge).encode();
   } finally {
@@ -83,8 +85,15 @@ OwnedPrivateIdentity identity(
   final file = fixture(name);
   return OwnedPrivateIdentity(
     file: file,
+    publicHint: readPublicKeyHint(
+      file,
+      publicKeyBytes: fixturePublicBytes(file),
+    ),
     credentialRevision: 7,
-    expected: readPublicKeyHint(file).inspection,
+    expected: readPublicKeyHint(
+      file,
+      publicKeyBytes: fixturePublicBytes(file),
+    ).inspection,
     signer: signer,
     checkAdmission: guard ?? (_) {},
     serverAlgorithms: algorithms ?? () => null,
@@ -124,13 +133,17 @@ void main() {
                 saved = fixture('$name${encrypted ? '-encrypted' : ''}');
             final signer = PrivateSigner();
             try {
-              final hint = readPublicKeyHint(file),
+              final hint = readPublicKeyHint(
+                    file,
+                    publicKeyBytes: fixturePublicBytes(file),
+                  ),
                   publicKey = hint.toPublicKey();
               final signed = await signer.sign(
                 file,
                 scheme,
                 challenge,
                 passphrase: encrypted ? 'serverdeck-unit-passphrase' : null,
+                expectedPublicKey: expectedPublic(file),
               );
               expect(signed.encode(), isNotEmpty);
               expect(switch (publicKey) {
@@ -194,12 +207,21 @@ void main() {
   test('public-only hint survives decoded file clearing and does not validate private math', () {
     final blob = Uint8List(8); // Invalid private body, valid aligned envelope.
     final file = envelope(privateBlob: blob);
-    final hint = readPublicKeyHint(file);
+    final hint = readPublicKeyHint(
+      file,
+      publicKeyBytes: fixturePublicBytes(file),
+    );
     file.fillRange(0, file.length, 0);
-    expect(hint.toPublicKey().encode(), readPublicKeyHint(fixture()).encoded);
+    expect(
+      hint.toPublicKey().encode(),
+      readPublicKeyHint(
+        fixture(),
+        publicKeyBytes: fixturePublicBytes(fixture()),
+      ).encoded,
+    );
     expect(() => hint.encoded[0] = 0, throwsUnsupportedError);
     expect(
-      () => parseOpenSshKey(envelope(privateBlob: blob)),
+      () => parsePrivateKey(envelope(privateBlob: blob)),
       throwsA(failure(FailureCode.unsupportedKey)),
     );
     final owned = OpenSshEnvelope.read(fixture());
@@ -211,31 +233,52 @@ void main() {
   test('hint rejects key counts, malformed UTF8, unsupported formats and noncanonical public blobs', () {
     for (final count in [0, 2, 0xffffffff]) {
       expect(
-        () => readPublicKeyHint(envelope(count: count)),
+        () => readPublicKeyHint(
+          envelope(count: count),
+          publicKeyBytes: fixturePublicBytes(envelope(count: count)),
+        ),
         throwsA(failure(FailureCode.unsupportedKey)),
       );
     }
-    final pub = readPublicKeyHint(fixture()).encoded;
+    final pub = readPublicKeyHint(
+      fixture(),
+      publicKeyBytes: fixturePublicBytes(fixture()),
+    ).encoded;
     expect(
       () => readPublicKeyHint(
         envelope(publicBlob: Uint8List.fromList([...pub, 0])),
+        publicKeyBytes: fixturePublicBytes(
+          envelope(publicBlob: Uint8List.fromList([...pub, 0])),
+        ),
       ),
       throwsA(failure(FailureCode.unsupportedKey)),
     );
-    for (final name in ['ecdsa', 'rsa-pkcs1', 'public-key']) {
+    for (final name in ['ecdsa', 'public-key']) {
       expect(
-        () => readPublicKeyHint(fixture(name)),
+        () => readPublicKeyHint(
+          fixture(name),
+          publicKeyBytes: fixturePublicBytes(fixture(name)),
+        ),
         throwsA(failure(FailureCode.unsupportedKey)),
       );
     }
     expect(
-      () => readPublicKeyHint(Uint8List.fromList([255])),
+      () => readPublicKeyHint(
+        Uint8List.fromList([255]),
+        publicKeyBytes: fixturePublicBytes(Uint8List.fromList([255])),
+      ),
       throwsA(failure(FailureCode.unsupportedKey)),
     );
   });
   test('signature schemes never select SHA1 or another key and respect absent discovery', () {
-    final rsa = readPublicKeyHint(fixture('rsa2048')),
-        ed = readPublicKeyHint(fixture());
+    final rsa = readPublicKeyHint(
+          fixture('rsa2048'),
+          publicKeyBytes: fixturePublicBytes(fixture('rsa2048')),
+        ),
+        ed = readPublicKeyHint(
+          fixture(),
+          publicKeyBytes: fixturePublicBytes(fixture()),
+        );
     expect(
       selectPrivateSignatureScheme(rsa, null),
       PrivateSignatureScheme.rsa256,
@@ -279,6 +322,7 @@ void main() {
               PrivateSignatureScheme.ed25519,
               challenge,
               passphrase: phrase,
+              expectedPublicKey: expectedPublic(fixture('ed25519-encrypted')),
             ),
             throwsA(
               failure(
@@ -304,7 +348,12 @@ void main() {
     );
     for (final file in [Uint8List(0), Uint8List(1024 * 1024 + 1)]) {
       await expectLater(
-        signer.sign(file, PrivateSignatureScheme.ed25519, challenge),
+        signer.sign(
+          file,
+          PrivateSignatureScheme.ed25519,
+          challenge,
+          expectedPublicKey: expectedPublic(file),
+        ),
         throwsA(failure(FailureCode.unsupportedKey)),
       );
     }
@@ -313,6 +362,7 @@ void main() {
         fixture(),
         PrivateSignatureScheme.ed25519,
         Uint8List(maxSignChallengeBytes + 1),
+        expectedPublicKey: expectedPublic(fixture()),
       ),
       throwsA(failure(FailureCode.unsupportedKey)),
     );
@@ -322,6 +372,7 @@ void main() {
         PrivateSignatureScheme.ed25519,
         challenge,
         passphrase: 'é' * 32769,
+        expectedPublicKey: expectedPublic(fixture()),
       ),
       throwsA(failure(FailureCode.invalidArgument)),
     );
@@ -331,6 +382,7 @@ void main() {
         PrivateSignatureScheme.ed25519,
         challenge,
         passphrase: String.fromCharCode(0xd800),
+        expectedPublicKey: expectedPublic(fixture()),
       ),
       throwsA(failure(FailureCode.invalidArgument)),
     );
@@ -340,19 +392,30 @@ void main() {
         PrivateSignatureScheme.ed25519,
         challenge,
         timeout: Duration.zero,
+        expectedPublicKey: expectedPublic(fixture()),
       ),
       throwsA(failure(FailureCode.timeout)),
     );
     expect(spawns, 0);
     await signer.dispose();
     await expectLater(
-      signer.sign(fixture(), PrivateSignatureScheme.ed25519, challenge),
+      signer.sign(
+        fixture(),
+        PrivateSignatureScheme.ed25519,
+        challenge,
+        expectedPublicKey: expectedPublic(fixture()),
+      ),
       throwsA(failure(FailureCode.shuttingDown)),
     );
     final real = PrivateSigner();
     try {
       await expectLater(
-        real.sign(fixture(), PrivateSignatureScheme.rsa512, challenge),
+        real.sign(
+          fixture(),
+          PrivateSignatureScheme.rsa512,
+          challenge,
+          expectedPublicKey: expectedPublic(fixture()),
+        ),
         throwsA(failure(FailureCode.unsupportedKey)),
       );
     } finally {
@@ -380,6 +443,7 @@ void main() {
             challenge,
             passphrase: 'synthetic',
             cancellation: c,
+            expectedPublicKey: expectedPublic(fixture()),
           ),
           throwsA(isA<WorkCancelled>()),
         ),
@@ -391,7 +455,12 @@ void main() {
     await Future.wait(pending);
     expect(signer.activeWorkers, 4);
     await expectLater(
-      signer.sign(fixture(), PrivateSignatureScheme.ed25519, challenge),
+      signer.sign(
+        fixture(),
+        PrivateSignatureScheme.ed25519,
+        challenge,
+        expectedPublicKey: expectedPublic(fixture()),
+      ),
       throwsA(failure(FailureCode.resourceExhausted)),
     );
     final workers = List.generate(4, (_) => Worker());
@@ -422,6 +491,7 @@ void main() {
       fixture(),
       PrivateSignatureScheme.ed25519,
       challenge,
+      expectedPublicKey: expectedPublic(fixture()),
     );
     await turn();
     worker.value.complete(signature());
@@ -452,6 +522,7 @@ void main() {
         PrivateSignatureScheme.ed25519,
         challenge,
         timeout: const Duration(minutes: 5),
+        expectedPublicKey: expectedPublic(fixture()),
       ),
       throwsA(failure(FailureCode.timeout)),
     );
@@ -475,7 +546,12 @@ void main() {
       final worker = Worker();
       final signer = PrivateSigner(spawn: (_) async => worker);
       final pending = expectLater(
-        signer.sign(fixture(), PrivateSignatureScheme.ed25519, challenge),
+        signer.sign(
+          fixture(),
+          PrivateSignatureScheme.ed25519,
+          challenge,
+          expectedPublicKey: expectedPublic(fixture()),
+        ),
         throwsA(failure(FailureCode.unsupportedKey)),
       );
       await turn();
@@ -519,13 +595,32 @@ void main() {
   test('identity binds metadata to original envelope and rejects mismatched credential metadata', () async {
     final signer = PrivateSigner();
     for (final expected in [
-      const KeyInspection(keyType: 'ssh-rsa', bits: 256, encrypted: false),
-      const KeyInspection(keyType: 'ssh-ed25519', bits: 2048, encrypted: false),
-      const KeyInspection(keyType: 'ssh-ed25519', bits: 256, encrypted: true),
+      const KeyInspection(
+        keyType: 'ssh-rsa',
+        bits: 256,
+        encrypted: false,
+        publicKeyBytes: <int>[],
+      ),
+      const KeyInspection(
+        keyType: 'ssh-ed25519',
+        bits: 2048,
+        encrypted: false,
+        publicKeyBytes: <int>[],
+      ),
+      const KeyInspection(
+        keyType: 'ssh-ed25519',
+        bits: 256,
+        encrypted: true,
+        publicKeyBytes: <int>[],
+      ),
     ]) {
       expect(
         () => OwnedPrivateIdentity(
           file: fixture(),
+          publicHint: readPublicKeyHint(
+            fixture(),
+            publicKeyBytes: fixturePublicBytes(fixture()),
+          ),
           credentialRevision: 7,
           expected: expected,
           signer: signer,
@@ -650,4 +745,19 @@ void main() {
     key.dispose();
     await signer.dispose();
   });
+}
+
+// Invalid-file boundary cases still supply an independent valid expected identity.
+Uint8List expectedPublic(Uint8List file) {
+  try {
+    return readPublicKeyHint(
+      file,
+      publicKeyBytes: fixturePublicBytes(file),
+    ).encoded;
+  } catch (_) {
+    return readPublicKeyHint(
+      fixture(),
+      publicKeyBytes: fixturePublicBytes(fixture()),
+    ).encoded;
+  }
 }

@@ -16,7 +16,7 @@ payload и загружает Flutter host DLL в том же PID. Основн�
 - **Primary Dependencies**: isar_community / flutter_libs / generator 3.4.1;
   build_runner 2.16.2 для генерации. Native Win32/DPAPI/BCrypt без tray/window plugins.
   Точные ограничения и проверка resolution: [research](research.md).
-- **Storage**: Isar, logical format 1; DPAPI CurrentUser bytes внутри транзакций.
+- **Storage**: Isar, текущий logical format3; DPAPI CurrentUser bytes внутри транзакций.
   `%LOCALAPPDATA%/ServerDeck/` через Known Folder API, не переменные окружения клиента.
 - **Testing**: flutter_test функциональные owner/widget tests; native CTest для
   bootstrap/platform с fake messenger/hooks; StoreBackend fake вместо реальной Isar.
@@ -61,7 +61,7 @@ payload и загружает Flutter host DLL в том же PID. Основн�
 | `lib/main.dart`, `lib/app.dart` | только основной GUI composition root, lifecycle wiring |
 | `lib/runtime/runtime_coordinator.dart`, `capability.dart` | state machine, generation gate, drain |
 | `lib/runtime/native_platform.dart` | typed adapter единственного method channel |
-| `lib/storage/records.dart`, `workspace_store.dart`, `migrations.dart` | Isar models/owner/txn/format lifecycle |
+| `lib/storage/records.dart`, `workspace_store.dart`, `store_manifest.dart` | Isar models/owner/txn/format lifecycle |
 | `test/runtime/`, `test/storage/` | функциональные проверки synthetic inputs |
 | `native/tests/`, `tools/build-release.ps1`, `tools/test-release.ps1` | native unit contracts, сборка EXE и статический аудит imports |
 
@@ -107,3 +107,23 @@ Native CTest label unit включает6 adapter/codec tests. Историче�
 helpers отключены по умолчанию и не входят в unit runner. Packaging проверяется
 сборкой и статическим manifest/import audit. VM tooling/evidence — история,
 не недостающая приёмка; актуальные команды — в quickstart.
+
+
+Current-only2026-11-04: убратьStoreBackend.copyStore/_migration*/format1branches; lib/storage/store_manifest.dart принимаеттолькоformat3 ивладеетcurrentpublication/recovery. T044 отменяетпрежниеbackward-compatdecisions поConstitutionVI; userdataнеудаляются.
+
+
+## Server workspace runtime composition
+lib/runtime/runtime_view.dart использует текущий C17 slot API001 и server workspace003.
+MCP settings открывает owner-hosted C12; пока route открыта collection004 paused,
+после закрытия сохранённый контекст продолжается. Runtime states/status/retry/tray
+recovery остаются owner-provided, без legacy navigation adapter. T045/003T072.
+
+## Полный шрифт иконок в выпуске — 2026-11-04
+
+Release build использует `--no-tree-shake-icons`: поставляется полный MaterialIcons
+из закреплённого Flutter SDK. Перед упаковкой tools/build-release.ps1 запускает
+tools/check-release-font.py, сравнивающий bundled font с SDK font побайтно; missing,
+empty или несовпадающий файл останавливает сборку до создания нового payload.
+Это статический asset audit, без запуска продукта. Стандартная unit-команда
+включает isolated Python units с временными synthetic font bytes для этого audit.
+Цена решения — полный font (~1.6MB вместо subset); внешних runtime зависимостей нет.

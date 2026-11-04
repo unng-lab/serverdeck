@@ -1,7 +1,7 @@
-# Data model — format2
+# Data model — format3
 
 Расширяет [storage002](../002-desktop-runtime/contracts/storage.md). Все domain записи
-в одной Isar. AppSettings.logicalFormat=2; opens только полный schema set:
+в одной Isar. AppSettings.logicalFormat=3; opens только полный schema set:
 AppSettings, Profile, Credential, EndpointTrust, McpGrant, MutationReceipt, SecurityState.
 UUID lowercase v4; revisions int64≥1; times UTC ms; byte arrays задают явные bounds.
 
@@ -110,31 +110,28 @@ STORAGE_UNAVAILABLE, not reset. A repeated rollback creates a further epoch, not
 multiple increments for requests at the same already-recorded floor.
 
 
-## Format2 initialization and copy publication
+## Current format3 initialization
 
-Все opens используют общий полный workspaceSchemas. Format1 original directory
-не открывается и не меняется: под owner lock копируется в новый staging UUID,
-там читаются/проверяются settings1, затем settings.logicalFormat=2 и SecurityState
-фиксируются одной txn. После close выполняется отдельный native staging flush, затем reopen/read
-invariants и close;
-лишь затем native flush/rename/atomic CURRENT. Source остаётся на диске.
-Живой owner сохраняет свой source/target UUID и выполненные стадии для retry,
-включая потерю ack после rename/CURRENT. Неизвестный restart orphan не принимается
-как новый workspace и не становится fallback. Если старый CURRENT ещё format1,
-новая попытка мигрирует только выбранный им исходник, не выбирает чужой orphan.
+Текущий manifest/appsettings используют толькоlogicalFormat3. Format1 и его copy/publication migration не поддерживаются. Fresh store создаёт receipt HMAC key; существующий current store читается без app-version adapters/backfill. Неизвестный формат отклоняется до DB open без подмены пустым состоянием.
 
-Новый format2 store и migration создают случайный32byte receipt HMAC key через
-Random.secure и native DPAPI CurrentUser с purpose receipt-hmac.v1 ДО txn.
-В txn сохраняется только protectedReceiptHmacKey; временный plaintext buffer
-очищается после protect. Ключ не генерируется заново при открытии существующего
-format2: отсутствие/непригодная запись блокирует store, не заменяет историю HMAC.
-Неподтверждённый close временного DB handle сохраняется и блокирует новое open/
-copy/publication до успешного close retry. Shutdown дожидается startup и не
-открывает write admission после уже принятого stop. Юнит fake не доказывает
-native DB durability или реальную миграцию движка.
 
-Native file.flushAtomic расширен allowlisted path data/flush/<canonicalUUIDv4> с
-пустыми bytes: только существующий staging, без destination, rename или CURRENT.
-Каждый файл flush; ошибки блокируют verification/publication. path data/publish/UUID
-затем повторно flush и публикует проверенный комплект. Initial format2 также проходит
-close→flush→reopen validation→close перед первой публикацией.
+## Текущие private credentials и модальная сессия
+Credential.publicKeyBytes — nullable byteList толькодляpassword; privateKey требует canonical SSH public bytes≤262144, type/bits соответствуют им. Worker import даёт metadata одновременно с proof, DPAPI защищает original file bytes. Нет чтения старых записей через envelope fallback. Constructor/API текущие, без aliases.
+ProfileSaveOutcome(profileId,requiresConnection) содержит только публичную identity save. DetailsSession хранит profileId/controller/navigationgeneration, onepromptledger≤64 и route refs только пока смонтирован. VerificationLease хранит controller/profile/admittedview/closed/cancel latch безroute refs, отменяет late pending admission exactly once через backendfences. Новая navigation/controller инвалидирует старый post-save intent.
+
+
+## Server workspace (runtime only)
+ProfileController.connections: immutable Map<profileId,ConnectionView>, successful
+current public reads only. Missing entry means unknown. Workspace selection uses
+existing selected/details with selection fence, current section enum PO/logs/jobs/
+settings and navigation generation. No navigation persistence or schema change.
+Global MCP route owns temporary activation flag; no server credential data in it.
+Workspace lease replaces details-modal lease ownership, retaining exact-attempt cleanup.
+
+
+OwnedSettingsRoute is runtime-only: exact DialogRoute/NavigatorState, retired latch,
+open state. Retired route cannot be reused; RuntimeView replaces the session on owner
+retirement. Prompt route handles are captured while mounted, not derived during
+workspace disposal. No new persisted record or compatibility branch.
+
+Current format3 adds MonitoringHistoryRecord(profileId unique,connectionRevision,payload) defined by [004](../004-server-monitoring/data-model.md#history). Other formats, including2, rejected before DB open without modification.

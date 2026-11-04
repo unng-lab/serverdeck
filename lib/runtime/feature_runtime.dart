@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import '../connections/connection_owner.dart';
+import '../journals/journal_owner.dart';
 import '../connections/host_signature.dart';
 import '../connections/private_signer.dart';
 import '../domain/actor.dart';
@@ -23,6 +24,7 @@ import '../trust/trust_owner.dart';
 import '../monitoring/monitoring_owner.dart';
 import 'capability.dart';
 import 'native_platform.dart';
+import 'local_diagnostics.dart';
 
 final class _Protector implements SecretProtector {
   const _Protector(this.platform);
@@ -87,7 +89,12 @@ final class FeatureRuntime implements RuntimeCapability {
       grants: grants,
       connections: connections,
     );
-    gate = DomainCommandGate(actors: actors, state: state);
+    final diagnostics = LocalDiagnostics(platform.context.dataRoot);
+    gate = DomainCommandGate(
+      actors: actors,
+      state: state,
+      onFailure: (error, stack) => diagnostics.record('command', error, stack),
+    );
     final receipts = ReceiptBook(signer, utcNow);
     trust = TrustOwner(
       repository: repository,
@@ -98,6 +105,7 @@ final class FeatureRuntime implements RuntimeCapability {
       utcNow: utcNow,
     );
     profiles = ProfileOwner(
+      onFailure: (error, stack) => diagnostics.record('profile', error, stack),
       gate: gate,
       repository: repository,
       receipts: receipts,
@@ -108,13 +116,22 @@ final class FeatureRuntime implements RuntimeCapability {
     );
     operations = OwnedAppOperations(profiles, connections, trust);
     monitoring = MonitoringOwner(
+      historyStore: repository,
       operations: operations,
       actor: actors.ui,
       connections: connections,
       startupAutoAllowed: monitoringAutoAllowed,
       utcNow: utcNow,
     );
+    journals = JournalsOwner(
+      repository: repository,
+      actor: actors.ui,
+      connections: connections,
+      newId: newId,
+      utcNow: utcNow,
+    );
     _capabilities = [
+      journals,
       monitoring,
       pipe,
       grants,
@@ -144,6 +161,7 @@ final class FeatureRuntime implements RuntimeCapability {
   late final McpPipeAdapter pipe;
   late final OwnedAppOperations operations;
   late final MonitoringOwner monitoring;
+  late final JournalsOwner journals;
   late McpRouter router;
   late final List<RuntimeCapability> _capabilities;
   bool _stopped = false, _initialized = false;
@@ -162,6 +180,7 @@ final class FeatureRuntime implements RuntimeCapability {
 
   Future<void> initialize() async {
     if (_initialized || _stopped) return;
+    await journals.start();
     try {
       router = McpRouter(
         operations: operations,

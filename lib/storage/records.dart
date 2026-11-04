@@ -5,7 +5,7 @@ part 'records.g.dart';
 @collection
 class AppSettings {
   Id id = 1;
-  int logicalFormat = 2;
+  int logicalFormat = 3;
   int settingsRevision = 1;
   int dataRevision = 1;
   int profilesListRevision = 1;
@@ -46,6 +46,7 @@ class Credential {
   List<byte> protectedBytes = [];
   String? publicKeyType;
   int? publicKeyBits;
+  List<byte>? publicKeyBytes;
   int secretRevision = 1;
 }
 
@@ -116,7 +117,31 @@ class SecurityState {
   int? lastClockRollbackAt;
 }
 
-/// Every open (including a migration copy) uses the complete current set.
+@collection
+class MonitoringHistoryRecord {
+  Id id = Isar.autoIncrement;
+  @Index(unique: true)
+  String profileId = '';
+  int connectionRevision = 1;
+  String payload = '';
+}
+
+/// Every current store open uses the complete current set.
+@collection
+class JournalSource {
+  Id id = Isar.autoIncrement;
+  @Index(unique: true)
+  String sourceId = '';
+  @Index()
+  String profileId = '';
+  int connectionRevision = 1;
+  String kind = 'journal';
+  String target = '';
+  String name = '';
+  bool enabled = true;
+  String payload = '{"version":1,"checkpoint":{},"entries":[],"partial":false}';
+}
+
 const workspaceSchemas = [
   AppSettingsSchema,
   ProfileSchema,
@@ -125,4 +150,6 @@ const workspaceSchemas = [
   McpGrantSchema,
   MutationReceiptSchema,
   SecurityStateSchema,
+  MonitoringHistoryRecordSchema,
+  JournalSourceSchema,
 ];

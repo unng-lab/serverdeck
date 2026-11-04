@@ -7,7 +7,7 @@ import 'dart:typed_data';
 import 'package:isar_community/isar.dart';
 
 import '../runtime/capability.dart';
-import 'migrations.dart';
+import 'store_manifest.dart';
 import 'records.dart';
 
 typedef FlushMetadata = Future<void> Function(String path, Uint8List bytes);
@@ -17,7 +17,6 @@ typedef ProtectReceiptKey = Future<Uint8List> Function(Uint8List bytes);
 abstract interface class StoreBackend {
   Future<void> initialize(String libraryPath);
   Future<Isar> open(String path);
-  Future<void> copyStore(String source, String target);
 }
 
 class IsarStoreBackend implements StoreBackend {
@@ -37,10 +36,6 @@ class IsarStoreBackend implements StoreBackend {
     relaxedDurability: false,
     inspector: false,
   );
-
-  @override
-  Future<void> copyStore(String source, String target) =>
-      copyStoreDirectory(source, target);
 }
 
 /// The composition root owns this instance. Widgets never receive the Isar handle.
@@ -63,9 +58,6 @@ class WorkspaceStore implements RuntimeStore {
   AppSettings? _settings;
   StoreManifest? _initialPublication;
   bool _initialInitialized = false, _initialPrepared = false;
-  StoreManifest? _migrationSource, _migrationTarget;
-  bool _migrationCopied = false, _migrationConverted = false;
-  bool _migrationPrepared = false, _migrationFlushed = false;
   Isar? _pendingClose;
   bool _closing = false, _admissionStopped = false;
   bool _inSyncTransaction = false;
@@ -101,20 +93,6 @@ class WorkspaceStore implements RuntimeStore {
       throw const StoreFailure('NATIVE_LIBRARY_UNAVAILABLE');
     }
     await backend.initialize(libraryPath);
-    if (_migrationSource != null) {
-      final sourceMatches =
-          selected?.storeId == _migrationSource!.storeId &&
-          selected?.formatVersion == 1;
-      final targetMatches =
-          selected?.storeId == _migrationTarget!.storeId &&
-          selected?.formatVersion == 2;
-      if (!sourceMatches && !targetMatches) {
-        throw const StoreFailure('INCOMPATIBLE_STORE');
-      }
-    }
-    if (selected?.formatVersion == 1) {
-      selected = await _migrate(data, selected!);
-    }
     Isar? opened;
     try {
       final manifest =
@@ -127,7 +105,7 @@ class WorkspaceStore implements RuntimeStore {
           await staging.create(recursive: true);
           opened = await _openAt(staging.path);
           final settings = await opened.appSettings.get(1) ?? AppSettings();
-          _validateSettings(settings, 2);
+          _validateSettings(settings);
           final security = await _newSecurityIfMissing(opened);
           await opened.writeTxn(() async {
             await opened!.appSettings.put(settings);
@@ -140,7 +118,7 @@ class WorkspaceStore implements RuntimeStore {
         if (!_initialPrepared) {
           await flushAtomic('data/flush/${manifest.storeId}', Uint8List(0));
           opened = await _openAt('${data.path}/staging-${manifest.storeId}');
-          _validateSettings(await opened.appSettings.get(1), 2);
+          _validateSettings(await opened.appSettings.get(1));
           _validateSecurity(await opened.securityStates.get(1));
           await _closeOpening(opened);
           opened = null;
@@ -154,7 +132,7 @@ class WorkspaceStore implements RuntimeStore {
         );
       }
       opened = await _openAt(path);
-      final settings = _validateSettings(await opened.appSettings.get(1), 2);
+      final settings = _validateSettings(await opened.appSettings.get(1));
       _validateSecurity(await opened.securityStates.get(1));
       settings.lastSuccessfulOpenAt = DateTime.now()
           .toUtc()
@@ -165,9 +143,6 @@ class WorkspaceStore implements RuntimeStore {
       _admission = !_admissionStopped && !_closing;
       _initialPublication = null;
       _initialInitialized = _initialPrepared = false;
-      _migrationSource = _migrationTarget = null;
-      _migrationCopied = _migrationConverted = _migrationPrepared =
-          _migrationFlushed = false;
     } catch (_) {
       if (opened != null && !identical(opened, _pendingClose)) {
         await _closeOpening(opened);
@@ -176,14 +151,13 @@ class WorkspaceStore implements RuntimeStore {
     }
   }
 
-  AppSettings _validateSettings(AppSettings? value, int format) {
+  AppSettings _validateSettings(AppSettings? value) {
     if (value == null ||
-        value.logicalFormat != format ||
+        value.logicalFormat != 3 ||
         value.settingsRevision < 1 ||
         value.dataRevision < 1 ||
         value.profilesListRevision < 1 ||
-        !{'dark', 'light'}.contains(value.theme) ||
-        (format == 1 && value.mcpEnabled)) {
+        !{'dark', 'light'}.contains(value.theme)) {
       throw const StoreFailure('INCOMPATIBLE_STORE');
     }
     return value;
@@ -224,52 +198,6 @@ class WorkspaceStore implements RuntimeStore {
       ..lastAuthorizationUtc = now;
     _validateSecurity(value);
     return value;
-  }
-
-  Future<StoreManifest> _migrate(Directory data, StoreManifest source) async {
-    _migrationSource ??= source;
-    final target = _migrationTarget ??= StoreManifest(newStoreId());
-    final staging = '${data.path}/staging-${target.storeId}';
-    Isar? db;
-    try {
-      if (!_migrationCopied) {
-        await backend.copyStore(
-          '${data.path}/${source.relativeDirectory}',
-          staging,
-        );
-        _migrationCopied = true;
-      }
-      if (!_migrationConverted) {
-        db = await _openAt(staging);
-        final settings = await db.appSettings.get(1);
-        _validateSettings(settings, 1);
-        final security = await _newSecurityIfMissing(db);
-        await db.writeTxn(() async {
-          await db!.appSettings.put(settings!..logicalFormat = 2);
-          if (security != null) await db!.securityStates.put(security);
-        });
-        _migrationConverted = true;
-        await _closeOpening(db);
-        db = null;
-      }
-      if (!_migrationFlushed) {
-        await flushAtomic('data/flush/${target.storeId}', Uint8List(0));
-        _migrationFlushed = true;
-      }
-      if (!_migrationPrepared) {
-        db = await _openAt(staging);
-        _validateSettings(await db.appSettings.get(1), 2);
-        _validateSecurity(await db.securityStates.get(1));
-        await _closeOpening(db);
-        db = null;
-        _migrationPrepared = true;
-      }
-      await flushAtomic('data/publish/${target.storeId}', target.encode());
-      return target;
-    } catch (_) {
-      if (db != null && !identical(db, _pendingClose)) await _closeOpening(db);
-      rethrow;
-    }
   }
 
   Future<void> _closeOpening(Isar db) async {

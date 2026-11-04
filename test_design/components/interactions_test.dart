@@ -367,12 +367,14 @@ void main() {
       await tester.tap(find.text('Журнал'));
       await tester.pump();
       expect(
-        tester
-            .widgetList<DeckButton>(find.byType(DeckButton))
-            .where((b) => b.kind == DeckButtonKind.primary)
-            .single
-            .child,
-        isA<Text>().having((t) => t.data, 'selected label', 'Журнал'),
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) =>
+                widget is DeckButton && widget.kind == DeckButtonKind.primary,
+          ),
+          matching: find.text('Журнал'),
+        ),
+        findsOneWidget,
       );
       await tester.pumpWidget(
         componentHarness(

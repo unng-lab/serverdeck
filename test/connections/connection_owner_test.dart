@@ -18,6 +18,8 @@ import 'package:serverdeck/profiles/credential_input.dart';
 import 'package:serverdeck/storage/records.dart';
 import 'package:serverdeck/runtime/owned_work.dart';
 import 'package:serverdeck/monitoring/linux_metrics.dart';
+import 'package:serverdeck/journals/journal_port.dart';
+import 'package:serverdeck/journals/journal_protocol.dart';
 
 import '../fixtures/domain_repository.dart';
 
@@ -99,7 +101,21 @@ final class Raw extends Fake implements SSHSocket {
   }
 }
 
-final class Session implements SshConnection, MonitoringSshConnection {
+final class Session
+    implements SshConnection, MonitoringSshConnection, JournalSshConnection {
+  int journalCalls = 0;
+  Completer<JournalReply>? journalReply;
+  @override
+  Future<JournalReply> collectJournal(
+    JournalRequest request,
+    WorkCancellation cancellation, {
+    Duration timeout = const Duration(seconds: 5),
+  }) {
+    journalCalls++;
+    return journalReply?.future ??
+        Future.value(JournalReply(units: ['a.service']));
+  }
+
   Session(this.options) {
     auth.future.ignore();
   }

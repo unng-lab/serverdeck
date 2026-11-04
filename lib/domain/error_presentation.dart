@@ -68,7 +68,7 @@ final class OperationPresentation {
       ),
       FailureCode.unsupportedKey => const OperationPresentation(
         'Формат или тип ключа не поддерживается.',
-        'Выберите приватный ключ OpenSSH Ed25519 либо RSA не менее 2048 бит, размером до 1 МиБ.',
+        'Выберите приватный ключ OpenSSH Ed25519/RSA либо RSA PEM не менее 2048 бит, размером до 1 МиБ.',
       ),
       FailureCode.unsupportedServer => const OperationPresentation(
         'Сервер не поддерживает разрешённые SSH-алгоритмы или выбранный способ входа.',

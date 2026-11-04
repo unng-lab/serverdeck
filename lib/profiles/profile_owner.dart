@@ -1,3 +1,5 @@
+import '../runtime/owned_work.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,6 @@ import '../runtime/capability.dart';
 import '../storage/domain_repository.dart';
 import '../storage/records.dart';
 import 'credential_input.dart';
-import 'key_parse_worker.dart';
 
 /// Private close-phase result. A replay performs no new invalidation/close.
 final class ProfileCloseOutcome {
@@ -53,6 +54,7 @@ final class ProfileOwner implements ProfileOperations, RuntimeCapability {
     required this.connections,
     required this.newId,
     required this.utcNow,
+    this.onFailure,
   });
   final DomainCommandGate gate;
   final DomainRepository repository;
@@ -61,7 +63,8 @@ final class ProfileOwner implements ProfileOperations, RuntimeCapability {
   final ProfileConnectionPort connections;
   final String Function() newId;
   final int Function() utcNow;
-  final Set<CredentialCancellation> _tokens = {};
+  final void Function(Object, StackTrace)? onFailure;
+  final Set<WorkCancellation> _tokens = {};
   final Set<Future<void>> _pending = {};
   bool _stopped = false;
   @override
@@ -466,20 +469,22 @@ final class ProfileOwner implements ProfileOperations, RuntimeCapability {
   Future<OperationResult<MutationValue>> _mutate(
     Actor actor,
     AuthenticationInput? input,
-    Future<OperationResult<MutationValue>> Function(CredentialCancellation)
-    body,
+    Future<OperationResult<MutationValue>> Function(WorkCancellation) body,
   ) async {
-    final cancellation = CredentialCancellation();
+    final cancellation = WorkCancellation();
     final done = Completer<void>();
     _tokens.add(cancellation);
     _pending.add(done.future);
     try {
       _ensureAdmission();
       return await body(cancellation);
-    } catch (error) {
+    } catch (error, stack) {
+      try {
+        onFailure?.call(error, stack);
+      } catch (_) {}
       final failure = error is OperationFailure
           ? error
-          : error is CredentialCancelled
+          : error is WorkCancelled
           ? OperationFailure(
               _stopped ? FailureCode.shuttingDown : FailureCode.conflict,
             )
@@ -605,6 +610,7 @@ final class ProfileOwner implements ProfileOperations, RuntimeCapability {
     ..secretRevision = revision
     ..protectedBytes = prepared.ciphertext.toList()
     ..publicKeyType = prepared.inspection?.keyType
+    ..publicKeyBytes = prepared.inspection?.publicKeyBytes.toList()
     ..publicKeyBits = prepared.inspection?.bits;
   static void _applyFields(Profile p, ValidatedProfileFields f) {
     p.displayName = f.displayName;

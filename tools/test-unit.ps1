@@ -8,3 +8,5 @@ flutter test
 if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 python -m unittest discover -s test/mcp -p '*_test.py'
 if ($LASTEXITCODE -ne 0) { throw 'Offline MCP schema unit tests failed; install tools/unit-requirements.txt' }
+python -m unittest discover -s tools/tests -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { throw 'Build tooling unit tests failed' }

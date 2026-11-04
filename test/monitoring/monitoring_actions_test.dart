@@ -10,7 +10,7 @@ import '../fixtures/monitoring_harness.dart';
 
 void main() {
   testWidgets(
-    'server row shows live metrics, threshold cause and last update',
+    'server row shows live metrics and threshold cause without timestamp log',
     (tester) async {
       final w = MonitoringWidgetHarness();
       addTearDown(w.dispose);
@@ -34,17 +34,25 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('RAM'), findsOneWidget);
-      expect(find.text('Диск /'), findsOneWidget);
+      await w.openDetails(tester);
+      expect(find.byTooltip(RegExp('Оперативная память')), findsOneWidget);
+      expect(find.byTooltip(RegExp('Диск /')), findsOneWidget);
       expect(find.text('95,0 %'), findsOneWidget);
-      expect(find.text('Порог достигнут: RAM ≥ 90%'), findsOneWidget);
-      expect(find.text('Порог достигнут'), findsOneWidget);
-      expect(find.text('RAM: обновлено'), findsOneWidget);
+      expect(
+        find.byTooltip(RegExp('Порог достигнут: RAM ≥ 90%')),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Порог достигнут'), findsOneWidget);
+      expect(find.textContaining('обновлено'), findsNothing);
+      expect(find.textContaining('с назад'), findsNothing);
       await w.tick(tester, 5);
       await tester.pump();
       expect(find.text('20,0 %'), findsOneWidget);
-      expect(find.text('Порог достигнут'), findsNothing);
-      expect(find.text('Порог достигнут: RAM ≥ 90%'), findsNothing);
+      expect(find.byTooltip('Порог достигнут'), findsNothing);
+      expect(
+        find.byTooltip(RegExp('Порог достигнут: RAM ≥ 90%')),
+        findsNothing,
+      );
       expect(find.text('1,0 %'), findsOneWidget);
     },
   );
@@ -84,6 +92,8 @@ void main() {
       await tester.tap(find.text('Host1'));
       await tester.pumpAndSettle();
       expect(w.controller.selected, mid(1));
+      await tester.tap(find.text('Настройки'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Подключиться'));
       await tester.tap(find.text('Подключиться'));
       await tester.pumpAndSettle();
@@ -103,7 +113,7 @@ void main() {
     await w.mount(tester);
     expect(find.text('Серверов пока нет'), findsOneWidget);
     expect(w.h.port.attempts, isEmpty);
-    await tester.tap(find.text('Добавить сервер'));
+    await tester.tap(find.byTooltip('Добавить сервер'));
     await tester.pumpAndSettle();
     expect(find.text('Профиль SSH'), findsOneWidget);
     expect(find.text('Сохранить'), findsOneWidget);

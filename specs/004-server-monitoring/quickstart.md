@@ -19,3 +19,15 @@ Functional widgets assert data/text/callbacks, no layout/colors/goldens.
 Native CMake/CTest unit targets only, not historical lifecycle/process-kill tools.
 All applicable checks and clean AGENTS independent review required. Units/static
 checks do not prove clean-OS integration. [Contract](contracts/monitoring.md).
+
+## US4 hour history units
+
+Fake clock/source/storage:720 cap and exact1h boundary, UTC rollback/future rows,
+partial/all-source failure, reconnect/resume/restart segments,rename/revision/delete,
+late load/commit fencing,failed/corrupt load inhibits overwrite,write failure/retry,
+owner shutdown drain. New owner over same fake repository restores past samples but
+no live readings/SSH. Functional widget selects Monitoring tab/server and checks
+C22 point values/empty/retry callbacks, never positions/colors/overflow.
+Run shared001 component units after changing C22; no captures unless explicit opt-in.
+Current format3 guard units prove format2 rejected before DB open, data untouched.
+

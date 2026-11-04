@@ -1,5 +1,6 @@
 # SSH transport policy v1
 
+
 ## Dependency and patch
 
 Vendored upstream dartssh2 4.1.0 archive SHA256
@@ -34,8 +35,7 @@ Callback absent / disableHostkeyVerification=true / success on storage failure �
 ## Explicit supported algorithms
 
 Host signature: ssh-ed25519, rsa-sha2-512, rsa-sha2-256 (в этом порядке).
-User private keys: OpenSSH Ed25519/RSA≥2048, encrypted bcrypt/unencrypted OpenSSH only,
-one key per input. KEX: curve25519-sha256, curve25519-sha256@libssh.org,
+User private keys: current OpenSSH Ed25519/RSA≥2048 or RSA PEM PKCS#1≥2048, plain/encrypted per [key-input](key-input.md); one key per input. KEX: curve25519-sha256, curve25519-sha256@libssh.org,
 ecdh-sha2-nistp521/384/256, diffie-hellman-group-exchange-sha256,
 diffie-hellman-group14-sha256. Cipher: aes256-gcm@openssh.com,
 aes128-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr,aes128-ctr.
@@ -45,13 +45,13 @@ no automatic weaker fallback. Unsupported overlap → UNSUPPORTED_SERVER.
 
 ## Credentials and authentication
 
-Original bounded UTF-8 OpenSSH file bytes validate with passphrase if encrypted,
+Original bounded UTF-8 supported private-key file bytes validate with passphrase if encrypted,
 require exactly one Ed25519/RSA≥2048 key, protect ORIGINAL bytes via DPAPI and store;
 never serialize parsed key via unencrypted toPem. Invalid/cancel leaves old data.
 Synchronous bcrypt parsing runs cancellable worker isolate; cancel kills worker,
 late results fenced. Protection/parse/log errors redacted.
 
-Private-file encryption supports bcrypt with AES128/192/256 CTR or CBC; this does
+Private-file OpenSSH encryption supports bcrypt with AES128/192/256 CTR or CBC; RSA PEM supports current [key-input](key-input.md) AES CBC/DES3 + file KDF; this does
 not enable CBC in SSH transport. Other private-file cipher/KDF combinations reject
 UNSUPPORTED_KEY. At most4 workers (including pending spawn and unconfirmed exit),
 30s monotonic parse deadline, clamped by caller remaining network budget on connect.
@@ -159,8 +159,8 @@ No new host-algorithm key-size policy or real network test is implied.
 
 Shared ownership core lives in lib/runtime/owned_work.dart: private key parser and
 HostSignatureVerifier each own a separate4slot pool with the same confirmed-exit
-reservation/retry rules. Cancellation aliases retain existing parser caller types;
-all prior parser units continue to apply. Fixed scheduler/spawn/getter/result errors
+reservation/retry rules. Parser callers use WorkCancellation, WorkCancelled and
+ScheduleOwnedDeadline directly, without prior-name aliases. Fixed scheduler/spawn/getter/result errors
 are sanitized by each adapter, never copied from worker stderr or exception text.
 Vendor helper checks canonical full key/signature bytes, positive odd RSA e>=3 and
 odd n>e, supported digest binding and hash lengths before expensive verification.
@@ -363,3 +363,10 @@ return retryable CLEANUP_REQUIRED and retry that same handle. This applies to di
 cleanup, NativeSshSocket's errored-close fallback and strict admitted socket close.
 An actually obtained done Future that completes with an error still confirms the
 consumer's exit. Units distinguish all three getter failures from completed errors.
+
+
+## Native binary buffer ownership — T051 decision
+
+Flutter StandardMethodCodec may return unmodifiable typed-data views. NativePlatform must return a detached, writable Uint8List owned by its caller for secret.protect, secret.unprotect and credential.pickKey (null cancellation remains null). Consumers may wipe their owned buffers on success, failure, cancellation and form disposal. Never mutate codec-owned storage. No wire-format, DPAPI purpose, storage schema or migration changes. Regression units use the actual Flutter codec with synthetic native replies and fake repository; the form's key selection → save → close and password save must commit protected bytes without UnsupportedError. No real credentials, native OS calls or real database are used in tests.
+
+Current private-key API: parsePrivateKey only. Every stored private credential requires publicKeyBytes; explicit PublicKeyHint is required by transport/identity constructors. readPublicKeyHint requires supplied public metadata and only validates it against the current input envelope; no old-record inference path. [Current input](key-input.md), [modal workflow](profile-workflow.md).

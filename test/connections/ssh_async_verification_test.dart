@@ -13,7 +13,7 @@ void main() {
     test(
       'late positive $during callback cannot resume a closed handshake',
       () async {
-        final parsed = parseOpenSshKey(
+        final parsed = parsePrivateKey(
           File('test/fixtures/ssh/ed25519.txt').readAsBytesSync(),
         );
         final peer = MemoryKexPeer(
@@ -79,7 +79,7 @@ void main() {
       test(
         'receive buffer is bounded while $during callback waits, cumulative=$cumulative',
         () async {
-          final parsed = parseOpenSshKey(
+          final parsed = parsePrivateKey(
             File('test/fixtures/ssh/ed25519.txt').readAsBytesSync(),
           );
           final peer = MemoryKexPeer(
@@ -157,7 +157,7 @@ void main() {
   test(
     'format policy is checked before an injected async crypto hook',
     () async {
-      final parsed = parseOpenSshKey(
+      final parsed = parsePrivateKey(
         File('test/fixtures/ssh/rsa2048.txt').readAsBytesSync(),
       );
       final peer = MemoryKexPeer(

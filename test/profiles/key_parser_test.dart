@@ -14,7 +14,7 @@ void main() {
   for (final type in ['ed25519', 'rsa2048']) {
     test('empty passphrase is invalid for supported encrypted $type', () {
       expect(
-        () => parseOpenSshKey(fixture('$type-encrypted'), passphrase: ''),
+        () => parsePrivateKey(fixture('$type-encrypted'), passphrase: ''),
         throwsA(
           isA<OperationFailure>()
               .having((e) => e.code, 'code', FailureCode.passphraseInvalid)
@@ -28,7 +28,7 @@ void main() {
         () {
           final original = fixture('$type${encrypted ? '-encrypted' : ''}');
           final saved = Uint8List.fromList(original);
-          final key = parseOpenSshKey(
+          final key = parsePrivateKey(
             original,
             passphrase: encrypted ? 'serverdeck-unit-passphrase' : null,
           );
@@ -52,7 +52,7 @@ void main() {
     () {
       final input = fixture('ed25519-encrypted');
       expect(
-        () => parseOpenSshKey(input),
+        () => parsePrivateKey(input),
         throwsA(
           isA<OperationFailure>().having(
             (e) => e.code,
@@ -62,7 +62,7 @@ void main() {
         ),
       );
       expect(
-        () => parseOpenSshKey(input, passphrase: 'SYNTHETIC_WRONG'),
+        () => parsePrivateKey(input, passphrase: 'SYNTHETIC_WRONG'),
         throwsA(
           isA<OperationFailure>()
               .having((e) => e.code, 'code', FailureCode.passphraseInvalid)
@@ -75,10 +75,10 @@ void main() {
       );
     },
   );
-  for (final unsupported in ['ecdsa', 'rsa-pkcs1', 'public-key']) {
+  for (final unsupported in ['ecdsa', 'public-key']) {
     test('rejects $unsupported instead of falling back to another parser', () {
       expect(
-        () => parseOpenSshKey(fixture(unsupported)),
+        () => parsePrivateKey(fixture(unsupported)),
         throwsA(
           isA<OperationFailure>().having(
             (e) => e.code,
@@ -92,11 +92,11 @@ void main() {
   test('rejects multiple PEM blocks and malformed UTF8', () {
     final bytes = fixture('ed25519');
     expect(
-      () => parseOpenSshKey(Uint8List.fromList([...bytes, ...bytes])),
+      () => parsePrivateKey(Uint8List.fromList([...bytes, ...bytes])),
       throwsA(isA<OperationFailure>()),
     );
     expect(
-      () => parseOpenSshKey(Uint8List.fromList([0xff, 0xfe])),
+      () => parsePrivateKey(Uint8List.fromList([0xff, 0xfe])),
       throwsA(isA<OperationFailure>()),
     );
   });
@@ -110,7 +110,7 @@ void main() {
       privateKeyBlob: container.privateKeyBlob,
     );
     expect(
-      () => parseOpenSshKey(
+      () => parsePrivateKey(
         Uint8List.fromList(utf8.encode(inconsistent.toPem())),
       ),
       throwsA(isA<OperationFailure>()),
@@ -121,7 +121,7 @@ void main() {
       privateKeyBlob: private,
     );
     expect(
-      () => parseOpenSshKey(Uint8List.fromList(utf8.encode(malformed.toPem()))),
+      () => parsePrivateKey(Uint8List.fromList(utf8.encode(malformed.toPem()))),
       throwsA(isA<OperationFailure>()),
     );
   });
@@ -136,7 +136,7 @@ void main() {
         privateKeyBlob: container.privateKeyBlob,
       );
       expect(
-        () => parseOpenSshKey(Uint8List.fromList(utf8.encode(multi.toPem()))),
+        () => parsePrivateKey(Uint8List.fromList(utf8.encode(multi.toPem()))),
         throwsA(isA<OperationFailure>()),
       );
     },

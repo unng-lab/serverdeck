@@ -10,12 +10,14 @@ import '../runtime/capability.dart';
 import '../runtime/owned_work.dart';
 import 'linux_metrics.dart';
 import 'monitoring_job.dart';
+import 'monitoring_history.dart';
 import 'monitoring_models.dart';
 import 'monitoring_port.dart';
 
 /// Owns only monitoring projections/work. SSH authority remains in ConnectionOwner.
 final class MonitoringOwner implements Listenable, RuntimeCapability {
   MonitoringOwner({
+    required this.historyStore,
     required this.operations,
     required this.actor,
     required this.connections,
@@ -35,6 +37,7 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
     });
   }
   final AppOperations operations;
+  final MonitoringHistoryStore historyStore;
   final UiActor actor;
   final MonitoringConnectionPort connections;
   final Duration Function()? _now;
@@ -56,6 +59,7 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
       _disposed = false,
       _rerun = false;
   int _epoch = 0;
+  Duration _lastHistoryCleanup = Duration.zero;
   MonitoringReason? error;
   @override
   String get id => 'monitoring';
@@ -223,7 +227,9 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
         state.dueAt = Duration.zero;
         state.reason = null;
       }
+      if (changedRevision) state.history = _ProfileHistory();
       state.profile = profile;
+      _loadHistory(state);
       if (view.state == ConnectionState.connected &&
           state.unsupportedSession == view.sessionId) {
         state.reason = MonitoringReason.unsupportedOs;
@@ -235,6 +241,13 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
         state.attempted = true;
       if (view.state != ConnectionState.connected) {
         state.baseline = null;
+      }
+    }
+    if (now - _lastHistoryCleanup >= const Duration(minutes: 1)) {
+      _lastHistoryCleanup = now;
+      for (final state in _entries.values) {
+        _pruneHistory(state.history);
+        _persistHistory(state);
       }
     }
     if (!_blocked) {
@@ -354,8 +367,10 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
               state.unsupportedSession = sessionId;
           },
           onError: (Object _, StackTrace __) {
-            if (valid())
+            if (valid()) {
               _invalidateReadings(state, MonitoringReason.invalidResponse);
+              _appendHistory(state);
+            }
           },
         )
         .whenComplete(() {
@@ -372,6 +387,7 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
   void _apply(_ProfileMonitoring state, LinuxSample sample) {
     if (sample.failure != null) {
       _invalidateReadings(state, sample.failure!);
+      _appendHistory(state);
       return;
     }
     state.reason = null;
@@ -415,6 +431,142 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
       sample.diskPercent,
       sample.reasonFor(MetricKind.disk),
     );
+    _appendHistory(state);
+  }
+
+  void _pruneHistory(_ProfileHistory history) {
+    final kept = HistoryCodec.prune(history.points, _utc(), now);
+    if (kept.length != history.points.length) history.version++;
+    history.points = kept;
+  }
+
+  void _loadHistory(_ProfileMonitoring state) {
+    final history = state.history;
+    if (history.loaded || history.readFailed) return;
+    try {
+      final payload = historyStore.loadHistory(
+        state.profile.profileId,
+        state.profile.connectionRevision,
+      );
+      final decoded = payload == null
+          ? <HistoryPoint>[]
+          : HistoryCodec.decode(payload);
+      final utc = _utc(), monotonic = now;
+      final stored = [
+        for (final p in decoded)
+          HistoryPoint(
+            utcMs: p.utcMs,
+            segment: p.segment,
+            cpu: p.cpu,
+            memory: p.memory,
+            disk: p.disk,
+            monotonicAt: monotonic - Duration(milliseconds: utc - p.utcMs),
+          ),
+      ];
+      history.points = [...stored, ...history.points];
+      history.loaded = true;
+      history.error = false;
+      _pruneHistory(history);
+      // Persist any TTL pruning, and pending points accumulated during a read fault.
+      if (history.version > 0) _persistHistory(state);
+    } catch (_) {
+      history.readFailed = history.error = true;
+    }
+  }
+
+  void _appendHistory(_ProfileMonitoring state) {
+    final history = state.history;
+    final time = _utc();
+    if (history.lastUtc != null && time < history.lastUtc!)
+      history.clockSegment++;
+    history.lastUtc = time;
+    double? value(MetricKind kind) {
+      final reading = state.readings[kind]!;
+      return reading.reason == null ? reading.percent : null;
+    }
+
+    history.points.add(
+      HistoryPoint(
+        utcMs: time,
+        segment:
+            '${actor.ownerEpoch}:$_epoch:${state.sessionId}:${history.clockSegment}',
+        monotonicAt: now,
+        cpu: value(MetricKind.cpu),
+        memory: value(MetricKind.memory),
+        disk: value(MetricKind.disk),
+      ),
+    );
+    history.version++;
+    _pruneHistory(history);
+    _persistHistory(state);
+  }
+
+  void _persistHistory(_ProfileMonitoring state) {
+    final history = state.history;
+    if (!history.loaded ||
+        history.readFailed ||
+        history.saving ||
+        history.version == history.savedVersion)
+      return;
+    final revision = state.profile.connectionRevision;
+    final id = state.profile.profileId;
+    bool current() =>
+        !_disposed &&
+        identical(_entries[id], state) &&
+        identical(state.history, history) &&
+        state.profile.connectionRevision == revision;
+    history.saving = true;
+    final version = history.version;
+    final work = Future<void>.sync(() async {
+      var success = false;
+      try {
+        final payload = HistoryCodec.encode(history.points);
+        await historyStore.saveHistory(id, revision, payload, current);
+        if (!current()) return;
+        history.savedVersion = version;
+        history.error = false;
+        success = true;
+      } catch (_) {
+        if (current()) history.error = true;
+      } finally {
+        history.saving = false;
+        if (current()) {
+          _notify();
+          if (success && history.version != history.savedVersion)
+            _persistHistory(state);
+        }
+      }
+    });
+    _track(work);
+  }
+
+  List<HistoryPoint> history(String id, int expectedConnectionRevision) {
+    final state = _entries[id];
+    if (state == null ||
+        state.profile.connectionRevision != expectedConnectionRevision)
+      return const [];
+    return List.unmodifiable(
+      HistoryCodec.prune(state.history.points, _utc(), now),
+    );
+  }
+
+  bool historyError(String id, int expectedConnectionRevision) {
+    final state = _entries[id];
+    return state?.profile.connectionRevision == expectedConnectionRevision &&
+        state!.history.error;
+  }
+
+  void retryHistory(String id, int expectedConnectionRevision) {
+    if (_stopped) return;
+    final state = _entries[id];
+    if (state == null ||
+        state.profile.connectionRevision != expectedConnectionRevision)
+      return;
+    state.history.readFailed = false;
+    _loadHistory(state);
+    _pruneHistory(state.history);
+    _persistHistory(state);
+    _notify();
   }
 
   void _invalidateReadings(
@@ -519,6 +671,7 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
 final class _ProfileMonitoring {
   _ProfileMonitoring(this.profile);
   ProfileView profile;
+  _ProfileHistory history = _ProfileHistory();
   String? sessionId, unsupportedSession;
   bool attempted = false;
   Duration dueAt = Duration.zero;
@@ -528,6 +681,13 @@ final class _ProfileMonitoring {
   Map<MetricKind, MetricReading> readings = {
     for (final k in MetricKind.values) k: const MetricReading.missing(),
   };
+}
+
+final class _ProfileHistory {
+  List<HistoryPoint> points = [];
+  bool loaded = false, readFailed = false, saving = false, error = false;
+  int version = 0, savedVersion = 0, clockSegment = 0;
+  int? lastUtc;
 }
 
 final class _MonitoringNotifier extends ChangeNotifier {

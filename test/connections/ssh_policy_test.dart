@@ -1,3 +1,5 @@
+import '../fixtures/key_material.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -51,7 +53,14 @@ final class Harness {
         : PrivateKeyCredential(
             bytes,
             revision: 3,
-            inspection: readPublicKeyHint(bytes).inspection,
+            publicHint: readPublicKeyHint(
+              bytes,
+              publicKeyBytes: fixturePublicBytes(bytes),
+            ),
+            inspection: readPublicKeyHint(
+              bytes,
+              publicKeyBytes: fixturePublicBytes(bytes),
+            ).inspection,
           );
     transport = StrictSshTransport(
       socket: wrap?.call(peer) ?? peer,
@@ -84,7 +93,7 @@ final class Harness {
       remainingBudget: budget ?? () => const Duration(seconds: 30),
     );
   }
-  final host = parseOpenSshKey(fixture('ed25519'));
+  final host = parsePrivateKey(fixture('ed25519'));
   final verifier = HostSignatureVerifier(),
       signer = PrivateSigner(),
       cancellation = WorkCancellation();
@@ -263,7 +272,7 @@ void main() {
       'failed outstanding KEX flush cannot preempt changed-host result failure=$persistFailure',
       () async {
         final entered = Completer<void>(), persisted = Completer<void>();
-        final replacement = parseOpenSshKey(fixture('rsa2048'));
+        final replacement = parsePrivateKey(fixture('rsa2048'));
         final expected = persistFailure
             ? FailureCode.storageUnavailable
             : FailureCode.hostKeyChanged;
@@ -358,7 +367,7 @@ void main() {
       'outstanding ping cannot mask changed-host persistence failure=$persistFailure',
       () async {
         final entered = Completer<void>(), persisted = Completer<void>();
-        final replacement = parseOpenSshKey(fixture('rsa2048'));
+        final replacement = parsePrivateKey(fixture('rsa2048'));
         final expected = persistFailure
             ? FailureCode.storageUnavailable
             : FailureCode.hostKeyChanged;
@@ -666,7 +675,7 @@ void main() {
   );
   test('changed verified host persistence is queued before ended and awaited before terminal event', () async {
     final entered = Completer<void>(), persisted = Completer<void>();
-    final replacement = parseOpenSshKey(fixture('rsa2048'));
+    final replacement = parsePrivateKey(fixture('rsa2048'));
     HostObservation? observed;
     final h = Harness(
       changed: (value) {
@@ -697,7 +706,7 @@ void main() {
     }
   });
   test('failed changed-host persistence returns storage failure instead of losing it to library close', () async {
-    final replacement = parseOpenSshKey(fixture('rsa2048'));
+    final replacement = parsePrivateKey(fixture('rsa2048'));
     final h = Harness(
       changed: (_) async =>
           throw const OperationFailure(FailureCode.storageUnavailable),
@@ -751,7 +760,7 @@ void main() {
   });
   test('invalid host signature and aggregate resource failure have fixed mapping before host acceptance', () async {
     for (final overflow in [false, true]) {
-      final parsed = parseOpenSshKey(fixture('ed25519'));
+      final parsed = parsePrivateKey(fixture('ed25519'));
       final peer = MemoryKexPeer(
         hostKey: parsed.key,
         negotiated: SSHHostkeyType.ed25519,

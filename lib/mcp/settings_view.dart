@@ -28,6 +28,7 @@ class _McpSettingsViewState extends State<McpSettingsView> {
   ) async =>
       await showDialog<bool>(
         context: context,
+        useRootNavigator: false,
         builder: (context) => DeckDialogLayout(
           title: title,
           child: Text(description),
@@ -46,39 +47,14 @@ class _McpSettingsViewState extends State<McpSettingsView> {
       ) ??
       false;
   Future<void> _issue() async {
-    final name = TextEditingController();
-    String? selected;
-    try {
-      selected = await showDialog<String>(
-        context: context,
-        builder: (context) => DeckDialogLayout(
-          title: 'Разрешить доступ MCP',
-          child: DeckFormSection(
-            title: 'Новый клиент',
-            children: [
-              DeckTextField(label: 'Название клиента', controller: name),
-              const Text(
-                'Клиент сможет читать и создавать SSH-профили, менять учётные данные, подключаться и подтверждать ключи серверов. Разрешение действует 90 дней в текущей учётной записи Windows. Выдавайте его только доверенному клиенту.',
-              ),
-            ],
-          ),
-          actions: [
-            DeckButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            DeckButton(
-              onPressed: () => Navigator.pop(context, name.text),
-              kind: DeckButtonKind.primary,
-              child: const Text('Разрешить доступ'),
-            ),
-          ],
-        ),
-      );
-      if (selected != null)
-        await widget.controller.issue(selected, confirmed: true);
-    } finally {
-      name.dispose();
+    final controller = widget.controller;
+    final selected = await showDialog<String>(
+      context: context,
+      useRootNavigator: false,
+      builder: (_) => const _McpClientNameDialog(),
+    );
+    if (mounted && controller == widget.controller && selected != null) {
+      await controller.issue(selected, confirmed: true);
     }
   }
 
@@ -213,4 +189,43 @@ class _McpSettingsViewState extends State<McpSettingsView> {
       );
     },
   );
+}
+
+class _McpClientNameDialog extends StatefulWidget {
+  const _McpClientNameDialog();
+  @override
+  State<_McpClientNameDialog> createState() => _McpClientNameDialogState();
+}
+
+class _McpClientNameDialogState extends State<_McpClientNameDialog> {
+  final name = TextEditingController();
+  @override
+  Widget build(BuildContext context) => DeckDialogLayout(
+    title: 'Разрешить доступ MCP',
+    child: DeckFormSection(
+      title: 'Новый клиент',
+      children: [
+        DeckTextField(label: 'Название клиента', controller: name),
+        const Text(
+          'Клиент сможет читать и создавать SSH-профили, менять учётные данные, подключаться и подтверждать ключи серверов. Разрешение действует 90 дней в текущей учётной записи Windows. Выдавайте его только доверенному клиенту.',
+        ),
+      ],
+    ),
+    actions: [
+      DeckButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Отмена'),
+      ),
+      DeckButton(
+        onPressed: () => Navigator.pop(context, name.text),
+        kind: DeckButtonKind.primary,
+        child: const Text('Разрешить доступ'),
+      ),
+    ],
+  );
+  @override
+  void dispose() {
+    name.dispose();
+    super.dispose();
+  }
 }

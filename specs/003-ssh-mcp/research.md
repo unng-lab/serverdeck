@@ -65,9 +65,8 @@ Ed25519/RSA2048 fixtures, отказ wrong passphrase и unencrypted round-trip.
 ## R302 — запись и миграция
 
 **Decision**: общий формат2 с DPAPI ciphertext внутри той же Isar txn, не внешний
-vault с двухфазной неопределённой записью. CURRENT preflight до open, migration на копии.
-**Rationale**: атомарные profile/credentials/trust/receipt mutations и безопасный downgrade
-guard. [Контракт002](../002-desktop-runtime/contracts/storage.md).
+vault с двухфазной неопределённой записью. CURRENT preflight до open; толькоformat3, безмиграций поConstitutionVI.
+**Rationale**: атомарные profile/credentials/trust/receipt mutations и явный current-format guard. [Контракт002](../002-desktop-runtime/contracts/storage.md).
 **Alternatives**: secret path-only, sidecar plaintext и отдельная база MCP отвергнуты.
 
 ## R303 — один owner и wire contract
@@ -79,3 +78,16 @@ Dart owner проверяет canonical grant каждый раз. Endpoint secu
 **Rationale**: нет второй модели данных/полномочий; запрет delete проверяется и в domain,
 и в опубликованном router. **Alternatives**: generic exec/shell/delete admin endpoint
 не нужны; сетевой MCP сервер не выбран.
+
+
+## Уточнение2026-11-04 — текущие форматы и API
+Decision: strict current RSA PEM/OpenSSH input readers, owned crypto workers, requiredpublicmetadata and explicitcurrent identity API. No parseOpenSsh alias, old-record inference, schema1migration or compatibility adapters. Rationale: userexplicit principleVI beforeapp1.0. LegacyPEM filename denotes a required input format, not ServerDeck version support. Local vendor research established that encryptedPKCS1 has no clear publicblob; metadata is derived at validated import and bound before signature. Alternatives rejected: runtime ssh-keygen, sourcefile rewrite, plaintext phrase persistence, old-record fallback/backfill.
+Decision: C12 route-owned phrase controller, verification lease and navigation-boundpostsave continuations; actual functional regressions cover delayedadmission/refresh, currentnewsession, A→B navigation. Layoutacceptance excluded.
+
+
+## Server workspace design decision2026-11-04
+Decision: approved local HTML design is a visual reference; reuse C07/C10/C13/C14/
+C17/C21 and current owners, direct API updates. Rationale: server selection is the
+context, section selection is work within it. Alternatives rejected: global feature
+rail, details-only modal and fake installed software/logs/jobs in shipped application.
+No new library/protocol or unresolved technical choice; no external research needed.

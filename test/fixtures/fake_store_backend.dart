@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:isar_community/isar.dart';
 import 'package:serverdeck/storage/records.dart';
-import 'package:serverdeck/storage/migrations.dart';
 import 'package:serverdeck/storage/workspace_store.dart';
 
 /// Models only the store's calls, never Isar durability or native behavior.
@@ -11,9 +10,7 @@ class FakeStoreBackend implements StoreBackend {
   final Map<String, FakeDatabase> databases = {};
   final List<String> initialized = [];
   final List<String> openedPaths = [];
-  int copies = 0;
   Future<void> Function(String)? beforeOpen;
-  Future<void> Function(String, String)? beforeCopy;
 
   @override
   Future<void> initialize(String libraryPath) async {
@@ -27,27 +24,6 @@ class FakeStoreBackend implements StoreBackend {
     final id = path.split('/').last.replaceFirst('staging-', '');
     await File('$path/serverdeck.isar').writeAsString('synthetic fixture');
     return databases.putIfAbsent(id, FakeDatabase.new);
-  }
-
-  @override
-  Future<void> copyStore(String source, String target) async {
-    copies++;
-    await beforeCopy?.call(source, target);
-    await copyStoreDirectory(source, target);
-    final sourceId = source.replaceAll('\\', '/').split('/').last;
-    final targetId = target
-        .replaceAll('\\', '/')
-        .split('/')
-        .last
-        .replaceFirst('staging-', '');
-    final original = databases[sourceId]!;
-    databases[targetId] = FakeDatabase()
-      ..settings.value = original.settings.value == null
-          ? null
-          : copySettings(original.settings.value!)
-      ..security.value = original.security.value == null
-          ? null
-          : copySecurity(original.security.value!);
   }
 }
 

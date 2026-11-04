@@ -170,21 +170,18 @@ void main() {
     expect(find.text('Демонстрация: Дата и время корректны'), findsOneWidget);
   });
 
-  testWidgets('full shell exposes all five navigation destinations', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      componentHarness(const ComponentExample(id: 'C17')),
-    );
-    expect(find.byType(FoundationShell), findsOneWidget);
-    for (final section in FoundationSection.values) {
-      expect(
-        find.text(section.label).evaluate().isNotEmpty ||
-            find.byTooltip(section.label).evaluate().isNotEmpty,
-        true,
+  testWidgets(
+    'C17 presents synthetic server navigation and workspace sections',
+    (tester) async {
+      await tester.pumpWidget(
+        componentHarness(const ComponentExample(id: 'C17')),
       );
-    }
-  });
+      expect(find.byType(FoundationShell), findsOneWidget);
+      for (final label in ['ПО', 'Журналы', 'Задания', 'Настройки']) {
+        expect(find.text(label), findsOneWidget);
+      }
+    },
+  );
 
   for (final entry in {
     'success': 'Задание завершено',

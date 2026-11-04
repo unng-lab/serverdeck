@@ -6,6 +6,15 @@ import '../domain/actor.dart';
 import '../domain/app_operations.dart';
 import '../domain/models.dart';
 
+final class ProfileSaveOutcome {
+  const ProfileSaveOutcome({
+    required this.profileId,
+    required this.requiresConnection,
+  });
+  final String profileId;
+  final bool requiresConnection;
+}
+
 /// C02/C10/C11 actions share the same typed API as MCP; no widget owns authority.
 final class ProfileController extends ChangeNotifier {
   ProfileController({
@@ -29,8 +38,10 @@ final class ProfileController extends ChangeNotifier {
   final VoidCallback? onAction;
   List<ProfileView> items = [];
   ProfileDetails? details;
+  String? lastSavedProfileId;
   OperationFailure? error;
   Map<String, TrustView> trusts = {};
+  Map<String, ConnectionView> connections = {};
   String? selected;
   bool loading = false, pending = false, _disposed = false;
   int _selection = 0;
@@ -63,6 +74,7 @@ final class ProfileController extends ChangeNotifier {
       if (_disposed) return;
       items = List.unmodifiable(values);
       final nextTrusts = <String, TrustView>{};
+      final nextConnections = <String, ConnectionView>{};
       for (final profile in values) {
         if (_disposed) return;
         final result = await operations.getTrust(actor, profile.profileId);
@@ -70,9 +82,21 @@ final class ProfileController extends ChangeNotifier {
           nextTrusts[profile.profileId] = result.value!;
         else if (trusts.containsKey(profile.profileId))
           nextTrusts[profile.profileId] = trusts[profile.profileId]!;
+        try {
+          final connection = await operations.getConnection(
+            actor,
+            profile.profileId,
+          );
+          if (connection.value != null) {
+            nextConnections[profile.profileId] = connection.value!;
+          }
+        } catch (_) {
+          // No successful observation: the sidebar must show unknown.
+        }
       }
       if (_disposed) return;
       trusts = Map.unmodifiable(nextTrusts);
+      connections = Map.unmodifiable(nextConnections);
       final id = selected, selection = _selection;
       if (id != null) {
         final result = await operations.getProfile(actor, id);
@@ -87,10 +111,15 @@ final class ProfileController extends ChangeNotifier {
       }
       error = null;
     } on OperationFailure catch (e) {
-      if (!_disposed) error = e;
+      if (!_disposed) {
+        error = e;
+        connections = const {};
+      }
     } catch (_) {
-      if (!_disposed)
+      if (!_disposed) {
         error = const OperationFailure(FailureCode.storageUnavailable);
+        connections = const {};
+      }
     } finally {
       loading = false;
       _notify();
@@ -109,6 +138,7 @@ final class ProfileController extends ChangeNotifier {
   Future<OperationFailure?> _action<T extends PublicValue>(
     Future<OperationResult<T>> Function() action,
   ) async {
+    if (_disposed) return const OperationFailure(FailureCode.shuttingDown);
     if (pending) return const OperationFailure(FailureCode.conflict);
     pending = true;
     _notify();
@@ -133,22 +163,30 @@ final class ProfileController extends ChangeNotifier {
   }
 
   Future<OperationFailure?> create(ProfileDraft draft, String mutationId) =>
-      _action(
-        () => operations.createProfile(actor, draft, mutationId: mutationId),
-      );
+      _action(() async {
+        final result = await operations.createProfile(
+          actor,
+          draft,
+          mutationId: mutationId,
+        );
+        if (result.value != null) lastSavedProfileId = result.value!.entityId;
+        return result;
+      });
   Future<OperationFailure?> update(
     ProfileView profile,
     ProfilePatch patch,
     String mutationId,
-  ) => _action(
-    () => operations.updateProfile(
+  ) => _action(() async {
+    final result = await operations.updateProfile(
       actor,
       profile.profileId,
       patch,
       expectedRevision: profile.revision,
       mutationId: mutationId,
-    ),
-  );
+    );
+    if (result.value != null) lastSavedProfileId = result.value!.entityId;
+    return result;
+  });
   Future<OperationFailure?> delete(
     ProfileView profile, {
     required bool confirmed,
@@ -160,13 +198,46 @@ final class ProfileController extends ChangeNotifier {
       confirmed: confirmed,
     ),
   );
-  Future<OperationFailure?> connect(ProfileView profile) => _action(
-    () => operations.connect(
+  Future<OperationFailure?> connect(
+    ProfileView profile, {
+    void Function(ConnectionView)? onStarted,
+  }) => _action(() async {
+    final result = await operations.connect(
       actor,
       profile.profileId,
       expectedRevision: profile.revision,
-    ),
-  );
+    );
+    if (result.value != null) onStarted?.call(result.value!);
+    return result;
+  });
+
+  /// Owner cleanup cannot be suppressed by the UI's pending-action guard.
+  /// The backend still authorizes and checks the exact attempt, including the
+  /// prohibition on cancelling an already established session as an attempt.
+  Future<void> cancelOwnedAttempt(String id, String attemptId) async {
+    OperationFailure? failure;
+    try {
+      failure = (await operations.cancelConnection(
+        actor,
+        id,
+        attemptId: attemptId,
+      )).error;
+    } on OperationFailure catch (error) {
+      failure = error;
+    } catch (_) {
+      failure = const OperationFailure(FailureCode.storageUnavailable);
+    }
+    if (_disposed) return;
+    await refresh();
+    if (_disposed) return;
+    if (failure != null &&
+        failure.code != FailureCode.conflict &&
+        failure.code != FailureCode.profileNotFound) {
+      error = failure;
+      _notify();
+    }
+  }
+
   Future<OperationFailure?> cancel(String id, String attemptId) => _action(
     () => operations.cancelConnection(actor, id, attemptId: attemptId),
   );

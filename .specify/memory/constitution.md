@@ -1,9 +1,11 @@
 <!--
-Sync Impact Report 2026-11-03
-Version: 1.2.0 -> 1.3.0. User clarification: tests are unit-only.
-Principle III now excludes integration/e2e/VM acceptance gates.
-Dependent feature artifacts and CI must follow this rule; old evidence remains history.
-Templates read the constitution at runtime and are unchanged.
+Sync Impact Report 2026-11-04
+Version 1.3.0 -> 1.4.0 (MINOR: new principle VI, explicit user instruction).
+Added: no application backward compatibility before app1.0; current input formats
+remain functional scope; no implied authorization to erase user data.
+Modified/removed prior principles: none. Dependent feature requirements are deferred
+to their existing001/002/003/004 workflows, not changed in this constitution stage.
+No unexplained placeholders or deferred governance decisions. No extension hooks.
 -->
 
 # ServerDeck Constitution
@@ -97,6 +99,24 @@ MUST быть доступно только через «Выход» в мен�
 не являются пользовательской командой выхода; восстановление после них MUST
 сохранять уже подтверждённые записи и не возобновлять SSH автоматически.
 
+### VI. Никакой обратной совместимости до первого мажорного релиза приложения
+
+До версии приложения 1.0 MUST NOT разрабатываться или сохраняться слои обратной
+совместимости: старые внутренние API/алиасы, адаптеры прежних контрактов, ветвления
+для старых записей, миграции/backfill старых форматов приложения и дублирующие пути
+выполнения. При изменении требований текущая реализация, контракты и тесты MUST
+обновляться напрямую. Версия самой конституции не является версией приложения.
+
+Поддерживаемые пользовательские входные форматы и протоколы определяются текущими
+функциональными требованиями. Явное требование принимать RSA PEM и OpenSSH означает
+поддержку двух входных форматов; оно не разрешает совместимость со старыми схемами,
+внутренними интерфейсами или записями ServerDeck.
+
+Несоответствующие текущему контракту данные MUST явно отклоняться без автоматической
+конвертации или подмены пустым состоянием. Запрет совместимости не разрешает стирать
+пользовательские данные без отдельного явного запроса. После первого мажорного релиза
+политика совместимости определяется отдельным согласованным изменением конституции.
+
 ## Scope and Sources
 
 Действующая визуальная основа — [пакет 001](../../specs/001-design-system/plan.md),
@@ -129,4 +149,4 @@ MUST быть доступно только через «Выход» в мен�
 MINOR — добавление правил, PATCH — уточнение без изменения смысла.
 При ревью MUST проверяться соблюдение правил в пределах изменённого scope.
 
-**Version**: 1.3.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
+**Version**: 1.4.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-04

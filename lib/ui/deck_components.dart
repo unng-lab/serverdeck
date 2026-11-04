@@ -366,14 +366,25 @@ class DeckStatus extends StatelessWidget {
     required this.label,
     this.tone = DeckTone.neutral,
     this.pending = false,
+    this.icon,
+    this.iconOnly = false,
   });
   final String label;
   final DeckTone tone;
   final bool pending;
+  final IconData? icon;
+  final bool iconOnly;
   @override
   Widget build(BuildContext context) {
     final effective = pending ? DeckTone.running : tone;
     final color = _colors(context)[_role(effective)];
+    if (iconOnly) {
+      return _DeckIconStatus(
+        label: label,
+        icon: icon ?? _symbol(effective),
+        color: color,
+      );
+    }
     return Semantics(
       liveRegion: pending,
       child: Row(
@@ -387,7 +398,7 @@ class DeckStatus extends StatelessWidget {
               child: pending && !MediaQuery.disableAnimationsOf(context)
                   ? CircularProgressIndicator(strokeWidth: 2, color: color)
                   : Icon(
-                      _symbol(effective),
+                      icon ?? _symbol(effective),
                       color: color,
                       size: BrandGeometry.iconSize,
                     ),
@@ -404,6 +415,44 @@ class DeckStatus extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DeckIconStatus extends StatefulWidget {
+  const _DeckIconStatus({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  @override
+  State<_DeckIconStatus> createState() => _DeckIconStatusState();
+}
+
+class _DeckIconStatusState extends State<_DeckIconStatus> {
+  final _tooltip = GlobalKey<TooltipState>();
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: widget.label,
+    child: Focus(
+      onFocusChange: (focused) {
+        if (focused) {
+          _tooltip.currentState?.ensureTooltipVisible();
+        } else {
+          Tooltip.dismissAllToolTips();
+        }
+      },
+      child: Tooltip(
+        key: _tooltip,
+        message: widget.label,
+        excludeFromSemantics: true,
+        child: ExcludeSemantics(
+          child: Icon(widget.icon, color: widget.color, size: 20),
+        ),
+      ),
+    ),
+  );
 }
 
 class DeckNotice extends StatelessWidget {

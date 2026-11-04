@@ -1,3 +1,5 @@
+import 'package:serverdeck/runtime/owned_work.dart';
+
 import 'dart:typed_data';
 
 import 'package:serverdeck/domain/actor.dart';
@@ -242,12 +244,12 @@ final class ProfileInspector implements KeyInspector {
   Future<KeyInspection> inspect(
     Uint8List bytes, {
     String? passphrase,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
     Duration timeout = const Duration(seconds: 30),
   }) async {
     calls++;
     cancellation?.check();
-    final parsed = parseOpenSshKey(bytes, passphrase: passphrase);
+    final parsed = parsePrivateKey(bytes, passphrase: passphrase);
     try {
       return parsed.inspection;
     } finally {

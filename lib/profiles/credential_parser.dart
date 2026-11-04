@@ -10,6 +10,7 @@ import 'package:dartssh2/src/utils/cipher_ext.dart';
 
 import '../domain/models.dart';
 import 'key_envelope.dart';
+import 'legacy_pem.dart';
 export 'key_envelope.dart' show KeyInspection;
 
 /// Private attempt material, never an operation projection or persistent record.
@@ -40,7 +41,12 @@ const _unsupported = OperationFailure(
 
 /// Pure parser unit. Production calls it only in an owned, cancellable isolate.
 /// Never serializes a parsed key; the caller protects the ORIGINAL input bytes.
-ParsedPrivateKey parseOpenSshKey(Uint8List original, {String? passphrase}) {
+ParsedPrivateKey parsePrivateKey(Uint8List original, {String? passphrase}) {
+  if (original.isEmpty ||
+      original.length > 1024 * 1024 ||
+      (passphrase != null && !isKeyPassphraseBounded(passphrase)))
+    throw _unsupported;
+  if (LegacyPem.recognizes(original)) return _parseLegacy(original, passphrase);
   Uint8List? plaintext, passwordBytes, derived;
   OpenSshEnvelope? envelope;
   SSHKeyPair? owned;
@@ -50,6 +56,7 @@ ParsedPrivateKey parseOpenSshKey(Uint8List original, {String? passphrase}) {
       throw _unsupported;
     envelope = OpenSshEnvelope.read(original);
     final publicBlob = envelope.hint.encoded;
+    if (publicBlob.length > 262144) throw _unsupported;
     final type = envelope.hint.inspection.keyType;
     final encrypted = envelope.encrypted;
     final blockSize = envelope.blockSize;
@@ -150,7 +157,12 @@ ParsedPrivateKey parseOpenSshKey(Uint8List original, {String? passphrase}) {
     if (!verifies) throw _unsupported;
     final result = ParsedPrivateKey._(
       owned,
-      KeyInspection(keyType: type, bits: bits, encrypted: encrypted),
+      KeyInspection(
+        keyType: type,
+        bits: bits,
+        encrypted: encrypted,
+        publicKeyBytes: List<int>.unmodifiable(publicBlob),
+      ),
     );
     owned = null;
     return result;
@@ -164,6 +176,51 @@ ParsedPrivateKey parseOpenSshKey(Uint8List original, {String? passphrase}) {
     }
     _clearKey(owned);
     envelope?.dispose();
+  }
+}
+
+ParsedPrivateKey _parseLegacy(Uint8List original, String? passphrase) {
+  final pem = LegacyPem.read(original);
+  SSHKeyPair? owned;
+  try {
+    final key = pem.decode(passphrase);
+    owned = key;
+    final proof = Uint8List.fromList(
+      utf8.encode('ServerDeck private key validation v1'),
+    );
+    final public = key.toPublicKey() as SSHRsaPublicKey;
+    if (!public.verify(proof, key.sign(proof))) throw _unsupported;
+    final bytes = public.encode();
+    if (bytes.length > 262144) throw _unsupported;
+    final result = ParsedPrivateKey._(
+      key,
+      KeyInspection(
+        keyType: 'ssh-rsa',
+        bits: key.n.bitLength,
+        encrypted: pem.encrypted,
+        publicKeyBytes: List<int>.unmodifiable(bytes),
+      ),
+    );
+    owned = null;
+    return result;
+  } on OperationFailure catch (error) {
+    if (pem.encrypted && error.code == FailureCode.unsupportedKey) {
+      throw const OperationFailure(
+        FailureCode.passphraseInvalid,
+        field: OperationField.passphrase,
+      );
+    }
+    rethrow;
+  } catch (_) {
+    throw pem.encrypted
+        ? const OperationFailure(
+            FailureCode.passphraseInvalid,
+            field: OperationField.passphrase,
+          )
+        : _unsupported;
+  } finally {
+    _clearKey(owned);
+    pem.dispose();
   }
 }
 

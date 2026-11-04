@@ -166,7 +166,7 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       const auto releaseDialog = std::unique_ptr<IFileOpenDialog, void(*)(IFileOpenDialog*)>(dialog, [](IFileOpenDialog* p) { p->Release(); });
       DWORD options = 0;
       if (FAILED(dialog->GetOptions(&options)) || FAILED(dialog->SetOptions(options | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM | FOS_DONTADDTORECENT)) ||
-          FAILED(dialog->SetTitle(L"Выберите приватный ключ OpenSSH"))) throw std::runtime_error("KEY_PICKER_FAILED");
+          FAILED(dialog->SetTitle(L"Выберите приватный ключ SSH"))) throw std::runtime_error("KEY_PICKER_FAILED");
       const HRESULT shown = dialog->Show(window_);
       if (shown == HRESULT_FROM_WIN32(ERROR_CANCELLED)) { result->Success(); return; }
       if (FAILED(shown)) throw std::runtime_error("KEY_PICKER_FAILED");

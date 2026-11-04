@@ -1,5 +1,6 @@
 # AppOperations v1 — общие UI/MCP-действия
 
+
 Это контракт будущей реализации, не реализация. Domain owner принадлежит основному
 приложению002. Только типизированные UI adapters могут создать UiActor; MCP получает
 McpActor(clientId,grantVersion,ownerEpoch), сформированный сервером после проверки
@@ -46,7 +47,7 @@ List sort: createdAt ascending then profileId. Cursor opaque base64url of last t
 listRevision. Concurrent list mutation invalidates cursor → CONFLICT; start list again.
 Empty list is successful only after store read success. Unsupported patch keys rejected;
 profileId/credentialId/endpointId cannot be overwritten directly. Port omitted on create22.
-Auth input: password exact UTF-8 string (1..65536 bytes); or original OpenSSH key bytes
+Auth input: password exact UTF-8 string (1..65536 bytes); or original supported SSH private-key bytes per key-input.md
 base64 (decoded≤1MiB), optional ephemeral passphrase (≤65536 UTF-8 bytes). Input bounds
 check before decoding/protect. UI file picker yields the same key bytes; MCP cannot
 read arbitrary local filenames. No secret getters, token-management or generic command.

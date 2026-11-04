@@ -400,7 +400,7 @@ DeckContextMenu(entries: const [DeckMenuEntry('Открыть')], onSelected: on
 
 **Варианты**: tab bar; breadcrumb; назад; selected/disabled.
 
-**Входы**: DeckTabs(labels, selected, onSelected?); DeckBreadcrumbs; IconButton back.
+**Входы**: DeckTabs(labels, icons, selected, onSelected?); DeckBreadcrumbs; IconButton back.
 
 **События**: onSelected(index); back callback.
 
@@ -415,7 +415,7 @@ DeckContextMenu(entries: const [DeckMenuEntry('Открыть')], onSelected: on
 **Пример**: `tool/component_catalog/examples.dart`.
 
 ```dart
-DeckTabs(labels: const ['Обзор', 'Журнал'], selected: selectedTab, onSelected: onTabChanged);
+DeckTabs(labels: const ['Обзор', 'Журнал'], icons: const [Icons.apps_outlined, Icons.description_outlined], selected: selectedTab, onSelected: onTabChanged);
 ```
 
 ## C17 — Каркас страницы
@@ -534,7 +534,7 @@ DeckLogMessage(message: record.message, source: source, eventTime: eventTime, ob
 
 **Варианты**: значение/единица/лимит; неизвестное; stale/partial; описание.
 
-**Входы**: DeckMetric(label, value?, unit, contextLabel, tone).
+**Входы**: DeckMetric(label, value?, unit, contextLabel, tone, compact=false). Compact показывает те же данные/семантику без вложенной surface; default сохраняет существующий вариант. Расширение мониторинга004, synthetic shared tests в001.
 
 **События**: Не создаёт событий.
 
@@ -560,15 +560,15 @@ DeckMetric(label: 'CPU', value: value, unit: '%', contextLabel: quality);
 
 **Варианты**: несколько различимых series; gap; legend; текстовая альтернатива.
 
-**Входы**: DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions).
+**Входы**: DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions, maxPoints=120, periodLabel).
 
 **События**: Локальное раскрытие/keyboard selection текстовых значений.
 
 **Состояния**: default; hover; focus; pressed; empty; stale; partial; unknown.
 
-**Ограничения**: До 120 points; gap >15000ms; no interpolation/polling/new timestamps.
+**Ограничения**: Параметр maxPoints 1..720, default120; gap >15000ms или breakBefore:true; no interpolation/polling/new timestamps. Finite num0..100 сохраняет дроби.
 
-**Критерии приёмки**: 0/1/120, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию.
+**Критерии приёмки**: 0/1/120/720, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию.
 
 **Реализация**: lib/ui/deck_history.dart.
 
@@ -796,3 +796,41 @@ Autocorrect, suggestions и personalized IME learning отключены. Вла
 Это дополнение существующего C03 в scope001, задача R013; не новый компонент и не
 изменение визуального контракта. Проверяется synthetic functional unit fixture
 `test/profiles/secret_field_test.dart`, а не дизайном экрана или матрицей viewport.
+
+
+## Текущие server workspace primitives2026-11-04 (заменяет прежний C17 API)
+
+C17 FoundationShell(state,sidebar,child,status,recoveryAction,onRetry,retryInProgress)
+создаёт брендовый каркас sidebar/body; navigation данные и callbacks предоставляет
+owner. Sidebar остаётся слева при изменении окна, ширина ограничена доступным
+пространством; body independently scrollable. Старые FoundationSection, requestedSection,
+feature slots и fallbackContent удаляются. Текущий catalog получает synthetic slots.
+Ни один runtime/domain owner не принадлежит каркасу.
+
+C07 DeckListItem добавляет compact/error/statusLabel: компактный title/address,
+leading/trailing icons; error независим от selected, сохраняется текст сообщения.
+C10 DeckStatus добавляет icon/iconOnly; iconOnly имеет Tooltip при hover/focus и
+Semantics label, keyboard-focusable, тон не заменяет доступное имя. C14 Tooltip
+используется напрямую. C21 DeckMetric добавляет icon для compact: при icon заданном
+label/value/unit/context доступны через C14/semantics, видимы icon+value; full вариант
+также остаётся текущим presentation вариантом для других общих примеров. C16 DeckTabs
+используется без нового локального аналога. Все extensions проверяются synthetic
+shared inputs; функции не получают собственных layout/golden gates.
+
+## Исправление отсутствующих иконок — 2026-11-04
+
+C16 DeckTabs принимает обязательный список `icons` той же длины, что `labels`.
+Каждая вкладка показывает декоративную иконку и текст; доступное имя и tooltip
+берутся из label, selected и disabled сохраняют прежнюю семантику и callbacks.
+Все текущие callers и каталоги обновляются напрямую, без старого API-адаптера.
+Синтетические shared units проверяют icons/labels/tooltip, выбор и disabled.
+Поставка MaterialIcons определяется пакетом002; отсутствие glyph нельзя считать
+доказанно исправленным по одному наличию Icon widget в functional test.
+
+## C22 current hour variant — 2026-11-04
+
+DeckHistory accepts maxPoints1..720(default120),periodLabel(default «До 10 минут»).
+Finite numeric fractions0..100 accepted; null/invalid remains gap. Row breakBefore:true
+forbids connecting to preceding row. Input order retained,no interpolation/polling/new
+timestamps. Feature004 uses720 and «Последний час»; text alternative preserves fractions.
+Shared synthetic tests0/1/720,fractions/gaps. This extends C22,not a feature-local graph.

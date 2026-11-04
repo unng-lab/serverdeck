@@ -243,3 +243,16 @@ admission, drain, deadline, retry и отсутствие повторных о�
 [Plan](plan.md) · [Research](research.md) · [Data model](data-model.md) ·
 [Runtime ABI/platform](contracts/runtime.md) · [Storage](contracts/storage.md) ·
 [Single EXE](contracts/packaging.md) · [Проверки](quickstart.md) · [Задачи](tasks.md).
+
+
+## Current-only уточнение2026-11-04
+ТекущийlogicalFormat3 — единственный runtimecontract. Schema1 и еёmigration — история. Другиеверсии отвергаютсядоDBopen безавтоконвертации/очистки. [Storage](contracts/storage.md),T044,ConstitutionVI. Current-operation recoveryсохраняется.
+
+
+## Server workspace navigation уточнение2026-11-04
+- FR-220: Runtime показывает серверный selector слева и контекстную область справа
+  через C17; прежняя глобальная навигация ПО/logs/jobs удаляется. Общие MCP settings
+  остаются отдельным действием и доступны без выбранного профиля.
+- AC-220: Readiness/storageBlocked/tray recovery остаются доступными; server settings
+  и общие MCP настройки различимы; UI не получает команды выхода вместо трея.
+- SC-220: Навигация не создаёт второй owner/EXE/store и не меняет persisted schema.

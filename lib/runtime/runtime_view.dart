@@ -12,6 +12,7 @@ import '../mcp/settings_controller.dart';
 import '../mcp/settings_view.dart';
 import '../monitoring/monitoring_owner.dart';
 import 'native_platform.dart';
+import 'owned_settings_route.dart';
 
 /// C17 shell with C01/C02/C10/C11/C12 content; feature slots are supplied by 003.
 class RuntimeView extends StatefulWidget {
@@ -34,7 +35,7 @@ class _RuntimeViewState extends State<RuntimeView> {
   RuntimeCoordinator get runtime => widget.runtime;
   ProfileController? _profiles;
   McpSettingsController? _settings;
-  FoundationSection _section = FoundationSection.servers;
+  OwnedSettingsRoute _applicationSettings = OwnedSettingsRoute();
   MonitoringOwner? get _monitoring =>
       widget.monitoring ?? widget.features?.monitoring;
   @override
@@ -47,9 +48,10 @@ class _RuntimeViewState extends State<RuntimeView> {
   void _syncMonitoring() => _monitoring?.setActive(
     runtime.acceptsOperations &&
         runtime.window != WindowState.trayHidden &&
-        _section == FoundationSection.servers,
+        !_applicationSettings.isOpen,
   );
   void _runtimeChanged() {
+    if (!runtime.acceptsOperations) _release();
     _syncMonitoring();
     if (mounted) setState(() {});
   }
@@ -64,12 +66,16 @@ class _RuntimeViewState extends State<RuntimeView> {
     final oldMonitoring =
         oldWidget.monitoring ?? oldWidget.features?.monitoring;
     if (oldMonitoring != _monitoring) oldMonitoring?.setActive(false);
-    if (oldWidget.features != widget.features || !runtime.acceptsOperations)
+    if (oldWidget.runtime != widget.runtime ||
+        oldWidget.features != widget.features ||
+        !runtime.acceptsOperations)
       _release();
     _syncMonitoring();
   }
 
   void _release() {
+    _applicationSettings.retire();
+    _applicationSettings = OwnedSettingsRoute();
     _profiles?.dispose();
     _settings?.dispose();
     _profiles = null;
@@ -91,6 +97,22 @@ class _RuntimeViewState extends State<RuntimeView> {
       actor: f.actors.ui,
       retryTransport: f.retryMcp,
       transportError: () => f.mcpError,
+    );
+  }
+
+  Future<void> _openApplicationSettings() async {
+    if (_applicationSettings.isOpen ||
+        !runtime.acceptsOperations ||
+        _settings == null)
+      return;
+    final session = _applicationSettings, settings = _settings!;
+    await session.show(
+      context,
+      child: McpSettingsView(controller: settings),
+      onChanged: () {
+        if (mounted && identical(session, _applicationSettings))
+          _syncMonitoring();
+      },
     );
   }
 
@@ -145,41 +167,52 @@ class _RuntimeViewState extends State<RuntimeView> {
             ],
           )
         : content;
+    final status = DeckStatus(
+      label: switch (runtime.state) {
+        RuntimeState.running => 'Приложение готово',
+        RuntimeState.starting => 'Запуск',
+        RuntimeState.storageBlocked => 'Данные недоступны',
+        _ => 'Завершение работы',
+      },
+      tone: runtime.acceptsOperations
+          ? DeckTone.available
+          : DeckTone.unavailable,
+    );
+    final recovery = !runtime.trayAvailable
+        ? DeckButton(
+            child: const Text('Повторить создание значка'),
+            onPressed: runtime.retryTray,
+          )
+        : null;
+    if (runtime.acceptsOperations && _profiles != null) {
+      return ProfileViewPanel(
+        controller: _profiles!,
+        pickKey: widget.features!.platform.pickPrivateKey,
+        monitoring: _monitoring,
+        journals: widget.features?.journals,
+        applicationStatus: status,
+        onApplicationSettings: _openApplicationSettings,
+        runtimeNotice: !runtime.trayAvailable
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const DeckNotice(
+                    title: 'Значок трея недоступен',
+                    message: 'Окно останется доступным.',
+                    tone: DeckTone.error,
+                  ),
+                  recovery!,
+                ],
+              )
+            : null,
+      );
+    }
     return FoundationShell(
       state: ReadinessState.ready,
-      onSectionChanged: (section) {
-        _section = section;
-        _syncMonitoring();
-      },
-      servers: runtime.acceptsOperations && _profiles != null
-          ? ProfileViewPanel(
-              controller: _profiles!,
-              pickKey: widget.features!.platform.pickPrivateKey,
-              monitoring: _monitoring,
-            )
-          : body,
-      software: body,
-      settings: runtime.acceptsOperations && _settings != null
-          ? McpSettingsView(controller: _settings!)
-          : body,
-      fallbackContent: body,
-      status: DeckStatus(
-        label: switch (runtime.state) {
-          RuntimeState.running => 'Приложение готово',
-          RuntimeState.starting => 'Запуск',
-          RuntimeState.storageBlocked => 'Данные недоступны',
-          _ => 'Завершение работы',
-        },
-        tone: runtime.acceptsOperations
-            ? DeckTone.available
-            : DeckTone.unavailable,
-      ),
-      recoveryAction: !runtime.trayAvailable
-          ? DeckButton(
-              child: const Text('Повторить создание значка'),
-              onPressed: runtime.retryTray,
-            )
-          : null,
+      sidebar: const Text('Серверы'),
+      child: SingleChildScrollView(child: body),
+      status: status,
+      recoveryAction: recovery,
     );
   }
 

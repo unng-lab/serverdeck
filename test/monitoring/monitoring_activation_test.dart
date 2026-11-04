@@ -10,7 +10,7 @@ import '../runtime/fakes.dart';
 
 void main() {
   testWidgets(
-    'runtime binds monitoring only to servers and visible/tray state',
+    'runtime keeps server workspace monitoring active until tray or disposal',
     (tester) async {
       final h = MonitoringHarness();
       addTearDown(h.dispose);
@@ -29,16 +29,6 @@ void main() {
           theme: BrandTheme.dark,
           home: RuntimeView(runtime: runtime, monitoring: h.owner),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(h.owner.active, isTrue);
-      await tester.tap(
-        find.byKey(const ValueKey('foundation-navigation-settings')),
-      );
-      await tester.pumpAndSettle();
-      expect(h.owner.active, isFalse);
-      await tester.tap(
-        find.byKey(const ValueKey('foundation-navigation-servers')),
       );
       await tester.pumpAndSettle();
       expect(h.owner.active, isTrue);

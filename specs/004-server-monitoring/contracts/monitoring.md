@@ -1,5 +1,6 @@
 # Monitoring contract v1
 
+
 ## Application boundary
 
 No new external API/MCP. MonitoringOwner receives AppOperations, UiActor,
@@ -143,7 +144,7 @@ owns monitor beyond widget lifetime so manual-stop marks survive screen rebuilds
 C21 metric label CPU/RAM/Диск /, one decimal percent; `<90,0` for rounding across
 threshold. Only fresh≥90 error tone with «Порог достигнут: CPU ≥ 90%» (or RAM/Диск /).
 Fresh normal «Актуально», stale «Устарело», missing value null; old invalid sample
-«Устарело: данные недоступны». C18 per-metric last successful local date/time.
+«Устарело: данные недоступны». Time labels only in C22 history, not current readings.
 C10 aggregate critical/partial/waiting/paused independent; preserve trust warnings.
 C11 safe reason and next action. Per-source failures each have a notice titled
 with the metric name, preserving every distinct cause/action even when multiple
@@ -177,3 +178,38 @@ Transient inactivity masks snapshot status as paused while inactive but does not
 overwrite a stored server failure/disconnected reason. Cached readings still become
 stale and CPU baseline clears; on activation canonical disconnected/failed state
 is restored without leaving a permanent paused next-action on an active screen.
+
+
+## Текущее представление2026-11-04
+C07 содержит компактныеC21 иC09; отсутствие timestamp/age/history в сводке и настройках; C22 во вкладке «Мониторинг» показывает временную историю. Freshness15s/threshold90% остаютсяв модели. LiveC12подробности/CRUD/trust/phrase — [поток003](../../003-ssh-mcp/contracts/profile-workflow.md); там доступны per-metric safe reason/next action. Default C21 сохранён как текущий полный вариант, compact — дополнительный текущий вариант001, не compatibilityshim.
+
+
+## Workspace override2026-11-04
+Ссылки на details modal выше заменены обычной рабочей областью выбранного сервера003.
+Мониторинг active во всех её вкладках, global MCP route pauses как inactive004,
+с сохранением SSH и возвратом контекста. [Текущий контракт](../../003-ssh-mcp/contracts/server-workspace.md)
+определяет sidebar mapping/error priority/tooltip privacy. Collector/scheduler/schema
+не меняются; новых remote функций ПО/logs/jobs нет.
+
+## History internal boundary
+
+MonitoringHistoryStore.load(profileId,connectionRevision) → String? payload;
+save(profileId,connectionRevision,payload,canCommit) → Future<void>. Conditional
+save checks profile existence/revision plus synchronous canCommit() in actual
+writer transaction; a rejected stale save is a no-op. No public/MCP interface.
+WorkspaceDomainRepository implements through single WorkspaceStore; DomainRepository
+includes this capability so all unit fake repositories provide current behavior.
+MonitoringOwner.history(profileId,expectedConnectionRevision) returns immutable points filtered by TTL;
+historyError(profileId,expectedConnectionRevision) indicates fixed safe failure; retryHistory(profileId,expectedConnectionRevision) reloads
+if read failed then merges pending live points, otherwise retries dirty save.
+Load identity/revision fenced; corruption blocks overwrite. Bounded/coalesced writes.
+Active1s tick prunes memory; minute cleanup writes pruned state, as do reads/collections.
+Freshness/critical ignore history. Whole failed collections append all null; partial
+uses null only for failing source. Cancelled/late collection appends nothing.
+New segments break on session/resume/restart/clock rollback. No invented pause samples.
+C11 «История мониторинга недоступна» with C02 «Повторить сохранение истории».
+C22 row fields receivedAt ISO UTC,cpuPercent,memoryUsedPercent,rootDiskUsedPercent,
+breakBefore(bool); text alternative permitted only here, not in current C21/settings.
+
+
+History projection,error and retry require the connectionRevision of the selected profile details. A cached entry at another revision returns no points/error and cannot retry, even while reconciliation waits/fails (FR-425,T035).

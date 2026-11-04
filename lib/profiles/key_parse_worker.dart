@@ -8,9 +8,6 @@ import '../runtime/owned_work.dart';
 import 'credential_parser.dart';
 import 'key_envelope.dart';
 
-typedef CredentialCancelled = WorkCancelled;
-typedef CredentialCancellation = WorkCancellation;
-
 final class KeyParseRequest {
   KeyParseRequest(Uint8List bytes, this.passphrase)
     : bytes = Uint8List.fromList(bytes);
@@ -28,20 +25,19 @@ abstract interface class KeyParseWorker
 typedef SpawnKeyWorker = Future<KeyParseWorker> Function(
   KeyParseRequest request,
 );
-typedef ScheduleKeyDeadline = ScheduleOwnedDeadline;
 
 abstract interface class KeyInspector {
   Future<KeyInspection> inspect(
     Uint8List bytes, {
     String? passphrase,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
     Duration timeout = const Duration(seconds: 30),
   });
 }
 
 /// Bounded owner for CPU-bound parsing; no external processes or network.
 final class CancellableKeyParser implements KeyInspector, RuntimeCapability {
-  CancellableKeyParser({SpawnKeyWorker? spawn, ScheduleKeyDeadline? schedule})
+  CancellableKeyParser({SpawnKeyWorker? spawn, ScheduleOwnedDeadline? schedule})
     : _pool = OwnedWorkerPool<KeyParseRequest, ParsedPrivateKey>(
         id: 'credential-parser',
         spawn: spawn ?? spawnKeyParseWorker,
@@ -59,13 +55,13 @@ final class CancellableKeyParser implements KeyInspector, RuntimeCapability {
   Future<ParsedPrivateKey> parse(
     Uint8List bytes, {
     String? passphrase,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
     Duration timeout = maxDuration,
   }) {
     if (_pool.isStopped)
       return Future.error(const OperationFailure(FailureCode.shuttingDown));
     if (cancellation?.isCancelled ?? false)
-      return Future.error(const CredentialCancelled());
+      return Future.error(const WorkCancelled());
     if (bytes.isEmpty || bytes.length > 1024 * 1024) {
       return Future.error(
         const OperationFailure(
@@ -125,7 +121,7 @@ final class CancellableKeyParser implements KeyInspector, RuntimeCapability {
   Future<KeyInspection> inspect(
     Uint8List bytes, {
     String? passphrase,
-    CredentialCancellation? cancellation,
+    WorkCancellation? cancellation,
     Duration timeout = maxDuration,
   }) async {
     final parsed = await parse(
@@ -177,7 +173,7 @@ Future<KeyParseWorker> spawnKeyParseWorker(KeyParseRequest request) async {
 void _parseEntry((SendPort, Uint8List, String?) request) {
   ParsedPrivateKey? parsed;
   try {
-    parsed = parseOpenSshKey(request.$2, passphrase: request.$3);
+    parsed = parsePrivateKey(request.$2, passphrase: request.$3);
     // send copies the graph; clear the sender's owned key before natural exit.
     request.$1.send(parsed);
   } on OperationFailure catch (error) {

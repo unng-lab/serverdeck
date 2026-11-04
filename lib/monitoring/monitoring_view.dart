@@ -1,10 +1,50 @@
 import 'package:flutter/material.dart' hide ConnectionState;
 
+import 'monitoring_history.dart';
+
 import '../domain/models.dart';
 import '../domain/error_presentation.dart';
 import '../ui/deck_components.dart';
 import 'monitoring_models.dart';
 import 'monitoring_owner.dart';
+
+class MonitoringHistoryPanel extends StatelessWidget {
+  const MonitoringHistoryPanel({
+    super.key,
+    required this.owner,
+    required this.profileId,
+    required this.connectionRevision,
+  });
+  final MonitoringOwner owner;
+  final String profileId;
+  final int connectionRevision;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (owner.historyError(profileId, connectionRevision)) ...[
+        const DeckNotice(
+          title: 'История мониторинга недоступна',
+          message: 'Не удалось прочитать или сохранить историю этого сервера.',
+          nextStep: 'Повторите сохранение истории. Текущие метрики продолжают обновляться.',
+          tone: DeckTone.warning,
+        ),
+        DeckButton(
+          onPressed: () => owner.retryHistory(profileId, connectionRevision),
+          child: const Text('Повторить сохранение истории'),
+        ),
+      ],
+      DeckHistory(
+        points: HistoryCodec.chart(
+          owner.history(profileId, connectionRevision),
+        ),
+        maxPoints: HistoryCodec.maxPoints,
+        periodLabel: 'Последний час',
+      ),
+    ],
+  );
+}
 
 /// C02/C11 global recovery controls; no credentials or remote errors in this view.
 class MonitoringControls extends StatelessWidget {
@@ -76,9 +116,12 @@ class MonitoringReadings extends StatelessWidget {
     super.key,
     required this.snapshot,
     required this.now,
+    this.compact = false,
+    this.detailsOnly = false,
   });
   final MonitoringSnapshot snapshot;
   final Duration now;
+  final bool compact, detailsOnly;
   @override
   Widget build(BuildContext context) {
     final connection = snapshot.connection;
@@ -95,6 +138,99 @@ class MonitoringReadings extends StatelessWidget {
       );
     }
 
+    Widget noticesPanel() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (connection?.failureCode != null)
+          DeckNotice(
+            title: 'Состояние подключения',
+            message: OperationPresentation.of(
+              OperationFailure(connection!.failureCode!),
+            ).message,
+            nextStep: OperationPresentation.of(
+              OperationFailure(connection.failureCode!),
+            ).nextStep,
+            tone: DeckTone.error,
+          )
+        else if (snapshot.statusReason != null)
+          noticeFor(snapshot.statusReason!)
+        else
+          for (final kind in MetricKind.values)
+            if (snapshot.readings[kind]!.reason != null &&
+                snapshot.readings[kind]!.reason != MonitoringReason.baseline &&
+                snapshot.readings[kind]!.reason != MonitoringReason.waiting)
+              noticeFor(snapshot.readings[kind]!.reason!, metric: kind.label),
+      ],
+    );
+    if (detailsOnly) return noticesPanel();
+    if (compact)
+      return Wrap(
+        spacing: 24,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (connection != null)
+            DeckStatus(
+              label: _connectionLabel(connection.state),
+              iconOnly: true,
+              icon: connected ? Icons.power_outlined : Icons.link_off,
+              tone: connected ? DeckTone.available : DeckTone.neutral,
+            ),
+          if (critical)
+            const DeckStatus(
+              label: 'Порог достигнут',
+              tone: DeckTone.error,
+              iconOnly: true,
+              icon: Icons.error_outline,
+            ),
+          if (partial)
+            const DeckStatus(
+              label: 'Частичные данные',
+              tone: DeckTone.warning,
+              iconOnly: true,
+              icon: Icons.warning_amber_rounded,
+            ),
+          if (!critical && !partial)
+            DeckStatus(
+              iconOnly: true,
+              icon: Icons.check_circle_outline,
+              label: snapshot.readings.values.every((r) => r.isFresh(now))
+                  ? 'Данные актуальны'
+                  : snapshot.collecting
+                  ? 'Собираем данные'
+                  : 'Нет свежих данных',
+              tone: snapshot.readings.values.every((r) => r.isFresh(now))
+                  ? DeckTone.available
+                  : snapshot.collecting
+                  ? DeckTone.running
+                  : DeckTone.neutral,
+            ),
+          for (final kind in MetricKind.values)
+            DeckMetric(
+              compact: true,
+              label: switch (kind) {
+                MetricKind.cpu => 'Процессор (CPU)',
+                MetricKind.memory => 'Оперативная память (RAM)',
+                MetricKind.disk => 'Диск /',
+              },
+              icon: switch (kind) {
+                MetricKind.cpu => Icons.memory_outlined,
+                MetricKind.memory => Icons.developer_board_outlined,
+                MetricKind.disk => Icons.storage_outlined,
+              },
+              value: snapshot.readings[kind]!.formattedPercent,
+              unit: '%',
+              contextLabel:
+                  snapshot.readings[kind]!.isFresh(now) &&
+                      !snapshot.readings[kind]!.isCritical(now)
+                  ? null
+                  : _metricStatus(kind, snapshot.readings[kind]!),
+              tone: snapshot.readings[kind]!.isCritical(now)
+                  ? DeckTone.error
+                  : DeckTone.neutral,
+            ),
+        ],
+      );
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -136,31 +272,7 @@ class MonitoringReadings extends StatelessWidget {
               ),
           ],
         ),
-        for (final kind in MetricKind.values)
-          if (snapshot.readings[kind]!.displayAt != null)
-            DeckKeyValue(
-              label: '${kind.label}: обновлено',
-              value: _time(snapshot.readings[kind]!),
-            ),
-        if (connection?.failureCode != null)
-          DeckNotice(
-            title: 'Состояние подключения',
-            message: OperationPresentation.of(
-              OperationFailure(connection!.failureCode!),
-            ).message,
-            nextStep: OperationPresentation.of(
-              OperationFailure(connection.failureCode!),
-            ).nextStep,
-            tone: DeckTone.error,
-          )
-        else if (snapshot.statusReason != null)
-          noticeFor(snapshot.statusReason!)
-        else
-          for (final kind in MetricKind.values)
-            if (snapshot.readings[kind]!.reason != null &&
-                snapshot.readings[kind]!.reason != MonitoringReason.baseline &&
-                snapshot.readings[kind]!.reason != MonitoringReason.waiting)
-              noticeFor(snapshot.readings[kind]!.reason!, metric: kind.label),
+        noticesPanel(),
       ],
     );
   }
@@ -181,20 +293,6 @@ class MonitoringReadings extends StatelessWidget {
     if (reading.reason == MonitoringReason.baseline)
       return 'Ожидаем следующий замер CPU';
     return 'Нет данных';
-  }
-
-  String _time(MetricReading reading) {
-    final at = DateTime.fromMillisecondsSinceEpoch(
-      reading.displayAt!,
-      isUtc: true,
-    ).toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    final stamp =
-        '${at.year}-${two(at.month)}-${two(at.day)} ${two(at.hour)}:${two(at.minute)}:${two(at.second)}';
-    final age = reading.receivedAt == null
-        ? 0
-        : (now - reading.receivedAt!).inSeconds.clamp(0, 2147483647);
-    return '$stamp · $age с назад';
   }
 }
 

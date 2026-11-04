@@ -1,5 +1,6 @@
 # Implementation Plan: 004 — Базовый мониторинг серверов
 
+
 **Branch**: `main` (не создавалась новая ветка) | **Date**: 2026-11-04 | **Spec**: [spec.md](spec.md)
 
 ## Summary
@@ -11,7 +12,7 @@ MonitoringOwner планирует сбор трёх метрик Linux чере
 ## Technical Context
 
 - Dart ≥3.13.5 / Flutter из pubspec, Windows C++17, существующий vendored dartssh2.
-- Isar community 3.4.1 без миграции: измерения только в памяти.
+- Isar community 3.4.1, текущий format3 без миграции; history persists, freshness runtime-only.
 - Служебный native marker запуска хранится отдельно от Isar, без секретов.
 - Target Windows 10/11 x64; Linux server: POSIX sh, uname, cat, df -Pk, /proc.
 - Максимум 4 сбора и 4 auto attempts, 5s deadline, 65536 bytes stdout+stderr,
@@ -45,7 +46,7 @@ MonitoringOwner планирует сбор трёх метрик Linux чере
 | lib/monitoring/linux_metrics.dart | Константная команда, strict parser |
 | lib/monitoring/monitoring_port.dart | Internal canonical liveness/auto-admission/collection capability |
 | lib/monitoring/monitoring_owner.dart | Fair queues, deadlines, freshness, auto attempts |
-| lib/monitoring/monitoring_view.dart | C21/C10/C11/C18 composition |
+| lib/monitoring/monitoring_view.dart | C21/C10/C11 composition; no UI time log |
 | lib/connections/connection_owner.dart | Owner-only admission, session/version fences |
 | lib/connections/ssh_transport.dart | Typed monitoring-only capability |
 | third_party/dartssh2/lib/src/ssh_client.dart, ssh_channel.dart | Cancellable bounded channel operation |
@@ -74,3 +75,53 @@ Reconcile на activation и 1s tick, coalesced; stale async reconcile fenced ep
 
 Отклонений от конституции нет. Узкий vendor patch обязателен для cancellation
 до exec ACK и ограничения раннего вывода. Обычный execute/run не подходит.
+
+
+## Компактное представление2026-11-04
+MonitoringReadings.compact + C21compact/C07trailing в profile_view; убрать _time и timestamp/age widgets, не модель времени. Подробные metric notices находятся внутри модального003. Изменение общегоDeckMetric выполняетсяв001/R014, componentunits отдельно. No newpackage/schema/service. После кода — функциональныетестыmonitoring/profiles сfakes, без screendesignchecks; independentreview иcurrentSpecKit analyze/converge004.
+
+
+## Server workspace monitoring presentation
+MonitoringReadings compact всегда icon+value/C14 tooltip, aggregate connection and
+freshness используют C10 iconOnly с разными символами. Public model state остаётся
+единственным источником 15s/90% semantics. Sidebar status берётся из current public
+connection/trust/monitoring projections, never widget timer inference of successful SSH.
+Runtime activation относится ко всей server workspace, global MCP overlay pauses.
+Detailed safe source reasons переходят из details modal в рабочую область003.
+
+## US4 — Hour history
+
+FR-422–426/AC-419–422. MonitoringOwner owns bounded history and writes through
+MonitoringHistoryStore implemented by WorkspaceDomainRepository, same WorkspaceStore.
+Required capability (also on unit fakes), no optional production memory fallback.
+lib/monitoring/monitoring_history.dart: typed points/strict codec,720 rows/profile,
+192KiB UTF8 payload/profile,1h TTL. At1000 profiles≤192MiB payload. Existing≤64 SSH.
+MonitoringHistoryRecord collection: unique profileId,connectionRevision,payload JSON.
+Current format3 is the only manifest/AppSettings format. Prior2 explicitly rejected
+before DB open without migration/backfill/deletion, per ConstitutionVI. Update002/003
+current storage contracts/models/guards and generated schema directly, preserving
+historical completed task/review evidence. No external runtime/new release dependency.
+
+Per profile read once/revision; writes coalesce (one in flight/profile), serialized
+by store. Commit condition rechecks profile existence/revision and owner lease.
+Previously valid queued samples may persist after disconnect, but not after owner
+retirement/revision/delete; accepted point belongs to its original historical segment.
+Profile delete/revision edit atomically deletes history. Shutdown drains admitted writes.
+History load is allowed while startupBlocked and never restores SSH/live readings.
+Load failure/corrupt blocks overwrite; pending live rows stay bounded, retry reloads
+and merges unique (time,segment) rows. Write failure retains dirty history for retry.
+Prune on read/write and active minute tick; no background process while app closed.
+UTC TTL excludes future points and ages≥1h; in-process monotonic age also bounds TTL.
+Clock rollback starts a new segment; same-time points replace previous point in segment.
+New session/resume/restart changes segment. Errors append nulls, never cached stale values.
+
+Extend shared C22 in scope001: maxPoints1..720(default120),periodLabel,
+finite num0..100,breakBefore. Existing default10min is unchanged; feature passes720
+and «Последний час». C22 consumes ISO UTC receivedAt and nullable CPU/RAM/disk;
+text alternative gives time/percent. No polling or persistence in widget.
+C16 fifth tab between jobs/settings, C11 safe storage error/C02 retry.
+Unit fake storage/clock/source functional checks, shared component units separately001;
+no feature layout/integration/real Isar/product-launch gates.
+
+
+History projection,error and retry require the connectionRevision of the selected profile details. A cached entry at another revision returns no points/error and cannot retry, even while reconciliation waits/fails (FR-425,T035).

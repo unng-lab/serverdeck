@@ -1,3 +1,5 @@
+import '../fixtures/key_material.dart';
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -37,8 +39,15 @@ final class Harness {
       final bytes = fixture(keyName);
       identity = OwnedPrivateIdentity(
         file: bytes,
+        publicHint: readPublicKeyHint(
+          bytes,
+          publicKeyBytes: fixturePublicBytes(bytes),
+        ),
         credentialRevision: 9,
-        expected: readPublicKeyHint(bytes).inspection,
+        expected: readPublicKeyHint(
+          bytes,
+          publicKeyBytes: fixturePublicBytes(bytes),
+        ).inspection,
         signer: signer,
         checkAdmission: (revision) {
           expect(revision, 9);
@@ -82,7 +91,7 @@ final class Harness {
     );
     client.done.ignore();
   }
-  final host = parseOpenSshKey(fixture('ed25519'));
+  final host = parsePrivateKey(fixture('ed25519'));
   final verifier = HostSignatureVerifier(), signer = PrivateSigner();
   late final MemoryAuthPeer peer;
   late final SSHClient client;
@@ -299,7 +308,7 @@ void main() {
   );
   test('verified different host during rekey closes and reports raw changed blob without auth', () async {
     final changed = Completer<(String, Uint8List)>();
-    final replacement = parseOpenSshKey(fixture('rsa2048'));
+    final replacement = parsePrivateKey(fixture('rsa2048'));
     final h = Harness(
       changed: (type, _, blob) =>
           changed.complete((type, Uint8List.fromList(blob))),

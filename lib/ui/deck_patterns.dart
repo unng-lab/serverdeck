@@ -115,41 +115,81 @@ class DeckListItem extends StatelessWidget {
     this.trailing,
     this.selected = false,
     this.onTap,
+    this.compact = false,
+    this.error = false,
+    this.statusLabel,
   });
   final String title;
   final String? description;
   final Widget? leading, trailing;
   final bool selected;
+  final bool compact, error;
+  final String? statusLabel;
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => DeckSurface(
     selected: selected,
+    error: error,
+    padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.all(16),
     onTap: onTap,
     semanticLabel: onTap == null ? null : title,
-    child: LayoutBuilder(
-      builder: (context, constraints) => Wrap(
-        spacing: 16,
-        runSpacing: 12,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          if (leading != null) leading!,
-          SizedBox(
-            width: (constraints.maxWidth - (leading == null ? 0 : 40)).clamp(
-              0,
-              320,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    child: compact
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (leading != null) ...[leading!, const SizedBox(width: 8)],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.labelLarge),
+                    if (description != null)
+                      Text(
+                        description!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    if (statusLabel != null)
+                      Text(
+                        statusLabel!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: error
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 6), trailing!],
+            ],
+          )
+        : LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                if (description != null) Text(description!),
+                if (leading != null) leading!,
+                SizedBox(
+                  width: (constraints.maxWidth - (leading == null ? 0 : 40))
+                      .clamp(0, 320),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (description != null) Text(description!),
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing!,
               ],
             ),
           ),
-          if (trailing != null) trailing!,
-        ],
-      ),
-    ),
   );
 }
 
@@ -193,26 +233,44 @@ class DeckTabs extends StatelessWidget {
   const DeckTabs({
     super.key,
     required this.labels,
+    required this.icons,
     required this.selected,
     required this.onSelected,
   });
   final List<String> labels;
+  final List<IconData> icons;
   final int selected;
   final ValueChanged<int>? onSelected;
   @override
-  Widget build(BuildContext context) => DeckActions(
-    children: [
-      for (var i = 0; i < labels.length; i++)
-        Semantics(
-          selected: i == selected,
-          child: DeckButton(
-            kind: i == selected ? DeckButtonKind.primary : DeckButtonKind.text,
-            onPressed: onSelected == null ? null : () => onSelected!(i),
-            child: Text(labels[i]),
+  Widget build(BuildContext context) {
+    assert(icons.length == labels.length);
+    return DeckActions(
+      children: [
+        for (var i = 0; i < labels.length; i++)
+          Semantics(
+            selected: i == selected,
+            child: Tooltip(
+              message: labels[i],
+              excludeFromSemantics: true,
+              child: DeckButton(
+                kind: i == selected
+                    ? DeckButtonKind.primary
+                    : DeckButtonKind.text,
+                onPressed: onSelected == null ? null : () => onSelected!(i),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ExcludeSemantics(child: Icon(icons[i])),
+                    const SizedBox(width: 8),
+                    Flexible(child: Text(labels[i])),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class DeckMetric extends StatelessWidget {
@@ -223,27 +281,70 @@ class DeckMetric extends StatelessWidget {
     this.unit,
     this.contextLabel,
     this.tone = DeckTone.neutral,
+    this.compact = false,
+    this.icon,
   });
   final String label;
   final String? value, unit, contextLabel;
   final DeckTone tone;
+  final bool compact;
+  final IconData? icon;
   @override
-  Widget build(BuildContext context) => DeckSurface(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DeckSectionHeader(title: label),
-        const SizedBox(height: 8),
-        Text(
-          value == null
-              ? 'Нет данных'
-              : '$value${unit == null ? '' : ' $unit'}',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        if (contextLabel != null) DeckStatus(label: contextLabel!, tone: tone),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => compact && icon != null
+      ? Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DeckStatus(
+              label:
+                  '$label: ${value ?? "Нет данных"}${value == null || unit == null ? "" : " $unit"}${contextLabel == null ? "" : ". $contextLabel"}',
+              icon: icon,
+              iconOnly: true,
+              tone: tone,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              value == null ? '—' : '$value${unit == null ? "" : " $unit"}',
+              style: TextStyle(
+                color: tone == DeckTone.error
+                    ? Theme.of(context).colorScheme.error
+                    : null,
+              ),
+            ),
+          ],
+        )
+      : compact
+      ? Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              value == null
+                  ? 'Нет данных'
+                  : '$value${unit == null ? '' : ' $unit'}',
+            ),
+            if (contextLabel != null)
+              DeckStatus(label: contextLabel!, tone: tone),
+          ],
+        )
+      : DeckSurface(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DeckSectionHeader(title: label),
+              const SizedBox(height: 8),
+              Text(
+                value == null
+                    ? 'Нет данных'
+                    : '$value${unit == null ? '' : ' $unit'}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              if (contextLabel != null)
+                DeckStatus(label: contextLabel!, tone: tone),
+            ],
+          ),
+        );
 }
 
 class DeckProgressStep {

@@ -514,8 +514,7 @@ const componentDocumentation = <String, Map<String, Object>>{
       'expandable details',
     ],
     'parameters': [
-      'DeckListItem(title, description, leading, trailing, selected, onTap)',
-      'DeckExpander',
+      'DeckListItem(title, description, leading, trailing, selected, onTap, compact=false, error=false, statusLabel)',
     ],
     'events': ['onTap', 'onExpansionChanged'],
     'variants': [
@@ -524,6 +523,8 @@ const componentDocumentation = <String, Map<String, Object>>{
       'выбор',
       'раскрытие',
       'адаптивная карточка',
+      'compact server row',
+      'selected error row',
     ],
     'limitations': [
       'Не выводит факт связи/прав из названия или цвета',
@@ -635,16 +636,22 @@ const componentDocumentation = <String, Map<String, Object>>{
       'pending',
       'badge/chip count',
     ],
-    'parameters': ['DeckStatus(label, tone, pending)', 'Material Badge/Chip'],
+    'parameters': ['DeckStatus(label, tone, pending, icon, iconOnly=false)'],
     'events': ['Не генерирует серверных событий'],
-    'variants': ['все DeckTone', 'счётчик', 'текст + символ', 'pending'],
+    'variants': [
+      'все DeckTone',
+      'счётчик',
+      'текст + символ',
+      'pending',
+      'icon-only tooltip/focus',
+    ],
     'limitations': ['Статус не только цвет', 'unknown не success/zero'],
     'acceptanceCriteria': [
       'Все DeckTone имеют текст/символ',
       'reduced motion оставляет понятный pending',
     ],
     'usageExample':
-        'const DeckStatus(label: \'Неизвестно\', tone: DeckTone.unknown);',
+        "const DeckStatus(label: 'Неизвестно', tone: DeckTone.unknown);",
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'hover': 'Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.',
@@ -859,7 +866,7 @@ const componentDocumentation = <String, Map<String, Object>>{
   'C16': {
     'anatomy': ['Tabs', 'selected', 'disabled', 'breadcrumb', 'back'],
     'parameters': [
-      'DeckTabs(labels, selected, onSelected?)',
+      'DeckTabs(labels, icons, selected, onSelected?)',
       'DeckBreadcrumbs',
       'IconButton back',
     ],
@@ -873,7 +880,7 @@ const componentDocumentation = <String, Map<String, Object>>{
       'Tab/breadcrumb/back доступны',
       'disabled callbacks отсутствуют',
     ],
-    'usageExample': 'DeckTabs(labels: const [\'Обзор\', \'Журнал\'], selected: selectedTab, onSelected: onTabChanged);',
+    'usageExample': 'DeckTabs(labels: const [\'Обзор\', \'Журнал\'], icons: const [Icons.apps_outlined, Icons.description_outlined], selected: selectedTab, onSelected: onTabChanged);',
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'pending': 'Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.',
@@ -889,36 +896,26 @@ const componentDocumentation = <String, Map<String, Object>>{
     },
   },
   'C17': {
-    'anatomy': [
-      'Sidebar/rail/phone navigation',
-      'topbar',
-      'title',
-      'target',
-      'content slot',
-    ],
+    'anatomy': ['brand', 'sidebar slot', 'workspace slot', 'owner status'],
     'parameters': [
-      'FoundationShell(state, requestedSection, targetName, targetAddress, feature slots)',
-      'DeckPageBody',
+      'FoundationShell(state, sidebar, child, status, recoveryAction, onRetry, retryInProgress)',
     ],
-    'events': ['onSectionChanged', 'разрешённые callback владельца'],
+    'events': ['callbacks владельца слотов'],
     'variants': [
-      'sidebar/rail/phone navigation',
-      'topbar',
-      'заголовок',
-      'контекст цели',
-      'body/actions',
+      'server sidebar',
+      'workspace content',
+      'readiness',
+      'owner status/recovery',
     ],
     'limitations': [
-      'Навигация UI-only',
-      'readiness/private subtree управляет host',
-      'пять разделов',
+      'Навигация и полномочия принадлежат owner',
+      'Нет старого глобального section API',
     ],
     'acceptanceCriteria': [
-      'Порог 520/1060',
-      'context/draft сохраняются на resize',
-      'ready loss скрывает private context',
+      'Current slots сохраняют состояние при rebuild',
+      'Unavailable скрывает приватные sidebar/child inputs',
     ],
-    'usageExample': 'FoundationShell(state: readiness, servers: servers, software: software, settings: settings, targetName: targetName);',
+    'usageExample': 'FoundationShell(state: readiness, sidebar: serverSelector, child: workspace, status: ownerStatus);',
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'selected': 'Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом.',
@@ -1049,13 +1046,16 @@ const componentDocumentation = <String, Map<String, Object>>{
   },
   'C21': {
     'anatomy': ['Label', 'value', 'unit/limit', 'quality/source/time'],
-    'parameters': ['DeckMetric(label, value?, unit, contextLabel, tone)'],
+    'parameters': [
+      'DeckMetric(label, value, unit, contextLabel, tone, compact=false, icon)',
+    ],
     'events': ['Не создаёт событий'],
     'variants': [
       'значение/единица/лимит',
       'неизвестное',
       'stale/partial',
       'описание',
+      'compact icon metric',
     ],
     'limitations': [
       'Unknown value = нет данных',
@@ -1066,7 +1066,7 @@ const componentDocumentation = <String, Map<String, Object>>{
       'Реальный 0 отличается от missing',
       'stale/partial подписаны',
     ],
-    'usageExample': 'DeckMetric(label: \'CPU\', value: value, unit: \'%\', contextLabel: quality);',
+    'usageExample': "DeckMetric(label: 'CPU', value: value, unit: '%', contextLabel: quality);",
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'hover': 'Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.',

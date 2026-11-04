@@ -7,6 +7,7 @@ import 'package:serverdeck/domain/app_operations.dart';
 import 'package:serverdeck/domain/models.dart';
 import 'package:serverdeck/monitoring/linux_metrics.dart';
 import 'package:serverdeck/monitoring/monitoring_job.dart';
+import 'package:serverdeck/monitoring/monitoring_history.dart';
 import 'package:serverdeck/monitoring/monitoring_models.dart';
 import 'package:serverdeck/monitoring/monitoring_owner.dart';
 import 'package:serverdeck/monitoring/monitoring_port.dart';
@@ -212,8 +213,14 @@ final class MonitoringPort implements MonitoringConnectionPort {
 }
 
 final class MonitoringHarness {
-  MonitoringHarness({bool autoAllowed = true}) {
+  MonitoringHarness({
+    bool autoAllowed = true,
+    MemoryHistoryStore? historyStore,
+    String? ownerEpoch,
+  }) : historyStore = historyStore ?? MemoryHistoryStore(),
+       actors = ActorAuthority(ownerEpoch ?? mid(900)) {
     owner = MonitoringOwner(
+      historyStore: this.historyStore,
       operations: operations,
       actor: actors.ui,
       connections: port,
@@ -226,8 +233,9 @@ final class MonitoringHarness {
   final operations = MonitoringOperations(),
       port = MonitoringPort(),
       clock = MonitoringClock();
-  final actors = ActorAuthority(mid(900));
+  final ActorAuthority actors;
   late final MonitoringOwner owner;
+  final MemoryHistoryStore historyStore;
   void add(int n, {bool connected = false}) {
     operations.items.add(profile(n));
     if (connected) port.connected(mid(n));
@@ -252,5 +260,31 @@ final class MonitoringHarness {
     }
     await owner.dispose();
     await port.dispose();
+  }
+}
+
+final class MemoryHistoryStore implements MonitoringHistoryStore {
+  final values = <(String, int), String>{};
+  bool failRead = false, failWrite = false;
+  Completer<void>? holdWrite;
+  int writes = 0;
+  @override
+  String? loadHistory(String id, int revision) {
+    if (failRead) throw StateError('synthetic history read failure');
+    return values[(id, revision)];
+  }
+
+  @override
+  Future<void> saveHistory(
+    String id,
+    int revision,
+    String payload,
+    bool Function() canCommit,
+  ) async {
+    await holdWrite?.future;
+    if (!canCommit()) return;
+    if (failWrite) throw StateError('synthetic history write failure');
+    values[(id, revision)] = payload;
+    writes++;
   }
 }

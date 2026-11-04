@@ -10,11 +10,16 @@ final class MemoryDomain {
   AppSettings settings = AppSettings();
   SecurityState security = SecurityState()..protectedReceiptHmacKey = [1];
   final profiles = <String, Profile>{};
+  final journalSources = <String, JournalSource>{};
   final credentials = <String, Credential>{};
   final endpoints = <String, EndpointTrust>{};
   final grants = <String, McpGrant>{};
   final receipts = <(String, String), MutationReceipt>{};
+  final histories = <String, MonitoringHistoryRecord>{};
   MemoryDomain clone() => MemoryDomain()
+    ..journalSources.addAll(
+      journalSources.map((k, v) => MapEntry(k, copyJournalSource(v))),
+    )
     ..settings = copySettings(settings)
     ..security = copySecurity(security)
     ..profiles.addAll(profiles.map((k, v) => MapEntry(k, copyProfile(v))))
@@ -23,8 +28,16 @@ final class MemoryDomain {
     )
     ..endpoints.addAll(endpoints.map((k, v) => MapEntry(k, copyEndpoint(v))))
     ..grants.addAll(grants.map((k, v) => MapEntry(k, copyGrant(v))))
-    ..receipts.addAll(receipts.map((k, v) => MapEntry(k, copyReceipt(v))));
+    ..receipts.addAll(receipts.map((k, v) => MapEntry(k, copyReceipt(v))))
+    ..histories.addAll(histories.map((k, v) => MapEntry(k, copyHistory(v))));
 }
+
+MonitoringHistoryRecord copyHistory(MonitoringHistoryRecord value) =>
+    MonitoringHistoryRecord()
+      ..id = value.id
+      ..profileId = value.profileId
+      ..connectionRevision = value.connectionRevision
+      ..payload = value.payload;
 
 final class MemoryDomainRepository implements DomainRepository {
   MemoryDomain state = MemoryDomain();
@@ -35,6 +48,26 @@ final class MemoryDomainRepository implements DomainRepository {
   bool failCommit = false;
   int? receiptCountOverride;
   int committedWrites = 0;
+  @override
+  String? loadHistory(String id, int revision) => read((r) {
+    final value = r.history(id);
+    return value?.connectionRevision == revision ? value!.payload : null;
+  });
+  @override
+  Future<void> saveHistory(
+    String id,
+    int revision,
+    String payload,
+    bool Function() canCommit,
+  ) => write((r) {
+    if (!canCommit() || r.profile(id)?.connectionRevision != revision) return;
+    final value = r.history(id) ?? MonitoringHistoryRecord();
+    value
+      ..profileId = id
+      ..connectionRevision = revision
+      ..payload = payload;
+    r.putHistory(value);
+  });
   @override
   T read<T>(T Function(DomainRead) body) {
     final records = _MemoryRecords(
@@ -88,6 +121,31 @@ final class MemoryDomainRepository implements DomainRepository {
 }
 
 final class _MemoryRecords implements DomainTransaction {
+  @override
+  List<JournalSource> journalSources() {
+    check();
+    return state.journalSources.values.map(copyJournalSource).toList();
+  }
+
+  @override
+  JournalSource? journalSource(String id) {
+    check();
+    final v = state.journalSources[id];
+    return v == null ? null : copyJournalSource(v);
+  }
+
+  @override
+  void putJournalSource(JournalSource v) {
+    write('journal');
+    state.journalSources[v.sourceId] = copyJournalSource(v);
+  }
+
+  @override
+  void deleteJournalSource(String id) {
+    write('delete journal');
+    state.journalSources.remove(id);
+  }
+
   _MemoryRecords(
     this.state,
     this.writable,
@@ -99,6 +157,19 @@ final class _MemoryRecords implements DomainTransaction {
   final void Function(String) touch;
   final int? receiptCountOverride;
   bool active = true;
+  @override
+  MonitoringHistoryRecord? history(String id) {
+    check();
+    final value = state.histories[id];
+    return value == null ? null : copyHistory(value);
+  }
+
+  @override
+  void putHistory(MonitoringHistoryRecord value) {
+    write('history');
+    state.histories[value.profileId] = copyHistory(value);
+  }
+
   void check() {
     if (!active) throw StateError('Expired record view');
   }
@@ -211,6 +282,22 @@ final class _MemoryRecords implements DomainTransaction {
   @override
   void putProfile(Profile v) {
     write('profile');
+    final oldJournalProfile = state.profiles[v.profileId];
+    if (oldJournalProfile != null &&
+        oldJournalProfile.connectionRevision != v.connectionRevision) {
+      for (final source in state.journalSources.values.where(
+        (s) => s.profileId == v.profileId,
+      )) {
+        source.connectionRevision = v.connectionRevision;
+        source.payload =
+            '{"version":1,"checkpoint":{},"entries":[],"partial":true}';
+      }
+    }
+    final previous = state.profiles[v.profileId];
+    if (previous != null &&
+        previous.connectionRevision != v.connectionRevision) {
+      state.histories.remove(v.profileId);
+    }
     if (state.profiles.containsKey(v.profileId) &&
         state.profiles[v.profileId]!.id != v.id)
       throw StateError('duplicate profile');
@@ -250,6 +337,8 @@ final class _MemoryRecords implements DomainTransaction {
   @override
   void deleteProfile(String id) {
     write('delete profile');
+    state.journalSources.removeWhere((_, s) => s.profileId == id);
+    state.histories.remove(id);
     state.profiles.remove(id);
   }
 
@@ -295,6 +384,7 @@ Credential copyCredential(Credential c) => Credential()
   ..protectedBytes = [...c.protectedBytes]
   ..publicKeyType = c.publicKeyType
   ..publicKeyBits = c.publicKeyBits
+  ..publicKeyBytes = c.publicKeyBytes == null ? null : [...c.publicKeyBytes!]
   ..secretRevision = c.secretRevision;
 EndpointTrust copyEndpoint(EndpointTrust e) => EndpointTrust()
   ..id = e.id
@@ -338,3 +428,14 @@ MutationReceipt copyReceipt(MutationReceipt r) => MutationReceipt()
   ..entityIds = [...r.entityIds]
   ..entityRevisions = [...r.entityRevisions]
   ..committedDataRevision = r.committedDataRevision;
+
+JournalSource copyJournalSource(JournalSource v) => JournalSource()
+  ..id = v.id
+  ..sourceId = v.sourceId
+  ..profileId = v.profileId
+  ..connectionRevision = v.connectionRevision
+  ..kind = v.kind
+  ..target = v.target
+  ..name = v.name
+  ..enabled = v.enabled
+  ..payload = v.payload;

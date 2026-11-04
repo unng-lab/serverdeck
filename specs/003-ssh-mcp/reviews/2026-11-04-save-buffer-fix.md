@@ -1,0 +1,11 @@
+# Private-key save buffer fix — 2026-11-04
+
+T050/T051 complete. Manual user diagnostic evidence identified UnsupportedError from clearing a read-only codec Uint8List in CredentialPreparer.prepare. The error masked successful DPAPI protection as storageUnavailable; picker cleanup and unprotect had the same buffer-ownership defect. NativePlatform now copies binary replies into detached writable caller-owned buffers; null picker cancellation remains null. No schema migration or user-data repair is required.
+
+Regression tests use real StandardMethodCodec and read-only encoded ByteData, synthetic RSA/password, memory repository and fake native replies. Against the old HEAD adapter, both actual form save cases and all three binary ownership tests fail (5 failures; cancellation passes). With the fix all6 pass. The successful form checks assert persisted protected bytes and dialog closure, without design/layout acceptance or real native/storage integration.
+
+Isolated workspace H:/projects/unng/serverdeck-key-save checks completed: exact format223/0, analyze0issues,493Flutter tests,2offline schema units,boundary56passed (output/key-save-fixed-unit.log); lychee147/0errors (output/key-save-fixed-links.log); Release build/static audits passed exit0 (output/key-save-fixed-build.log). EXE SHA256 e128e0fe9b274534fa82353f533f33703f1a9913113d10a5a2b25a7eb7f6084b.
+
+Independent read-only reviewer /root/review_save_buffer_fix found no issues, scoped increment ready. No integration/VM/real-Isar/design tests run. Updated EXE still awaits replacing the running diagnostic build and user retry; actual user save success is not claimed. Main workspace contains concurrent004 changes, excluded from the isolated release. Source correction/tests/contracts are also applied to main while preserving004 changes; main's own check evidence has separate scope.
+
+Main port checks completed: format246/0, analyze0issues,598Flutter tests,2offline schema units,boundary71passed (output/key-save-main-unit.log); links176/0errors (output/key-save-main-links.log). Independent read-only main-port review /root/review_save_fix_main_port: no findings, scoped port ready;004 additions preserved and excluded from readiness assessment. No source changes after reviews; task status narrative synchronized.

@@ -1,11 +1,12 @@
 # Implementation Plan: 003 — SSH и локальный MCP
 
+
 **Feature context**: `003-ssh-mcp` | **Date**: 2026-11-02 | **Spec**: [spec.md](spec.md)
 
 ## Summary
 
 На runtime002 добавляются domain owners профилей/SSH/доверия и MCP router.
-Единственный WorkspaceStore переходит в logical format2. UI и MCP вызывают один
+Единственный WorkspaceStore переходит в logical format3. UI и MCP вызывают один
 типизированный AppOperations; исключение — deleteProfile принимается только UI
 через неподделываемый внутренний UiActor, отсутствует в wire schemas/router.
 Стандартный stdio MCP идёт через transport-only ветку того же EXE к private Named Pipe.
@@ -16,7 +17,7 @@
 - **Dependencies**: Isar trio3.4.1, build_runner2.16.2 (--force-jit), vendored dartssh2
   upstream4.1.0 с минимальным policy/host-key hook patch. JSON-RPC/MCP небольшой
   allowlist router на dart:convert, без внешнего MCP server package/runtime.
-- **Storage**: полный format2 schema set, DPAPI blobs в Isar; credential export для
+- **Storage**: полный format3 schema set, DPAPI blobs в Isar; credential export для
   моста — производный protected blob, не вторая база. [Data model](data-model.md).
 - **Testing**: только unit dart/flutter_test с fake store/transport/clock и native
   CTest изолированных IPC adapters/codecs с synthetic identity hooks. SSH bytes
@@ -60,7 +61,7 @@
 | `lib/connections/connection_owner.dart`, `ssh_transport.dart`, `network_budget.dart` | attempt/session/generation, host verify, timers |
 | `lib/trust/trust_owner.dart` | endpoint trust/challenges/warning persistence/epoch |
 | `lib/mcp/router.dart`, `grant_owner.dart`, `pipe_adapter.dart`, `tool_schemas.dart` | allowlist+authorization+projection, no raw Isar |
-| `lib/storage/records.dart`, `migrations.dart`, `workspace_store.dart` | полный schema2 и atomic domain txn |
+| `lib/storage/records.dart`, `store_manifest.dart`, `workspace_store.dart` | полный schema2 и atomic domain txn |
 | `native/bootstrap/mcp_pipe.cpp`, `native/include/mcp_boundary.h`, `mcp_pipe.h`, `mcp_json.h` | stdio/pipe/Windows identities/DPAPI/export |
 | `third_party/dartssh2/`, `patches/dartssh2-4.1.0-policy.patch` | pinned upstream+small explicit patch, preserved license |
 | `test/domain/`, `test/mcp/`, `test/connections/`, `native/tests/` | functional/protocol/ACL/recovery |
@@ -318,3 +319,61 @@ privacy is registered in001/R013; its functional synthetic test and shared compo
 unit checks remain separate from feature-screen design (which is not tested).
 Python jsonschema4.26.0 is an offline test-tool dependency only, listed in
 `tools/unit-requirements.txt`; no Python/runtime is shipped or required by the app.
+
+
+## Текущий план уточнения профилей — 2026-11-04
+
+Пакет003 расширяется непосредственно, по constitution1.4.0/VI. [key-input](contracts/key-input.md), [profile-workflow](contracts/profile-workflow.md) — текущие контракты.
+P35: strict legacy_pem.dart + parsePrivateKey единственный parser API; Crypto внутри имеющихся4slot/30s workers, вход1MiB/phrase65536UTF8bytes, AES128/192/256CBC/DES3 и строгие DER/RSA proof. Vendor/runtime tools не добавлять.
+P36: KeyInspection→CredentialPreparer→ProfileOwner→Credential.publicKeyBytes: обязательная canonical public metadata дляprivateKey, null толькоpassword. Regenerate records.g.dart; snapshot/copier обязаны копировать bytes. Нет old-record fallback или backfill.
+P37: ConnectionOwner→PrivateKeyCredential→OwnedPrivateIdentity требуют явный PublicKeyHint; PrivateSignRequest получает frozenexpectedbytes, сравнение до подписи. Удалить старые aliases/optional compatibility arguments, обновить все callers/tests напрямую.
+P38: profile_form/controller возвращают ProfileSaveOutcome; profile_view C12 modal. Manualconnect после успешного commit, coalescing/promotion004; oneprompt ledger64tokens; секрет phrase принадлежит routeState до unmount.
+P39: VerificationLease удерживает controller/profile/exactattempt до позднего admission, cancelOwnedAttempt обходит толькоUIpending; backendauth/exactattempt/non-session guards остаются. Capture navigationgeneration/controller/profile до формы и повторно до/послеrefresh; позднийA не меняетB.
+P40: StoreBackend/migrations формат1 удаляются в scope002, оставшийся manifest/publication модуль store_manifest.dart принимаеттолькоformat3. Несовместимое отвергается до открытияDB, безreset.
+P41: После всего code — synthetic PEM/parser/signing/metadata/form/controller/modal tests, затем mandatoryformat/analyze/fluttertest/boundary/schemaunits/native(ifchanged)/lychee; C21sharedunits scope001. Fresh independentreview loop, analyze/converge текущего003; сборка одногоEXE с004.
+
+
+## План рабочей области сервера — 2026-11-04
+
+P42: Обновить C17 FoundationShell напрямую до sidebar/child/state/status/recovery
+слотов; старые FoundationSection и feature-specific slots удалить. C07 compact/error,
+C10 iconOnly/icon и C21 compact/icon оформить в001/R015, C13 reuse для вкладок.
+P43: ProfileViewPanel владеет выбранным server workspace и четырьмя вкладками.
+ProfileController добавляет public connections projection через getConnection;
+неуспех чтения не оставляет успешный статус. Поиск/CRUD слева; настройки профиля
+справа, C12 только формы/consent/phrase. Нет новых runtime dependencies/schema.
+P44: Сохранить verification lease и nonce ledger, заменить modal ownership на
+workspace navigation generation. Selection/deletion/global settings/controller/
+dispose инвалидируют continuations и закрывают собственный prompt. Late admission
+отменяется exact-attempt через canonical backend, established/new session сохраняется.
+P45: RuntimeView открывает общий MCP C12 из sidebar; active во всех server tabs,
+paused во время общей settings route, восстановление прежнего выбора при закрытии.
+Readiness/tray recovery и общий owner graph002 остаются. Текущий source of intent:
+[server workspace](contracts/server-workspace.md), заменяющий parts profile-workflow.
+P46: Сначала весь product code, затем обновление текущих functional tests/fakes и
+shared synthetic component tests, mandatory checks/links, fresh independent review,
+analyze/converge и один EXE. Никаких BC APIs, screen layout/VM/integration gates.
+
+
+## P47 — mandatory retirement corrections from implementation review
+T078 сохраняет prompt Route/NavigatorState до retirement и удаляет route after frame
+при controller rebind/dispose; никаких ancestor lookup из disposing contexts.
+T079: lib/runtime/owned_settings_route.dart owns global dialog/nested Navigator;
+RuntimeView binds it to exact runtime/features/settings session and retires before
+release. lib/mcp/settings_view.dart child dialogs use nearest Navigator and own
+name controller to actual unmount; settings_controller.dart blocks effects after
+dispose. New fake route/controller tests in test/runtime/owned_settings_route_test.dart,
+test/profiles/server_workflow_test.dart,test/mcp/settings_actions_test.dart.
+
+
+P48/T080: заменить special-prompt bookkeeping единым registry owned DialogRoute →
+NavigatorState для всех profile C12 в profile_view.dart, capture deletion controller/
+generation/selected identity до/после await. ProfileController._action disposed guard
+не касается cancelOwnedAttempt. Synthetic tests заполненных forms/deletion иsame-id
+replacement/subtree removal; обычный disposed dispatch denied, cleanup still allowed.
+
+
+P49/T081: _rowStatus различает null observation иknown unpinned. Нельзя заменять
+canonical connected/needPassphrase на inferred needTrust из отсутствующего/cached
+TrustView. Explicit needTrust и known disconnected unpinned сохраняют badge;
+failed getTrust иstale cached unpinned покрываются isolated fake widgets.

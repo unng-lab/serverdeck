@@ -21,7 +21,7 @@ void main() {
         test(
           'KEX ${negotiated.name} binds embedded $signatureType before host callback, worker=$useWorker',
           () async {
-            final parsed = parseOpenSshKey(
+            final parsed = parsePrivateKey(
               File('test/fixtures/ssh/rsa2048.txt').readAsBytesSync(),
             );
             final peer = MemoryKexPeer(
@@ -83,7 +83,7 @@ void main() {
       test(
         'Ed25519 KEX verifies exact blob before trust, tampered=$tamper worker=$useWorker',
         () async {
-          final parsed = parseOpenSshKey(
+          final parsed = parsePrivateKey(
             File('test/fixtures/ssh/ed25519.txt').readAsBytesSync(),
           );
           final peer = MemoryKexPeer(

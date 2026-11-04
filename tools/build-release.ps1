@@ -1,4 +1,6 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([string]$OutputDirectory = 'output/release')
+
+$ErrorActionPreference = 'Stop'
 Push-Location (Split-Path -Parent $PSScriptRoot)
 try {
     function Run-Checked([string]$Program, [string[]]$Arguments) {
@@ -11,7 +13,11 @@ try {
     }
     Run-Checked python @('tools/check-ssh-vendor.py')
     Run-Checked flutter @('pub', 'get', '--enforce-lockfile')
-    Run-Checked flutter @('build', 'windows', '--release')
+    Run-Checked flutter @('build', 'windows', '--release', '--no-tree-shake-icons')
+    $flutterRoot = Split-Path -Parent (Split-Path -Parent (Get-Command flutter).Source)
+    Run-Checked python @('tools/check-release-font.py',
+        '--bundled', 'build/windows/x64/runner/Release/data/flutter_assets/fonts/MaterialIcons-Regular.otf',
+        '--expected', "$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf")
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
     $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
     if (!$vs) { throw 'VS2022 Desktop C++ tools required' }
@@ -32,7 +38,6 @@ try {
     $licenseDirectory = Join-Path $tree 'licenses'
     New-Item -ItemType Directory -Force -Path $licenseDirectory | Out-Null
     Copy-Item -LiteralPath LICENSE -Destination "$licenseDirectory/ServerDeck.txt"
-    $flutterRoot = Split-Path -Parent (Split-Path -Parent (Get-Command flutter).Source)
     Copy-Item -LiteralPath "$flutterRoot/bin/cache/pkg/sky_engine/LICENSE" -Destination "$licenseDirectory/Flutter-engine.txt"
     $packageConfig = Get-Content -Raw .dart_tool/package_config.json | ConvertFrom-Json
     foreach ($name in @('isar_community', 'isar_community_flutter_libs', 'asn1lib', 'convert', 'meta', 'pointycastle', 'pinenacl')) {
@@ -54,9 +59,10 @@ try {
     Run-Checked cmake @('--build', 'build/bootstrap', '--config', 'Release')
     Run-Checked python @('tools/package-release.py', '--bootstrap', 'build/bootstrap/Release/ServerDeck.exe',
         '--output', $evidence, '--system', $systemDirectory)
-    New-Item -ItemType Directory -Force -Path output/release | Out-Null
-    Copy-Item -LiteralPath build/bootstrap/Release/ServerDeck.exe -Destination output/release/ServerDeck.exe
-    Get-FileHash -LiteralPath output/release/ServerDeck.exe -Algorithm SHA256
+    New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+    $outputExe = Join-Path $OutputDirectory 'ServerDeck.exe'
+    Copy-Item -LiteralPath build/bootstrap/Release/ServerDeck.exe -Destination $outputExe
+    Get-FileHash -LiteralPath $outputExe -Algorithm SHA256
 } finally {
     Pop-Location
 }

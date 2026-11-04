@@ -7,8 +7,8 @@
 
 | Record | Поля / инварианты |
 | --- | --- |
-| AppSettings (Isar id=1) | logicalFormat=1; settingsRevision≥1; dataRevision≥1; profilesListRevision≥1; theme=dark/light (default dark); mcpEnabled=false (зарезервировано); createdAt; lastSuccessfulOpenAt |
-| StoreManifest (CURRENT) | formatVersion=1; storeId UUID; relativeDirectory=`stores/<id>`; publicationVersion=1; никакого секрета |
+| AppSettings (Isar id=1) | logicalFormat=3; settingsRevision≥1; dataRevision≥1; profilesListRevision≥1; theme=dark/light (default dark); mcpEnabled=false (зарезервировано); createdAt; lastSuccessfulOpenAt |
+| StoreManifest (CURRENT) | formatVersion=3; storeId UUID; relativeDirectory=`stores/<id>`; publicationVersion=1; никакого секрета |
 | PayloadManifest (RCDATA) | format=1; hostAbi=1; platform=windows-x64; files path/size/sha256; payloadId=SHA256 canonical manifest bytes |
 | RuntimeDescriptor | ownerEpoch UUID; pid; processCreationTime (Windows FILETIME); userSid; logonSid; activation pipe name; actualExePath; protocolVersion=1 |
 
@@ -41,11 +41,7 @@ Stop admission и beginWrite проходят одним coordinator gate. На�
 
 ## Форматы и расширение
 
-002 понимает logical format 1 и только AppSettings collection. 003 открывает
-format 2 и добавляет записи своего [data-model](../003-ssh-mcp/data-model.md).
-Открытие format выше поддерживаемого запрещено до открытия Isar. Исходные данные
-не удаляются и не заменяются при ошибке. Схема Isar генерируется из versioned
-Dart models; сгенерированные файлы коммитятся и проверяются regeneration diff.
+Приложение использует текущий logical format3 с полным schema set [003](../003-ssh-mcp/data-model.md). Любой другой формат отвергается до открытия Isar. Миграций/old-schema adapters нет; при ошибке данные не удаляются и не заменяются. Schema генерируется из текущих Dart models, generated files проверяются вместе с текущим кодом.
 
 `dataRevision` увеличивается одной txn на каждое durable domain изменение;
 `profilesListRevision` — только при CRUD профилей, используется для cursor invalidation.

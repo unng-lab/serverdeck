@@ -111,6 +111,13 @@ final class MonitoringWidgetHarness {
     await tester.pump();
   }
 
+  Future<void> openDetails(WidgetTester tester) async {
+    await tester.tap(find.text(h.operations.items.first.displayName));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Настройки'));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> tick(WidgetTester tester, int seconds) async {
     h.clock.advance(Duration(seconds: seconds));
     await h.owner.reconcile();

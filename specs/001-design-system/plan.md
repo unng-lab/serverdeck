@@ -12,3 +12,15 @@ Flutter 3.47.7 / Dart 3.13.5. Единственный root package serverdeck. 
 Входы, события, варианты и приёмка каждого семейства — [контракт](component-library.md). Владельцы данных, авторизация и runtime будущего приложения определяются отдельно. Каталоги не содержат credentials и реальных подключений.
 
 Среда и проверки: [quickstart](quickstart.md). История прежних задач и страниц сохранена целиком во внешнем архиве из [RESET](../../RESET.md).
+
+
+## Server workspace extension2026-11-04
+R015 обновляет существующие C07/C10/C17/C21 напрямую и synthetic catalog. Общая
+геометрия остаётся внутри reusable components; feature uses C13/C14/C17 without
+local shell clones. Current-only API, no new palette/assets/dependency. Прочие
+разделы brandbook — исторические варианты, а не обязательная feature navigation.
+
+## C22 hour extension2026-11-04
+
+Support004/FR-422 through DeckHistory maxPoints1..720(default120),periodLabel,
+finite fractional percentages and breakBefore; synthetic component units only.

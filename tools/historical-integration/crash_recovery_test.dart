@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:serverdeck/storage/migrations.dart';
+import 'package:serverdeck/storage/store_manifest.dart';
 import 'package:serverdeck/storage/workspace_store.dart';
 
 void main() {

@@ -260,3 +260,68 @@ alongside the codec-only ipc_auth_test.cpp. No product acceptance gate is added.
 ## Phase 26: Convergence
 
 - [X] T049 CRITICAL переиспользовать C18 DeckKeyValue(selectable) для public fingerprints/JSON metadata и DeckCopyButton для token-free MCP configuration вместо ручного Clipboard callback. Functional synthetic unit проверяет exact public JSON copy и безопасный feedback при clipboard failure, без owner graph/реального clipboard/design acceptance. Mandatory Flutter/link/build checks и fresh independent review (Constitution I, FR305/319/320/334, T014/T020; contradicts).
+
+## Post-completion — Reported private-key save failure (2026-11-04)
+
+- [X] T050 Add bounded local diagnostic evidence for profile/command failures in `lib/runtime/local_diagnostics.dart`, injected from the composition root. File: `<dataRoot>/operation-diagnostics.json`, latest 8 in-process failures, max 12 method frames per failure. Store only fixed stage, runtime type, public failure-code enum and method names; never exception messages, input/credential bytes, passphrases, hostnames, paths or full stack traces. Failure to write diagnostics must not affect operation results. Cover redaction, retention and sink failure with synthetic unit inputs; run required checks and independent review.
+- [X] T051 Diagnose and correct the reported save failure using safe evidence; add isolated regression units for the confirmed cause. Preserve the user's existing database and credentials. No real-Isar/integration/VM tests. Do not declare the save defect resolved merely because the key parser accepts the converted key.
+
+
+T051 confirmed cause: NativePlatform returned read-only codec-owned Uint8List views. CredentialPreparer's finally wiped secret.protect output and threw UnsupportedError, masking successful protection (and potentially prior parser errors) as storageUnavailable. Picker cleanup and unprotect consumers had the same ownership mismatch. Fix all three typed-data replies at NativePlatform with detached writable copies; null picker cancellation preserved. `native_binary_ownership_test.dart` injects read-only encoded ByteData, not merely an unmodifiable value re-encoded by a mutable mock envelope. `profile_form_save_test.dart` exercises actual form/controller/ProfileOwner/CredentialPreparer/codec with synthetic RSA/password and in-memory repository. Both form cases and all three binary ownership tests fail against HEAD's old NativePlatform and pass with the fix; cancellation remains passing. No native OS/real credentials/real Isar used by regression tests. T051 mandatory checks and independent reviews completed; see reviews/2026-11-04-save-buffer-fix.md.
+
+
+## Уточнение профилей/ключей/модального потока — 2026-11-04
+
+Обновляется существующий003, без отдельного нового пакета. Constitution1.4.0/VI запрещает compatibility aliases, old-schema adapters, migrations/backfill доapp1.0. История прежних задач сохраняется; текущие решения ниже её заменяют. Весь productcode до обновления tests.
+
+- [X] T052 Уточнить существующие spec/plan/data-model/research/contracts/checklists003, связи001/002/004; выполнить clarify/checklist/analyze/linkcheck и independent package review до current-onlycleanup (FR-335–341).
+- [X] T053 RSA PEM/OpenSSH inputs в lib/profiles/legacy_pem.dart,credential_parser.dart,key_envelope.dart: strict PEM/DER/RSAproof, AES128/192/256CBC/DES3, input1MiB/phrase65536bytes/4workers30s; единственный parsePrivateKey API безalias (FR-335/341,AC-323,SC-310).
+- [X] T054 Mandatory canonical publicKeyBytes/type/bits дляprivateKey в lib/profiles/credential_input.dart,profile_owner.dart,lib/storage/records.dart/records.g.dart; null толькоpassword, nooldrecordfallback/backfill (FR-336/341,AC-324/330).
+- [X] T055 Required explicit PublicKeyHint в PrivateKeyCredential/OwnedPrivateIdentity, mandatorymetadata snapshot и frozenexpectedpublicbytes в lib/connections/connection_owner.dart,ssh_transport.dart,private_signer.dart; mismatch до подписи, originalbytesDPAPI, currentlabels/errors (FR-335/336,AC-323/324,SC-310).
+- [X] T056 Live C12 modal details/actions в lib/profiles/profile_view.dart вместо нижней панели, select/read безconnect; зависимости004/T026 и001/R014 (FR-337,AC-325).
+- [X] T057 ProfileSaveOutcome иpostcommit manualverify в lib/profiles/profile_form.dart,profile_controller.dart,profile_view.dart; new/connectionaffecting only, serializedfirsttrust/phrase, noautoaccept/rollback/retry (FR-338/340,AC-326/327,SC-311).
+- [X] T058 Changed-key/action badges иexplicittrustrecovery в lib/profiles/profile_view.dart; noordinary/backgroundmodal (FR-339,AC-328).
+- [X] T059 Удалить parseralias/optionalidentityfallback в003 и migration/copyStore в002/T044, обновить callers напрямую; userdata не стирать/автоматическинепереносить (FR-341,AC-330,ConstitutionVI).
+- [X] T060 После всегокода обновить currentAPIfixtures/deepcopies иsyntheticunits в test/profiles/,test/connections/,test/domain/: PEM/OpenSSH errors/DER/metadata/signature иmodal/save/actions; inputformats неoldapp-recordfallback (FR-335–341,SC-310–312).
+- [X] T061 Route-owned phrasecontroller доunmount в lib/profiles/profile_view.dart; clearonsubmit/cancel/dispose, repeated/stalerouteguards иfunctionalregression (FR-340,AC-329).
+- [X] T062 VerificationLease lateconnect/refresh, onStarted доrefresh иcancelOwnedAttempt безUIpendingsuppression в profile_view.dart/profile_controller.dart; canonicalexactattempt/nonsession/auth guards. Regressionlatepending/newattempt/establishedsession/refresh (FR-338/340,AC-327/329,SC-312).
+- [X] T063 Controller/profile/navigationgeneration binding до/послеpostsave refresh в profile_view.dart; lateA не меняетB/неоткрываетзакрытыйflow; two-profile regression (FR-339/340,AC-328/329,SC-312).
+- [X] T064 Mandatoryformat/analyze/fluttertest/boundary/schemaunits/nativeifchanged/sharedC21units иlychee; записатьфактическиеscope/results в reviews/profile-workflow.md (FR-335–341).
+- [X] T065 Полноеindependentreview существующих001/002/003/004 изменений послеchecks; confirmedfixes новымиtasks, rerunchecks/freshreviewдоclean (всеFR/AC/SCуточнения).
+- [X] T066 ФинальныеSpecKitanalyze/converge текущих003 и004; singleEXEbuild/staticaudit вместе004, безновогопакета/commit/pushбеззапроса (всеFR/AC/SC).
+
+Dependencies: T052→T053–T059+001R014/002T044/004T026→T060–T063→T064→T065→T066. T061–063 сохраняютfunctional/reviewcorrectionhistory. PlanP35→T053;P36→T054;P37→T055/059;P38→T056/057/061;P39→T062/063;P40→002T044;P41→T060/064–066. FR335→T053/055/060;FR336→T054/055/060;FR337→T056/060;FR338→T057/062/060;FR339→T058/063/060;FR340→T057/061/062/063/060;FR341→T053/054/059/002T044.
+
+## Исправления независимого ревью текущей реализации
+
+- [X] T067 Обрабатывать актуальный trust challenge перед terminal-state завершением onboarding в profile_view.dart, включая уже connected ветку _verifySaved. Functional units failed+replace и connected+retain проверяют явное согласие, отсутствие дублирования и отсутствие фоновых prompts. Сохранить nonce/revision guards и established session (FR-338–340, AC-326–329, review_current_packages_implementation P2).
+- [X] T068 Удалить CredentialCancelled/CredentialCancellation/ScheduleKeyDeadline aliases из key_parse_worker.dart; product/test callers и contracts/ssh.md используют WorkCancelled/WorkCancellation/ScheduleOwnedDeadline напрямую. После обоих fixes выполнить mandatory checks и свежее независимое ревью (FR-341, Constitution VI, review_current_packages_implementation P2).
+
+
+## Server workspace — утверждённая навигация2026-11-04
+
+- [X] T069 Обновить существующие001–004 spec/plan/model/research/contracts/checklists, выполнить clarify/analyze/lychee и independent package review; no newpackage (FR-342–347).
+- [X] T070 Обновить общие C07/C10/C17/C21 и catalog в scope001/R015: lib/ui/deck_patterns.dart,lib/ui/deck_components.dart,lib/shell/foundation_shell.dart,tool/component_catalog/examples.dart; прямое удаление старых slots/FoundationSection, безcompat shims (FR-342/346).
+- [X] T071 Реализовать selection/search/CRUD/sidebar и4server tabs/settings в lib/profiles/profile_view.dart,profile_controller.dart; immutable public connections map иunknown failures, no demo remote data (FR-342/343/345,AC-331/332/334).
+- [X] T072 Runtime композиция C17 иобщие MCP settings route изsidebar в lib/runtime/runtime_view.dart; active во всех tabs, overlay pause/restore, readiness/tray recovery;002/T045 (FR-343/347,AC-332).
+- [X] T073 Перенести onboarding ownership в workspace generation в lib/profiles/profile_view.dart: save exactid/filterclear, leave/deletion/controller/globalsettings/dispose retire prompts/lease, lateA/B иconnectedretain; сохранить routephrase controller/backend fences (FR-344,AC-333,SC-313).
+- [X] T074 Подключить sidebar priority/errorlabels иcompact icon metrics/status/tooltips в lib/profiles/profile_view.dart,lib/monitoring/monitoring_view.dart;004/T029, no time/secret data (FR-345/346,AC-334/335).
+- [X] T075 Только после всего product code обновить текущие callers/fakes/functional units в test/profiles/,test/monitoring/,test/runtime/ иshared synthetic tests test_design/components/; directcurrentAPI, no featurelayout/integration (все FR-342–347,SC-314).
+- [X] T076 Выполнить tools/test-unit.ps1, shared components unit suite, lychee; fix checks иполный независимый review/fix loop существующих001–004, actualevidence в reviews/server-workspace.md (все FR/AC/SC).
+- [X] T077 Финальные analyze/converge003/004, проверить001R015/002T045, собрать один EXE соstatic audit; без commit/push инового пакета (все FR/AC/SC).
+
+Dependencies: T069→T070–074→T075→T076→T077. Product implementation sequential where files overlap; no implementation subagents required. Independent package/code reviews обязательны. User override: весь code до tests; history прежних задач сохранена. FR342→T070/071;FR343→T071/072;FR344→T073;FR345→T071/074;FR346→T070/074;FR347→T072/004T029. P42→T070;P43→T071;P44→T073;P45→T072;P46→T075–077.
+
+## Workspace retirement review corrections
+
+- [X] T078 Удалять принадлежащие workspace trust/phrase routes при controller rebind (включая тот же selected ID) и dispose в lib/profiles/profile_view.dart; безопасное route retirement после frame, exact lease/nonce guards сохраняются. Functional rebind/removed-subtree units без screen geometry (FR-344, AC-333, review_server_workspace_implementation_1 P2).
+- [X] T079 Привязать общий MCP route и вложенные confirmation/input routes к конкретным runtime/features/settings owner; закрывать при release/admission loss/dispose, builder не читает mutable nullable controller. McpSettingsController не dispatch после dispose. Изолированные fake route/controller tests и mandatory checks/fresh review (FR-343/347,002FR-220, review_server_workspace_implementation_1 P2).
+
+- [X] T080 Распространить owner-bound retirement на все C12 профиля (form/delete/trust/phrase) в lib/profiles/profile_view.dart; delete captures controller/generation/profile после await; обычный ProfileController._action отказывает после dispose, cancelOwnedAttempt cleanup остаётся разрешённым. Functional fake units filled form/delete same-ID rebind/removal без dispatch старому/новому владельцу; rerun checks/fresh review (FR-344,AC-333,SC-313,review_server_workspace_implementation_2 P2).
+
+- [X] T081 Различать отсутствующее trust-наблюдение и известный unpinned endpoint в lib/profiles/profile_view.dart: canonical needTrust/needPassphrase/connected имеют свой смысл, cached unpinned badge только disconnected/cancelled. Fake failed-getTrust и stale-unpinned units, rerun mandatory checks/fresh review (FR-345,AC-334,review_server_workspace_implementation_3 P2).
+
+- [X] T082 Передать иконки четырёх вкладок в C16, добавить иконку общих настроек
+  в lib/profiles/profile_view.dart согласно contracts/server-workspace.md;
+  001/R016 и002/T046 исправляют shared API и asset delivery. Реализация до тестов,
+  mandatory checks/build/static audit, independent review; без новых разделов/данных.

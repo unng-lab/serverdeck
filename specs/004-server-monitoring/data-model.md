@@ -31,4 +31,19 @@ At most 1000 states under existing profile limit; deleted states pruned.
 Persistence: data/monitoring-run-v1.json, exactly ASCII
 `{"version":1,"state":"running"}` or `{"version":1,"state":"clean"}`.
 Read≤128 bytes; invalid/oversized/reparse/I/O is blocked, not missing.
-No metric/credentials/config persistence, no Isar migration.
+No credentials/config persistence here; history persists as defined below, no Isar migration.
+
+## History
+
+MonitoringHistoryRecord: Isar id, unique profileId, exact connectionRevision,
+payload JSON `{version:1,points:[[utcMs,segment,cpu,ram,disk],...]}`.
+At most720 rows,192KiB UTF8,utcMs nonnegative int,segment nonempty string≤128,
+percent null or finite num0..100. Invalid shape/version/limits rejected without
+conversion/deletion. Input order is collection order. Clock rollback/new segment
+breaks continuity; same (time,segment) replaces previous row.
+TTL `(utcNow−3600000,utcNow]`; future/expired points removed on cleanup.
+Runtime points additionally retain monotonicReceivedAt for1h expiry across wall rollback;
+this field is not persisted. Restart only has UTC, never restores current freshness.
+Segment is runtime-unique owner token + activation epoch + SSH session identifier.
+Profile revision changes clear history; rename/reconnect preserve old segments.
+

@@ -6,6 +6,9 @@ import 'package:dartssh2/dartssh2.dart';
 import '../domain/actor.dart';
 import '../domain/app_operations.dart';
 import '../domain/models.dart';
+import '../journals/journal_models.dart';
+import '../journals/journal_port.dart';
+import '../journals/journal_protocol.dart';
 import '../profiles/key_envelope.dart';
 import '../profiles/profile_owner.dart';
 import '../runtime/capability.dart';
@@ -98,7 +101,8 @@ final class ConnectionOwner
         ConnectionOperations,
         ProfileConnectionPort,
         RuntimeCapability,
-        MonitoringConnectionPort {
+        MonitoringConnectionPort,
+        JournalConnectionPort {
   ConnectionOwner({
     required this.actors,
     required this.repository,
@@ -137,6 +141,8 @@ final class ConnectionOwner
   final _quarantine = <String, Set<_ConnectionEntry>>{};
   final _changes = StreamController<void>.broadcast();
   final _monitoringJobs = <String, void Function(MonitoringReason)>{};
+  final _journalJobs = <String, void Function(JournalStatus)>{};
+  final _collectionTails = <String, Future<void>>{};
   bool _stopped = false, _disposed = false;
   static const maxLive = 64, cleanupDuration = Duration(seconds: 5);
   @override
@@ -181,14 +187,18 @@ final class ConnectionOwner
     );
     Future<void> run() async {
       try {
-        final sample = await _collectMonitoring(
-          actor,
+        final sample = await _withCollectionSlot(
           profileId,
-          sessionId,
-          expectedConnectionRevision,
           child,
-          remaining,
-          () => fail(MonitoringReason.disconnected),
+          () => _collectMonitoring(
+            actor,
+            profileId,
+            sessionId,
+            expectedConnectionRevision,
+            child,
+            remaining,
+            () => fail(MonitoringReason.disconnected),
+          ),
         );
         if (!result.isCompleted) result.complete(sample);
       } on WorkCancelled {
@@ -283,9 +293,137 @@ final class ConnectionOwner
     }
   }
 
+  /// At most one request per capability/profile reaches this bounded FIFO.
+  /// Cancellation completes the public job promptly; a retired waiter never
+  /// dispatches when its predecessor releases the resource.
+  Future<T> _withCollectionSlot<T>(
+    String profileId,
+    WorkCancellation cancellation,
+    Future<T> Function() action,
+  ) async {
+    final previous = _collectionTails[profileId] ?? Future<void>.value();
+    final released = Completer<void>(), tail = released.future;
+    _collectionTails[profileId] = tail;
+    try {
+      await previous;
+      cancellation.check();
+      return await action();
+    } finally {
+      released.complete();
+      if (identical(_collectionTails[profileId], tail))
+        unawaited(_collectionTails.remove(profileId));
+    }
+  }
+
   static void Function() _timer(Duration duration, void Function() callback) {
     final timer = Timer(duration, callback);
     return timer.cancel;
+  }
+
+  @override
+  JournalJob beginJournal(
+    UiActor actor,
+    String profileId,
+    String sessionId, {
+    required int expectedConnectionRevision,
+    required JournalRequest request,
+    required WorkCancellation cancellation,
+  }) {
+    JournalJob reject(JournalStatus reason) =>
+        JournalJob(Future.value(JournalReply(failure: reason)), () {});
+    if (_stopped) return reject(JournalStatus.paused);
+    if (_journalJobs.length >= 4 || _journalJobs.containsKey(profileId))
+      return reject(JournalStatus.waiting);
+    final child = WorkCancellation(), result = Completer<JournalReply>();
+    void fail(JournalStatus reason) {
+      if (!result.isCompleted) result.complete(JournalReply(failure: reason));
+      child.cancel();
+    }
+
+    _journalJobs[profileId] = fail;
+    final elapsed = Stopwatch()..start();
+    final unlisten = cancellation.listen(() => fail(JournalStatus.paused));
+    final deadline = _schedule(
+      const Duration(seconds: 5),
+      () => fail(JournalStatus.timeout),
+    );
+    Future<void> run() async {
+      _ConnectionEntry? captured;
+      void Function()? unlistenParent;
+      Future<JournalReply>? pending;
+      void check(_ConnectionEntry e) {
+        child.check();
+        _check(e, auth: true);
+        if (e.actor is! OwnerActor ||
+            e.state != ConnectionState.connected ||
+            e.sessionId != sessionId ||
+            e.connectionRevision != expectedConnectionRevision ||
+            (e.transport?.isClosed ?? true))
+          throw const OperationFailure(FailureCode.conflict);
+      }
+
+      try {
+        await _withCollectionSlot(profileId, child, () async {
+          await getGate().prepare(actor, (context) {
+            _validateProfile(profileId);
+            final e = _entries[profileId];
+            if (e == null) throw const OperationFailure(FailureCode.conflict);
+            captured = e;
+            context.linearize(() {
+              check(e);
+              final transport = e.transport,
+                  budget = const Duration(seconds: 5) - elapsed.elapsed;
+              if (transport is! JournalSshConnection) {
+                pending = Future.value(
+                  JournalReply(failure: JournalStatus.unavailable),
+                );
+              } else if (budget <= Duration.zero) {
+                pending = Future.value(
+                  JournalReply(failure: JournalStatus.timeout),
+                );
+              } else {
+                unlistenParent = e.cancellation.listen(
+                  () => fail(JournalStatus.disconnected),
+                );
+                child.check();
+                pending = (transport as JournalSshConnection).collectJournal(
+                  request,
+                  child,
+                  timeout: budget,
+                );
+              }
+              pending?.ignore();
+              return _view(e);
+            }, fence: e.fence);
+          });
+          final sample = await pending!;
+          await getGate().prepare(
+            actor,
+            (context) => context.read(() {
+              check(captured!);
+              return sample;
+            }),
+          );
+          if (!result.isCompleted) result.complete(sample);
+        });
+      } on WorkCancelled {
+        fail(JournalStatus.paused);
+      } on OperationFailure {
+        fail(JournalStatus.disconnected);
+      } catch (_) {
+        fail(JournalStatus.invalidResponse);
+      } finally {
+        unlisten();
+        unlistenParent?.call();
+        deadline();
+        elapsed.stop();
+        if (identical(_journalJobs[profileId], fail))
+          _journalJobs.remove(profileId);
+      }
+    }
+
+    _track(run());
+    return JournalJob(result.future, () => fail(JournalStatus.paused));
   }
 
   void _notify() {
@@ -562,7 +700,17 @@ final class ConnectionOwner
         if (e.kind == 'password') {
           credential = PasswordCredential(plaintext);
         } else if (e.kind == 'privateKey') {
-          final hint = readPublicKeyHint(plaintext);
+          if (e.publicKeyBytes == null)
+            throw const OperationFailure(FailureCode.storageUnavailable);
+          final PublicKeyHint hint;
+          try {
+            hint = readPublicKeyHint(
+              plaintext,
+              publicKeyBytes: e.publicKeyBytes!,
+            );
+          } catch (_) {
+            throw const OperationFailure(FailureCode.storageUnavailable);
+          }
           if (hint.inspection.keyType != e.keyType ||
               hint.inspection.bits != e.keyBits)
             throw const OperationFailure(FailureCode.storageUnavailable);
@@ -570,6 +718,7 @@ final class ConnectionOwner
             plaintext,
             revision: e.credentialRevision,
             inspection: hint.inspection,
+            publicHint: hint,
           );
         } else {
           throw const OperationFailure(FailureCode.storageUnavailable);
@@ -1170,6 +1319,9 @@ final class ConnectionOwner
   @override
   Future<void> stopAdmission() async {
     _stopped = true;
+    for (final cancel in List.of(_journalJobs.values)) {
+      cancel(JournalStatus.paused);
+    }
     for (final cancel in List.of(_monitoringJobs.values)) {
       cancel(MonitoringReason.stopped);
     }
@@ -1236,6 +1388,9 @@ final class _ConnectionEntry {
       kind = c.kind,
       keyType = c.publicKeyType,
       keyBits = c.publicKeyBits,
+      publicKeyBytes = c.publicKeyBytes == null
+          ? null
+          : List<int>.unmodifiable(c.publicKeyBytes!),
       ciphertext = Uint8List.fromList(c.protectedBytes),
       fence = VersionFence(
         profileId: p.profileId,
@@ -1254,6 +1409,7 @@ final class _ConnectionEntry {
   final int port, credentialRevision, connectionRevision, startGeneration;
   final String? keyType;
   final int? keyBits;
+  final List<int>? publicKeyBytes;
   final Uint8List ciphertext;
   CommandActor actor;
   VersionFence fence;

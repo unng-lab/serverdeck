@@ -56,7 +56,7 @@ final class ChannelHarness {
     );
     client.done.ignore();
   }
-  final host = parseOpenSshKey(
+  final host = parsePrivateKey(
     File('test/fixtures/ssh/ed25519.txt').readAsBytesSync(),
   );
   final verifier = HostSignatureVerifier();

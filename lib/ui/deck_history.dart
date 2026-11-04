@@ -19,12 +19,16 @@ class DeckHistory extends StatefulWidget {
     this.observedAt,
     this.receivedAt,
     this.actions,
-  });
+    this.maxPoints = 120,
+    this.periodLabel = 'До 10 минут',
+  }) : assert(maxPoints >= 1 && maxPoints <= 720);
 
   final List<Object?> points;
   final String? quality, source, observedAt, receivedAt;
   final bool stale;
   final Widget? actions;
+  final int maxPoints;
+  final String periodLabel;
 
   @override
   State<DeckHistory> createState() => _DeckHistoryState();
@@ -134,7 +138,7 @@ class _DeckHistoryState extends State<DeckHistory> {
   @override
   Widget build(BuildContext context) {
     final rows = [
-      for (final point in widget.points.take(120))
+      for (final point in widget.points.take(widget.maxPoints))
         point is Map<String, Object?> ? point : const <String, Object?>{},
     ];
     final stale = widget.stale || widget.quality == 'stale';
@@ -143,9 +147,9 @@ class _DeckHistoryState extends State<DeckHistory> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const DeckSectionHeader(
+        DeckSectionHeader(
           title: 'История ресурсов',
-          description: 'До 10 минут · значения от 0 до 100%',
+          description: '${widget.periodLabel} · значения от 0 до 100%',
         ),
         const SizedBox(height: BrandSpacing.space8),
         if (widget.source != null) Text('Источник: ${widget.source}'),
@@ -541,7 +545,10 @@ class _SeriesPainter extends CustomPainter {
           (start == end ? width / 2 : width * (time - start) / (end - start));
       final y = inset + height * (1 - value / 100);
       final point = Offset(x, y);
-      if (last == null || time <= last || time - last > 15000) {
+      if (last == null ||
+          rows[index]['breakBefore'] == true ||
+          time <= last ||
+          time - last > 15000) {
         path.moveTo(x, y);
       } else {
         path.lineTo(x, y);
@@ -629,8 +636,8 @@ void _drawSymbol(Canvas canvas, Offset point, String id, Color color) {
   }
 }
 
-int? _validValue(Object? value) =>
-    value is int && value >= 0 && value <= 100 ? value : null;
+num? _validValue(Object? value) =>
+    value is num && value.isFinite && value >= 0 && value <= 100 ? value : null;
 int? _time(Map<String, Object?> row) =>
     DateTime.tryParse('${row['receivedAt']}')?.millisecondsSinceEpoch;
 String _timeLabel(Map<String, Object?> row) {
@@ -646,6 +653,7 @@ bool _hasMissingValues(List<Map<String, Object?>> rows) => rows.any(
   (row) => _series.any((series) => _validValue(row[series.field]) == null),
 );
 String? _gapReason(Map<String, Object?> previous, Map<String, Object?> next) {
+  if (next['breakBefore'] == true) return 'новый период наблюдения';
   final first = _time(previous), second = _time(next);
   if (first == null || second == null) return 'время не указано';
   if (second == first) return 'время наблюдения повторилось';

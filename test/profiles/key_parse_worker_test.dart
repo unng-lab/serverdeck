@@ -1,3 +1,5 @@
+import 'package:serverdeck/runtime/owned_work.dart';
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -33,7 +35,7 @@ void main() {
     final parser = CancellableKeyParser();
     final parsed = await parser.parse(vector());
     expect(parsed.inspection.keyType, 'ssh-ed25519');
-    final direct = parseOpenSshKey(vector());
+    final direct = parsePrivateKey(vector());
     final message = Uint8List.fromList([1, 2, 3]);
     expect(
       parsed.key.sign(message).encode(),
@@ -61,7 +63,7 @@ void main() {
       await turn();
       expect(request.bytes.every((b) => b == 0), isTrue);
       expect(request.passphrase, isNull);
-      final parsed = parseOpenSshKey(original);
+      final parsed = parsePrivateKey(original);
       worker.parsed.complete(parsed);
       expect(await result, same(parsed));
       expect(parser.activeWorkers, 1);
@@ -87,12 +89,12 @@ void main() {
           return start.future;
         },
       );
-      final cancellations = List.generate(4, (_) => CredentialCancellation());
+      final cancellations = List.generate(4, (_) => WorkCancellation());
       final expectations = [
         for (final c in cancellations)
           expectLater(
             parser.parse(vector(), cancellation: c),
-            throwsA(isA<CredentialCancelled>()),
+            throwsA(isA<WorkCancelled>()),
           ),
       ];
       await turn();
@@ -118,7 +120,7 @@ void main() {
       expect(parser.activeWorkers, 0);
       expect(requests.every((r) => r.bytes.every((b) => b == 0)), isTrue);
       // A cancelled worker's late key is disposed rather than published.
-      final lateKey = parseOpenSshKey(vector());
+      final lateKey = parsePrivateKey(vector());
       workers.first.parsed.complete(lateKey);
       await turn();
       expect(() => lateKey.key, throwsStateError);
@@ -195,10 +197,10 @@ void main() {
           throw StateError('unreachable');
         },
       );
-      final cancelled = CredentialCancellation()..cancel();
+      final cancelled = WorkCancellation()..cancel();
       await expectLater(
         parser.parse(vector(), cancellation: cancelled),
-        throwsA(isA<CredentialCancelled>()),
+        throwsA(isA<WorkCancelled>()),
       );
       await expectLater(
         parser.parse(Uint8List(1024 * 1024 + 1)),
@@ -227,7 +229,7 @@ void main() {
     final parser = CancellableKeyParser(spawn: (_) async => worker);
     final failure = expectLater(
       parser.parse(vector()),
-      throwsA(isA<CredentialCancelled>()),
+      throwsA(isA<WorkCancelled>()),
     );
     await turn();
     var disposed = false;

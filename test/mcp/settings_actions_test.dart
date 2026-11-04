@@ -4,6 +4,31 @@ import 'package:serverdeck/mcp/settings_controller.dart';
 import '../fixtures/feature_harness.dart';
 
 void main() {
+  test(
+    'disposed settings controller cannot dispatch delayed UI actions',
+    () async {
+      final h = FeatureHarness();
+      var retries = 0;
+      final c = McpSettingsController(
+        owner: h.grants,
+        actor: h.actors.ui,
+        retryTransport: () async {
+          retries++;
+        },
+        transportError: () => null,
+        poll: false,
+      );
+      c.dispose();
+      await c.refresh();
+      await c.issue('Retired client', confirmed: true);
+      await c.setEnabled(true);
+      await c.retryMcp();
+      expect(h.repository.state.grants, isEmpty);
+      expect(h.transport.enabled, isFalse);
+      expect(retries, 0);
+      await h.dispose();
+    },
+  );
   test('settings require consent, produce token-free config and drive durable revoke', () async {
     final h = FeatureHarness();
     var retries = 0;

@@ -6,6 +6,9 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:pointycastle/digests/sha256.dart';
 
 import '../domain/models.dart';
+import '../journals/journal_models.dart';
+import '../journals/journal_port.dart';
+import '../journals/journal_protocol.dart';
 import '../profiles/key_envelope.dart';
 import '../runtime/owned_work.dart';
 import '../monitoring/linux_metrics.dart';
@@ -115,6 +118,7 @@ final class PrivateKeyCredential extends AttemptCredential {
     super.bytes, {
     required this.revision,
     required this.inspection,
+    required this.publicHint,
   }) {
     if (bytes.isEmpty || bytes.length > 1024 * 1024 || revision < 1) {
       dispose();
@@ -123,6 +127,7 @@ final class PrivateKeyCredential extends AttemptCredential {
   }
   final int revision;
   final KeyInspection inspection;
+  final PublicKeyHint publicHint;
 }
 
 /// Implement through DomainCommandGate: execute actualWrite synchronously inside
@@ -150,7 +155,7 @@ abstract interface class MonitoringSshConnection {
 }
 
 final class StrictSshTransport
-    implements SshConnection, MonitoringSshConnection {
+    implements SshConnection, MonitoringSshConnection, JournalSshConnection {
   StrictSshTransport({
     required SSHSocket socket,
     required String username,
@@ -174,6 +179,7 @@ final class StrictSshTransport
           file: credential.bytes,
           credentialRevision: credential.revision,
           expected: credential.inspection,
+          publicHint: credential.publicHint,
           signer: signer,
           checkAdmission: (_) => _checkAuth(),
           serverAlgorithms: () => _client.serverSigAlgs,
@@ -338,6 +344,54 @@ final class StrictSshTransport
       return const LinuxSample.failed(MonitoringReason.disconnected);
     } catch (_) {
       return const LinuxSample.failed(MonitoringReason.invalidResponse);
+    }
+  }
+
+  @override
+  Future<JournalReply> collectJournal(
+    JournalRequest request,
+    WorkCancellation cancellation, {
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    try {
+      cancellation.check();
+      _checkAuth();
+      final operation = _client.startBoundedExec(
+        journalCommand(request),
+        timeout: timeout,
+        captureStatus: true,
+      );
+      final unlisten = cancellation.listen(operation.cancel);
+      try {
+        final result = await operation.result;
+        cancellation.check();
+        _checkAuth();
+        final failure = switch (result.failure) {
+          SSHBoundedExecFailure.cancelled => JournalStatus.paused,
+          SSHBoundedExecFailure.timeout => JournalStatus.timeout,
+          SSHBoundedExecFailure.outputLimit => JournalStatus.outputLimit,
+          SSHBoundedExecFailure.cleanupPending => JournalStatus.waiting,
+          SSHBoundedExecFailure.unavailable => JournalStatus.unavailable,
+          SSHBoundedExecFailure.invalidResponse =>
+            JournalStatus.invalidResponse,
+          null => null,
+        };
+        if (failure != null) return JournalReply(failure: failure);
+        return parseJournalReply(
+          request,
+          result.stdout,
+          result.stderr,
+          result.exitCode,
+        );
+      } finally {
+        unlisten();
+      }
+    } on WorkCancelled {
+      return JournalReply(failure: JournalStatus.paused);
+    } on OperationFailure {
+      return JournalReply(failure: JournalStatus.disconnected);
+    } catch (_) {
+      return JournalReply(failure: JournalStatus.invalidResponse);
     }
   }
 

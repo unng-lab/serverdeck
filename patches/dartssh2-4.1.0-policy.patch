@@ -1,36 +1,273 @@
---- a/lib/src/ssh_errors.dart
-+++ b/lib/src/ssh_errors.dart
-@@ -146,3 +146,24 @@
-     return 'SSHSocketError($error)';
+diff --git a/SERVERDECK.md b/SERVERDECK.md
+new file mode 100644
+--- /dev/null
++++ b/SERVERDECK.md
+@@ -0,0 +1,53 @@
++# ServerDeck policy variant
++
++Upstream source and MIT license are preserved. UPSTREAM.json records archive and
++per-file pristine hashes; patches/dartssh2-4.1.0-policy.patch records the three
++changed library files. Upstream README examples describe upstream defaults, not
++this stricter application variant.
++
++SSHClient requires onVerifyHostKey(type,fingerprint,exactBlob) and
++onHostKeyChanged(type,fingerprint,exactBlob), signature verification enabled, and
++exactly one password callback OR one identity. No keyboard-interactive, hostbased,
++agent or password-change callbacks. No initial none auth; partial success fails
++with SSHUnsupportedAuthError. Changed rekey closes and notifies, never asks to
++continue; key identity compares exact bytes, not negotiated RSA signature type.
++Callbacks receive copies. Missing raw transport verifier rejects the first key.
++
++Upstream already supports nullable handshakeTimeout/authTimeout; application
++adapter supplies null timers and keepAliveInterval:null, using its own budget.
++The application algorithm allowlist and key parser policy are implemented by003
++transport adapter tasks, not implied complete by vendoring this library.
++
++Only lib/, package metadata, README/CHANGELOG and license were extracted from the
++verified archive; upstream runnable/integration tests were not added to this repo.
++Local analyzer options retain upstream lint style while keeping errors/warnings
++checked. Unit tests use memory transport; no SSH/network process is started.
++
++RSA host signatures must match negotiated rsa-sha2-256/512 exactly; embedded SHA1
++or a different RSA digest rejects before host acceptance and NEWKEYS/auth. Public
++key identity still uses the unchanged ssh-rsa wire blob. T028 tests feed complete
++synthetic pre-NEWKEYS KEX bytes in memory, never a listening SSH service.
++
++
++The application supplies onVerifyHostSignature backed by an owned4slot worker pool.
++Transport checks bounded canonical encoding/algorithm first, then awaits the CPU
++verifier before host acceptance. verifyHostSignature is the shared pure function;
++low-level tests may use the synchronous fallback, never the strict app adapter.
++Closure during signature/trust waits prevents late NEWKEYS/auth. Pending incoming
++bytes are capped at1MiB; overflow closes with fixed SSHResourceLimitError. Worker
++scheduling failures use fixed SSHSignatureVerificationError reasons. No host key
++size-security floor is added; numeric/format sanity and bounded CPU are enforced.
++
++## 004 bounded monitoring execution
++
++SSHClient.startBoundedExec returns a synchronous cancellable handle, one unresolved
++opening/open/retired monitoring channel per connection. Deadline at most5s begins
++before open. A65536-byte cumulative stdout+all extended-data budget is enforced
++inside channel admission before asynchronous buffering; only stdout retained.
++Ordinary channels retain upstream window/stream behavior. Cancelled pending opens
++retain their waiter/ID; late success closes without exec. Retired channels drop
++messages until peer CLOSE, never refill windows or queue replies. New monitoring
++calls receive cleanupPending until the protocol slot retires. Duplicate ACKs cannot
++accumulate as reply queue entries. All public bounded results use fixed failures,
++not remote exception text. Application adapter must supply only its fixed collector
++and must enforce canonical session/trust/cancellation admission.
+diff --git a/THIRD_PARTY_NOTICES.txt b/THIRD_PARTY_NOTICES.txt
+new file mode 100644
+--- /dev/null
++++ b/THIRD_PARTY_NOTICES.txt
+@@ -0,0 +1,81 @@
++// ignore_for_file: non_constant_identifier_names, constant_identifier_names
++
++/*
++ * This file is a 1:1 port from the OpenBSD blowfish.c and bcrypt_pbkdf.c. As a
++ * result, it retains the original copyright and license. The two files are
++ * under slightly different (but compatible) licenses, and are here combined in
++ * one file.
++ *
++ * Credit for the actual porting work goes to:
++ *  Devi Mandiri <me@devi.web.id>
++ */
++
++/*
++ * The Blowfish portions are under the following license:
++ *
++ * Blowfish block cipher for OpenBSD
++ * Copyright 1997 Niels Provos <provos@physnet.uni-hamburg.de>
++ * All rights reserved.
++ *
++ * Implementation advice by David Mazieres <dm@lcs.mit.edu>.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/*
++ * The bcrypt_pbkdf portions are under the following license:
++ *
++ * Copyright (c) 2013 Ted Unangst <tedu@openbsd.org>
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/*
++ * Performance improvements (Javascript-specific):
++ *
++ * Copyright 2016, Joyent Inc
++ * Author: Alex Wilson <alex.wilson@joyent.com>
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ */
++
+diff --git a/analysis_options.yaml b/analysis_options.yaml
+new file mode 100644
+--- /dev/null
++++ b/analysis_options.yaml
+@@ -0,0 +1,7 @@
++# Keep upstream source style; analyzer errors/warnings remain enabled.
++# The application rules remain enforced outside this vendored package.
++linter:
++  rules:
++    avoid_print: false
++    prefer_single_quotes: false
++    unawaited_futures: false
+diff --git a/lib/src/ssh_channel.dart b/lib/src/ssh_channel.dart
+--- a/lib/src/ssh_channel.dart
++++ b/lib/src/ssh_channel.dart
+@@ -36,6 +36,11 @@
+   SSHChannel get channel => SSHChannel(this);
+ 
+   final Future<void> Function()? onFlush;
++
++  /// Optional bounded synchronous consumer, before asynchronous stream buffering.
++  /// Used only by the application monitoring channel; ordinary streams unchanged.
++  final void Function(SSHChannelData)? onData;
++  final void Function()? onAbort;
+ 
+   SSHChannelController({
+     required this.localId,
+@@ -46,6 +51,8 @@
+     required this.remoteMaximumPacketSize,
+     required this.sendMessage,
+     this.onFlush,
++    this.onData,
++    this.onAbort,
+     this.printDebug,
+   }) {
+     if (remoteInitialWindowSize > 0) {
+@@ -127,8 +134,13 @@
+   var _hasSentClose = false;
+ 
+   final _done = Completer<void>();
++  bool _boundedReplyExpected = false;
+ 
+   Future<bool> sendExec(String command) {
++    if (onData != null) {
++      _terminalState.throwIfTerminated();
++      _boundedReplyExpected = true;
++    }
+     return _sendRequest(
+       SSH_Message_Channel_Request.exec(
+         recipientChannel: remoteId,
+@@ -247,6 +259,9 @@
    }
- }
-+
-+/// Server requests unsupported additional authentication factors.
-+class SSHUnsupportedAuthError with SSHMessageError implements SSHAuthError {
-+  @override
-+  final String message = 'Additional authentication factors are unsupported';
-+}
-+
-+/// Fixed scheduling failures from the application's bounded crypto owner.
-+enum SSHSignatureFailure { stopping, exhausted, timeout, cancelled }
-+
-+class SSHSignatureVerificationError with SSHMessageError implements SSHError {
-+  final SSHSignatureFailure reason;
-+  SSHSignatureVerificationError(this.reason);
-+  @override
-+  String get message => 'Host signature verification ${reason.name}';
-+}
-+
-+class SSHResourceLimitError with SSHMessageError implements SSHError {
-+  @override
-+  final String message = 'SSH receive buffer limit exceeded';
-+}
+ 
+   void handleMessage(SSHMessage message) {
++    // Retired bounded channels retain their protocol ID until peer CLOSE only.
++    // In particular never queue unsolicited replies or replenish their window.
++    if (onData != null && _done.isCompleted) return;
+     if (message is SSH_Message_Channel_Data) {
+       _handleDataMessage(message.data);
+     } else if (message is SSH_Message_Channel_Extended_Data) {
+@@ -298,6 +313,9 @@
+       error ?? SSHStateError('Channel destroyed before receiving reply'),
+       stackTrace,
+     );
++    // done alone also denotes orderly peer CLOSE. Bounded consumers must retain
++    // this local-abort distinction even after a successful exec ACK/status.
++    onAbort?.call();
+   }
+ 
+   Future<bool> _sendRequest(SSHMessage request) async {
+@@ -368,7 +386,12 @@
+     }
+ 
+     _localWindow -= data.length;
+-    _remoteStream.add(SSHChannelData(data, type: type));
++    final consumer = onData;
++    if (consumer == null) {
++      _remoteStream.add(SSHChannelData(data, type: type));
++    } else {
++      consumer(SSHChannelData(data, type: type));
++    }
+     _sendWindowAdjustIfNeeded();
+   }
+ 
+@@ -407,11 +430,25 @@
+ 
+   void _handleRequestSuccessMessage() {
+     printDebug?.call('SSHChannel._handleRequestSuccessMessage');
++    if (onData != null) {
++      if (!_boundedReplyExpected) {
++        destroy();
++        return;
++      }
++      _boundedReplyExpected = false;
++    }
+     _requestReplyQueue.add(true);
+   }
+ 
+   void _handleRequestFailureMessage() {
+     printDebug?.call('SSHChannel._handleRequestFailureMessage');
++    if (onData != null) {
++      if (!_boundedReplyExpected) {
++        destroy();
++        return;
++      }
++      _boundedReplyExpected = false;
++    }
+     _requestReplyQueue.add(false);
+   }
+ 
+@@ -478,7 +515,7 @@
+     printDebug?.call('SSHChannel._sendWindowAdjustIfNeeded');
+ 
+     if (_done.isCompleted) return;
+-    if (_remoteStream.isPaused) return;
++    if (onData == null && _remoteStream.isPaused) return;
+ 
+     final bytesToAdd = localInitialWindowSize - _localWindow;
+     if (bytesToAdd <= 0) return;
+diff --git a/lib/src/ssh_client.dart b/lib/src/ssh_client.dart
 --- a/lib/src/ssh_client.dart
 +++ b/lib/src/ssh_client.dart
 @@ -169,15 +169,15 @@
    /// Crypto algorithms available for the client.
    final SSHAlgorithms algorithms;
-
+ 
 -  /// Function called when the first host key is received. The callback receives
 -  /// the host key type and fingerprint, and should return true to accept the key
 -  /// or false to reject it and close the connection. If this is null, all host
@@ -48,7 +285,7 @@
 +  final SSHHostkeyChangedHandler? onHostKeyChanged;
 +
 +  final SSHHostSignatureVerifier? onVerifyHostSignature;
-
+ 
    /// List of identities (key pairs or external signers) to use for
    /// authentication. Set this field to enable authentication with public key.
 @@ -286,6 +286,8 @@
@@ -89,9 +326,9 @@
        onReady: _handleTransportReady,
        onMessage: _handlePacket,
        disableHostkeyVerification: disableHostkeyVerification,
-@@ -385,6 +402,32 @@
+@@ -385,6 +402,33 @@
    );
-
+ 
    final _channels = <int, SSHChannelController>{};
 +  SSHBoundedExec? _boundedExec;
 +
@@ -100,6 +337,7 @@
 +  SSHBoundedExec startBoundedExec(
 +    String command, {
 +    Duration timeout = const Duration(seconds: 5),
++    bool captureStatus = false,
 +  }) {
 +    if (_boundedExec != null) {
 +      return SSHBoundedExec._failed(SSHBoundedExecFailure.cleanupPending);
@@ -110,7 +348,7 @@
 +    if (timeout <= Duration.zero || timeout > const Duration(seconds: 5)) {
 +      throw ArgumentError('Invalid bounded execution deadline');
 +    }
-+    final operation = SSHBoundedExec._(this, command);
++    final operation = SSHBoundedExec._(this, command, captureStatus);
 +    _boundedExec = operation;
 +    operation._start(timeout);
 +    return operation;
@@ -119,11 +357,11 @@
 +  void _retireBounded(int id) {
 +    if (_boundedExec?._id == id) _boundedExec = null;
 +  }
-
+ 
    final _authMethodsLeft = Queue<SSHAuthMethod>();
-
-@@ -930,6 +973,8 @@
-
+ 
+@@ -930,6 +974,8 @@
+ 
    /// Close all channels that are currently open.
    void _closeChannels([Object? error, StackTrace? stackTrace]) {
 +    _boundedExec?._fail(SSHBoundedExecFailure.unavailable);
@@ -131,7 +369,7 @@
      for (final channel in _channels.values) {
        channel.destroy(error, stackTrace);
        _channelIdAllocator.release(channel.localId);
-@@ -1139,7 +1184,8 @@
+@@ -1139,7 +1185,8 @@
          'Authentication partially succeeded with '
          '${_currentAuthMethod?.name}',
        );
@@ -141,37 +379,37 @@
      } else {
        _markCurrentAuthMethodAttempted();
      }
-@@ -1468,6 +1514,7 @@
+@@ -1468,6 +1515,7 @@
      _requirePendingChannelOpen(message.recipientChannel, 'failure');
-
+ 
      _channelIdAllocator.release(message.recipientChannel);
 +    _retireBounded(message.recipientChannel);
      _pendingChannelOpens.fail(
        message.recipientChannel,
        SSHChannelOpenError(message.reasonCode, message.description),
-@@ -1524,6 +1571,7 @@
+@@ -1524,6 +1572,7 @@
        channel.handleMessage(message);
        _channels.remove(message.recipientChannel);
        _channelIdAllocator.release(message.recipientChannel);
 +      _retireBounded(message.recipientChannel);
      }
    }
-
-@@ -1554,9 +1602,7 @@
+ 
+@@ -1554,9 +1603,7 @@
        _preferredAuthMethods.add(SSHAuthMethod.hostbased);
      }
-
+ 
 -    _authMethodsLeft
 -      ..addAll(_preferredAuthMethods)
 -      ..add(SSHAuthMethod.none);
 +    _authMethodsLeft.addAll(_preferredAuthMethods);
-
+ 
      _tryNextAuthMethod();
    }
-@@ -1741,16 +1787,6 @@
+@@ -1741,16 +1788,6 @@
      }
    }
-
+ 
 -  void _resetAuthStateForNextFactor() {
 -    _exhaustedAuthMethods.clear();
 -    // OpenSSH resets public-key attempt state after partial success so the
@@ -184,11 +422,11 @@
 -
    Future<SSHChannelController> _openSessionChannel() {
      final localChannelId = _channelIdAllocator.allocate();
-
-@@ -1831,19 +1867,25 @@
+ 
+@@ -1831,19 +1868,25 @@
        throw SSHStateError('Channel $localChannelId is already open');
      }
-
+ 
 +    final bounded = _boundedExec?._id == localChannelId ? _boundedExec : null;
      final channelController = SSHChannelController(
        localId: localChannelId,
@@ -206,16 +444,16 @@
 +          : () => bounded._fail(SSHBoundedExecFailure.invalidResponse),
        printDebug: printDebug,
      );
-
+ 
      _channels[localChannelId] = channelController;
 +    bounded?._accept(channelController);
      return channelController;
    }
-
-@@ -1855,6 +1897,133 @@
+ 
+@@ -1855,6 +1898,144 @@
    }
  }
-
+ 
 +enum SSHBoundedExecFailure {
 +  cancelled,
 +  timeout,
@@ -226,26 +464,33 @@
 +}
 +
 +final class SSHBoundedExecResult {
-+  SSHBoundedExecResult._(Uint8List bytes, this.exitCode, this.failure)
-+      : _stdout = bytes;
++  SSHBoundedExecResult._(Uint8List bytes, this.exitCode, this.failure,
++      [Uint8List? errors])
++      : _stdout = bytes,
++        _stderr = errors ?? Uint8List(0);
 +  final Uint8List _stdout;
++  final Uint8List _stderr;
 +  Uint8List get stdout => Uint8List.fromList(_stdout);
++  Uint8List get stderr => Uint8List.fromList(_stderr);
 +  final int? exitCode;
 +  final SSHBoundedExecFailure? failure;
 +}
 +
 +/// Cancellable before channel-open or exec ACK. Results contain no remote errors.
 +final class SSHBoundedExec {
-+  SSHBoundedExec._(this._client, this._command);
++  SSHBoundedExec._(this._client, this._command, this._captureStatus);
 +  SSHBoundedExec._failed(SSHBoundedExecFailure failure)
 +      : _client = null,
++        _captureStatus = false,
 +        _command = '' {
 +    _result.complete(SSHBoundedExecResult._(Uint8List(0), null, failure));
 +  }
 +  final SSHClient? _client;
 +  final String _command;
++  final bool _captureStatus;
 +  final _result = Completer<SSHBoundedExecResult>();
 +  final _stdout = BytesBuilder();
++  final _stderr = BytesBuilder();
 +  Timer? _timer;
 +  int? _id, _exitCode;
 +  int _received = 0;
@@ -281,13 +526,15 @@
 +      if (_result.isCompleted) return;
 +      await channel.channel.done;
 +      if (_result.isCompleted) return;
-+      if (_exitCode != 0 || !_sawStatus || _invalidStatus) {
++      if ((!_captureStatus && _exitCode != 0) ||
++          !_sawStatus ||
++          _invalidStatus) {
 +        _fail(SSHBoundedExecFailure.invalidResponse);
 +        return;
 +      }
 +      _timer?.cancel();
-+      _result.complete(
-+          SSHBoundedExecResult._(_stdout.takeBytes(), _exitCode, null));
++      _result.complete(SSHBoundedExecResult._(
++          _stdout.takeBytes(), _exitCode, null, _stderr.takeBytes()));
 +    } catch (_) {
 +      _fail(SSHBoundedExecFailure.invalidResponse);
 +      final id = _id;
@@ -325,6 +572,7 @@
 +    }
 +    _received += data.bytes.length;
 +    if (!data.isExtendedData) _stdout.add(data.bytes);
++    if (data.isExtendedData && _captureStatus) _stderr.add(data.bytes);
 +  }
 +
 +  void cancel() => _fail(SSHBoundedExecFailure.cancelled);
@@ -333,6 +581,7 @@
 +    if (_result.isCompleted) return;
 +    _timer?.cancel();
 +    _stdout.clear();
++    _stderr.clear();
 +    _result.complete(SSHBoundedExecResult._(Uint8List(0), null, reason));
 +    _channel?.destroy();
 +    // Keep the ID / one protocol slot until peer CLOSE or open failure. With no
@@ -345,7 +594,36 @@
 +
  class SSHRemoteForward {
    final String host;
-
+ 
+diff --git a/lib/src/ssh_errors.dart b/lib/src/ssh_errors.dart
+--- a/lib/src/ssh_errors.dart
++++ b/lib/src/ssh_errors.dart
+@@ -146,3 +146,24 @@
+     return 'SSHSocketError($error)';
+   }
+ }
++
++/// Server requests unsupported additional authentication factors.
++class SSHUnsupportedAuthError with SSHMessageError implements SSHAuthError {
++  @override
++  final String message = 'Additional authentication factors are unsupported';
++}
++
++/// Fixed scheduling failures from the application's bounded crypto owner.
++enum SSHSignatureFailure { stopping, exhausted, timeout, cancelled }
++
++class SSHSignatureVerificationError with SSHMessageError implements SSHError {
++  final SSHSignatureFailure reason;
++  SSHSignatureVerificationError(this.reason);
++  @override
++  String get message => 'Host signature verification ${reason.name}';
++}
++
++class SSHResourceLimitError with SSHMessageError implements SSHError {
++  @override
++  final String message = 'SSH receive buffer limit exceeded';
++}
+diff --git a/lib/src/ssh_transport.dart b/lib/src/ssh_transport.dart
 --- a/lib/src/ssh_transport.dart
 +++ b/lib/src/ssh_transport.dart
 @@ -42,6 +42,21 @@
@@ -368,7 +646,7 @@
 +  Uint8List signatureBytes,
 +  Uint8List exchangeHash,
  );
-
+ 
  Uint8List _hostkeyFingerprint(Uint8List hostkey) {
 @@ -98,6 +113,11 @@
    /// Function called when the hostkey has been received. Returns true if the
@@ -379,7 +657,7 @@
 +  final SSHHostkeyChangedHandler? onHostKeyChanged;
 +
 +  final SSHHostSignatureVerifier? onVerifyHostSignature;
-
+ 
    /// Function called when the transport is ready to send data.
    final SSHTransportReadyHandler? onReady;
 @@ -147,6 +167,8 @@
@@ -396,12 +674,12 @@
    /// succeeded for.
    Uint8List? _verifiedHostkeyFingerprint;
 +  Uint8List? _verifiedHostkeyBlob;
-
+ 
    /// Host key type verified during the first key exchange, checked alongside
    /// [_verifiedHostkeyFingerprint] on rekey.
 @@ -633,7 +656,13 @@
    }
-
+ 
    /// Callback triggered when new raw bytes are received from the socket.
 +  static const maxBufferedBytes = 1024 * 1024;
    void _onSocketData(Uint8List data) {
@@ -416,7 +694,7 @@
 @@ -1381,33 +1410,94 @@
      return writer.takeBytes();
    }
-
+ 
 -  /// Verifies the server's public host key signature against the computed exchange hash.
 -  bool _verifyHostkey({
 +  /// Bounded linear-time format checks; no expensive public-key math here.
@@ -530,9 +808,9 @@
 +      return false;
      }
    }
-
+ 
 @@ -1874,11 +1964,25 @@
-
+ 
      if (!disableHostkeyVerification) {
        printDebug?.call('SSHTransport._verifyHostkey');
 -      final verified = _verifyHostkey(
@@ -561,7 +839,7 @@
 +      if (isClosed) return; // A cancelled/closed handshake never resumes late.
        if (!verified) throw SSHHostkeyError('Signature verification failed');
      }
-
+ 
 @@ -1894,9 +1998,8 @@
        // the same key the user (or [onVerifyHostKey]) already approved.
        // OpenSSH rejects a host key change during rekey; do the same.
@@ -600,140 +878,14 @@
 +        : false;
      printDebug?.call('SSHTransport.onVerifyHostKey = $userVerified');
 +    if (isClosed) return;
-
+ 
      if (!userVerified) {
        closeWithError(SSHHostkeyError('Hostkey verification failed'));
 @@ -1928,6 +2041,7 @@
-
+ 
      _hostkeyVerified = true;
      _verifiedHostkeyFingerprint = fingerprint;
 +    _verifiedHostkeyBlob = Uint8List.fromList(hostkey);
      _verifiedHostkeyType = _hostkeyType;
      _sendNewKeys();
      _applyLocalKeys();
---- a/lib/src/ssh_channel.dart
-+++ b/lib/src/ssh_channel.dart
-@@ -36,6 +36,11 @@
-   SSHChannel get channel => SSHChannel(this);
-
-   final Future<void> Function()? onFlush;
-+
-+  /// Optional bounded synchronous consumer, before asynchronous stream buffering.
-+  /// Used only by the application monitoring channel; ordinary streams unchanged.
-+  final void Function(SSHChannelData)? onData;
-+  final void Function()? onAbort;
-
-   SSHChannelController({
-     required this.localId,
-@@ -46,6 +51,8 @@
-     required this.remoteMaximumPacketSize,
-     required this.sendMessage,
-     this.onFlush,
-+    this.onData,
-+    this.onAbort,
-     this.printDebug,
-   }) {
-     if (remoteInitialWindowSize > 0) {
-@@ -127,8 +134,13 @@
-   var _hasSentClose = false;
-
-   final _done = Completer<void>();
-+  bool _boundedReplyExpected = false;
-
-   Future<bool> sendExec(String command) {
-+    if (onData != null) {
-+      _terminalState.throwIfTerminated();
-+      _boundedReplyExpected = true;
-+    }
-     return _sendRequest(
-       SSH_Message_Channel_Request.exec(
-         recipientChannel: remoteId,
-@@ -247,6 +259,9 @@
-   }
-
-   void handleMessage(SSHMessage message) {
-+    // Retired bounded channels retain their protocol ID until peer CLOSE only.
-+    // In particular never queue unsolicited replies or replenish their window.
-+    if (onData != null && _done.isCompleted) return;
-     if (message is SSH_Message_Channel_Data) {
-       _handleDataMessage(message.data);
-     } else if (message is SSH_Message_Channel_Extended_Data) {
-@@ -298,6 +313,9 @@
-       error ?? SSHStateError('Channel destroyed before receiving reply'),
-       stackTrace,
-     );
-+    // done alone also denotes orderly peer CLOSE. Bounded consumers must retain
-+    // this local-abort distinction even after a successful exec ACK/status.
-+    onAbort?.call();
-   }
-
-   Future<bool> _sendRequest(SSHMessage request) async {
-@@ -368,7 +386,12 @@
-     }
-
-     _localWindow -= data.length;
--    _remoteStream.add(SSHChannelData(data, type: type));
-+    final consumer = onData;
-+    if (consumer == null) {
-+      _remoteStream.add(SSHChannelData(data, type: type));
-+    } else {
-+      consumer(SSHChannelData(data, type: type));
-+    }
-     _sendWindowAdjustIfNeeded();
-   }
-
-@@ -407,11 +430,25 @@
-
-   void _handleRequestSuccessMessage() {
-     printDebug?.call('SSHChannel._handleRequestSuccessMessage');
-+    if (onData != null) {
-+      if (!_boundedReplyExpected) {
-+        destroy();
-+        return;
-+      }
-+      _boundedReplyExpected = false;
-+    }
-     _requestReplyQueue.add(true);
-   }
-
-   void _handleRequestFailureMessage() {
-     printDebug?.call('SSHChannel._handleRequestFailureMessage');
-+    if (onData != null) {
-+      if (!_boundedReplyExpected) {
-+        destroy();
-+        return;
-+      }
-+      _boundedReplyExpected = false;
-+    }
-     _requestReplyQueue.add(false);
-   }
-
-@@ -478,7 +515,7 @@
-     printDebug?.call('SSHChannel._sendWindowAdjustIfNeeded');
-
-     if (_done.isCompleted) return;
--    if (_remoteStream.isPaused) return;
-+    if (onData == null && _remoteStream.isPaused) return;
-
-     final bytesToAdd = localInitialWindowSize - _localWindow;
-     if (bytesToAdd <= 0) return;
---- a/SERVERDECK.md
-+++ b/SERVERDECK.md
-@@ -37,3 +37,17 @@
- bytes are capped at1MiB; overflow closes with fixed SSHResourceLimitError. Worker
- scheduling failures use fixed SSHSignatureVerificationError reasons. No host key
- size-security floor is added; numeric/format sanity and bounded CPU are enforced.
-+
-+## 004 bounded monitoring execution
-+
-+SSHClient.startBoundedExec returns a synchronous cancellable handle, one unresolved
-+opening/open/retired monitoring channel per connection. Deadline at most5s begins
-+before open. A65536-byte cumulative stdout+all extended-data budget is enforced
-+inside channel admission before asynchronous buffering; only stdout retained.
-+Ordinary channels retain upstream window/stream behavior. Cancelled pending opens
-+retain their waiter/ID; late success closes without exec. Retired channels drop
-+messages until peer CLOSE, never refill windows or queue replies. New monitoring
-+calls receive cleanupPending until the protocol slot retires. Duplicate ACKs cannot
-+accumulate as reply queue entries. All public bounded results use fixed failures,
-+not remote exception text. Application adapter must supply only its fixed collector
-+and must enforce canonical session/trust/cancellation admission.

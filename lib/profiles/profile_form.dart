@@ -137,7 +137,18 @@ class _ProfileFormState extends State<ProfileForm> {
             );
       if (!mounted) return;
       if (failure == null) {
-        Navigator.pop(context, true);
+        Navigator.pop(
+          context,
+          ProfileSaveOutcome(
+            profileId: p?.profileId ?? widget.controller.lastSavedProfileId!,
+            requiresConnection:
+                p == null ||
+                auth != null ||
+                p.host != _host.text ||
+                p.port != port ||
+                p.username != _user.text,
+          ),
+        );
       } else {
         setState(() {
           _error = failure;
@@ -212,7 +223,7 @@ class _ProfileFormState extends State<ProfileForm> {
                 ),
                 DropdownMenuItem(
                   value: AuthKind.privateKey,
-                  child: Text('Приватный ключ OpenSSH'),
+                  child: Text('Приватный ключ SSH'),
                 ),
               ],
               onChanged: _pending

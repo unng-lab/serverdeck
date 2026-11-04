@@ -51,7 +51,7 @@ void main() {
         );
         await tester.tap(find.byType(DropdownButtonFormField<AuthKind>));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Приватный ключ OpenSSH').last);
+        await tester.tap(find.text('Приватный ключ SSH').last);
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Выбрать файл ключа'));
         await tester.tap(find.text('Выбрать файл ключа'));
