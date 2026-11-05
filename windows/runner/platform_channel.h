@@ -10,6 +10,7 @@
 #include "../../native/include/mcp_pipe.h"
 #include "../../native/include/monitoring_run.h"
 #include <shellapi.h>
+#include "update_runtime.h"
 
 struct PlatformChannelHooks {
   std::function<HANDLE()> createEvent = [] { return CreateEventW(nullptr, TRUE, FALSE, nullptr); };
@@ -27,7 +28,9 @@ struct PlatformChannelHooks {
     [](HWND window, UINT_PTR id, UINT interval) { return SetTimer(window, id, interval, nullptr); };
   std::function<void(HWND, UINT_PTR)> stopTrayMonitor =
     [](HWND window, UINT_PTR id) { KillTimer(window, id); };
+  std::function<std::unique_ptr<UpdateRuntime>()> createUpdates;
 };
+flutter::EncodableMap EncodeUpdateSnapshot(const sd::updates::Snapshot& snapshot);
 
 constexpr UINT kTrayCallback = WM_APP + 41;
 constexpr UINT kActivationMessage = WM_APP + 42;
@@ -53,6 +56,7 @@ class PlatformChannel {
   void CloseActivation();
   void ServeActivation();
   flutter::EncodableMap Snapshot() const;
+  sd::updates::UpdateService& Updates();
   HWND window_;
   ServerDeckHostArgsV1 args_;
   PlatformChannelHooks hooks_;
@@ -71,4 +75,6 @@ class PlatformChannel {
   std::thread activationThread_;
   std::unique_ptr<sd::mcp::Broker> mcp_;
   sd::monitoring::RunState monitoringRun_;
+  bool updatesStopped_ = false;
+  std::unique_ptr<UpdateRuntime> updates_;
 };

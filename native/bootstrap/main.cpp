@@ -3,12 +3,20 @@
 #include "payload.h"
 #include "instance.h"
 #include "mcp_pipe.h"
+#include "build_identity.h"
+#include "startup_update.h"
+#include "install_registration.h"
+#include "setup_package.h"
 #include <shellapi.h>
 #include <cstdio>
 #include <stdexcept>
 
 namespace {
 std::wstring StartupMessage(const std::string& code) {
+  if (code == "INSTALL_REQUIRED") return L"Установите ServerDeck полным ServerDeckSetup.exe. Запуск отдельной копии программы вне каталога установки не поддерживается.";
+  if (code == "BUSY") return L"Установка обслуживается другим процессом. Дождитесь завершения и повторите запуск.";
+  if (code == "RECOVERY_REQUIRED" || code == "UNINSTALL_PARTIAL" || code == "INVALID_ARTIFACT")
+    return L"Не удалось подтвердить целую установку. Используйте «ServerDeck — восстановление» или полный доверенный установщик. Данные не удалены.";
   if (code == "OWNER_OTHER_LOGON") return L"Приложение работает в другой сессии Windows. Завершите его в той сессии и повторите запуск.";
   if (code.rfind("OWNER_", 0) == 0) return L"Приложение уже запущено, но недоступно для активации. Дождитесь завершения запуска или выхода и повторите попытку.";
   if (code == "INSUFFICIENT_DISK_SPACE") return L"Недостаточно свободного места для запуска. Освободите место в пользовательском каталоге и повторите попытку.";
@@ -40,15 +48,36 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, wchar_t*, int) {
     return sd::mcp::RunStdio(clientId);
   }
   if (!gui) return 2;
+  sd::install::StartupInvocation invocation;
   for (;;) {
     try {
       std::wstring exe(32768, L'\0');
       const DWORD length = GetModuleFileNameW(nullptr, exe.data(), static_cast<DWORD>(exe.size()));
       if (!length || length >= exe.size()) throw std::runtime_error("EXE_PATH_FAILED");
       exe.resize(length);
-      const auto root = sd::DataRoot();
-      auto owner = sd::AcquireOwner(root, exe);
-      if (!owner) return 0;
+      const auto paths = sd::install::Paths::CurrentUser(); const auto root = paths.data;
+      if (!sd::install::SameInstallPath(exe, paths.install / L"ServerDeck.exe")) throw std::runtime_error("INSTALL_REQUIRED");
+      std::unique_ptr<sd::install::Lease> lease;
+      try { lease = std::make_unique<sd::install::Lease>(paths, true); }
+      catch (const sd::updates::Failure& error) {
+        if (std::string(error.what()) != "OWNER_RUNNING") throw;
+        sd::ActivateOwner(root); return 0;
+      }
+      sd::install::Files files(paths); sd::install::WindowsRegistration registration(paths);
+      sd::install::Executor executor(files, *lease, registration, sd::install::ValidateEmbeddedSetup);
+      const auto policy = sd::install::ReadEmbeddedPolicy(instance);
+      sd::updates::PendingStore pending(paths, policy.value_or(sd::updates::Policy{}), sd::install::ValidateEmbeddedSetup);
+      auto process = sd::install::MakeWindowsHandoffPort();
+      const auto mappedVersion = sd::install::ReadBuildVersion(instance);
+      const auto action = sd::install::PrepareGuiStartup(executor, pending, *lease, paths, mappedVersion, invocation, *process, policy.has_value());
+      if (action == sd::install::StartupAction::handedOff) return 0;
+      if (action == sd::install::StartupAction::relaunch) {
+        const auto current = executor.Current();
+        if (!current || !(sd::install::ReadFileBuildVersion(paths.install / L"ServerDeck.exe") == current->version))
+          throw sd::updates::Failure("RECOVERY_REQUIRED");
+        lease.reset(); sd::install::LaunchCanonical(paths); return 0;
+      }
+      auto owner = sd::AcquireOwnerFromLease(*lease, paths, exe); lease->ReleaseMaintenance();
       sd::SecureTree(root);
       HRSRC resource = FindResourceW(instance, L"SERVERDECK_PAYLOAD_V1", RT_RCDATA);
       if (!resource) throw std::runtime_error("PAYLOAD_MISSING");

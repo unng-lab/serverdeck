@@ -1,5 +1,14 @@
 <!--
 Sync Impact Report 2026-11-04
+Version 2.0.0 -> 3.0.0 (MAJOR: user replaces direct EXE delivery with an installer).
+Modified IV: one downloaded full offline setup; one installed self-contained application.
+Transient installation/update/uninstall maintenance processes are permitted, without a
+service, database ownership or automatic termination of the primary application.
+Other principles, including the user's compatible-storage amendment VI, are preserved.
+Templates/commands read the constitution at runtime and are unchanged.
+-->
+<!--
+Sync Impact Report 2026-11-04
 Version 1.4.0 -> 2.0.0 (MAJOR: user redefines principle VI for data preservation).
 Modified VI: no backward compatibility -> version bump only for demonstrated
 incompatibility; compatible Isar additions preserve data and format without app migrations.
@@ -61,7 +70,7 @@ MUST NOT добавляться, запускаться автоматическ
 семантики, enabled actions и поведения owner/controller. Они MUST NOT подменяться
 проверками внешнего вида или дублировать дизайн-тесты C01–C30.
 
-### IV. Flutter + Isar, поставка одним EXE
+### IV. Flutter + Isar, установка из одного файла
 
 Клиент MUST быть одним локальным Windows-приложением на Flutter с встроенной
 базой данных Isar. Отдельные приложения, устанавливаемые backend/daemon/service,
@@ -75,13 +84,18 @@ SSH, MCP и хранение MUST принадлежать одному экзе
 себя по EOF/отказу канала; пользовательский выход основного приложения остаётся
 только в трее. Отсутствие владельца не разрешает мосту запускать основное приложение.
 
-Релиз MUST поставляться одним `ServerDeck.exe`, включающим необходимые Flutter/Isar
-библиотеки, assets и runtime-зависимости. От пользователя MUST NOT требоваться
+Релиз MUST распространяться одним полным офлайн-установщиком `ServerDeckSetup.exe`,
+который устанавливает самодостаточный `ServerDeck.exe`, включающий Flutter/Isar
+библиотеки, assets и runtime-зависимости. Скачанный установщик не является portable
+приложением. От пользователя MUST NOT требоваться
 отдельная установка Flutter, Dart, Isar, SSH-клиента или вспомогательного runtime.
-Один EXE означает один поставляемый файл и одну точку запуска, а не отсутствие
+Один установленный EXE означает одну точку запуска UI/MCP, а не отсутствие
 файлов данных на диске. Внутренняя автоматическая распаковка встроенных библиотек
 в управляемый каталог допустима; отдельные устанавливаемые приложения и фоновые
-сервисы не допускаются. Приложение MUST работать без загрузки зависимостей из сети
+сервисы не допускаются. Короткоживущие процессы установки, обновления и удаления
+допускаются только для обслуживания файлов/регистрации: они не открывают базу,
+не становятся владельцами SSH/MCP и не завершают основной экземпляр вместо
+пользователя. Установка из скачанного файла и приложение MUST работать без загрузки зависимостей из сети
 и без административных прав. Данные Isar и защищённые секреты отделяются от EXE
 и от заменяемых runtime-файлов; обновление EXE MUST NOT стирать данные.
 
@@ -165,4 +179,4 @@ MUST NOT выполняться без явного запроса. Неизве
 MINOR — добавление правил, PATCH — уточнение без изменения смысла.
 При ревью MUST проверяться соблюдение правил в пределах изменённого scope.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-04
+**Version**: 3.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-04

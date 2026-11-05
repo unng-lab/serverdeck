@@ -10,9 +10,25 @@ add_library(${BINARY_NAME} SHARED
   "flutter_window.cpp"
   "host_main.cpp"
   "platform_channel.cpp"
+  "update_runtime.cpp"
   "../../native/bootstrap/security.cpp"
   "../../native/bootstrap/instance.cpp"
   "../../native/bootstrap/mcp_pipe.cpp"
+  "../../native/install/release_catalog.cpp"
+  "../../native/install/github_releases.cpp"
+  "../../native/install/installation.cpp"
+  "../../native/install/maintenance_handoff.cpp"
+  "../../native/install/install_executor.cpp"
+  "../../native/install/install_registration.cpp"
+  "../../native/install/setup_package.cpp"
+    "../../native/install/update_service.cpp"
+    "../../native/install/artifact_transfer.cpp"
+    "../../native/install/pending_update.cpp"
+  "../../native/install/pending_lifecycle.cpp"
+  "../../native/install/build_identity.cpp"
+  "../../native/install/startup_update.cpp"
+  "../../native/install/uninstall.cpp"
+  "../../native/install/uninstall_cache.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
@@ -41,7 +57,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
-target_link_libraries(${BINARY_NAME} PRIVATE bcrypt advapi32 ole32 shell32 user32 crypt32)
+target_link_libraries(${BINARY_NAME} PRIVATE bcrypt advapi32 ole32 shell32 user32 crypt32 winhttp ws2_32 uuid shlwapi)
 target_include_directories(${BINARY_NAME} PRIVATE "../../native/include")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 

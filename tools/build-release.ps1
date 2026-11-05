@@ -1,4 +1,8 @@
-﻿param([string]$OutputDirectory = 'output/release')
+﻿param(
+    [string]$OutputDirectory = 'output/release',
+    [ValidateSet('developer', 'publishable')][string]$Profile = 'developer',
+    [string]$UpdatePolicy
+)
 
 $ErrorActionPreference = 'Stop'
 Push-Location (Split-Path -Parent $PSScriptRoot)
@@ -6,6 +10,24 @@ try {
     function Run-Checked([string]$Program, [string[]]$Arguments) {
         & $Program @Arguments
         if ($LASTEXITCODE -ne 0) { throw "$Program failed (exit $LASTEXITCODE)" }
+    }
+    if ($Profile -eq 'publishable' -and !$UpdatePolicy) {
+        throw 'Publishable profile requires -UpdatePolicy with immutable public trust inputs'
+    }
+    $versionMatch = [regex]::Match((Get-Content -Raw pubspec.yaml), '(?m)^version:\s*(\S+)\s*$')
+    $storeMatch = [regex]::Match((Get-Content -Raw lib/storage/store_manifest.dart), 'const currentStorageFormat = ([0-9]+);')
+    if (!$versionMatch.Success -or !$storeMatch.Success) { throw 'Missing release version/storage format' }
+    $version = $versionMatch.Groups[1].Value
+    $storeFormat = $storeMatch.Groups[1].Value
+    $evidence = Join-Path (Get-Location) 'output/release-evidence'
+    New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+    $policyArguments = @('--store-format', $storeFormat)
+    if ($Profile -eq 'publishable') { $policyArguments += '--publishable' }
+    $trustResource = ''
+    if ($UpdatePolicy) {
+        $policyArguments += @('--policy', (Resolve-Path -LiteralPath $UpdatePolicy).Path)
+        Run-Checked python (@('tools/package-installer.py', '--canonicalize-policy', '--output', $evidence) + $policyArguments)
+        $trustResource = "$evidence/trust.rc"
     }
     $sdk = & flutter --version --machine | ConvertFrom-Json
     if ($sdk.frameworkVersion -ne '3.47.7' -or $sdk.dartSdkVersion -ne '3.13.5') {
@@ -24,8 +46,6 @@ try {
     $toolset = (Get-Content (Join-Path $vs 'VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt')).Trim()
     $compiler = Join-Path $vs "VC/Tools/MSVC/$toolset/bin/Hostx64/x64/cl.exe"
     $tree = Join-Path (Get-Location) 'build/windows/x64/runner/Release'
-    $evidence = Join-Path (Get-Location) 'output/release-evidence'
-    New-Item -ItemType Directory -Force -Path $evidence | Out-Null
     $identities = @{
         flutter = $sdk; toolset = $toolset
         compilerSHA256 = (Get-FileHash -LiteralPath $compiler -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -55,13 +75,24 @@ try {
     $redist = Join-Path $vs "VC/Redist/MSVC/$redistVersion"
     Run-Checked python @('tools/package-release.py', '--tree', $tree, '--output', $evidence,
         '--identities', "$evidence/identities.json", '--redist', $redist, '--system', $systemDirectory)
-    Run-Checked cmake @('-S', 'native', '-B', 'build/bootstrap', '-A', 'x64', "-DSERVERDECK_PAYLOAD_RESOURCE=$evidence/payload.rc")
-    Run-Checked cmake @('--build', 'build/bootstrap', '--config', 'Release')
+    Run-Checked cmake @('-S', 'native', '-B', 'build/bootstrap', '-A', 'x64', "-DSERVERDECK_PAYLOAD_RESOURCE=$evidence/payload.rc", "-DSERVERDECK_APP_VERSION=$version",
+        "-DSERVERDECK_TRUST_RESOURCE=$trustResource", '-DSERVERDECK_SETUP_RESOURCE=')
+    Run-Checked cmake @('--build', 'build/bootstrap', '--config', 'Release', '--target', 'ServerDeck')
     Run-Checked python @('tools/package-release.py', '--bootstrap', 'build/bootstrap/Release/ServerDeck.exe',
         '--output', $evidence, '--system', $systemDirectory)
+    $installerArguments = @('tools/package-installer.py', '--application', 'build/bootstrap/Release/ServerDeck.exe',
+        '--output', $evidence, '--version', $version) + $policyArguments
+    Run-Checked python $installerArguments
+    Run-Checked cmake @('-S', 'native', '-B', 'build/setup', '-A', 'x64',
+        "-DSERVERDECK_SETUP_RESOURCE=$evidence/setup.rc", '-DSERVERDECK_PAYLOAD_RESOURCE=', '-DSERVERDECK_TRUST_RESOURCE=')
+    Run-Checked cmake @('--build', 'build/setup', '--config', 'Release', '--target', 'ServerDeckSetup')
+    Run-Checked python ($installerArguments + @('--audit-setup', 'build/setup/Release/ServerDeckSetup.exe'))
+    New-Item -ItemType Directory -Force -Path "$evidence/setup-imports" | Out-Null
+    Run-Checked python @('tools/package-release.py', '--bootstrap', 'build/setup/Release/ServerDeckSetup.exe',
+        '--output', "$evidence/setup-imports", '--system', $systemDirectory)
     New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-    $outputExe = Join-Path $OutputDirectory 'ServerDeck.exe'
-    Copy-Item -LiteralPath build/bootstrap/Release/ServerDeck.exe -Destination $outputExe
+    $outputExe = Join-Path $OutputDirectory 'ServerDeckSetup.exe'
+    Copy-Item -LiteralPath build/setup/Release/ServerDeckSetup.exe -Destination $outputExe
     Get-FileHash -LiteralPath $outputExe -Algorithm SHA256
 } finally {
     Pop-Location

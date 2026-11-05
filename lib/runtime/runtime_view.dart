@@ -9,7 +9,8 @@ import 'feature_runtime.dart';
 import '../profiles/profile_controller.dart';
 import '../profiles/profile_view.dart';
 import '../mcp/settings_controller.dart';
-import '../mcp/settings_view.dart';
+import 'application_settings_view.dart';
+import '../updates/update_owner.dart';
 import '../monitoring/monitoring_owner.dart';
 import 'native_platform.dart';
 import 'owned_settings_route.dart';
@@ -21,12 +22,14 @@ class RuntimeView extends StatefulWidget {
     required this.runtime,
     this.features,
     this.monitoring,
+    this.updates,
   });
   final RuntimeCoordinator runtime;
   final FeatureRuntime? features;
 
   /// Optional owner injection for isolated activation tests/composition.
   final MonitoringOwner? monitoring;
+  final UpdateOwner? updates;
   @override
   State<RuntimeView> createState() => _RuntimeViewState();
 }
@@ -38,11 +41,17 @@ class _RuntimeViewState extends State<RuntimeView> {
   OwnedSettingsRoute _applicationSettings = OwnedSettingsRoute();
   MonitoringOwner? get _monitoring =>
       widget.monitoring ?? widget.features?.monitoring;
+  UpdateOwner? get _updates => widget.updates ?? widget.features?.updates;
   @override
   void initState() {
     super.initState();
     runtime.addListener(_runtimeChanged);
     _syncMonitoring();
+    _startUpdates();
+  }
+
+  void _startUpdates() {
+    if (runtime.acceptsOperations) unawaited(_updates?.start());
   }
 
   void _syncMonitoring() => _monitoring?.setActive(
@@ -53,6 +62,7 @@ class _RuntimeViewState extends State<RuntimeView> {
   void _runtimeChanged() {
     if (!runtime.acceptsOperations) _release();
     _syncMonitoring();
+    _startUpdates();
     if (mounted) setState(() {});
   }
 
@@ -68,9 +78,11 @@ class _RuntimeViewState extends State<RuntimeView> {
     if (oldMonitoring != _monitoring) oldMonitoring?.setActive(false);
     if (oldWidget.runtime != widget.runtime ||
         oldWidget.features != widget.features ||
+        oldWidget.updates != widget.updates ||
         !runtime.acceptsOperations)
       _release();
     _syncMonitoring();
+    _startUpdates();
   }
 
   void _release() {
@@ -103,12 +115,12 @@ class _RuntimeViewState extends State<RuntimeView> {
   Future<void> _openApplicationSettings() async {
     if (_applicationSettings.isOpen ||
         !runtime.acceptsOperations ||
-        _settings == null)
+        _updates == null)
       return;
-    final session = _applicationSettings, settings = _settings!;
+    final session = _applicationSettings;
     await session.show(
       context,
-      child: McpSettingsView(controller: settings),
+      child: ApplicationSettingsView(updates: _updates!, mcp: _settings),
       onChanged: () {
         if (mounted && identical(session, _applicationSettings))
           _syncMonitoring();
@@ -210,7 +222,19 @@ class _RuntimeViewState extends State<RuntimeView> {
     return FoundationShell(
       state: ReadinessState.ready,
       sidebar: const Text('Серверы'),
-      child: SingleChildScrollView(child: body),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            body,
+            if (runtime.acceptsOperations && _updates != null)
+              DeckButton(
+                onPressed: _openApplicationSettings,
+                child: const Text('Настройки приложения'),
+              ),
+          ],
+        ),
+      ),
       status: status,
       recoveryAction: recovery,
     );

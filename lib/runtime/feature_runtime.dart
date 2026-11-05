@@ -22,6 +22,7 @@ import '../profiles/profile_owner.dart';
 import '../storage/domain_repository.dart';
 import '../trust/trust_owner.dart';
 import '../monitoring/monitoring_owner.dart';
+import '../updates/update_owner.dart';
 import 'capability.dart';
 import 'native_platform.dart';
 import 'local_diagnostics.dart';
@@ -130,7 +131,12 @@ final class FeatureRuntime implements RuntimeCapability {
       newId: newId,
       utcNow: utcNow,
     );
+    updates = UpdateOwner(
+      port: NativeUpdatePort(platform),
+      currentVersion: platform.context.release,
+    );
     _capabilities = [
+      updates,
       journals,
       monitoring,
       pipe,
@@ -162,6 +168,7 @@ final class FeatureRuntime implements RuntimeCapability {
   late final OwnedAppOperations operations;
   late final MonitoringOwner monitoring;
   late final JournalsOwner journals;
+  late final UpdateOwner updates;
   late McpRouter router;
   late final List<RuntimeCapability> _capabilities;
   bool _stopped = false, _initialized = false;

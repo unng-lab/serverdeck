@@ -1,5 +1,12 @@
 # Single-EXE release contract v1
 
+> Уточнение 2026-11-04: этот контракт описывает внутренний самодостаточный
+> `ServerDeck.exe`, а не пользовательский скачиваемый артефакт. Внешняя поставка
+> теперь — полный `ServerDeckSetup.exe` согласно
+> [контракту установки 006](../../006-install-update/contracts/installation.md).
+> Build graph ниже синхронизирован с установщиком; прежняя evidence относится
+> только к внутреннему EXE. Требования runtime extraction/import closure сохраняются.
+
 ## Build graph
 
 1. Pinned Flutter Release AOT assemble и native plugin graph создают standard data
@@ -11,9 +18,13 @@
    msvcp140.dll, vcruntime140.dll, vcruntime140_1.dll и реально импортируемые non-OS DLL.
    Полный PE import+delay-import closure аудируется; DLL не скачиваются при запуске.
 4. Сформировать manifest и RCDATA payload, встроить в `/MT` bootstrap ServerDeck.exe.
+   Встроить SERVERDECK_BUILD_V1 с `SDBUILD001\n<canonical version>\n` (ASCII LF,
+   ≤128bytes); версия берётся из pubspec и проверяется упаковщиком против setup.
    Bootstrap imports только штатные Windows DLL. Обнаруженная bootstrap import
    flutter_windows/Isar/vcruntime/MSVCP — build failure.
-5. Пользователю отдаётся только ServerDeck.exe. В CI отдельно остаются manifest,
+5. Встроить окончательный ServerDeck.exe в полный ServerDeckSetup.exe по006;
+   пользователю отдаётся установщик из GitHub Releases. Перед extraction/host load
+   установленный bootstrap выполняет canonical/pending preflight по006. В CI остаются manifest,
    SBOM/licenses, import audit и exact toolchain identities; это не файлы установки.
 
 Build prerequisites: Flutter3.47.7/Dart3.13.5 из `.flutter-version`, Windowsx64,

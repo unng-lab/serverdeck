@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build single EXE and audit imports
+      - name: Build developer installer and audit embedded application
         shell: pwsh
         run: ./tools/build-release.ps1
       - name: Application unit checks
@@ -35,5 +35,5 @@ jobs:
         with:
           name: ServerDeck
           path: |
-            output/release/ServerDeck.exe
+            output/release/ServerDeckSetup.exe
             output/release-evidence/

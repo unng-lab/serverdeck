@@ -48,6 +48,42 @@ std::vector<uint8_t> Bytes(const M& map) {
   return std::get<std::vector<uint8_t>>(*value);
 }
 }
+M EncodeUpdateSnapshot(const sd::updates::Snapshot& snapshot) {
+  const auto integer = [](uint64_t value) -> V {
+    if (value > INT64_MAX) throw sd::updates::Failure("RECOVERY_REQUIRED");
+    return V(static_cast<int64_t>(value));
+  };
+  M result{{V("state"), V(snapshot.state)}, {V("currentVersion"), V(snapshot.current.text)},
+    {V("enabled"), V(snapshot.preferences.enabled)}, {V("bytes"), integer(snapshot.bytes)}};
+  if (!snapshot.code.empty()) result.emplace(V("code"), V(snapshot.code));
+  if (snapshot.total) result.emplace(V("total"), integer(*snapshot.total));
+  for (const auto& field : {std::make_pair("lastAttempt", snapshot.preferences.lastAttempt),
+      std::make_pair("lastSuccess", snapshot.preferences.lastSuccess), std::make_pair("deferredUntil", snapshot.preferences.deferredUntil)})
+    if (field.second) result.emplace(V(field.first), integer(*field.second));
+  if (!snapshot.preparedVersion.empty()) result.emplace(V("preparedVersion"), V(snapshot.preparedVersion));
+  if (!snapshot.preparedCode.empty()) result.emplace(V("preparedCode"), V(snapshot.preparedCode));
+  const bool offerRequired = snapshot.state == "available" || snapshot.state == "downloading" || snapshot.state == "verifying" || snapshot.state == "ready";
+  if (offerRequired && !snapshot.offer) throw sd::updates::Failure("RECOVERY_REQUIRED");
+  if (snapshot.offer) {
+    // The service exposes only verified, compatible offers. Source URLs, hashes
+    // and filesystem paths never cross this presentation boundary.
+    const auto& release = *snapshot.offer;
+    result.emplace(V("targetVersion"), V(release.version.text)); result.emplace(V("notes"), V(release.notes));
+    result.emplace(V("publishedUTC"), integer(release.published)); result.emplace(V("setupSize"), integer(release.setupSize));
+    result.emplace(V("platform"), V(release.platform)); result.emplace(V("bootstrapAbi"), integer(release.bootstrapAbi));
+    result.emplace(V("storeFormat"), integer(release.storeFormat)); result.emplace(V("compatibility"), V("compatible"));
+    result.emplace(V("compatibilityReason"), V("Выпуск совместим с текущей программой и форматом данных."));
+  }
+  return result;
+}
+sd::updates::UpdateService& PlatformChannel::Updates() {
+  if (!updates_) {
+    auto created = hooks_.createUpdates ? hooks_.createUpdates() : CreateUpdateRuntime(args_, sd::install::Paths::CurrentUser());
+    if (!created || !created->service) throw sd::updates::Failure("STORAGE_IO");
+    updates_ = std::move(created);
+  }
+  return *updates_->service;
+}
 PlatformChannel::PlatformChannel(HWND window, flutter::BinaryMessenger* messenger,
                                const ServerDeckHostArgsV1& args, PlatformChannelHooks hooks)
     : window_(window), args_(args), hooks_(std::move(hooks)),
@@ -75,6 +111,7 @@ PlatformChannel::PlatformChannel(HWND window, flutter::BinaryMessenger* messenge
   }
 }
 PlatformChannel::~PlatformChannel() {
+  if (updates_) { updates_->service->StopAdmission(); updates_->service->Cancel(); updates_->service->Drain(); }
   try { StopTrayMonitor(); } catch (...) {}
   try { CloseActivation(); } catch (...) {}
   try { channel_->SetMethodCallHandler(nullptr); } catch (...) {}
@@ -148,7 +185,39 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       result->Error("STALE_EPOCH", "Устаревший экземпляр"); return;
     }
     const auto& name = call.method_name();
-    if (name == "monitoring.beginRun") {
+    if (name.rfind("updates.", 0) == 0) {
+      const bool setting = name == "updates.setEnabled", download = name == "updates.download";
+      const bool snapshot = name == "updates.snapshot", cancel = name == "updates.cancel";
+      const bool stop = name == "updates.stopAdmission", drained = name == "updates.drained";
+      if (!setting && !download && !snapshot && !cancel && !stop && !drained && name != "updates.check" && name != "updates.defer")
+        throw std::invalid_argument("INVALID_ARGUMENT");
+      if (map.size() != (setting || download ? 2u : 1u)) throw std::invalid_argument("INVALID_ARGUMENT");
+      std::string version;
+      if (download) {
+        version = Text(map, "version");
+        try { sd::updates::ParseVersion(version); } catch (...) { throw std::invalid_argument("INVALID_ARGUMENT"); }
+      }
+      const auto* enabled = setting ? Field(map, "enabled") : nullptr;
+      if (setting && (!enabled || !std::holds_alternative<bool>(*enabled))) throw std::invalid_argument("INVALID_ARGUMENT");
+      if (stop) {
+        updatesStopped_ = true; if (updates_) updates_->service->StopAdmission(); result->Success();
+      } else if (cancel) {
+        if (updates_) updates_->service->Cancel(); result->Success();
+      } else if (drained) {
+        result->Success(V(!updates_ || updates_->service->TryDrain()));
+      } else if (snapshot && (updatesStopped_ || exitRequested_ || activationClosed_ || osEnding_ || activationStatus_ == 2) && !updates_) {
+        sd::updates::Snapshot stopped; stopped.current = UpdateBuildVersion(); stopped.state = "failed"; stopped.code = "CANCELLED";
+        result->Success(V(EncodeUpdateSnapshot(stopped)));
+      } else {
+        if (!snapshot && (updatesStopped_ || exitRequested_ || activationClosed_ || osEnding_ || activationStatus_ != 1))
+          throw sd::updates::Failure("CANCELLED");
+        if (snapshot) result->Success(V(EncodeUpdateSnapshot(Updates().Read())));
+        else if (name == "updates.check") result->Success(V(Updates().Check()));
+        else if (download) result->Success(V(Updates().Download(version)));
+        else if (setting) { Updates().SetEnabled(std::get<bool>(*enabled)); result->Success(); }
+        else { Updates().Defer(); result->Success(); }
+      }
+    } else if (name == "monitoring.beginRun") {
       if (exitRequested_ || activationClosed_ || osEnding_ || map.size() != 1)
         throw std::invalid_argument("INVALID_ARGUMENT");
       const auto root = std::filesystem::path(args_.dataRoot);
@@ -203,11 +272,7 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       } else { result->NotImplemented(); return; }
       result->Success();
     } else if (name == "initialize") {
-#ifdef FLUTTER_VERSION
-      const char* release = FLUTTER_VERSION;
-#else
-      const char* release = "0.1.0";
-#endif
+      const auto release = UpdateBuildVersion().text;
       M context{{V("ownerEpoch"), V(sd::Utf8(args_.ownerEpoch))},
         {V("release"), V(release)},
         {V("userSid"), V(sd::Utf8(sd::UserSid()))}, {V("logonSid"), V(sd::Utf8(sd::LogonSid()))},
@@ -218,7 +283,9 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       if (const auto* state = Field(map, "runtimeState")) {
         if (!std::holds_alternative<std::string>(*state)) throw std::invalid_argument("INVALID_ARGUMENT");
         const auto& value = std::get<std::string>(*state);
-        if (value == "shuttingDown" || value == "shutdownBlocked" || value == "terminated") activationStatus_ = 2;
+        if (value == "shuttingDown" || value == "shutdownBlocked" || value == "terminated") {
+          activationStatus_ = 2; updatesStopped_ = true; if (updates_) updates_->service->StopAdmission();
+        }
         else if (!exitRequested_) activationStatus_ = value == "running" ? 1 : 3;
       }
       result->Success(V(Snapshot()));
@@ -305,6 +372,7 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       result->Success();
     } else result->NotImplemented();
   } catch (const std::invalid_argument&) { result->Error("INVALID_ARGUMENT", "Неверный запрос платформы"); }
+    catch (const sd::updates::Failure& error) { result->Error(error.what(), "Операция обновления не выполнена"); }
     catch (...) { result->Error("STORAGE_IO", "Операция платформы не выполнена"); }
 }
 bool PlatformChannel::OnMessage(UINT message, WPARAM wparam, LPARAM lparam, LRESULT* result) {

@@ -97,19 +97,13 @@ bool PeerIdentity(HANDLE pipe, bool serverPeer, const std::wstring& user,
 OwnerLease::~OwnerLease() {
   if (lock && lock->valid()) DeleteFileW((root / L"owner.json").c_str());
 }
-std::unique_ptr<OwnerLease> AcquireOwner(const std::filesystem::path& root,
-                                      const std::filesystem::path& exe) {
+namespace {
+std::unique_ptr<OwnerLease> PublishOwner(const std::filesystem::path& root,
+                                       const std::filesystem::path& exe, std::unique_ptr<Handle> lock) {
   auto owner = std::make_unique<OwnerLease>();
   owner->root = root;
-  const auto lockPath = root / L"owner.lock";
-  RejectReparse(lockPath);
-  owner->lock = std::make_unique<Handle>(CreateFileW(lockPath.c_str(), GENERIC_READ | GENERIC_WRITE | WRITE_DAC,
-    0, nullptr, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
-  if (!owner->lock->valid()) {
-    if (GetLastError() != ERROR_SHARING_VIOLATION) throw std::runtime_error("OWNER_LOCK_FAILED");
-    ActivateExisting(root);
-    return nullptr;
-  }
+  owner->lock = std::move(lock);
+  if (!owner->lock || !owner->lock->valid()) throw std::runtime_error("OWNER_LOCK_FAILED");
   SecureFileHandle(owner->lock->get());
   owner->epoch = Uuid();
   const auto user = UserSid();
@@ -137,5 +131,24 @@ std::unique_ptr<OwnerLease> AcquireOwner(const std::filesystem::path& root,
   const auto bytes = data.str();
   AtomicFile(root / L"owner.json", std::vector<uint8_t>(bytes.begin(), bytes.end()));
   return owner;
+}
+}
+void ActivateOwner(const std::filesystem::path& root) { ActivateExisting(root); }
+std::unique_ptr<OwnerLease> AcquireOwner(const std::filesystem::path& root,
+                                      const std::filesystem::path& exe) {
+  const auto lockPath = root / L"owner.lock"; RejectReparse(lockPath);
+  auto lock = std::make_unique<Handle>(CreateFileW(lockPath.c_str(), GENERIC_READ | GENERIC_WRITE | WRITE_DAC,
+    0, nullptr, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+  if (!lock->valid()) {
+    if (GetLastError() != ERROR_SHARING_VIOLATION) throw std::runtime_error("OWNER_LOCK_FAILED");
+    ActivateOwner(root); return nullptr;
+  }
+  return PublishOwner(root, exe, std::move(lock));
+}
+std::unique_ptr<OwnerLease> AcquireOwnerFromLease(install::Lease& lease, const install::Paths& paths,
+    const std::filesystem::path& exe) {
+  paths.Validate();
+  if (!lease.Owns(paths, true)) throw std::runtime_error("OWNER_LOCK_FAILED");
+  return PublishOwner(paths.data, exe, lease.TakeOwner());
 }
 }

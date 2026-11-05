@@ -52,6 +52,11 @@ DWORD HandleCount() {
   if (!GetProcessHandleCount(GetCurrentProcess(), &count)) throw std::runtime_error("Handle count");
   return count;
 }
+struct UpdatePreferences : sd::updates::PreferenceStore {
+  sd::updates::Preferences value;
+  sd::updates::Preferences Load() override { return value; }
+  void Save(const sd::updates::Preferences& next) override { value = next; }
+};
 }
 int main() {
   wchar_t temp[MAX_PATH]{};
@@ -266,6 +271,67 @@ int main() {
       }
       if (!marker.Call("runtime.finishExit", finish).error.empty() ||
           sd::monitoring::Read(root) != sd::monitoring::clean) return 43;
+    }
+    // Update channel validates before lazy factory side effects; cleanup never
+    // creates a service, and stop remains latched across subsequent calls.
+    {
+      Messenger marker; int factories = 0;
+      PlatformChannelHooks isolated;
+      isolated.startWorker = [](std::function<void()>) { return std::thread{}; };
+      isolated.createTray = [](HWND) { return true; };
+      isolated.startTrayMonitor = [](HWND, UINT_PTR id, UINT) { return id; };
+      isolated.stopTrayMonitor = [](HWND, UINT_PTR) {};
+      isolated.createUpdates = [&] {
+        ++factories; auto runtime = std::make_unique<UpdateRuntime>();
+        runtime->preferences = std::make_unique<UpdatePreferences>();
+        runtime->service = std::make_unique<sd::updates::UpdateService>(std::nullopt,
+          sd::updates::ParseVersion("0.1.0+1"), *runtime->preferences);
+        return runtime;
+      };
+      const M epoch{{V("ownerEpoch"), V(sd::Utf8(args.ownerEpoch))}};
+      {
+        PlatformChannel channel(nullptr, &marker, args, isolated);
+        if (marker.Call("updates.check", {{V("ownerEpoch"), V("stale")}}).error != "STALE_EPOCH") return 44;
+        auto extra = epoch; extra[V("url")] = V("https://other.test");
+        if (marker.Call("updates.snapshot", extra).error != "INVALID_ARGUMENT") return 45;
+        auto setting = epoch; setting[V("enabled")] = V(1);
+        if (marker.Call("updates.setEnabled", setting).error != "INVALID_ARGUMENT") return 46;
+        auto download = epoch; download[V("version")] = V("0.2.0");
+        if (marker.Call("updates.download", download).error != "INVALID_ARGUMENT" || factories) return 47;
+        if (!marker.Call("updates.cancel", epoch).error.empty() || !std::get<bool>(marker.Call("updates.drained", epoch).value) || factories) return 48;
+        auto running = epoch; running[V("runtimeState")] = V("running"); marker.Call("runtime.snapshot", running);
+        const auto snapshot = marker.Call("updates.snapshot", epoch);
+        if (!snapshot.error.empty() || factories != 1 ||
+            std::get<std::string>(std::get<M>(snapshot.value).at(V("code"))) != "UPDATE_NOT_CONFIGURED" ||
+            std::get<bool>(marker.Call("updates.check", epoch).value)) return 49;
+        setting[V("enabled")] = V(false);
+        if (!marker.Call("updates.setEnabled", setting).error.empty()) return 50;
+        if (!marker.Call("updates.stopAdmission", epoch).error.empty() || marker.Call("updates.check", epoch).error != "CANCELLED" ||
+            !marker.Call("updates.cancel", epoch).error.empty() || !std::get<bool>(marker.Call("updates.drained", epoch).value)) return 51;
+      }
+      {
+        PlatformChannel channel(nullptr, &marker, args, isolated);
+        if (!marker.Call("updates.stopAdmission", epoch).error.empty()) return 52;
+        const auto stopped = marker.Call("updates.snapshot", epoch);
+        if (!stopped.error.empty() || factories != 1 ||
+            std::get<std::string>(std::get<M>(stopped.value).at(V("code"))) != "CANCELLED" ||
+            marker.Call("updates.check", epoch).error != "CANCELLED") return 53;
+      }
+      sd::updates::Snapshot snapshot; snapshot.current = sd::updates::ParseVersion("0.1.0+1"); snapshot.state = "available";
+      sd::updates::Release release; release.version = sd::updates::ParseVersion("0.2.0+1");
+      release.platform = "windows-x64"; release.bootstrapAbi = 1; release.storeFormat = 2; release.published = 123;
+      release.setupSize = 456; release.notes = "signed notes"; release.url = "https://private-source.example/setup";
+      release.setupHash.assign(64, 'a'); release.appHash.assign(64, 'b'); snapshot.offer = release;
+      snapshot.preparedVersion = "0.1.1+1"; snapshot.preparedCode = "RELEASE_REVOKED";
+      const auto encoded = EncodeUpdateSnapshot(snapshot);
+      if (std::get<int64_t>(encoded.at(V("setupSize"))) != 456 || std::get<int64_t>(encoded.at(V("publishedUTC"))) != 123 ||
+          std::get<int64_t>(encoded.at(V("bootstrapAbi"))) != 1 || std::get<int64_t>(encoded.at(V("storeFormat"))) != 2 ||
+          std::get<std::string>(encoded.at(V("compatibility"))) != "compatible" || encoded.count(V("total")) ||
+          encoded.count(V("url")) || encoded.count(V("setupHash")) || encoded.count(V("appHash"))) return 54;
+      snapshot.total = 400; if (std::get<int64_t>(EncodeUpdateSnapshot(snapshot).at(V("total"))) != 400) return 55;
+      snapshot.offer.reset(); bool missingRejected = false;
+      try { EncodeUpdateSnapshot(snapshot); } catch (const sd::updates::Failure&) { missingRejected = true; }
+      if (!missingRejected) return 56;
     }
     std::filesystem::remove_all(root);
     return 0;

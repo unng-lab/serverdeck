@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import '../updates/update_owner.dart';
+
 enum WindowState { visible, minimized, trayHidden }
 
 class PlatformSnapshot {
@@ -28,6 +30,49 @@ class PlatformSnapshot {
         osEnding: value['osEnding'] as bool,
         exitRequested: value['exitRequested'] == true,
       );
+}
+
+/// Restricted owner port: only version/boolean commands cross the channel.
+/// Native code owns policy, URLs, paths, signature verification and file writes.
+final class NativeUpdatePort implements UpdatePort, UpdateLifecyclePort {
+  const NativeUpdatePort(this.platform);
+  final NativePlatform platform;
+  Future<bool> _accepted(String method, [Map<String, Object?>? extra]) async {
+    final value = await platform._invoke<Object?>(method, extra);
+    if (value is! bool) throw const FormatException('Invalid update admission');
+    return value;
+  }
+
+  @override
+  Future<UpdateSnapshot> snapshot() async {
+    final value = await platform._invoke<Object?>('updates.snapshot');
+    if (value is! Map<Object?, Object?>) {
+      throw const FormatException('Invalid update snapshot');
+    }
+    return UpdateSnapshot.decode(value);
+  }
+
+  @override
+  Future<bool> check() => _accepted('updates.check');
+  @override
+  Future<bool> download(String version) =>
+      _accepted('updates.download', {'version': version});
+  @override
+  Future<void> cancel() => platform._invoke<void>('updates.cancel');
+  @override
+  Future<void> setEnabled(bool enabled) =>
+      platform._invoke<void>('updates.setEnabled', {'enabled': enabled});
+  @override
+  Future<void> defer() => platform._invoke<void>('updates.defer');
+  @override
+  Future<void> stopAdmission() =>
+      platform._invoke<void>('updates.stopAdmission');
+  @override
+  Future<void> drain() async {
+    while (!await _accepted('updates.drained')) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+  }
 }
 
 class PlatformEvent {
