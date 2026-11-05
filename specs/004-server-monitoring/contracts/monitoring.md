@@ -213,3 +213,14 @@ breakBefore(bool); text alternative permitted only here, not in current C21/sett
 
 
 History projection,error and retry require the connectionRevision of the selected profile details. A cached entry at another revision returns no points/error and cannot retry, even while reconciliation waits/fails (FR-425,T035).
+
+## Full-size C22 projection
+
+MonitoringOwner.historyUtcNow supplies owner UTC,not last historical timestamp.
+MonitoringHistoryPanel obtains revision-fenced points,passes UTCwindowEnd,
+fullSize:true,maxPoints720 and quality known/all-fields,incomplete/any-null,
+empty/no-points. C22 interaction/presentation contract belongs to001;no fetching.
+No schema/TTL/SSH changes. Source code linuxMonitoringCommand reads /proc/stat,
+MemTotal/MemAvailable from/proc/meminfo,df-Pk-root;percent semantics FR402 unchanged.
+Do not launch desktop app or ComputerUse without a new explicit user request;
+unit/static/sharedcomponent checks remain allowed.

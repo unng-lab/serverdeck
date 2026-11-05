@@ -65,7 +65,7 @@ Ed25519/RSA2048 fixtures, отказ wrong passphrase и unencrypted round-trip.
 ## R302 — запись и миграция
 
 **Decision**: общий формат2 с DPAPI ciphertext внутри той же Isar txn, не внешний
-vault с двухфазной неопределённой записью. CURRENT preflight до open; толькоformat3, безмиграций поConstitutionVI.
+vault с двухфазной неопределённой записью. CURRENT preflight до open; толькоformat2, безмиграций поConstitutionVI.
 **Rationale**: атомарные profile/credentials/trust/receipt mutations и явный current-format guard. [Контракт002](../002-desktop-runtime/contracts/storage.md).
 **Alternatives**: secret path-only, sidecar plaintext и отдельная база MCP отвергнуты.
 

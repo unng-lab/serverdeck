@@ -1,11 +1,13 @@
 import 'package:isar_community/isar.dart';
 
+import 'store_manifest.dart';
+
 part 'records.g.dart';
 
 @collection
 class AppSettings {
   Id id = 1;
-  int logicalFormat = 3;
+  int logicalFormat = currentStorageFormat;
   int settingsRevision = 1;
   int dataRevision = 1;
   int profilesListRevision = 1;

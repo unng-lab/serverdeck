@@ -3,6 +3,13 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+/// This identifies incompatible data semantics, not every additive Isar schema.
+const currentStorageFormat = 2;
+
+/// Compatible schema additions retain the current data format.
+bool isCompatibleStorageFormat(Object? value) =>
+    value is int && value == currentStorageFormat;
+
 final _storeId = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
 );
@@ -17,7 +24,7 @@ class StoreFailure implements Exception {
 class StoreManifest {
   const StoreManifest(this.storeId);
   final String storeId;
-  int get formatVersion => 3;
+  int get formatVersion => currentStorageFormat;
   String get relativeDirectory => 'stores/$storeId';
   Uint8List encode() => Uint8List.fromList(
     utf8.encode(
@@ -36,8 +43,7 @@ class StoreManifest {
       final id = value['storeId'];
       if (value['publicationVersion'] is! int ||
           value['publicationVersion'] != 1 ||
-          value['formatVersion'] is! int ||
-          value['formatVersion'] != 3 ||
+          !isCompatibleStorageFormat(value['formatVersion']) ||
           id is! String ||
           !_storeId.hasMatch(id) ||
           value['relativeDirectory'] != 'stores/$id') {

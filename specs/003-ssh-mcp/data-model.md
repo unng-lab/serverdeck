@@ -1,7 +1,7 @@
-# Data model — format3
+# Data model — format2
 
 Расширяет [storage002](../002-desktop-runtime/contracts/storage.md). Все domain записи
-в одной Isar. AppSettings.logicalFormat=3; opens только полный schema set:
+в одной Isar. AppSettings.logicalFormat=2; opens только полный schema set:
 AppSettings, Profile, Credential, EndpointTrust, McpGrant, MutationReceipt, SecurityState.
 UUID lowercase v4; revisions int64≥1; times UTC ms; byte arrays задают явные bounds.
 
@@ -110,9 +110,9 @@ STORAGE_UNAVAILABLE, not reset. A repeated rollback creates a further epoch, not
 multiple increments for requests at the same already-recorded floor.
 
 
-## Current format3 initialization
+## Current format2 initialization
 
-Текущий manifest/appsettings используют толькоlogicalFormat3. Format1 и его copy/publication migration не поддерживаются. Fresh store создаёт receipt HMAC key; существующий current store читается без app-version adapters/backfill. Неизвестный формат отклоняется до DB open без подмены пустым состоянием.
+Текущий manifest/appsettings используют толькоlogicalFormat2. Format1 и его copy/publication migration не поддерживаются. Fresh store создаёт receipt HMAC key; существующий current store читается без app-version adapters/backfill. Неизвестный формат отклоняется до DB open без подмены пустым состоянием.
 
 
 ## Текущие private credentials и модальная сессия
@@ -134,4 +134,4 @@ open state. Retired route cannot be reused; RuntimeView replaces the session on 
 retirement. Prompt route handles are captured while mounted, not derived during
 workspace disposal. No new persisted record or compatibility branch.
 
-Current format3 adds MonitoringHistoryRecord(profileId unique,connectionRevision,payload) defined by [004](../004-server-monitoring/data-model.md#history). Other formats, including2, rejected before DB open without modification.
+The format2 schema adds MonitoringHistoryRecord(profileId unique,connectionRevision,payload) defined by [004](../004-server-monitoring/data-model.md#history). Unsupported versions are rejected before DB open without modification.

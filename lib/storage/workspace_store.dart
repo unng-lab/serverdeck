@@ -153,7 +153,7 @@ class WorkspaceStore implements RuntimeStore {
 
   AppSettings _validateSettings(AppSettings? value) {
     if (value == null ||
-        value.logicalFormat != 3 ||
+        !isCompatibleStorageFormat(value.logicalFormat) ||
         value.settingsRevision < 1 ||
         value.dataRevision < 1 ||
         value.profilesListRevision < 1 ||

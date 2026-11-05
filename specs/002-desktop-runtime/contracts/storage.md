@@ -1,4 +1,4 @@
-# Current storage contract — format3
+# Current storage contract — format2
 
 ## Каталоги и authority
 
@@ -32,7 +32,7 @@ DPAPI failure ничего не пишет. Uint8List plaintext живёт то�
 
 ## Current store open
 
-Manifest publicationVersion1/logical format3 — единственный текущий контракт. Формат1 и автоматическое copy/migrate/backfill не поддерживаются по principleVI constitution1.4.0. Неизвестный формат отклоняется до StoreBackend.open; originalCURRENT/source tree не изменяются и не заменяются пустойБД. Модуль store_manifest.dart владеет текущим manifest/preflight/publication guards; StoreBackend не имеет copyStore API. Fresh initialization и retry собственной непубликованной staging остаются обычным recovery текущей операции, не старымформатом.
+Manifest publicationVersion1/logical format2 — текущий контракт. Формат1 и автоматическое copy/migrate/backfill не поддерживаются по principleVI constitution2.0.0. Неизвестный формат отклоняется до StoreBackend.open; originalCURRENT/source tree не изменяются и не заменяются пустойБД. Модуль store_manifest.dart владеет текущим manifest/preflight/publication guards; StoreBackend не имеет copyStore API. Fresh initialization и retry собственной непубликованной staging остаются обычным recovery текущей операции, не старымформатом.
 
 ## Unit test boundary
 
@@ -42,3 +42,29 @@ in-memory Isar interface и проверяет вызовы/порядок/ош�
 Файловые guards проверяются на временных synthetic trees. Fake txn rollback не
 является доказательством native durability; real-engine crash tests исключены
 из обязательных проверок по решению пользователя, требования к данным сохраняются.
+
+## Совместимые дополнения и версия формата — 2026-11-04
+
+FR-221: currentStorageFormat=2; isCompatibleStorageFormat принимает только integer2.
+AppSettings.logicalFormat и CURRENT.formatVersion проверяются одной политикой;
+publicationVersion1, UUID/path/reparse/security/content проверки сохраняются.
+Новые и существующие базы используют2. Нет переименования каталога, переписывания CURRENT или logicalFormat и копирования базы.
+Отсутствие новой коллекции MonitoringHistoryRecord/JournalSource означает пустой
+новый набор данных, а не повреждение существующих профилей/credentials/trust.
+Их добавляет текущий schema set через штатный Isar open. Старые коллекции не
+переименовываются, не удаляются и не меняют представление. Отдельных миграций нет.
+
+FR-222: повышение версии допускается только с указанием конкретного несовместимого
+изменения и сценария чтения/записи. Для нового поля нужен определённый результат
+чтения отсутствующего значения; initializer без обоснования недостаточен. Изменение
+типа/имени хранения/обязательных ограничений/смысла требует оценки сохранения данных.
+
+Ошибка версии/повреждения не приводит к reset, конвертации или автоматическому retry
+через пустую базу. Прежние schemas, API adapters и migration/backfill не добавляются.
+
+AC-221: fake backend для CURRENT2 и AppSettings2 открывает тот же storeId,
+сохраняет версии, theme/revisions/security и CURRENT bytes, не публикует замену.
+AC-222: неподдерживаемый/unknown формат, повреждённый manifest/path/settings продолжают явно
+отклоняться; unsupported manifest не вызывает backend.open или публикацию.
+Unit fixtures проверяют adapter contract, а не реальную native durability.
+Основание штатных schema additions: [Isar data migration](https://isar.dev/recipes/data_migration.html).

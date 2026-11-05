@@ -24,3 +24,10 @@ local shell clones. Current-only API, no new palette/assets/dependency. Проч
 
 Support004/FR-422 through DeckHistory maxPoints1..720(default120),periodLabel,
 finite fractional percentages and breakBefore; synthetic component units only.
+
+## C22 full-size graphs
+
+Расширить тот же sharedC22,не локальный график004. Part lib/ui/deck_history_full.dart:
+оси,порог90%,заливка непрерывных сегментов,hover/tap/keyboard выбор реального замера.
+Страница004 передаёт fullSize/windowEnd. Нет новых пакетов/схем/коллекторов.
+Synthetic001 проверяет размеры/оси/hover/focus;functional004 — только data/actions.

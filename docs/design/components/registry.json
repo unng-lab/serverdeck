@@ -1669,7 +1669,8 @@
         "несколько различимых series",
         "gap",
         "legend",
-        "текстовая альтернатива"
+        "текстовая альтернатива",
+        "полноразмерные графики отдельной страницы"
       ],
       "applicableStates": [
         "default",
@@ -1692,7 +1693,8 @@
         "cancelled": "Это состояние относится к данным/форме/заданию владельца, а не к данному control; оно не симулируется фиктивным результатом."
       },
       "implementationPaths": [
-        "lib/ui/deck_history.dart"
+        "lib/ui/deck_history.dart",
+        "lib/ui/deck_history_full.dart"
       ],
       "exampleIds": [
         "C22-default",
@@ -1709,7 +1711,8 @@
         "test_design/components/interactions_test.dart",
         "test_design/components/state_fixtures_test.dart",
         "test_design/components/review_round2_test.dart",
-        "test_design/components/history_test.dart"
+        "test_design/components/history_test.dart",
+        "test_design/components/history_full_test.dart"
       ],
       "designStatus": "ready",
       "codeStatus": "ready",
@@ -1721,18 +1724,21 @@
         "textual values"
       ],
       "parameters": [
-        "DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions)"
+        "DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions, maxPoints, periodLabel, fullSize, windowEnd)"
       ],
       "events": [
-        "Локальное раскрытие/keyboard selection текстовых значений"
+        "Локальное раскрытие/keyboard selection текстовых значений",
+        "Hover/tap и клавиатурный выбор реального замера в fullSize"
       ],
       "limitations": [
-        "До 120 points",
-        "gap >15000ms",
-        "no interpolation/polling/new timestamps"
+        "maxPoints1..720, default120",
+        "gap >15000ms или breakBefore",
+        "no interpolation/polling/new timestamps",
+        "fullSize требует owner windowEnd; ось UTC за последний час"
       ],
       "acceptanceCriteria": [
-        "0/1/120, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию"
+        "0/1/120, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию",
+        "fullSize: доступная ширина,читаемая высота,оси,порог90%,gap-safe line/fill,hover и keyboard readout"
       ],
       "usageExample": "DeckHistory(points: points, source: source, observedAt: observedAt, stale: stale);",
       "runnableExamplePath": "tool/component_catalog/examples.dart"

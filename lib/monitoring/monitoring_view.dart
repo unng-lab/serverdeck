@@ -20,30 +20,45 @@ class MonitoringHistoryPanel extends StatelessWidget {
   final int connectionRevision;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (owner.historyError(profileId, connectionRevision)) ...[
-        const DeckNotice(
-          title: 'История мониторинга недоступна',
-          message: 'Не удалось прочитать или сохранить историю этого сервера.',
-          nextStep: 'Повторите сохранение истории. Текущие метрики продолжают обновляться.',
-          tone: DeckTone.warning,
-        ),
-        DeckButton(
-          onPressed: () => owner.retryHistory(profileId, connectionRevision),
-          child: const Text('Повторить сохранение истории'),
+  Widget build(BuildContext context) {
+    final points = owner.history(profileId, connectionRevision);
+    final partial = points.any(
+      (p) => p.cpu == null || p.memory == null || p.disk == null,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (owner.historyError(profileId, connectionRevision)) ...[
+          const DeckNotice(
+            title: 'История мониторинга недоступна',
+            message:
+                'Не удалось прочитать или сохранить историю этого сервера.',
+            nextStep: 'Повторите сохранение истории. Текущие метрики продолжают обновляться.',
+            tone: DeckTone.warning,
+          ),
+          DeckButton(
+            onPressed: () => owner.retryHistory(profileId, connectionRevision),
+            child: const Text('Повторить сохранение истории'),
+          ),
+        ],
+        DeckHistory(
+          points: HistoryCodec.chart(points),
+          maxPoints: HistoryCodec.maxPoints,
+          periodLabel: 'Последний час',
+          fullSize: true,
+          windowEnd: DateTime.fromMillisecondsSinceEpoch(
+            owner.historyUtcNow,
+            isUtc: true,
+          ),
+          quality: points.isEmpty
+              ? 'empty'
+              : partial
+              ? 'incomplete'
+              : 'known',
         ),
       ],
-      DeckHistory(
-        points: HistoryCodec.chart(
-          owner.history(profileId, connectionRevision),
-        ),
-        maxPoints: HistoryCodec.maxPoints,
-        periodLabel: 'Последний час',
-      ),
-    ],
-  );
+    );
+  }
 }
 
 /// C02/C11 global recovery controls; no credentials or remote errors in this view.

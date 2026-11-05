@@ -246,7 +246,7 @@ admission, drain, deadline, retry и отсутствие повторных о�
 
 
 ## Current-only уточнение2026-11-04
-ТекущийlogicalFormat3 — единственный runtimecontract. Schema1 и еёmigration — история. Другиеверсии отвергаютсядоDBopen безавтоконвертации/очистки. [Storage](contracts/storage.md),T044,ConstitutionVI. Current-operation recoveryсохраняется.
+ТекущийlogicalFormat2 — единственный runtimecontract. Schema1 и еёmigration — история. Неподдерживаемые версии отвергаютсядоDBopen безавтоконвертации/очистки. [Storage](contracts/storage.md),T044,ConstitutionVI. Current-operation recoveryсохраняется.
 
 
 ## Server workspace navigation уточнение2026-11-04
@@ -256,3 +256,11 @@ admission, drain, deadline, retry и отсутствие повторных о�
 - AC-220: Readiness/storageBlocked/tray recovery остаются доступными; server settings
   и общие MCP настройки различимы; UI не получает команды выхода вместо трея.
 - SC-220: Навигация не создаёт второй owner/EXE/store и не меняет persisted schema.
+
+
+## Версия несовместимого формата — 2026-11-04
+
+FR-221/222 и AC-221/222 из [storage contract](contracts/storage.md#совместимые-дополнения-и-версия-формата--2026-11-04)
+определяют совместимое расширение формата2 без изменения пользовательских данных. Добавление
+истории004 и источников005 сохраняет формат2. Обоснование повышения версии —
+конкретная несовместимость, а не изменение набора коллекций.

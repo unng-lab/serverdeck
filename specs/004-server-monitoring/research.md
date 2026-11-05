@@ -52,9 +52,9 @@ workspace/tray/crash rules; last hour means actual collected samples, not remote
 Decision: single Isar collection with one bounded payload/profile; no extra daemon.
 Alternative720k individual rows rejected to simplify bounded per-profile codec/pruning.
 Read-only research agent history_storage_research inspected storage/runtime boundaries:
-current format2 full schema set requires direct current format3 guard update to avoid
-implicit schema conversion. This is our design choice under ConstitutionVI, not a
-claim that constitution names version3. Old data rejected intact, never migrated/reset.
+The earlier decision to bump metadata for additive collections was incorrect.
+Current format2 remains valid. Isar handles adding empty collections. User clarified
+ConstitutionVI: bump only for demonstrated data incompatibility, not schema count.
 Alternative file cache rejected: duplicates store/security/lifecycle ownership.
 Reuse C22 with explicit720 capacity rather than averaging hour into120 samples;
 keep exact fractional values and explicit segment/gap metadata.

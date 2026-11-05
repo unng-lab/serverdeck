@@ -4,8 +4,7 @@
 
 User explicitly requested separate Monitoring tab,next to ПО/logs/jobs/settings,
 hour graphs and persistence across restart. Updated existing004,not a new package.
-Clarified persistence with user. Plan includes same Isar owner,current format3,
-no conversion/backfill/deletion of other formats. Research agent inspected current
+Clarified persistence with user. Plan includes same Isar owner. Research agent inspected current
 storage boundaries. No extensions.yml,so pre/post hooks absent for all stages.
 Requirements checklist all16 checked; custom hour-history5 checked after reviewer
 assessment. Other current checklists also0unchecked. Implementation did not edit
@@ -27,8 +26,7 @@ constitution unchanged and GitHub issues not requested.
 T030–033 implemented: strict bounded codec,required repository capability,
 current-schema collection/guards,transactional revision/delete cleanup,
 owner history load/coalesced save/retry/prune/segments,shared C22 hour variant,
-server tab and functional actions. New current format3 rejects2 before database
-open without modifying original data. Generated records with build_runner exit0.
+server tab and functional actions. Generated records with build_runner exit0.
 Converge assessment of new5FR/4AC/SC407 and plan touchpoints found no remaining
 implementation gap at this checkpoint; tasks.md not appended by converge.
 Independent code review still pending; this is not a final completion claim.

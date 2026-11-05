@@ -8,6 +8,8 @@ import '../theme/brand_theme.dart';
 import '../theme/brand_tokens.dart';
 import 'deck_components.dart';
 
+part 'deck_history_full.dart';
+
 /// Bounded source-order observations. Presentation never samples or polls.
 class DeckHistory extends StatefulWidget {
   const DeckHistory({
@@ -21,7 +23,10 @@ class DeckHistory extends StatefulWidget {
     this.actions,
     this.maxPoints = 120,
     this.periodLabel = 'До 10 минут',
-  }) : assert(maxPoints >= 1 && maxPoints <= 720);
+    this.fullSize = false,
+    this.windowEnd,
+  }) : assert(maxPoints >= 1 && maxPoints <= 720),
+       assert(!fullSize || windowEnd != null);
 
   final List<Object?> points;
   final String? quality, source, observedAt, receivedAt;
@@ -29,6 +34,8 @@ class DeckHistory extends StatefulWidget {
   final Widget? actions;
   final int maxPoints;
   final String periodLabel;
+  final bool fullSize;
+  final DateTime? windowEnd;
 
   @override
   State<DeckHistory> createState() => _DeckHistoryState();
@@ -163,92 +170,105 @@ class _DeckHistoryState extends State<DeckHistory> {
             'В истории есть пропуски значений; они не заменены нулями.',
           ),
         const SizedBox(height: BrandSpacing.space12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final viewport = MediaQuery.sizeOf(context).width;
-            final phone = viewport <= BrandGeometry.phoneBreakpoint;
-            final preferred = viewport > BrandGeometry.compactBreakpoint
-                ? 300.0
-                : 270.0;
-            final width = math.min(preferred, constraints.maxWidth);
-            final plots = SizedBox(
-              key: const ValueKey('metrics-history-plots'),
-              width: width,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        if (widget.fullSize)
+          _FullHistory(
+            rows: rows,
+            windowEnd: widget.windowEnd!,
+            stale: stale,
+            quality: quality,
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final viewport = MediaQuery.sizeOf(context).width;
+              final phone = viewport <= BrandGeometry.phoneBreakpoint;
+              final preferred = viewport > BrandGeometry.compactBreakpoint
+                  ? 300.0
+                  : 270.0;
+              final width = math.min(preferred, constraints.maxWidth);
+              final plots = SizedBox(
+                key: const ValueKey('metrics-history-plots'),
+                width: width,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DeckStatus(
+                      key: const ValueKey('metrics-history-plot-quality'),
+                      label: _qualityLabel(quality),
+                      tone: _qualityTone(quality),
+                    ),
+                    const SizedBox(height: BrandSpacing.space8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (
+                          var index = 0;
+                          index < _series.length;
+                          index++
+                        ) ...[
+                          if (index > 0)
+                            const SizedBox(width: BrandSpacing.space8),
+                          Expanded(
+                            child: _SeriesPlot(
+                              series: _series[index],
+                              rows: rows,
+                              color: colors[_series[index].role],
+                              grid: colors['border'],
+                              stale: stale,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              );
+              final actions = widget.actions;
+              if (actions == null) {
+                return Align(alignment: Alignment.centerRight, child: plots);
+              }
+              final minimumActions =
+                  280 * MediaQuery.textScalerOf(context).scale(14) / 14;
+              if (!phone &&
+                  constraints.maxWidth >=
+                      width + BrandSpacing.space24 + minimumActions) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: const ValueKey('server-overview-actions'),
+                        child: actions,
+                      ),
+                    ),
+                    const SizedBox(width: BrandSpacing.space24),
+                    plots,
+                  ],
+                );
+              }
+              final actionGroup = KeyedSubtree(
+                key: const ValueKey('server-overview-actions'),
+                child: actions,
+              );
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DeckStatus(
-                    key: const ValueKey('metrics-history-plot-quality'),
-                    label: _qualityLabel(quality),
-                    tone: _qualityTone(quality),
-                  ),
-                  const SizedBox(height: BrandSpacing.space8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (var index = 0; index < _series.length; index++) ...[
-                        if (index > 0)
-                          const SizedBox(width: BrandSpacing.space8),
-                        Expanded(
-                          child: _SeriesPlot(
-                            series: _series[index],
-                            rows: rows,
-                            color: colors[_series[index].role],
-                            grid: colors['border'],
-                            stale: stale,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            );
-            final actions = widget.actions;
-            if (actions == null) {
-              return Align(alignment: Alignment.centerRight, child: plots);
-            }
-            final minimumActions =
-                280 * MediaQuery.textScalerOf(context).scale(14) / 14;
-            if (!phone &&
-                constraints.maxWidth >=
-                    width + BrandSpacing.space24 + minimumActions) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: KeyedSubtree(
-                      key: const ValueKey('server-overview-actions'),
-                      child: actions,
-                    ),
-                  ),
-                  const SizedBox(width: BrandSpacing.space24),
-                  plots,
+                  if (!phone) ...[
+                    actionGroup,
+                    const SizedBox(height: BrandSpacing.space16),
+                  ],
+                  Align(alignment: Alignment.centerRight, child: plots),
+                  if (phone) ...[
+                    const SizedBox(height: BrandSpacing.space16),
+                    actionGroup,
+                  ],
                 ],
               );
-            }
-            final actionGroup = KeyedSubtree(
-              key: const ValueKey('server-overview-actions'),
-              child: actions,
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!phone) ...[
-                  actionGroup,
-                  const SizedBox(height: BrandSpacing.space16),
-                ],
-                Align(alignment: Alignment.centerRight, child: plots),
-                if (phone) ...[
-                  const SizedBox(height: BrandSpacing.space16),
-                  actionGroup,
-                ],
-              ],
-            );
-          },
-        ),
+            },
+          ),
         const SizedBox(height: BrandSpacing.space12),
+        if (widget.fullSize && widget.actions != null) widget.actions!,
         Align(
           alignment: Alignment.centerLeft,
           child: Semantics(

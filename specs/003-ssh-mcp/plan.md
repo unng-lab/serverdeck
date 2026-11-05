@@ -6,7 +6,7 @@
 ## Summary
 
 На runtime002 добавляются domain owners профилей/SSH/доверия и MCP router.
-Единственный WorkspaceStore переходит в logical format3. UI и MCP вызывают один
+Единственный WorkspaceStore переходит в logical format2. UI и MCP вызывают один
 типизированный AppOperations; исключение — deleteProfile принимается только UI
 через неподделываемый внутренний UiActor, отсутствует в wire schemas/router.
 Стандартный stdio MCP идёт через transport-only ветку того же EXE к private Named Pipe.
@@ -17,7 +17,7 @@
 - **Dependencies**: Isar trio3.4.1, build_runner2.16.2 (--force-jit), vendored dartssh2
   upstream4.1.0 с минимальным policy/host-key hook patch. JSON-RPC/MCP небольшой
   allowlist router на dart:convert, без внешнего MCP server package/runtime.
-- **Storage**: полный format3 schema set, DPAPI blobs в Isar; credential export для
+- **Storage**: полный format2 schema set, DPAPI blobs в Isar; credential export для
   моста — производный protected blob, не вторая база. [Data model](data-model.md).
 - **Testing**: только unit dart/flutter_test с fake store/transport/clock и native
   CTest изолированных IPC adapters/codecs с synthetic identity hooks. SSH bytes
@@ -329,7 +329,7 @@ P36: KeyInspection→CredentialPreparer→ProfileOwner→Credential.publicKeyByt
 P37: ConnectionOwner→PrivateKeyCredential→OwnedPrivateIdentity требуют явный PublicKeyHint; PrivateSignRequest получает frozenexpectedbytes, сравнение до подписи. Удалить старые aliases/optional compatibility arguments, обновить все callers/tests напрямую.
 P38: profile_form/controller возвращают ProfileSaveOutcome; profile_view C12 modal. Manualconnect после успешного commit, coalescing/promotion004; oneprompt ledger64tokens; секрет phrase принадлежит routeState до unmount.
 P39: VerificationLease удерживает controller/profile/exactattempt до позднего admission, cancelOwnedAttempt обходит толькоUIpending; backendauth/exactattempt/non-session guards остаются. Capture navigationgeneration/controller/profile до формы и повторно до/послеrefresh; позднийA не меняетB.
-P40: StoreBackend/migrations формат1 удаляются в scope002, оставшийся manifest/publication модуль store_manifest.dart принимаеттолькоformat3. Несовместимое отвергается до открытияDB, безreset.
+P40: StoreBackend/migrations формат1 удаляются в scope002, оставшийся manifest/publication модуль store_manifest.dart принимаеттолькоformat2. Несовместимое отвергается до открытияDB, безreset.
 P41: После всего code — synthetic PEM/parser/signing/metadata/form/controller/modal tests, затем mandatoryformat/analyze/fluttertest/boundary/schemaunits/native(ifchanged)/lychee; C21sharedunits scope001. Fresh independentreview loop, analyze/converge текущего003; сборка одногоEXE с004.
 
 

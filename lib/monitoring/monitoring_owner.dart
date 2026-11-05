@@ -68,6 +68,7 @@ final class MonitoringOwner implements Listenable, RuntimeCapability {
   int get profileCount => _entries.length;
   List<ProfileView> get profiles => _profiles;
   Duration get now => _now?.call() ?? _clock.elapsed;
+  int get historyUtcNow => _utc();
   static int _systemUtc() => DateTime.now().toUtc().millisecondsSinceEpoch;
   static void Function() _timer(Duration d, void Function() callback) {
     final timer = Timer(d, callback);

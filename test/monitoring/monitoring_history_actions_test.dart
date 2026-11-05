@@ -77,6 +77,10 @@ void main() {
       expect((first.points.first as Map)['memoryUsedPercent'], 25);
       expect(first.maxPoints, 720);
       expect(first.periodLabel, 'Последний час');
+      expect(first.fullSize, isTrue);
+      expect(first.windowEnd!.millisecondsSinceEpoch, w.h.clock.utc());
+      expect(first.quality, 'incomplete');
+      expect(find.text('Качество истории не указано'), findsNothing);
       expect(
         find.text('Последний час · значения от 0 до 100%'),
         findsOneWidget,

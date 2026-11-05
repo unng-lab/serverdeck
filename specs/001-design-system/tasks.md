@@ -53,3 +53,7 @@
 ## C22 hour extension
 
 - [X] R018 Extend lib/ui/deck_history.dart with bounded720 hour variant,fractions,explicit segment breaks; synthetic units test_design/components/history_hour_test.dart; mandatory/shared checks and review with004/T032–034. No feature-screen acceptance/captures.
+
+## C22 page graphs
+
+- [X] R019 Реализовать fullSize C22 в lib/ui/deck_history.dart и part lib/ui/deck_history_full.dart: три full-width графика,часовая ось UTC,0–100%,порог90%,gap-safe fill/line,hover/tap и keyboard cursor/readout,empty/partial/quality; synthetic shared tests test_design/components/history_full_test.dart и mandatory/shared checks,независимоеreview (004/T037).

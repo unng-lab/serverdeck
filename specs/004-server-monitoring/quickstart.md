@@ -29,5 +29,5 @@ owner shutdown drain. New owner over same fake repository restores past samples 
 no live readings/SSH. Functional widget selects Monitoring tab/server and checks
 C22 point values/empty/retry callbacks, never positions/colors/overflow.
 Run shared001 component units after changing C22; no captures unless explicit opt-in.
-Current format3 guard units prove format2 rejected before DB open, data untouched.
+Current format2 unit fixtures open the same store and preserve metadata/settings/security; unsupported versions are rejected before DB open without replacement.
 

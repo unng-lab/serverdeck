@@ -42,7 +42,7 @@ SHA256 `a4c33ed6c3a11460a6d1378b39b57ef8e1b6a05bfed81062a0c8081e9e290711`.
 
 **Decision**: relaxedDurability=false; absolute native DLL initialization,
 `download:false`, inspector=false. Перед Isar.open проверять CURRENT logical format.
-Только текущий format3; другие версии отвергаются доDBopen, без migration/copy/backfill поConstitutionVI.
+Только текущий format2; другие версии отвергаются доDBopen, без migration/copy/backfill поConstitutionVI.
 **Rationale**: Isar default relaxedDurability=true не подходит подтверждённым записям;
 Isar автоматически меняет схему при open, поэтому guard внутри DB может быть слишком
 поздним. Нельзя открывать только metadata schema и удалять неизвестные коллекции.

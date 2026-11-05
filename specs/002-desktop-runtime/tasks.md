@@ -170,3 +170,8 @@ T044 acceptance уточнено review: fresh CURRENT содержит publicat
   в tools/build-release.ps1, добавить static full-font equality audit до packaging
   и isolated Python units в обычный unit runner. Собрать и проверить payload assets,
   без release smoke/VM; обязательное независимое ревью вместе001/R016,003/T082.
+
+
+## Совместимое расширение схемы — 2026-11-04
+
+- [ ] T047 Отменить необоснованное повышение формата при additive collections: central currentStorageFormat2 policy в lib/storage/store_manifest.dart, AppSettings default lib/storage/records.dart и WorkspaceStore guard; сохранить исходные номера/данные без rewrite/reset/migration; fake acceptance test/storage/current_store_format_test.dart для текущего manifest/settings2 и неподдерживаемых форматов, metadata/security сохранения (FR-221/222,AC-221/222). Выполнить обязательные checks, независимое review/fix loop и сборку EXE; evidence reviews/compatible-format.md.

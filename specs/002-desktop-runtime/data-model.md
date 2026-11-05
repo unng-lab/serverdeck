@@ -7,8 +7,8 @@
 
 | Record | Поля / инварианты |
 | --- | --- |
-| AppSettings (Isar id=1) | logicalFormat=3; settingsRevision≥1; dataRevision≥1; profilesListRevision≥1; theme=dark/light (default dark); mcpEnabled=false (зарезервировано); createdAt; lastSuccessfulOpenAt |
-| StoreManifest (CURRENT) | formatVersion=3; storeId UUID; relativeDirectory=`stores/<id>`; publicationVersion=1; никакого секрета |
+| AppSettings (Isar id=1) | logicalFormat=2; settingsRevision≥1; dataRevision≥1; profilesListRevision≥1; theme=dark/light (default dark); mcpEnabled=false (зарезервировано); createdAt; lastSuccessfulOpenAt |
+| StoreManifest (CURRENT) | formatVersion=2; storeId UUID; relativeDirectory=`stores/<id>`; publicationVersion=1; никакого секрета |
 | PayloadManifest (RCDATA) | format=1; hostAbi=1; platform=windows-x64; files path/size/sha256; payloadId=SHA256 canonical manifest bytes |
 | RuntimeDescriptor | ownerEpoch UUID; pid; processCreationTime (Windows FILETIME); userSid; logonSid; activation pipe name; actualExePath; protocolVersion=1 |
 
@@ -41,7 +41,7 @@ Stop admission и beginWrite проходят одним coordinator gate. На�
 
 ## Форматы и расширение
 
-Приложение использует текущий logical format3 с полным schema set [003](../003-ssh-mcp/data-model.md). Любой другой формат отвергается до открытия Isar. Миграций/old-schema adapters нет; при ошибке данные не удаляются и не заменяются. Schema генерируется из текущих Dart models, generated files проверяются вместе с текущим кодом.
+Приложение использует текущий logical format2 с полным schema set [003](../003-ssh-mcp/data-model.md). Неподдерживаемые форматы отвергаются до открытия Isar. Миграций/old-schema adapters нет; при ошибке данные не удаляются и не заменяются. Schema генерируется из текущих Dart models, generated files проверяются вместе с текущим кодом.
 
 `dataRevision` увеличивается одной txn на каждое durable domain изменение;
 `profilesListRevision` — только при CRUD профилей, используется для cursor invalidation.

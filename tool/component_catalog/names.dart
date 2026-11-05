@@ -651,7 +651,7 @@ const componentDocumentation = <String, Map<String, Object>>{
       'reduced motion оставляет понятный pending',
     ],
     'usageExample':
-        "const DeckStatus(label: 'Неизвестно', tone: DeckTone.unknown);",
+        'const DeckStatus(label: \'Неизвестно\', tone: DeckTone.unknown);',
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'hover': 'Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.',
@@ -1066,7 +1066,7 @@ const componentDocumentation = <String, Map<String, Object>>{
       'Реальный 0 отличается от missing',
       'stale/partial подписаны',
     ],
-    'usageExample': "DeckMetric(label: 'CPU', value: value, unit: '%', contextLabel: quality);",
+    'usageExample': 'DeckMetric(label: \'CPU\', value: value, unit: \'%\', contextLabel: quality);',
     'runnableExamplePath': 'tool/component_catalog/examples.dart',
     'notApplicableReasons': {
       'hover': 'Материал readonly; действия и асинхронный исход принадлежат owner/другому семейству. Все объявленные варианты отдельно показаны в default.',
@@ -1086,22 +1086,28 @@ const componentDocumentation = <String, Map<String, Object>>{
   'C22': {
     'anatomy': ['Series', 'pattern/symbol', 'legend', 'gaps', 'textual values'],
     'parameters': [
-      'DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions)',
+      'DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions, maxPoints, periodLabel, fullSize, windowEnd)',
     ],
-    'events': ['Локальное раскрытие/keyboard selection текстовых значений'],
+    'events': [
+      'Локальное раскрытие/keyboard selection текстовых значений',
+      'Hover/tap и клавиатурный выбор реального замера в fullSize',
+    ],
     'variants': [
       'несколько различимых series',
       'gap',
       'legend',
       'текстовая альтернатива',
+      'полноразмерные графики отдельной страницы',
     ],
     'limitations': [
-      'До 120 points',
-      'gap >15000ms',
+      'maxPoints1..720, default120',
+      'gap >15000ms или breakBefore',
       'no interpolation/polling/new timestamps',
+      'fullSize требует owner windowEnd; ось UTC за последний час',
     ],
     'acceptanceCriteria': [
       '0/1/120, invalid/reversed/duplicate time и gaps не превращаются в непрерывную линию',
+      'fullSize: доступная ширина,читаемая высота,оси,порог90%,gap-safe line/fill,hover и keyboard readout',
     ],
     'usageExample': 'DeckHistory(points: points, source: source, observedAt: observedAt, stale: stale);',
     'runnableExamplePath': 'tool/component_catalog/examples.dart',

@@ -94,7 +94,7 @@ MVP — US1; полная цель требует все US1–US3 и clean chec
 
 ## Phase 11 — US4: persisted hour history
 
-- [X] T030 [US4] Update current format3 storage guards in lib/storage/{records.dart,records.g.dart,store_manifest.dart,workspace_store.dart}; add MonitoringHistoryRecord schema, required MonitoringHistoryStore in lib/monitoring/monitoring_history.dart and lib/storage/domain_repository.dart; atomic profile revision/delete cleanup; fake repository and unit codec/store fences in test/monitoring/monitoring_history_test.dart, test/storage/current_store_format_test.dart (FR-423–426,AC-420–422).
+- [X] T030 [US4] Keep current format2 storage guards in lib/storage/{records.dart,records.g.dart,store_manifest.dart,workspace_store.dart}; add MonitoringHistoryRecord schema, required MonitoringHistoryStore in lib/monitoring/monitoring_history.dart and lib/storage/domain_repository.dart; atomic profile revision/delete cleanup; fake repository and unit codec/store fences in test/monitoring/monitoring_history_test.dart, test/storage/current_store_format_test.dart (FR-423–426,AC-420–422).
 - [X] T031 [US4] Add bounded owner history load/save/retry,720 rows/192KiB/1h TTL,UTC+monotonic pruning and segment/lifecycle fences in lib/monitoring/monitoring_owner.dart; wire required store in lib/runtime/feature_runtime.dart; fake-clock owner units test/monitoring/monitoring_history_owner_test.dart (FR-423–426,AC-420–422).
 - [X] T032 [US4] Extend shared C22 lib/ui/deck_history.dart maxPoints1..720(default120),periodLabel,finite fractional percent,breakBefore; document001 and synthetic component tests test_design/components/history_hour_test.dart (FR-422,SC-407). No feature design acceptance.
 - [X] T033 [US4] Add C16 Monitoring tab/icon and C22/C11/C02 composition lib/profiles/profile_view.dart,lib/monitoring/monitoring_view.dart; functional fake tests test/monitoring/monitoring_history_actions_test.dart for selected profile,points,empty,retry,no extra collection (FR-422,FR-426,AC-419,AC-422).
@@ -108,3 +108,12 @@ history remains intact. Readiness requires clean independent package review firs
 ## Phase 12: Convergence
 
 - [X] T035 Fence history,historyError,retryHistory by selected profile connectionRevision in lib/monitoring/monitoring_owner.dart,lib/monitoring/monitoring_view.dart,lib/profiles/profile_view.dart; add delayed/failed reconciliation after profile edit fake functional regression test/monitoring/monitoring_history_actions_test.dart; retain rename/reconnect history. FR-425,AC-419/421 (partial; independent review P2). Rerun mandatory/shared/link checks and fresh review.
+
+
+## Phase 13: Compatible storage correction
+
+- [ ] T036 Исправить прежнее решение T030 о повышении версии: коллекция истории совместима с существующими записями формата2; применять общую current format2 policy из002/T047 без миграций, переписывания или очистки базы. Согласовать plan/research/quickstart004, checks/fresh review и собрать EXE (FR-424/426,002/FR-221/222). История выполненной T030 сохраняется.
+
+## Phase 14 — Полноразмерные графики
+
+- [X] T037 Использовать общий fullSize C22/001R019 в lib/monitoring/monitoring_view.dart,передать owner clock из lib/monitoring/monitoring_owner.dart и explicit quality; functional data/semantics/no-extra-collection tests test/monitoring/monitoring_history_actions_test.dart,без feature-layout/design checks (FR-427/428,AC-423/424). Mandatory/shared/links checks,independentreview/fixloop; freshEXE build без запуска приложения/ComputerUse.

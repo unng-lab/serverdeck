@@ -558,9 +558,9 @@ DeckMetric(label: 'CPU', value: value, unit: '%', contextLabel: quality);
 
 **Состав**: Series; pattern/symbol; legend; gaps; textual values.
 
-**Варианты**: несколько различимых series; gap; legend; текстовая альтернатива.
+**Варианты**: compact для небольшого блока; fullSize для отдельной страницы; gap; текстовая альтернатива.
 
-**Входы**: DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions, maxPoints=120, periodLabel).
+**Входы**: DeckHistory(points, quality, stale, source, observedAt, receivedAt, actions, maxPoints=120, periodLabel, fullSize=false, windowEnd).
 
 **События**: Локальное раскрытие/keyboard selection текстовых значений.
 
@@ -834,3 +834,24 @@ Finite numeric fractions0..100 accepted; null/invalid remains gap. Row breakBefo
 forbids connecting to preceding row. Input order retained,no interpolation/polling/new
 timestamps. Feature004 uses720 and «Последний час»; text alternative preserves fractions.
 Shared synthetic tests0/1/720,fractions/gaps. This extends C22,not a feature-local graph.
+
+## C22 — Полноразмерные графики ресурсов
+
+DeckHistory(fullSize:true,windowEnd:ownerUtc,points:...,maxPoints:720) — вариант
+для отдельной страницы. Три графика CPU/RAM/диска занимают доступную ширину,
+высота поля около220logical pixels плюс оси/подписи. Compact270–300/25 остаётся
+только вариантом для небольших блоков. ОсьY0/25/50/75/100%;осьX UTC за
+`(windowEnd−1h,windowEnd]`,2или4интервала по ширине,подписанные часы/минуты.
+Пунктир90% — постоянный порог,не статус текущей свежести.
+
+windowEnd обязателен для fullSize. Компонент не создаёт timestamps/таймер/сбор.
+Одиночная точка видима. Null,invalid value/time,duplicate/reversed time,breakBefore,
+интервал>15s разрывают линию и заливку; точки вне диапазона не рисуются.
+Hover/tap выбирает ближайший реальный timestamp;общий cursor/readout UTC и значений
+на трёх графиках. Null — «Нет данных»,без интерполяции. Tab фокусирует C22,
+←/→ выбирают предыдущий/следующий timestamp,Home/End — крайние. Выбор сохраняется
+при обновлении только пока timestamp есть в окне. Readout≤2десятичных знаков,
+значение ниже90,округляющеесядо90,показывается<90%; painter использует исходное.
+Текстовая альтернатива «Значения истории» и owner actions сохраняются. Quality
+даёт owner,сохранённые точки не объявляются текущими. Пустота видна для каждой серии.
+Synthetic shared design/interaction checks только001/test_design/components.

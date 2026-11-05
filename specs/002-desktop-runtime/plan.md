@@ -16,7 +16,7 @@ payload и загружает Flutter host DLL в том же PID. Основн�
 - **Primary Dependencies**: isar_community / flutter_libs / generator 3.4.1;
   build_runner 2.16.2 для генерации. Native Win32/DPAPI/BCrypt без tray/window plugins.
   Точные ограничения и проверка resolution: [research](research.md).
-- **Storage**: Isar, текущий logical format3; DPAPI CurrentUser bytes внутри транзакций.
+- **Storage**: Isar, текущий logical format2; DPAPI CurrentUser bytes внутри транзакций.
   `%LOCALAPPDATA%/ServerDeck/` через Known Folder API, не переменные окружения клиента.
 - **Testing**: flutter_test функциональные owner/widget tests; native CTest для
   bootstrap/platform с fake messenger/hooks; StoreBackend fake вместо реальной Isar.
@@ -109,7 +109,7 @@ helpers отключены по умолчанию и не входят в unit 
 не недостающая приёмка; актуальные команды — в quickstart.
 
 
-Current-only2026-11-04: убратьStoreBackend.copyStore/_migration*/format1branches; lib/storage/store_manifest.dart принимаеттолькоformat3 ивладеетcurrentpublication/recovery. T044 отменяетпрежниеbackward-compatdecisions поConstitutionVI; userdataнеудаляются.
+Current-only2026-11-04: убратьStoreBackend.copyStore/_migration*/format1branches; lib/storage/store_manifest.dart принимаеттолькоformat2 ивладеетcurrentpublication/recovery. T044 отменяетпрежниеbackward-compatdecisions поConstitutionVI; userdataнеудаляются.
 
 
 ## Server workspace runtime composition
@@ -127,3 +127,15 @@ empty или несовпадающий файл останавливает сб
 Это статический asset audit, без запуска продукта. Стандартная unit-команда
 включает isolated Python units с временными synthetic font bytes для этого audit.
 Цена решения — полный font (~1.6MB вместо subset); внешних runtime зависимостей нет.
+
+
+## Совместимость формата — 2026-11-04
+
+Единая currentStorageFormat/isCompatibleStorageFormat policy в store_manifest.dart
+используется manifest decoder, AppSettings default и WorkspaceStore settings guard.
+Существующий формат2 проходит текущий путь, decode сохраняет formatVersion, без
+перезаписи manifest/settings и без replacement DB. Все прочие integrity/security
+checks прежние. Новые коллекции в records/workspaceSchemas добавляются стандартным
+Isar open. Политика не означает поддержку старых executable/API или будущих схем.
+Unit fake fixtures + format/analyze/flutter test + link checks + independent review;
+затем fresh singleEXE build. Реальная база не используется в тестах.

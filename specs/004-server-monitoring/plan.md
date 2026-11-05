@@ -12,7 +12,7 @@ MonitoringOwner планирует сбор трёх метрик Linux чере
 ## Technical Context
 
 - Dart ≥3.13.5 / Flutter из pubspec, Windows C++17, существующий vendored dartssh2.
-- Isar community 3.4.1, текущий format3 без миграции; history persists, freshness runtime-only.
+- Isar community 3.4.1, текущий format2 без миграции; history persists, freshness runtime-only.
 - Служебный native marker запуска хранится отдельно от Isar, без секретов.
 - Target Windows 10/11 x64; Linux server: POSIX sh, uname, cat, df -Pk, /proc.
 - Максимум 4 сбора и 4 auto attempts, 5s deadline, 65536 bytes stdout+stderr,
@@ -97,8 +97,8 @@ Required capability (also on unit fakes), no optional production memory fallback
 lib/monitoring/monitoring_history.dart: typed points/strict codec,720 rows/profile,
 192KiB UTF8 payload/profile,1h TTL. At1000 profiles≤192MiB payload. Existing≤64 SSH.
 MonitoringHistoryRecord collection: unique profileId,connectionRevision,payload JSON.
-Current format3 is the only manifest/AppSettings format. Prior2 explicitly rejected
-before DB open without migration/backfill/deletion, per ConstitutionVI. Update002/003
+Format2 remains current for additive schema without metadata conversion; unsupported formats are
+rejected before DB open. Additive Isar collections do not change format version. Update002/003
 current storage contracts/models/guards and generated schema directly, preserving
 historical completed task/review evidence. No external runtime/new release dependency.
 
@@ -125,3 +125,12 @@ no feature layout/integration/real Isar/product-launch gates.
 
 
 History projection,error and retry require the connectionRevision of the selected profile details. A cached entry at another revision returns no points/error and cannot retry, even while reconciliation waits/fails (FR-425,T035).
+
+## Page-sized resource history
+
+FR-427/428,AC-423/424: MonitoringHistoryPanel передаёт fullSize:true,windowEnd из
+MonitoringOwner.historyUtcNow,quality known/incomplete/empty по nullableточкам.
+Используется C22/001R019. Schema/TTL/collector не менять. Не запускать приложение
+или ComputerUse без отдельного запроса пользователя. Старое представление найдено
+в DeckHistory: compact width270–300 и plot25. Путь данных — Linux collector→
+MonitoringOwner→Isar history→C22. Никаких новых runtime dependencies.
