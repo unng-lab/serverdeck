@@ -58,6 +58,12 @@ int main() {
       Lease original(paths, true);
       ValidateLeaseHandle(original.maintenance(), paths.data / L"maintenance.lock");
       ValidateLeaseHandle(original.owner(), paths.data / L"owner.lock");
+      // A fixed logical path can resolve to a different physical spelling (for
+      // example packaged desktop LocalCache). Match the object, retaining locks.
+      const auto alias = paths.data / L"owner-alias.lock";
+      Require(CreateHardLinkW(sd::ExtendedPath(alias).c_str(),
+        sd::ExtendedPath(paths.data / L"owner.lock").c_str(), nullptr) != FALSE, "lock alias fixture");
+      ValidateLeaseHandle(original.owner(), alias);
       Reject([&] { ValidateLeaseHandle(original.owner(), paths.data / L"maintenance.lock"); });
       sd::Handle event(CreateEventW(nullptr, TRUE, FALSE, nullptr)), permit(CreateEventW(nullptr, TRUE, FALSE, nullptr));
       Reject([&] { ValidateLeaseHandle(event.get(), paths.data / L"owner.lock"); });

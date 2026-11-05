@@ -3,6 +3,8 @@
 #include <map>
 
 namespace sd::install {
+// Native read adapter seam; callback follows RegGetValueW's byte-count contract.
+std::optional<std::wstring> ReadRegistryString(const std::function<LSTATUS(void*, DWORD*)>& read);
 struct RegistrationValues {
   std::map<std::wstring, std::wstring> strings;
   std::map<std::wstring, DWORD> dwords;

@@ -56,6 +56,38 @@ int main() {
   using namespace sd::install;
   std::filesystem::path root;
   try {
+    // RegGetValueW's size probe can reserve an extra terminator which the
+    // successful value read does not include in its actual byte count.
+    const std::wstring registryPath = L"C:\\Users\\example\\ServerDeck";
+    const DWORD valueBytes = static_cast<DWORD>((registryPath.size() + 1) * sizeof(wchar_t));
+    for (const DWORD padding : {DWORD{0}, static_cast<DWORD>(sizeof(wchar_t)), DWORD{64}}) {
+      int reads = 0;
+      const auto value = ReadRegistryString([&](void* buffer, DWORD* bytes) -> LSTATUS {
+        ++reads;
+        if (!buffer) { *bytes = valueBytes + padding; return ERROR_SUCCESS; }
+        Require(*bytes >= valueBytes, "registry buffer too small");
+        std::memcpy(buffer, registryPath.c_str(), valueBytes); *bytes = valueBytes; return ERROR_SUCCESS;
+      });
+      Require(value && *value == registryPath && reads == 2, "registry actual-length regression");
+    }
+    Require(!ReadRegistryString([](void*, DWORD*) -> LSTATUS { return ERROR_FILE_NOT_FOUND; }), "absent registry string");
+    for (int failure = 0; failure < 7; ++failure) {
+      bool rejected = false;
+      try {
+        ReadRegistryString([&](void* buffer, DWORD* bytes) -> LSTATUS {
+          if (!buffer) { *bytes = failure == 0 ? 65538 : valueBytes; return ERROR_SUCCESS; }
+          std::memcpy(buffer, registryPath.c_str(), valueBytes);
+          if (failure == 1) return ERROR_MORE_DATA;
+          if (failure == 2) *bytes = 0;
+          if (failure == 3) *bytes = valueBytes - 1;
+          if (failure == 4) *bytes = valueBytes + 2;
+          if (failure == 5) static_cast<wchar_t*>(buffer)[registryPath.size()] = L'x';
+          if (failure == 6) static_cast<wchar_t*>(buffer)[1] = L'\0';
+          return ERROR_SUCCESS;
+        });
+      } catch (const sd::updates::Failure&) { rejected = true; }
+      Require(rejected, "invalid registry string accepted");
+    }
     wchar_t temp[32768]{}; Require(GetTempPathW(32768, temp) != 0, "temp");
     root = std::filesystem::path(temp) / (L"ServerDeckExecutorUnit-" + sd::Uuid()); sd::SecureDirectory(root);
     const std::string oldApp = "old app bytes", oldSetup = "old setup bytes", newApp = "new app bytes", newSetup = "new setup bytes";

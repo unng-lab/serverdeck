@@ -454,3 +454,25 @@ image loading or import resolution is used: an already mapped old bootstrap cann
 substitute its cached resources for the canonical file replaced during recovery.
 Ambiguous RVA mappings, duplicate selected resources, malformed trees, and multiple
 resource languages fail with INVALID_ARTIFACT before canonical relaunch/apply.
+
+## Native adapter corrections
+
+The child binds each inherited lease HANDLE to the fixed expected lock path by
+opening that path for `FILE_READ_ATTRIBUTES` with all sharing flags and comparing
+`FileIdInfo` (volume serial plus the complete 128-bit file ID). Both objects must
+be ordinary files, with no reparse point on the expected path. This supports
+Windows packaged-desktop LocalCache redirection without accepting a different
+file merely because its name, length or contents match. Required HANDLE rights,
+zero length and independent exclusive read/write/delete sharing probes remain
+mandatory. The attribute-only comparison handle does not acquire a second lease.
+Parent process ancestry, image, user/logon and five-handle permission protocol are
+unchanged. Synthetic temporary-file tests cover a hard-link alias to the same
+object, different lock objects, insufficient rights and shared handles; no child
+process is launched by these tests.
+
+The HKCU string adapter bounds both the size probe and actual UTF-16 byte count
+returned by the value read. It resizes to that actual count before checking and
+removing the terminal NUL; an oversized probe is not part of the value. Odd,
+zero, oversized or grown counts, read errors, missing terminators and embedded
+NULs still fail closed. Regression units inject the read callback, without using
+the real registry.

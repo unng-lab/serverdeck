@@ -159,3 +159,9 @@ T028/T029 выполняются вместе с соответствующим�
 ## Phase 9: Convergence
 
 - [X] T069 Показать статус повторной проверки/применения/восстановления в transient update helper до Flutter/DB; typed reporter в startup_update, bounded native status presentation без business owner/quit/restart callback. Synthetic reporter sequence success/offline/failure, static setup resource/import build, links и fresh review по FR-610 (partial, HIGH; convergence F1).
+
+## Phase 10: Installer adapter corrections
+
+- [X] T070 Исправить HKCU string read в native/install/install_registration.cpp: учитывать фактический UTF-16 byte count второго RegGetValueW; synthetic read seam/fixtures в native/include/install_registration.h и native/tests/install_executor_test.cpp покрывают oversized probe и malformed/grown/error results (FR-603/604; AC-603/604).
+- [X] T071 Исправить принятие inherited lease в native/install/maintenance_handoff.cpp: сравнить fixed expected lock с HANDLE по volume/file ID при Windows packaged LocalCache redirection, сохранив reparse/rights/zero-size/exclusive-sharing/parent/permit проверки; synthetic hard-link alias и existing negative cases в native/tests/maintenance_handoff_test.cpp (FR-611/614; AC-611/613).
+- [X] T072 Выполнить native unit/build/link checks и independent read-only review исправлений адаптеров, устранить подтверждённые findings; evidence в reviews/installer-adapters.md. Пользовательская локальная диагностика не заменяет unit gate и не вводит integration/e2e gates.

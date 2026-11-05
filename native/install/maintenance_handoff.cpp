@@ -5,6 +5,7 @@
 #include <sddl.h>
 #include <tlhelp32.h>
 #include <algorithm>
+#include <cstring>
 #include <set>
 
 namespace sd::install {
@@ -92,9 +93,19 @@ void ValidateLeaseHandle(HANDLE handle, const std::filesystem::path& expected) {
   BY_HANDLE_FILE_INFORMATION info{}; LARGE_INTEGER size{};
   if (GetFileType(handle) != FILE_TYPE_DISK || !GetFileInformationByHandle(handle, &info) ||
       (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) || !GetFileSizeEx(handle, &size) || size.QuadPart != 0) Invalid();
-  std::wstring final(32768, L'\0'); const auto length = GetFinalPathNameByHandleW(handle, final.data(), static_cast<DWORD>(final.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-  if (!length || length >= final.size()) Invalid(); final.resize(length);
-  if (!SamePath(final, expected)) Invalid();
+  // Packaged desktop callers may resolve this fixed logical path into LocalCache.
+  // Bind the inherited object to that path's actual file identity, not its spelling.
+  Handle named(CreateFileW(ExtendedPath(expected).c_str(), FILE_READ_ATTRIBUTES,
+    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+    FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+  BY_HANDLE_FILE_INFORMATION namedInfo{};
+  FILE_ID_INFO inheritedId{}, namedId{};
+  if (!named.valid() || !GetFileInformationByHandle(named.get(), &namedInfo) ||
+      (namedInfo.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) ||
+      !GetFileInformationByHandleEx(handle, FileIdInfo, &inheritedId, sizeof(inheritedId)) ||
+      !GetFileInformationByHandleEx(named.get(), FileIdInfo, &namedId, sizeof(namedId)) ||
+      inheritedId.VolumeSerialNumber != namedId.VolumeSerialNumber ||
+      std::memcmp(inheritedId.FileId.Identifier, namedId.FileId.Identifier, sizeof(inheritedId.FileId.Identifier))) Invalid();
   // Probe all sharing dimensions independently, on the exact original file
   // object rather than a mutable pathname. A combined RW denial says nothing
   // about delete/rename permission or which of READ/WRITE was denied.

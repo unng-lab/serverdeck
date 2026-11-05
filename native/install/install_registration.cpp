@@ -30,14 +30,9 @@ bool OpenKey(Key& key, REGSAM access) {
   if (result != ERROR_SUCCESS) Io(); return true;
 }
 std::optional<std::wstring> ReadString(HKEY key, const std::wstring& name) {
-  DWORD bytes = 0;
-  auto result = RegGetValueW(key, nullptr, name.c_str(), RRF_RT_REG_SZ, nullptr, nullptr, &bytes);
-  if (result == ERROR_FILE_NOT_FOUND) return {};
-  if (result != ERROR_SUCCESS || bytes < sizeof(wchar_t) || bytes > 65536 || bytes % sizeof(wchar_t)) Io();
-  std::wstring text(bytes / sizeof(wchar_t), L'\0');
-  result = RegGetValueW(key, nullptr, name.c_str(), RRF_RT_REG_SZ, nullptr, text.data(), &bytes);
-  if (result != ERROR_SUCCESS || text.back() != L'\0') Io();
-  text.pop_back(); if (text.find(L'\0') != std::wstring::npos) Foreign(); return text;
+  return ReadRegistryString([&](void* buffer, DWORD* bytes) {
+    return RegGetValueW(key, nullptr, name.c_str(), RRF_RT_REG_SZ, nullptr, buffer, bytes);
+  });
 }
 bool LinkMatches(const std::filesystem::path& path, const std::filesystem::path& target, const wchar_t* arguments) {
   RejectReparse(path);
@@ -115,6 +110,19 @@ class NativeShortcuts final : public ShortcutPort {
   void Save(const std::filesystem::path& path, const std::filesystem::path& target, const wchar_t* arguments) override { SaveLink(path, target, arguments); }
   void Remove(const std::filesystem::path& path) override { RemoveLink(path); }
 };
+}
+std::optional<std::wstring> ReadRegistryString(const std::function<LSTATUS(void*, DWORD*)>& read) {
+  DWORD bytes = 0;
+  auto result = read(nullptr, &bytes);
+  if (result == ERROR_FILE_NOT_FOUND) return {};
+  if (result != ERROR_SUCCESS || bytes < sizeof(wchar_t) || bytes > 65536 || bytes % sizeof(wchar_t)) Io();
+  std::wstring text(bytes / sizeof(wchar_t), L'\0');
+  result = read(text.data(), &bytes);
+  if (result != ERROR_SUCCESS || bytes < sizeof(wchar_t) ||
+      bytes % sizeof(wchar_t) || bytes / sizeof(wchar_t) > text.size()) Io();
+  text.resize(bytes / sizeof(wchar_t));
+  if (text.back() != L'\0') Io();
+  text.pop_back(); if (text.find(L'\0') != std::wstring::npos) Foreign(); return text;
 }
 RegistrationValues ProjectRegistration(const Paths& paths, const Installation& record) {
   paths.Validate(); if (record.sid != Utf8(paths.sid)) Foreign(); EncodeInstallation(record);
