@@ -30,7 +30,17 @@ class JournalView extends StatefulWidget {
 
 class _JournalViewState extends State<JournalView> {
   String? _selected, _error;
+  final _search = TextEditingController();
+  String _query = '';
   int _limit = 200;
+  void _selectSource(String id) {
+    _selected = id;
+    _limit = 200;
+  }
+
+  void _changeSearch(String value) => setState(() {
+    _query = value.trim().toLowerCase();
+  });
   final _routes = <(DialogRoute<void>, NavigatorState)>{};
   Future<void> _dialog(WidgetBuilder builder) async {
     final navigator = Navigator.of(context),
@@ -61,6 +71,8 @@ class _JournalViewState extends State<JournalView> {
         old.connectionRevision != widget.connectionRevision) {
       _closeRoutes();
       _selected = null;
+      _search.clear();
+      _query = '';
       _error = null;
       _limit = 200;
     }
@@ -69,6 +81,7 @@ class _JournalViewState extends State<JournalView> {
   @override
   void dispose() {
     _closeRoutes();
+    _search.dispose();
     super.dispose();
   }
 
@@ -114,8 +127,7 @@ class _JournalViewState extends State<JournalView> {
                 widget.connectionRevision == revision &&
                 identical(widget.owner, owner))
               setState(() {
-                _selected = id;
-                _limit = 200;
+                _selectSource(id);
               });
           }
         },
@@ -210,9 +222,9 @@ class _JournalViewState extends State<JournalView> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.owner,
     builder: (context, _) {
-      final owner = widget.owner, sources = owner.sources(widget.profileId);
+      final owner = widget.owner, allSources = owner.sources(widget.profileId);
       JournalSource? selected;
-      for (final s in sources) {
+      for (final s in allSources) {
         if (s.sourceId == _selected) selected = s;
       }
       final profile = widget.profileId, revision = widget.connectionRevision;
@@ -229,7 +241,26 @@ class _JournalViewState extends State<JournalView> {
       final entries = source == null
           ? <JournalEntry>[]
           : owner.entries(source.sourceId);
-      final services = owner.services[widget.profileId] ?? const <String>[];
+      final allServices = owner.services[widget.profileId] ?? const <String>[];
+      final services = _query.isEmpty
+          ? allServices
+          : allServices.where((s) => s.toLowerCase().contains(_query)).toList();
+      final sources = _query.isEmpty
+          ? allSources
+          : allSources
+                .where(
+                  (s) =>
+                      s.name.toLowerCase().contains(_query) ||
+                      s.target.toLowerCase().contains(_query),
+                )
+                .toList();
+      void clearSearch() {
+        if (current()) {
+          _search.clear();
+          _changeSearch('');
+        }
+      }
+
       final serviceState = owner.serviceStates[widget.profileId];
       var partial = false;
       if (source != null) {
@@ -270,12 +301,31 @@ class _JournalViewState extends State<JournalView> {
               ),
             ],
           ),
+          DeckSearch(
+            key: ValueKey((owner, profile, revision)),
+            controller: _search,
+            label: 'Поиск сервиса или источника',
+            onChanged: (value) {
+              if (current()) _changeSearch(value);
+            },
+          ),
           if (serviceState != null)
             Text('Сервисы: ${journalStatusLabel(serviceState)}'),
-          if (services.isNotEmpty)
+          if (allServices.isNotEmpty || serviceState == JournalStatus.empty)
             DeckCollection<String>(
               rows: services,
               idOf: (s) => s,
+              state: allServices.isEmpty
+                  ? DeckDataState.empty
+                  : services.isEmpty
+                  ? DeckDataState.noResults
+                  : DeckDataState.data,
+              message: allServices.isEmpty
+                  ? 'Сервисы не обнаружены'
+                  : services.isEmpty
+                  ? 'Сервисы не найдены'
+                  : null,
+              onClearSearch: clearSearch,
               columns: [
                 DeckColumn(
                   id: 'unit',
@@ -287,7 +337,7 @@ class _JournalViewState extends State<JournalView> {
                 DeckButton(
                   child: const Text('Добавить сервис'),
                   onPressed:
-                      sources.any(
+                      allSources.any(
                         (s) => s.kind == 'journal' && s.target == unit,
                       )
                       ? null
@@ -300,8 +350,7 @@ class _JournalViewState extends State<JournalView> {
                           );
                           if (current())
                             setState(() {
-                              _selected = id;
-                              _limit = 200;
+                              _selectSource(id);
                             });
                         }),
                 ),
@@ -323,13 +372,21 @@ class _JournalViewState extends State<JournalView> {
                 value: (s) => journalStatusLabel(owner.status(s)),
               ),
             ],
-            state: sources.isEmpty ? DeckDataState.empty : DeckDataState.data,
-            message: 'Добавьте сервис или файл журнала',
+            state: allSources.isEmpty
+                ? DeckDataState.empty
+                : sources.isEmpty
+                ? DeckDataState.noResults
+                : DeckDataState.data,
+            message: allSources.isEmpty
+                ? 'Добавьте сервис или файл журнала'
+                : sources.isEmpty
+                ? 'Источники не найдены'
+                : null,
+            onClearSearch: clearSearch,
             onOpen: (s) {
               if (!current()) return;
               setState(() {
-                _selected = s.sourceId;
-                _limit = 200;
+                _selectSource(s.sourceId);
               });
             },
           ),

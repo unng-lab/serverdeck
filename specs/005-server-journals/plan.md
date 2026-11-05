@@ -50,4 +50,6 @@ test/fixtures/domain_repository.dart # detached in-memory sources
 
 ## Complexity Tracking
 
+Search refinement FR-515 (user correction) reuses C05 in lib/journals/journal_view.dart and test/journals/journal_search_test.dart: filter discovered unit names and configured source name/target before their lists, independent of current selected source and record pagination. Source selection/discovery retain query; server/revision/owner reset it. No owner/storage/transport/schema changes or message filtering.
+
 Нет исключений. Per-source JSON — bounded transaction unit; глобальная очистка в каждой записи. UI не владеет SSH/Isar.

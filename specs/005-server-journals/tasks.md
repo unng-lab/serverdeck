@@ -84,3 +84,18 @@ T001→T002→T003/T004→T005→T006→T007. US1 T008→T009→T010→T011; US2
 
 - [x] T036 Связать opened record detail с текущей owner/profile/source/event/receipt/revision проекцией в lib/journals/journal_view.dart; не держать snapshot payload; functional tests test/journals/journal_view_test.dart покрывают TTL/source delete/revision reset, контракт005 per FR-506/512/SC-503 (partial,P2).
 - [x] T037 Добавить точный expiry-notify timer и advancing monotonic UTC high-water в lib/journals/journal_owner.dart, освобождать timer при shutdown и повторно читать current projection на deadline; test/journals/journal_retention_test.dart и journal_view_test.dart проверяют границу между5s ticks и rollback per FR-506/SC-503 (partial,P2,self-review).
+
+## Phase 12: Local message search
+
+- [x] T038 Уточнить FR-515/AC-515, contract/plan существующего005, lychee и independent readiness review перед реализацией поиска.
+- [x] T039 Добавить C05 поиск и управление transient query/controller в lib/journals/journal_view.dart, фильтрацию полного текста до pagination, count/empty/no-results/reset/live lifecycle; functional tests test/journals/journal_search_test.dart по FR-515/AC-515.
+- [x] T040 Выполнить обязательные format/analyze/flutter test/boundary/lychee и независимое code/spec review поиска, исправить подтверждённые findings; сохранить evidence в specs/005-server-journals/reviews/search.md.
+
+
+## Phase 13: User correction — service name search
+
+T038–T040 document the completed but rejected message-search interpretation. Preserve that history; the following tasks supersede its behavior.
+
+- [x] T041 Уточнить FR-515/AC-515, plan/contract под подтверждённый поиск systemd-сервиса/названия источника, lychee и независимое readiness review.
+- [x] T042 Заменить message filter на фильтр обнаруженных units и configured source name/target в lib/journals/journal_view.dart; обновить test/journals/journal_search_test.dart для AC-515, сохранения selected logs/paging и context lifecycle.
+- [x] T043 Выполнить format/analyze/flutter test/boundary/lychee и независимое code/spec review; записать действующее поведение и реальные результаты в specs/005-server-journals/reviews/search.md.
