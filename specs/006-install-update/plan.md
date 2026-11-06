@@ -137,11 +137,11 @@ units assert revalidating/applying/recovering stages, without window/layout test
 
 Release enablement amendment: release/update-policy.json is a persistent public root,
 not a runtime user setting. Default build/workflow is publishable. Private key remains
-in local publisher storage outside the repo with restrictive ACL; initialize tool
-never rotates deployed trust automatically. prepare-release verifies final audited
-installer/resources, matching key and previous signed records before local signing.
-No private CI secret upload or release publication is needed for building; publishing
-prepared public assets remains a distinct authorized operator action.
+in local publisher storage outside the repo with restrictive ACL; its matching copy
+is configured as a repository Actions secret for tag-only automatic publication.
+Initialize never rotates trust automatically. prepare-release verifies final audited
+installer/resources, matching key and previous signed records before signing on the
+runner. Local builds audit assets without publication.
 
 Main-window version amendment: lib/runtime/native_platform.dart adds nullable
 RuntimePlatform.release implemented from initialized local context; no guessed missing
@@ -165,3 +165,23 @@ bootstrap owner-to-maintenance transfer and dedicated restart adapter in startup
 T085. Tests T086 cover AC-619–620 and SC-607; full release/check/review T087.
 T082 readiness precedes code; T083 and T084 may be developed independently, T085 follows
 native contract, T086 validates combined behavior. Shared design scope unchanged.
+
+
+## Stable SemVer migration (2026-11-06)
+
+New release identity is `0.1.1`, then stable `major.minor.patch`; no suffixes.
+The build entrypoint rejects suffixes. Host CMake reads pubspec directly because
+Flutter may synthesize a build suffix. String resource/runtime identity matches
+bootstrap SDBUILD001/setup/audit/catalog/tag; Windows numeric revision is0.
+Python/native codecs accept only three components; old `+N` metadata/catalogs and
+pending consents are unsupported. User chose a clean installation, with no migration
+or compatibility layer. Database content is never implicitly cleared. No key,
+store format or ABI change. See [versioning](contracts/versioning.md).
+
+
+## Tag-only publication amendment
+
+The [versioning contract](contracts/versioning.md) supersedes prior local-publisher
+and no-CI-secret statements above: tag push is the only release entrypoint. The
+workflow builds, signs with the existing pinned-key secret and publishes both
+assets before marking latest. No publication tests or trial releases are added.

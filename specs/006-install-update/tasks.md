@@ -196,3 +196,16 @@ T028/T029 выполняются вместе с соответствующим�
 и завершённого независимого review. История T001–081 сохраняется.
 
 - [X] T088 Закрыть independent implementation review R1: в native/include/serverdeck_host.h и windows/runner/host_main.cpp отключить обычный WM_DESTROY quit перед teardown после explicit restart pump quit. Native queue unit с synthetic window в native/tests/runtime_contract_test.cpp и native/CMakeLists.txt доказывает отсутствие второго WM_QUIT перед retry UI; повторить checks/build и fresh independent review (FR-623/AC-620).
+
+
+## Phase 15: Stable SemVer and tag-only release (user decision 2026-11-06)
+
+- [X] T089 Обновить pubspec до0.1.1, native/Python codecs и numeric comparison до
+  трёх компонентов; убрать `+N` поддержку, изменить активные fake/synthetic fixtures,
+  host/bootstrap/setup metadata и Windows resource revision0 (FR-624/AC-621).
+- [X] T090 Закрепить чистую установку, version identity и tag-only workflow в
+  конституции4.1.0/spec/plan/data-model/contracts/release instructions; сохранить
+  завершённую историю задач. Автоматически build/sign/publish только по tag push;
+  без тестов публикации и пробных релизов (FR-625).
+- [X] T091 Выполнить обязательные format/analyze/Flutter/boundaries/Python/native,
+  build/resource/link checks; независимое review/fix loop. Evidence: [reviews/semver-tag-release.md](reviews/semver-tag-release.md). Публикация не запускалась.

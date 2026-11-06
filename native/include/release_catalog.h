@@ -14,7 +14,7 @@ class Failure : public std::runtime_error {
   explicit Failure(const char* code) : std::runtime_error(code) {}
 };
 struct Version {
-  std::array<uint16_t, 4> parts{};
+  std::array<uint16_t, 3> parts{};
   std::string text;
   bool operator<(const Version& other) const { return parts < other.parts; }
   bool operator==(const Version& other) const { return parts == other.parts; }

@@ -27,8 +27,9 @@ lychee "specs/**/*.md"
 Build should emit full publishable ServerDeckSetup.exe, exact embedded ServerDeck.exe,
 matching resource hashes, x64/asInvoker and OS-only bootstrap imports. Default/workflow audit must be publishable with matching embedded policy. Only an
 explicit developer build without policy reports UPDATE_NOT_CONFIGURED.
-./tools/prepare-release.ps1 -FirstRelease prepares matching signed metadata locally
-without upload; subsequent releases require -PreviousCatalog.
+Local build is validation only. Publication is exclusively tag push -> GitHub Actions,
+as defined in [versioning](contracts/versioning.md). The workflow signs and publishes
+both assets; no manual release or publication tests.
 
 ## Unit acceptance
 
@@ -47,12 +48,12 @@ VM/e2e/smoke/process-kill or screen design gate. Results support isolated behavi
 static composition, not actual installation/integration on clean Windows.
 
 
-Main-window version amendment: functional runtime/view/channel fakes verify full build
+Main-window version amendment: functional runtime/view/channel fakes verify full release
 number, unknown before initialization, storage failure/retry, runtime rebinding and
 normal workspace without a selected server. The display must not substitute a newer
 offer or trigger extra work. Only texts/actions/state assertions; no feature-layout
-checks. Release0.1.0+3 uses prepare-release.ps1 -PreviousCatalog pointing at the
-public v0.1.0+2 signed catalog, preserving its record byte-for-byte.
+checks. Current stable release identity is major.minor.patch without a build suffix.
+The0.1.1 cutover requires a clean installation; old +N records are unsupported.
 
 ## Direct update / restart amendment
 

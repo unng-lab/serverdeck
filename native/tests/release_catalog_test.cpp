@@ -73,10 +73,13 @@ int main() {
     const Signer signer;
     const auto policyJson = PolicyJson(signer);
     const auto policy = ParsePolicy(policyJson);
-    Require(ParseVersion("1.10.0+1").parts[1] == 10, "version fields");
-    Require(ParseVersion("1.2.0+2") < ParseVersion("1.2.0+10"), "numeric build ordering");
-    for (const auto* bad : {"1.2.3", "01.2.3+4", "1.2.3+04", "65536.0.0+1", "1.2.3+-1",
-        "1.2.3+1x", "1.2.3+1\n", "1.2.3+1+2", "1.2.3.4+5", "0.0.0+", ""})
+    Require(ParseVersion("1.10.0").parts[1] == 10, "version fields");
+    Require(ParseVersion("1.2.2") < ParseVersion("1.2.10"), "numeric patch ordering");
+    Require(ParseVersion("0.1.1").text == "0.1.1", "stable version text");
+    Require(ParseVersion("0.1.0") < ParseVersion("0.1.1"), "patch ordering");
+    Require(ParseVersion("65535.65535.65535").parts[2] == 65535, "version bounds");
+    for (const auto* bad : {"1.2", "01.2.3", "1.2.3-rc.1", "1.2.3+meta", "1.2.65536",
+        "1.2.3+4", "1.2.3\n", "1.2.3.4", "", "1.2.-1"})
       Reject([&] { ParseVersion(bad); });
     for (const auto* bad : {"http://assets.example.test/a", "https://user:pw@assets.example.test/a",
         "https://@assets.example.test/a",
@@ -99,10 +102,10 @@ int main() {
       Reject([&] { ParsePolicy(sd::mcp::Encode(sd::mcp::Json(changed))); });
     }
 
-    const auto goodPayload = Payload(Record("0.2.0+2"));
+    const auto goodPayload = Payload(Record("0.2.1"));
     const auto envelope = signer.Envelope(goodPayload);
     const auto catalog = ParseCatalog(envelope, policy, 100000);
-    const auto staticPayload = "SDRELEASES002\n99990\n1\n" + Record("0.2.0+2");
+    const auto staticPayload = "SDRELEASES002\n99990\n1\n" + Record("0.2.1");
     const auto staticEnvelope = signer.Envelope(staticPayload);
     const auto staticCatalog = ParseCatalog(staticEnvelope, policy, 100000 + 365 * 86400);
     Require(staticCatalog.protocol == 2 && !staticCatalog.expires &&
@@ -114,17 +117,17 @@ int main() {
     auto staticTamper = staticEnvelope; staticTamper[staticTamper.size() - 3] = 'A';
     Reject([&] { ParseCatalog(staticTamper, policy, 100000); }, "SOURCE_UNTRUSTED");
     Require(catalog.releases.size() == 1 && catalog.releases[0].notes == sd::Utf8(L"Тест"), "catalog decode");
-    const auto* offer = LatestCompatible(catalog, policy, ParseVersion("0.1.0+1"));
+    const auto* offer = LatestCompatible(catalog, policy, ParseVersion("0.1.0"));
     Require(offer && offer->setupSize == 12 && offer->published == 99900, "signed offer fields");
     Require(FindConsented(catalog, *offer, policy) == &catalog.releases[0], "consent lookup");
-    Require(!LatestCompatible(catalog, policy, ParseVersion("0.2.0+2")), "equal version offered");
-    Require(!LatestCompatible(catalog, policy, ParseVersion("1.0.0+1")), "downgrade offered");
-    const auto unordered = ParseCatalog(signer.Envelope(Payload(Record("0.10.0+1") + Record("0.3.0+20"), "2")), policy, 100000);
-    Require(LatestCompatible(unordered, policy, ParseVersion("0.1.0+1"))->version.text == "0.10.0+1", "feed order selected");
+    Require(!LatestCompatible(catalog, policy, ParseVersion("0.2.1")), "equal version offered");
+    Require(!LatestCompatible(catalog, policy, ParseVersion("1.0.0")), "downgrade offered");
+    const auto unordered = ParseCatalog(signer.Envelope(Payload(Record("0.10.0") + Record("0.3.19"), "2")), policy, 100000);
+    Require(LatestCompatible(unordered, policy, ParseVersion("0.1.0"))->version.text == "0.10.0", "feed order selected");
     const auto empty = ParseCatalog(signer.Envelope(Payload("", "0")), policy, 100000);
     Require(empty.releases.empty(), "empty catalog");
     Reject([&] { FindConsented(empty, *offer, policy); }, "RELEASE_REVOKED");
-    const auto rebound = ParseCatalog(signer.Envelope(Payload(Record("0.2.0+2", std::string(64, 'c')))), policy, 100000);
+    const auto rebound = ParseCatalog(signer.Envelope(Payload(Record("0.2.1", std::string(64, 'c')))), policy, 100000);
     Reject([&] { FindConsented(rebound, *offer, policy); }, "SOURCE_CHANGED");
     auto incompatible = catalog.releases[0]; incompatible.storeFormat = 3;
     Require(!Compatible(incompatible, policy), "incompatible store accepted");
@@ -133,13 +136,13 @@ int main() {
     Reject([&] { ParseCatalog(signer.Envelope(goodPayload, "unknown"), policy, 100000); }, "SOURCE_UNTRUSTED");
     const Signer other;
     Reject([&] { ParseCatalog(other.Envelope(goodPayload), policy, 100000); }, "SOURCE_UNTRUSTED");
-    Reject([&] { ParseCatalog(signer.Envelope(Payload(Record("0.2.0+2"), "1", "100000")), policy, 100000); }, "SOURCE_EXPIRED");
+    Reject([&] { ParseCatalog(signer.Envelope(Payload(Record("0.2.1"), "1", "100000")), policy, 100000); }, "SOURCE_EXPIRED");
     Reject([&] { ParseCatalog(signer.Envelope(Payload("", "0", "1001000")), policy, 100000); }, "SOURCE_EXPIRED");
     Reject([&] { ParseCatalog(signer.Envelope(Payload("", "0", "101000", "100301")), policy, 100000); }, "SOURCE_EXPIRED");
     for (const auto& badPayload : {
-        Payload(Record("0.2.0+2") + Record("0.2.0+2"), "2"), Payload("", "33"),
-        Payload(Record("0.2.0+2", std::string(64, 'a'), "1", "1073741825")),
-        Payload(Record("0.2.0+2", std::string(64, 'A'))), Payload(Record("0.2.0+2")) + "extra\n"})
+        Payload(Record("0.2.1") + Record("0.2.1"), "2"), Payload("", "33"),
+        Payload(Record("0.2.1", std::string(64, 'a'), "1", "1073741825")),
+        Payload(Record("0.2.1", std::string(64, 'A'))), Payload(Record("0.2.1")) + "extra\n"})
       Reject([&] { ParseCatalog(signer.Envelope(badPayload), policy, 100000); });
     Reject([&] { ParseCatalog(envelope + "\r", policy, 100000); });
     Reject([&] { ParseCatalog(std::string(kCatalogLimit + 1, 'x'), policy, 100000); });

@@ -32,7 +32,7 @@ class ReleasePayloadTest(unittest.TestCase):
         struct.pack_into('<H', data, 132, 0x8664)
         struct.pack_into('<H', data, 152, 0x20b)
         self.setup.write_bytes(data)
-        self.audit = {'profile': 'publishable', 'version': '0.1.0+2',
+        self.audit = {'profile': 'publishable', 'version': '0.1.1',
                       'setup': {'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()},
                       'application': {'size': 7, 'sha256': 'a' * 64}}
         self.policy = {'schema': 1, 'endpoint': self.module.packaging.GITHUB_ENDPOINT,
@@ -47,7 +47,7 @@ class ReleasePayloadTest(unittest.TestCase):
         if name == 'SERVERDECK_TRUST_V1':
             return self.trust
         if name == 'SERVERDECK_SETUP_V1':
-            return b'SDSETUP001\n0.1.0+2\n7\n' + b'a' * 64 + b'\n'
+            return b'SDSETUP001\n0.1.1\n7\n' + b'a' * 64 + b'\n'
         if name == 1 and kind == 24:
             return b'<assembly><requestedExecutionLevel level="asInvoker" uiAccess="false"/></assembly>'
         raise AssertionError(name)
@@ -60,9 +60,9 @@ class ReleasePayloadTest(unittest.TestCase):
 
     def test_exact_bytes_policy_and_notes(self):
         fields = self.payload().decode().splitlines()
-        self.assertEqual(fields[:6], ['SDRELEASES002', '100000', '1', '0.1.0+2', 'windows-x64', '1'])
+        self.assertEqual(fields[:6], ['SDRELEASES002', '100000', '1', '0.1.1', 'windows-x64', '1'])
         self.assertEqual(fields[9], self.audit['setup']['sha256'])
-        self.assertIn('/v0.1.0%2B2/ServerDeckSetup.exe', fields[12])
+        self.assertIn('/v0.1.1/ServerDeckSetup.exe', fields[12])
 
     def test_developer_tampered_setup_trust_and_app_are_refused(self):
         developer = copy.deepcopy(self.audit)
@@ -76,7 +76,7 @@ class ReleasePayloadTest(unittest.TestCase):
             self.payload()
 
     def test_previous_records_are_preserved_and_version_reuse_refused(self):
-        prior = self.payload().replace(b'0.1.0+2', b'0.1.0+1').replace(b'0.1.0%2B2', b'0.1.0%2B1')
+        prior = self.payload().replace(b'0.1.1', b'0.1.0').replace(b'0.1.1', b'0.1.0')
         combined = self.payload(previous=prior)
         self.assertEqual(combined.splitlines()[2], b'2')
         self.assertEqual(combined.splitlines()[14:], prior.splitlines()[3:])
@@ -90,7 +90,7 @@ class ReleasePayloadTest(unittest.TestCase):
         for notes in [b'', b'\0', b'x' * 16385, b'\xff']:
             with self.assertRaises((ValueError, UnicodeDecodeError)):
                 self.payload(notes_bytes=notes)
-        prior = self.payload().replace(b'\n1\n0.1.0+2', b'\n32\n0.1.0+2', 1)
+        prior = self.payload().replace(b'\n1\n0.1.1', b'\n32\n0.1.1', 1)
         with self.assertRaises(ValueError):
             self.payload(previous=prior)
 
@@ -129,7 +129,7 @@ exit 0
 $ErrorActionPreference = 'Stop'
 $root = {quote(directory)}; $keys = Join-Path $root 'keys'; $policy = Join-Path $root 'public.json'
 & {quote(TOOLS / 'initialize-update-signing.ps1')} -Policy $policy -KeyDirectory $keys -KeyId unit
-$audit = Join-Path $root 'audit.json'; [IO.File]::WriteAllText($audit, '{{"version":"0.1.0+2"}}')
+$audit = Join-Path $root 'audit.json'; [IO.File]::WriteAllText($audit, '{{"version":"0.1.1"}}')
 $installer = Join-Path $root 'ServerDeckSetup.exe'; $payload = Join-Path $root 'update-payload.txt'
 $global:producerCalls = 0
 function global:python {{

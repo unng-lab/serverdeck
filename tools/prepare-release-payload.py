@@ -33,7 +33,7 @@ def _number(text, maximum):
 
 
 def _url(version):
-    return f'https://github.com/unng-lab/serverdeck/releases/download/v{version.replace("+", "%2B")}/ServerDeckSetup.exe'
+    return f'https://github.com/unng-lab/serverdeck/releases/download/v{version}/ServerDeckSetup.exe'
 
 
 def _previous(payload, version, issued):

@@ -7,7 +7,7 @@ import 'package:serverdeck/runtime/native_platform.dart';
 
 class FakePlatform implements RuntimePlatform {
   @override
-  final ValueNotifier<String?> release = ValueNotifier<String?>('0.1.0+1');
+  final ValueNotifier<String?> release = ValueNotifier<String?>('0.1.0');
   final controller = StreamController<PlatformEvent>.broadcast(sync: true);
   bool tray = true, visible = true, exited = false, activationClosed = false;
   int seq = 0;

@@ -1,0 +1,45 @@
+# Версия и выпуск по тегу
+
+Решение пользователя 2026-11-06; [конституция4.1.0](../../../.specify/memory/constitution.md).
+Заменяет прежнюю схему `major.minor.patch+build` и ручную публикацию.
+
+## Идентичность
+
+`pubspec.yaml` — источник стабильной версии `major.minor.patch`; каждый компонент
+0..65535, без ведущих нулей кроме0. Следующий выпуск `0.1.1`. Сравнение числовой
+тройки; никакие суффиксы не принимаются. Git-тег — ровно `v<version>`, title —
+`ServerDeck <version>`, notes — `release/notes/<version>.md`. Setup/bootstrap/host,
+UI, audit и signed catalog несут ту же строку. Числовой Windows VERSIONINFO имеет
+revision0; Flutter-generated build number не входит в идентичность приложения.
+
+Это clean-install cutover по запросу пользователя. `+N` metadata, pending, catalogs
+не читаются; переход/миграция старой установки не поддерживается. Старые records
+не включаются в первый catalog0.1.1. Данные не стираются кодом автоматически;
+чистую установку пользователь выполняет самостоятельно. Исторические reviews и
+completed tasks сохраняются как история, не как действующее правило совместимости.
+
+## Единственный путь публикации
+
+Издатель меняет pubspec/notes, выполняет обязательные code checks, коммитит и
+отправляет новый тег `vX.Y.Z`. Только tag push запускает release workflow; нет
+`workflow_dispatch`, создания релиза локальной командой или ручной загрузки assets.
+Workflow проверяет точное совпадение тега/pubspec и отсутствие существующего
+release, собирает/audits установщик, подготавливает подписанный catalog и создаёт
+черновик с обоими обязательными assets. Только после их загрузки release становится
+published latest. Опубликованные bytes/теги не заменяются. Ошибка после создания
+draft требует удалить непубличный draft перед повторным запуском того же workflow;
+опубликованный выпуск никогда не перезаписывается.
+
+Runner: GitHub-hosted windows-2022, pinned Flutter/Dart, Python, VS/CMake/PowerShell
+и gh; зависимости сборки задаёт существующий build entrypoint. GitHub token имеет
+`contents:write`; выпуск сериализуется concurrency group без отмены текущего run.
+Секрет `SERVERDECK_UPDATE_SIGNING_KEY` содержит PEM существующего P256 ключа,
+соответствующего `release/update-policy.json`; он записывается только во временный
+файл runner и удаляется finally. Ключ не попадает в artifact/log/repository.
+Отсутствие/несоответствие ключа блокирует выпуск, новый root не создаётся.
+
+Для0.1.1 применяется FirstRelease, далее скачивается latest signed catalog и
+передаётся PreviousCatalog. Существующая проверка подписи, строгого увеличения
+версии и immutable records сохраняется; rollback/дубликат не публикуется.
+Тесты процесса публикации и тестовые релизы запрещены по решению пользователя;
+это не отменяет unit/static/build checks изменений приложения.

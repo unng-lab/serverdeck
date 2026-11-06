@@ -16,8 +16,7 @@ bool Hex(const std::string& value) {
   return value.size() == 64 && value.find_first_not_of("0123456789abcdef") == std::string::npos;
 }
 std::string Tag(const Version& version) {
-  auto result = "v" + version.text;
-  result.replace(result.find('+'), 1, "%2B"); return result;
+  return "v" + version.text;
 }
 int Nibble(char c) {
   if (c >= '0' && c <= '9') return c - '0';

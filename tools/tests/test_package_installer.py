@@ -42,30 +42,36 @@ class InstallerPackageTest(unittest.TestCase):
         }
 
     def test_prepare_binds_exact_app_bytes_and_rc_names(self):
-        result = self.module.prepare(self.app, self.root / 'out', '0.2.0+10',
-                                     resource_reader=lambda _, name: b'SDBUILD001\n0.2.0+10\n' if name == 'SERVERDECK_BUILD_V1' else None)
+        result = self.module.prepare(self.app, self.root / 'out', '0.2.9',
+                                     resource_reader=lambda _, name: b'SDBUILD001\n0.2.9\n' if name == 'SERVERDECK_BUILD_V1' else None)
         digest = hashlib.sha256(self.app.read_bytes()).hexdigest()
         self.assertEqual(result['appSha256'], digest)
         self.assertEqual((self.root / 'out/setup-manifest.txt').read_bytes(),
-                         f'SDSETUP001\n0.2.0+10\n1024\n{digest}\n'.encode())
+                         f'SDSETUP001\n0.2.9\n1024\n{digest}\n'.encode())
         resource = (self.root / 'out/setup.rc').read_text(encoding='utf-8')
         self.assertIn('SERVERDECK_APPLICATION_V1 RCDATA', resource)
         self.assertIn(self.app.resolve().as_posix(), resource)
         self.assertIn('SERVERDECK_SETUP_V1 RCDATA', resource)
 
+    def test_stable_version(self):
+        self.assertEqual(self.module.version_tuple('0.1.1'), (0, 1, 1))
+        result = self.module.prepare(self.app, self.root / 'stable', '0.1.1',
+                                     resource_reader=lambda _, name: b'SDBUILD001\n0.1.1\n' if name == 'SERVERDECK_BUILD_V1' else None)
+        self.assertEqual(result['version'], '0.1.1')
+
     def test_versions_are_canonical_and_bounded(self):
-        for bad in ['0.2.0', '00.2.0+1', '0.2.0+01', '65536.0.0+1', '0.2.0+-1', '0.2.0+1\n']:
+        for bad in ['0.2', '0.2.0-rc.1', '0.2.0+1', '0.2.0+meta', '0.2.65536', '00.2.0', '0.2.01', '65536.0.0', '0.2.-1', '0.2.0\n']:
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.module.prepare(self.app, self.root / 'bad', bad)
 
     def test_rejects_invalid_pe_or_over_limit_before_writing_output(self):
         with mock.patch.object(self.module, 'ARTIFACT_LIMIT', 1023):
             with self.assertRaises(ValueError):
-                self.module.prepare(self.app, self.root / 'large', '0.2.0+1')
+                self.module.prepare(self.app, self.root / 'large', '0.2.0')
         self.assertFalse((self.root / 'large').exists())
         self.app.write_bytes(b'not PE')
         with self.assertRaises((ValueError, struct.error)):
-            self.module.prepare(self.app, self.root / 'invalid', '0.2.0+1')
+            self.module.prepare(self.app, self.root / 'invalid', '0.2.0')
 
     def test_valid_policy_is_canonical_and_contains_only_public_inputs(self):
         encoded = json.dumps(self.policy).encode()
@@ -98,14 +104,14 @@ class InstallerPackageTest(unittest.TestCase):
 
     def test_publishable_profile_requires_policy_and_matching_embedded_policy(self):
         with self.assertRaises(ValueError):
-            self.module.prepare(self.app, self.root / 'public', '0.2.0+1', publishable=True)
+            self.module.prepare(self.app, self.root / 'public', '0.2.0', publishable=True)
         policy_file = self.root / 'policy.json'
         public_policy = dict(self.policy, endpoint=self.module.GITHUB_ENDPOINT,
                              downloadHosts=sorted(self.module.GITHUB_HOSTS))
         canonical = self.module.canonical_policy(json.dumps(public_policy).encode(), 2, publishable=True)
         policy_file.write_bytes(canonical)
-        reader = mock.Mock(side_effect=lambda _, name: b'SDBUILD001\n0.2.0+1\n' if name == 'SERVERDECK_BUILD_V1' else canonical)
-        self.module.prepare(self.app, self.root / 'signed-input', '0.2.0+1', policy_file,
+        reader = mock.Mock(side_effect=lambda _, name: b'SDBUILD001\n0.2.0\n' if name == 'SERVERDECK_BUILD_V1' else canonical)
+        self.module.prepare(self.app, self.root / 'signed-input', '0.2.0', policy_file,
                             current_store_format=2, resource_reader=reader, publishable=True)
         reader.assert_has_calls([mock.call(self.app, 'SERVERDECK_BUILD_V1'), mock.call(self.app, 'SERVERDECK_TRUST_V1')])
         for invalid in (self.policy, dict(public_policy, endpoint=self.module.GITHUB_ENDPOINT + '?token=x'),
@@ -115,39 +121,39 @@ class InstallerPackageTest(unittest.TestCase):
                 self.module.canonical_policy(json.dumps(invalid).encode(), 2, publishable=True)
         policy_file.write_text(json.dumps(self.policy))
         with self.assertRaises(ValueError):
-            self.module.prepare(self.app, self.root / 'generic-public', '0.2.0+1', policy_file,
+            self.module.prepare(self.app, self.root / 'generic-public', '0.2.0', policy_file,
                                 current_store_format=2, resource_reader=lambda *_: b'', publishable=True)
         self.assertFalse((self.root / 'generic-public').exists())
         policy_file.write_bytes(canonical)
         with self.assertRaises(ValueError):
-            self.module.prepare(self.app, self.root / 'different', '0.2.0+1', policy_file,
+            self.module.prepare(self.app, self.root / 'different', '0.2.0', policy_file,
                                 current_store_format=2, resource_reader=lambda *_: b'{}')
         with self.assertRaises(ValueError):
-            self.module.prepare(self.app, self.root / 'lost-policy', '0.2.0+1',
+            self.module.prepare(self.app, self.root / 'lost-policy', '0.2.0',
                                 resource_reader=lambda *_: canonical)
 
     def test_static_setup_audit_checks_exact_resources_and_as_invoker(self):
         setup = self.root / 'ServerDeckSetup.exe'
         setup.write_bytes(self.app.read_bytes() + b'synthetic container')
         app_id = {'size': self.app.stat().st_size, 'sha256': hashlib.sha256(self.app.read_bytes()).hexdigest()}
-        manifest = f"SDSETUP001\n0.2.0+1\n{app_id['size']}\n{app_id['sha256']}\n".encode()
+        manifest = f"SDSETUP001\n0.2.0\n{app_id['size']}\n{app_id['sha256']}\n".encode()
         xml = b'<assembly><requestedExecutionLevel level="asInvoker" uiAccess="false"/></assembly>'
 
         def reader(_, name, resource_type=10):
             if name == 'SERVERDECK_BUILD_V1':
-                return b'SDBUILD001\n0.2.0+1\n'
+                return b'SDBUILD001\n0.2.0\n'
             if resource_type == 24:
                 self.assertEqual(name, 1)
                 return xml
             return manifest if name == 'SERVERDECK_SETUP_V1' else None
 
-        self.module.audit_setup(self.app, setup, self.root / 'audit', '0.2.0+1',
+        self.module.audit_setup(self.app, setup, self.root / 'audit', '0.2.0',
                                 resource_reader=reader, identity_reader=lambda *_: app_id)
         with self.assertRaises(ValueError):
-            self.module.prepare(self.app, self.root / 'wrong-build-version', '0.3.0+1', resource_reader=reader)
+            self.module.prepare(self.app, self.root / 'wrong-build-version', '0.3.0', resource_reader=reader)
         self.assertFalse((self.root / 'wrong-build-version').exists())
         with self.assertRaises(ValueError):
-            self.module.audit_setup(self.app, setup, self.root / 'bad-resource', '0.2.0+1',
+            self.module.audit_setup(self.app, setup, self.root / 'bad-resource', '0.2.0',
                                     resource_reader=reader, identity_reader=lambda *_: dict(app_id, sha256='0' * 64))
         for bad in [b'<assembly/>', xml.replace(b'asInvoker', b'requireAdministrator'),
                     xml.replace(b'uiAccess="false"', b'uiAccess="true"')]:

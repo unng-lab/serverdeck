@@ -8,7 +8,7 @@ sd::updates::Version UpdateBuildVersion() {
 #ifdef FLUTTER_VERSION
   return sd::updates::ParseVersion(FLUTTER_VERSION);
 #else
-  return sd::updates::ParseVersion("0.1.0+1");
+  return sd::updates::ParseVersion("0.1.1");
 #endif
 }
 std::optional<sd::updates::Policy> ReadUpdatePolicy(const std::filesystem::path& executable) {

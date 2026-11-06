@@ -69,7 +69,7 @@ int main() {
     wchar_t temporary[32768]{}; Require(GetTempPathW(32768, temporary) != 0, "temp path");
     root = std::filesystem::path(temporary) / (L"ServerDeckRemovalUnit-" + sd::Uuid()); sd::SecureDirectory(root);
     const std::string app = "synthetic application", setup = "synthetic setup";
-    const Package package{sd::updates::ParseVersion("0.1.0+1"), View(app), View(setup)};
+    const Package package{sd::updates::ParseVersion("0.1.0"), View(app), View(setup)};
     for (const auto* name : {L"normal", L"empty-root", L"locked", L"interrupted", L"sid", L"active", L"foreign-pending", L"reparse", L"retry-registration", L"remove-registration", L"after-registration"}) {
       const auto scenario = root / name; sd::SecureDirectory(scenario);
       const Paths paths{scenario / L"install", scenario / L"data", scenario / L"programs", sd::UserSid()};

@@ -1,14 +1,34 @@
 name: Windows installer with GitHub updates
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Validate release identity
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = ([regex]::Match((Get-Content -Raw pubspec.yaml), '(?m)^version:\s*(\S+)\s*$')).Groups[1].Value
+          if ($version -cnotmatch '^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$' -or
+              @($version.Split('.') | Where-Object { [int]$_ -gt 65535 }).Count -or
+              $env:GITHUB_REF_NAME -cne "v$version") { throw 'Tag must exactly match stable pubspec version' }
+          if (!(Test-Path -LiteralPath "release/notes/$version.md")) { throw 'Release notes missing' }
+          $existing = gh api "repos/$env:GH_REPO/releases" --paginate --jq '.[].tag_name'
+          if ($LASTEXITCODE) { throw 'Cannot inspect existing releases' }
+          if ($existing -ccontains $env:GITHUB_REF_NAME) { throw 'Release already exists; publish a new tag' }
       - name: Install pinned Flutter
         shell: pwsh
         run: |
@@ -23,17 +43,50 @@ jobs:
       - name: Build update-enabled installer and audit embedded trust
         shell: pwsh
         run: ./tools/build-release.ps1 -Profile publishable -UpdatePolicy release/update-policy.json
-      - name: Application unit checks
+      - name: Prepare signed release assets
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPDATE_SIGNING_KEY: ${{ secrets.SERVERDECK_UPDATE_SIGNING_KEY }}
         run: |
-          python -m pip install -r tools/unit-requirements.txt
-          ./tools/test-unit.ps1
-      - name: Native unit tests
+          $ErrorActionPreference = 'Stop'
+          if (!$env:UPDATE_SIGNING_KEY) { throw 'SERVERDECK_UPDATE_SIGNING_KEY secret is required' }
+          $key = Join-Path $env:RUNNER_TEMP 'serverdeck-update-signing.pem'
+          try {
+            [IO.File]::WriteAllText($key, $env:UPDATE_SIGNING_KEY)
+            $env:UPDATE_SIGNING_KEY = ''
+            # 0.1.1 starts a clean-install catalog; old +N versions are retired.
+            if ($env:GITHUB_REF_NAME -ceq 'v0.1.1') {
+              ./tools/prepare-release.ps1 -PrivateKey $key -FirstRelease
+              if ($LASTEXITCODE) { throw 'First catalog preparation failed' }
+            } else {
+              $previous = Join-Path $env:RUNNER_TEMP 'previous-release'
+              gh release download --pattern serverdeck-update-catalog.txt --dir $previous
+              if ($LASTEXITCODE) { throw 'Cannot download previous catalog' }
+              ./tools/prepare-release.ps1 -PrivateKey $key -PreviousCatalog (Join-Path $previous 'serverdeck-update-catalog.txt')
+              if ($LASTEXITCODE) { throw 'Catalog preparation failed' }
+            }
+          } finally {
+            $env:UPDATE_SIGNING_KEY = ''
+            if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key -Force }
+          }
+      - name: Publish tag release
         shell: pwsh
-        run: ./tools/test-release.ps1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          gh release create $env:GITHUB_REF_NAME --verify-tag --draft --title "ServerDeck $version" --notes-file "release/notes/$version.md" output/release/ServerDeckSetup.exe output/release/serverdeck-update-catalog.txt
+          if ($LASTEXITCODE) { throw 'Draft release upload failed' }
+          gh release edit $env:GITHUB_REF_NAME --draft=false --latest
+          if ($LASTEXITCODE) { throw 'Release publication failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: ServerDeck-windows-x64-update-enabled
           path: |
             output/release/ServerDeckSetup.exe
+            output/release/serverdeck-update-catalog.txt
             output/release-evidence/

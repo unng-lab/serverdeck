@@ -13,10 +13,10 @@ import '../runtime/fakes.dart';
 
 class Port implements UpdatePort {
   UpdateSnapshot value = const UpdateSnapshot(
-    currentVersion: '0.1.0+3',
+    currentVersion: '0.1.2',
     enabled: false,
     state: UpdateState.idle,
-    preparedVersion: '0.1.0+4',
+    preparedVersion: '0.1.1',
   );
   bool readFails = false;
   @override
@@ -40,34 +40,34 @@ class Port implements UpdatePort {
 void main() {
   test('retained prepared survives failed replacement, but not prepared/read errors or stop', () async {
     final port = Port();
-    final owner = UpdateOwner(port: port, currentVersion: '0.1.0+3');
+    final owner = UpdateOwner(port: port, currentVersion: '0.1.2');
     addTearDown(owner.dispose);
     for (final code in ['NETWORK_UNAVAILABLE', 'CANCELLED']) {
       port.value = UpdateSnapshot(
-        currentVersion: '0.1.0+3',
+        currentVersion: '0.1.2',
         enabled: false,
         state: UpdateState.failed,
         code: code,
-        preparedVersion: '0.1.0+4',
+        preparedVersion: '0.1.1',
       );
       await owner.start();
       await owner.refresh();
       expect(owner.canRestart, isTrue);
     }
     port.value = const UpdateSnapshot(
-      currentVersion: '0.1.0+3',
+      currentVersion: '0.1.2',
       enabled: false,
       state: UpdateState.failed,
-      preparedVersion: '0.1.0+4',
+      preparedVersion: '0.1.1',
       preparedCode: 'RELEASE_REVOKED',
     );
     await owner.refresh();
     expect(owner.canRestart, isFalse);
     port.value = const UpdateSnapshot(
-      currentVersion: '0.1.0+3',
+      currentVersion: '0.1.2',
       enabled: false,
       state: UpdateState.checking,
-      preparedVersion: '0.1.0+4',
+      preparedVersion: '0.1.1',
     );
     await owner.refresh();
     expect(owner.canRestart, isFalse);
@@ -92,12 +92,12 @@ void main() {
     addTearDown(runtime.dispose);
     addTearDown(platform.controller.close);
     await runtime.start();
-    expect(await runtime.requestUpdateRestart('0.1.0+4'), isFalse);
+    expect(await runtime.requestUpdateRestart('0.1.1'), isFalse);
     expect(runtime.acceptsOperations, isTrue);
     expect(store.closed, isFalse);
     platform.acceptRestart = true;
     store.failWrites = true;
-    expect(await runtime.requestUpdateRestart('0.1.0+4'), isTrue);
+    expect(await runtime.requestUpdateRestart('0.1.1'), isTrue);
     expect(runtime.state, RuntimeState.shutdownBlocked);
     expect(platform.exits, 0);
     expect(
@@ -124,8 +124,8 @@ void main() {
       addTearDown(runtime.dispose);
       addTearDown(platform.controller.close);
       await runtime.start();
-      final a = runtime.requestUpdateRestart('0.1.0+4');
-      final b = runtime.requestUpdateRestart('0.1.0+4');
+      final a = runtime.requestUpdateRestart('0.1.1');
+      final b = runtime.requestUpdateRestart('0.1.1');
       await Future<void>.delayed(Duration.zero);
       expect(platform.restartRequests, 1);
       expect(platform.exits, 0);
@@ -161,14 +161,14 @@ void main() {
   testWidgets(
     'main entry opens updates directly, preserves version, retires on shutdown',
     (tester) async {
-      final platform = FakePlatform()..release.value = '0.1.0+3';
+      final platform = FakePlatform()..release.value = '0.1.2';
       final store = FakeStore();
       final runtime = RuntimeCoordinator(
         platform: platform,
         store: store,
         epoch: 'owner',
       );
-      final owner = UpdateOwner(port: Port(), currentVersion: '0.1.0+3');
+      final owner = UpdateOwner(port: Port(), currentVersion: '0.1.2');
       addTearDown(owner.dispose);
       addTearDown(runtime.dispose);
       addTearDown(platform.controller.close);
@@ -181,14 +181,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Приложение готово'), findsNothing);
-      expect(find.text('0.1.0+3'), findsOneWidget);
+      expect(find.text('0.1.2'), findsOneWidget);
       await tester.tap(find.text('Обновление готово'));
       await tester.pumpAndSettle();
       expect(find.byType(UpdateView), findsOneWidget);
       await tester.ensureVisible(find.text('Обновить и перезапустить'));
       await tester.tap(find.text('Обновить и перезапустить'));
       await tester.pumpAndSettle();
-      expect(find.text('Обновить до 0.1.0+4 и перезапустить?'), findsOneWidget);
+      expect(find.text('Обновить до 0.1.1 и перезапустить?'), findsOneWidget);
       store.failWrites = true;
       final exit = runtime.requestExit();
       await tester.pumpAndSettle();
@@ -203,7 +203,7 @@ void main() {
     'restart confirmation cancel, stale prepared version, and accepted callback',
     (tester) async {
       final port = Port();
-      final owner = UpdateOwner(port: port, currentVersion: '0.1.0+3');
+      final owner = UpdateOwner(port: port, currentVersion: '0.1.2');
       addTearDown(owner.dispose);
       await owner.start();
       final calls = <String>[];
@@ -233,10 +233,10 @@ void main() {
       expect(calls, isEmpty);
       await open();
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+3',
+        currentVersion: '0.1.2',
         enabled: false,
         state: UpdateState.idle,
-        preparedVersion: '0.1.0+5',
+        preparedVersion: '0.1.4',
       );
       await owner.refresh();
       await tester.pump();
@@ -250,7 +250,7 @@ void main() {
         find.widgetWithText(DeckButton, 'Обновить и перезапустить').last,
       );
       await tester.pumpAndSettle();
-      expect(calls, ['0.1.0+5']);
+      expect(calls, ['0.1.4']);
       await tester.pumpWidget(const SizedBox());
     },
   );

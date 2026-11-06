@@ -91,12 +91,12 @@ int main() {
     wchar_t temp[32768]{}; Require(GetTempPathW(32768, temp) != 0, "temp");
     root = std::filesystem::path(temp) / (L"ServerDeckExecutorUnit-" + sd::Uuid()); sd::SecureDirectory(root);
     const std::string oldApp = "old app bytes", oldSetup = "old setup bytes", newApp = "new app bytes", newSetup = "new setup bytes";
-    const Package old{sd::updates::ParseVersion("0.1.0+1"), View(oldApp), View(oldSetup)};
-    const Package next{sd::updates::ParseVersion("0.2.0+2"), View(newApp), View(newSetup)};
+    const Package old{sd::updates::ParseVersion("0.1.0"), View(oldApp), View(oldSetup)};
+    const Package next{sd::updates::ParseVersion("0.1.1"), View(newApp), View(newSetup)};
     const auto validate = [](const std::filesystem::path&, const sd::updates::Version&, const Identity&) {};
-    const auto header = "SDSETUP001\n0.1.0+1\n12\n" + std::string(64, 'a') + "\n";
+    const auto header = "SDSETUP001\n0.1.0\n12\n" + std::string(64, 'a') + "\n";
     Require(DecodeSetupManifest(header).version == old.version, "setup manifest codec");
-    for (const auto& invalid : {std::string(), header + "extra\n", std::string("SDSETUP002\n0.1.0+1\n12\n") + std::string(64, 'a') + '\n'}) {
+    for (const auto& invalid : {std::string(), header + "extra\n", std::string("SDSETUP002\n0.1.0\n12\n") + std::string(64, 'a') + '\n'}) {
       bool refused = false; try { DecodeSetupManifest(invalid); } catch (...) { refused = true; }
       Require(refused, "invalid setup manifest accepted");
     }
@@ -126,7 +126,7 @@ int main() {
         Require(refused && !files.Exists(L"journal.v1") && executor.Current()->app == Identity{oldApp.size(), sd::Sha256(View(oldApp).data, oldApp.size())}, "same version conflicting bytes accepted");
       }
       bool downgradeRejected = false;
-      const Package older{sd::updates::ParseVersion("0.0.0+1"), View(oldApp), View(oldSetup)};
+      const Package older{sd::updates::ParseVersion("0.0.0"), View(oldApp), View(oldSetup)};
       try { executor.Apply(older, true); } catch (...) { downgradeRejected = true; }
       Require(downgradeRejected && executor.Current()->version == old.version, "downgrade modified install");
       const std::string selected(stop);

@@ -106,7 +106,7 @@ std::vector<uint8_t> ResourceFixture() {
   entry = {}; entry.NameIsString = 1; entry.NameOffset = 128; entry.DataIsDirectory = 1; entry.OffsetToDirectory = 64; put(560, entry);
   directory = {}; directory.NumberOfIdEntries = 1; put(576, directory);
   entry = {}; entry.Name = 1033; entry.OffsetToData = 96; put(592, entry);
-  const std::string text = "SDBUILD001\n0.2.0+1\n";
+  const std::string text = "SDBUILD001\n0.2.0\n";
   IMAGE_RESOURCE_DATA_ENTRY data{}; data.OffsetToData = 4096 + 192; data.Size = static_cast<DWORD>(text.size()); put(608, data);
   const std::wstring name = L"SERVERDECK_BUILD_V1"; const WORD count = static_cast<WORD>(name.size()); put(640, count);
   std::memcpy(bytes.data() + 642, name.data(), name.size() * sizeof(wchar_t)); std::memcpy(bytes.data() + 704, text.data(), text.size());
@@ -121,7 +121,7 @@ int main() {
     root = std::filesystem::path(temp) / (L"ServerDeckPendingUnit-" + sd::Uuid()); sd::SecureDirectory(root);
     Signer signer; const auto policy = signer.Policy();
     const std::string oldBytes = "verified old synthetic setup", newBytes(131073, 'n');
-    const auto old = MakeRelease("0.2.0+1", oldBytes), next = MakeRelease("0.3.0+1", newBytes);
+    const auto old = MakeRelease("0.2.0", oldBytes), next = MakeRelease("0.3.0", newBytes);
     const auto oldCatalog = signer.Catalog(old), newCatalog = signer.Catalog(next);
     {
       const auto scenario = root / L"static-catalog"; sd::SecureDirectory(scenario);
@@ -318,26 +318,27 @@ int main() {
       Reject([&] { DecodeRetirement(retirement + "\n"); }, "RECOVERY_REQUIRED");
       Reject([&] { EncodeRetirement({ready.consent, "unknown"}); }, "RECOVERY_REQUIRED");
     }
-    Require(sd::install::DecodeBuildVersion("SDBUILD001\n0.2.0+1\n").text == "0.2.0+1", "mapped build version codec");
-    Require(sd::install::ReadBuildVersion(GetModuleHandleW(nullptr)).text == "9.8.7+6" &&
-      sd::install::ReadFileBuildVersion(sd::install::ModuleFile()).text == "9.8.7+6" &&
+    Require(sd::install::DecodeBuildVersion("SDBUILD001\n0.2.0\n").text == "0.2.0", "mapped build version codec");
+    Require(sd::install::ReadBuildVersion(GetModuleHandleW(nullptr)).text == "9.8.12" &&
+      sd::install::ReadFileBuildVersion(sd::install::ModuleFile()).text == "9.8.12" &&
       !sd::install::ReadEmbeddedPolicy(GetModuleHandleW(nullptr)), "resource-only build identity mapping");
     const auto image = ResourceFixture();
-    Require(sd::install::ParseRawResource(image.data(), image.size(), L"SERVERDECK_BUILD_V1", 128) == std::optional<std::string>{"SDBUILD001\n0.2.0+1\n"} &&
+    Require(sd::install::ParseRawResource(image.data(), image.size(), L"SERVERDECK_BUILD_V1", 128) == std::optional<std::string>{"SDBUILD001\n0.2.0\n"} &&
       !sd::install::ParseRawResource(image.data(), image.size(), L"SERVERDECK_TRUST_V1", 8192), "raw resource fixture");
     for (const auto offset : {size_t(0), size_t(60), size_t(132), size_t(152), size_t(212), size_t(260), size_t(280), size_t(524), size_t(560), size_t(608)}) {
       auto bad = image; std::fill(bad.begin() + offset, bad.begin() + offset + 4, uint8_t{255});
       Reject([&] { sd::install::ParseRawResource(bad.data(), bad.size(), L"SERVERDECK_BUILD_V1", 128); }, "INVALID_ARTIFACT");
     }
     Reject([&] { sd::install::ParseRawResource(image.data(), 64, L"SERVERDECK_BUILD_V1", 128); }, "INVALID_ARTIFACT");
-    for (const auto* invalid : {"SDBUILD001\n0.2.0\n", "SDBUILD001\n0.2.0+1\nextra\n", "SDBUILD001\n0.2.0+1\r\n"})
+    Require(sd::install::DecodeBuildVersion("SDBUILD001\n0.1.1\n").text == "0.1.1", "stable mapped build codec");
+    for (const auto* invalid : {"SDBUILD001\n0.2\n", "SDBUILD001\n0.2.0\nextra\n", "SDBUILD001\n0.2.0\r\n"})
       Reject([&] { sd::install::DecodeBuildVersion(invalid); }, "INVALID_ARTIFACT");
     for (const auto* scenarioName : {"restart-ready", "restart-timeout", "restart-invalid", "gui-ready", "gui-unconfigured", "gui-timeout", "gui-timeout-defer-io", "gui-timeout-defer-checkpoint", "gui-bad-cache", "helper-offline", "helper-invalid",
         "helper-success", "helper-stale", "helper-registered", "helper-committed"}) {
       const auto scenario = root / sd::Wide(scenarioName); sd::SecureDirectory(scenario);
       const sd::install::Paths paths{scenario / L"install", scenario / L"data", scenario / L"programs", sd::UserSid()};
       const std::string app = "synthetic app", initialSetup = "initial installed setup";
-      const sd::install::Package baseline{ParseVersion("0.1.0+1"), {reinterpret_cast<const uint8_t*>(app.data()), app.size()},
+      const sd::install::Package baseline{ParseVersion("0.1.0"), {reinterpret_cast<const uint8_t*>(app.data()), app.size()},
         {reinterpret_cast<const uint8_t*>(initialSetup.data()), initialSetup.size()}};
       const sd::install::Package candidate{old.version, baseline.app, {reinterpret_cast<const uint8_t*>(oldBytes.data()), oldBytes.size()}};
       Registration registration; sd::install::Files files(paths);

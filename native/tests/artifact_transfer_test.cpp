@@ -47,7 +47,7 @@ struct Transport : sd::updates::ArtifactTransport {
 };
 sd::updates::Release MakeRelease(const std::string& bytes) {
   sd::updates::Release value;
-  value.version = sd::updates::ParseVersion("0.2.0+1"); value.platform = "windows-x64";
+  value.version = sd::updates::ParseVersion("0.2.0"); value.platform = "windows-x64";
   value.bootstrapAbi = 1; value.storeFormat = 2; value.setupSize = bytes.size();
   value.setupHash = sd::Sha256(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
   value.url = "https://assets.example/build/setup.exe"; return value;

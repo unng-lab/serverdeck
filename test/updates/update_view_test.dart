@@ -8,7 +8,7 @@ import 'package:serverdeck/updates/update_owner.dart';
 import 'package:serverdeck/updates/update_view.dart';
 
 const _offer = UpdateOffer(
-  version: '0.2.0+1',
+  version: '0.2.0',
   notes: 'Новые возможности и исправления',
   publishedUtc: 1700000000,
   setupSize: 123456,
@@ -21,7 +21,7 @@ const _offer = UpdateOffer(
 
 final class _Port implements UpdatePort {
   UpdateSnapshot value = const UpdateSnapshot(
-    currentVersion: '0.1.0+1',
+    currentVersion: '0.1.0',
     state: UpdateState.available,
     enabled: false,
     offer: _offer,
@@ -36,7 +36,7 @@ final class _Port implements UpdatePort {
   Future<bool> check() async {
     checks++;
     value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.checking,
       enabled: false,
     );
@@ -48,7 +48,7 @@ final class _Port implements UpdatePort {
     downloads++;
     confirmedVersion = version;
     value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.downloading,
       enabled: false,
       offer: _offer,
@@ -61,7 +61,7 @@ final class _Port implements UpdatePort {
     cancels++;
     if (noOpCancel) return;
     value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.failed,
       enabled: false,
       code: 'CANCELLED',
@@ -72,7 +72,7 @@ final class _Port implements UpdatePort {
   Future<void> defer() async {
     deferrals++;
     value = UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       enabled: false,
       preparedVersion: value.preparedVersion,
       preparedCode: value.preparedCode,
@@ -88,7 +88,7 @@ final class _Port implements UpdatePort {
 Future<UpdateOwner> _mount(WidgetTester tester, _Port port) async {
   final owner = UpdateOwner(
     port: port,
-    currentVersion: '0.1.0+1',
+    currentVersion: '0.1.0',
     schedule: (_, _) => () {},
   );
   await owner.start();
@@ -115,7 +115,7 @@ void main() {
     (tester) async {
       final port = _Port();
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.verifying,
         enabled: false,
         offer: _offer,
@@ -123,7 +123,7 @@ void main() {
       final owner = await _mount(tester, port);
       port.noOpCancel = true;
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.ready,
         enabled: false,
         offer: _offer,
@@ -148,22 +148,22 @@ void main() {
     (tester) async {
       final port = _Port();
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.available,
         enabled: false,
         offer: _offer,
-        preparedVersion: '0.1.1+1',
+        preparedVersion: '0.1.1',
         preparedCode: 'RELEASE_REVOKED',
       );
       final owner = await _mount(tester, port);
-      expect(find.text('Ранее подготовлено 0.1.1+1'), findsOneWidget);
+      expect(find.text('Ранее подготовлено 0.1.1'), findsOneWidget);
       expect(
         find.textContaining('больше не доступен в каталоге'),
         findsOneWidget,
       );
-      expect(find.text('0.2.0+1'), findsOneWidget);
+      expect(find.text('0.2.0'), findsOneWidget);
       await _tap(tester, 'Позже');
-      expect(find.text('Ранее подготовлено 0.1.1+1'), findsOneWidget);
+      expect(find.text('Ранее подготовлено 0.1.1'), findsOneWidget);
       expect(port.downloads, 0);
       await owner.dispose();
     },
@@ -174,7 +174,7 @@ void main() {
     final port = _Port();
     final owner = UpdateOwner(
       port: port,
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       schedule: (_, _) => () {},
     );
     await owner.start();
@@ -200,12 +200,12 @@ void main() {
     );
     await _tap(tester, 'Открыть настройки');
     await _tap(tester, 'Подготовить обновление');
-    expect(find.text('Подготовить обновление 0.2.0+1?'), findsOneWidget);
+    expect(find.text('Подготовить обновление 0.2.0?'), findsOneWidget);
     await owner.stopAdmission();
     route.retire();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Подготовить обновление 0.2.0+1?'), findsNothing);
+    expect(find.text('Подготовить обновление 0.2.0?'), findsNothing);
     expect(port.downloads, 0);
     await owner.dispose();
   });
@@ -240,8 +240,8 @@ void main() {
   ) async {
     final port = _Port();
     final owner = await _mount(tester, port);
-    expect(find.text('0.1.0+1'), findsOneWidget);
-    expect(find.text('0.2.0+1'), findsOneWidget);
+    expect(find.text('0.1.0'), findsOneWidget);
+    expect(find.text('0.2.0'), findsOneWidget);
     expect(find.text('123456 байт'), findsOneWidget);
     expect(find.text('windows-x64'), findsOneWidget);
     expect(find.text('2023-11-14T22:13:20.000Z · UTC'), findsOneWidget);
@@ -249,7 +249,7 @@ void main() {
     expect(find.text(_offer.notes), findsOneWidget);
     expect(port.downloads, 0);
     await _tap(tester, 'Подготовить обновление');
-    expect(find.text('Подготовить обновление 0.2.0+1?'), findsOneWidget);
+    expect(find.text('Подготовить обновление 0.2.0?'), findsOneWidget);
     expect(find.textContaining('следующем запуске программы'), findsOneWidget);
     expect(port.downloads, 0);
     await _tap(tester, 'Отмена');
@@ -284,11 +284,11 @@ void main() {
     final owner = await _mount(tester, port);
     await _tap(tester, 'Подготовить обновление');
     port.value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.available,
       enabled: false,
       offer: UpdateOffer(
-        version: '0.2.0+1',
+        version: '0.2.0',
         notes: 'Другой выпуск',
         publishedUtc: 1700000100,
         setupSize: 654321,
@@ -312,7 +312,7 @@ void main() {
   ) async {
     final port = _Port();
     port.value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.downloading,
       enabled: false,
       offer: _offer,
@@ -334,7 +334,7 @@ void main() {
   ) async {
     final port = _Port();
     port.value = const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: UpdateState.ready,
       enabled: false,
       offer: _offer,
@@ -355,7 +355,7 @@ void main() {
     (tester) async {
       final port = _Port();
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.failed,
         enabled: false,
         code: 'UPDATE_NOT_CONFIGURED',
@@ -367,7 +367,7 @@ void main() {
       );
       expect(find.text('Установлена актуальная версия'), findsNothing);
       port.value = const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.failed,
         enabled: false,
         code: 'NETWORK_UNAVAILABLE',

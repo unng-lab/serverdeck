@@ -18,9 +18,12 @@
 | Deferral | SDDEFER001, exact consent string, attempt UUIDv4, allowlisted code, consumed bool; ≤8KiB canonical JSON | helper → bootstrap, worker reads notice |
 | Snapshot | state, current/target version, notes, signed setupSize/publishedUTC/platform/ABI/storeFormat/compatibility, bytes/total?, code?, enabled, timestamps, independently retained preparedVersion?/preparedCode? | native → Dart |
 
-Versions: `major.minor.patch+build`, four integers0..65535, no leading zeros except0.
-Compare numeric tuple; build participates. Same version with other hash/size is a trust
-failure, not alias. Format/ABI validated before offer, actual DB-open remains authoritative
+Versions: stable `major.minor.patch` (first `0.1.1`), three integers0..65535,
+no leading zeros except0, no prerelease/build metadata. Compare numeric three-field
+tuple. Windows numeric VERSIONINFO is `major,minor,patch,0`; revision0 is not part
+of the release ID. `+build` is rejected in every runtime/publisher codec. This is a
+clean-install cutover; old installation metadata/pending/catalogs are unsupported.
+Same version with other hash/size is a trust failure, not alias. Format/ABI validated before offer, actual DB-open remains authoritative
 for data corruption/unsupported format; no remote-selected migration.
 
 ```text

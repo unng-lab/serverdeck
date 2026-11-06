@@ -285,23 +285,23 @@ int main() {
         ++factories; auto runtime = std::make_unique<UpdateRuntime>();
         runtime->preferences = std::make_unique<UpdatePreferences>();
         runtime->service = std::make_unique<sd::updates::UpdateService>(std::nullopt,
-          sd::updates::ParseVersion("0.1.0+1"), *runtime->preferences);
+          sd::updates::ParseVersion("0.1.0"), *runtime->preferences);
         return runtime;
       };
       const M epoch{{V("ownerEpoch"), V(sd::Utf8(args.ownerEpoch))}};
       {
         PlatformChannel channel(nullptr, &marker, args, isolated);
         if (marker.Call("updates.check", {{V("ownerEpoch"), V("stale")}}).error != "STALE_EPOCH") return 44;
-        M restart = epoch; restart.emplace(V("version"), V("0.2.0+1"));
+        M restart = epoch; restart.emplace(V("version"), V("0.2.0"));
         if (std::get<bool>(marker.Call("runtime.requestUpdateRestart", restart).value) || factories) return 57;
         restart.emplace(V("path"), V("foreign.exe"));
         if (marker.Call("runtime.requestUpdateRestart", restart).error != "INVALID_ARGUMENT") return 58;
-        if (marker.Call("runtime.requestUpdateRestart", {{V("ownerEpoch"), V("stale")}, {V("version"), V("0.2.0+1")}}).error != "STALE_EPOCH") return 59;
+        if (marker.Call("runtime.requestUpdateRestart", {{V("ownerEpoch"), V("stale")}, {V("version"), V("0.2.0")}}).error != "STALE_EPOCH") return 59;
         auto extra = epoch; extra[V("url")] = V("https://other.test");
         if (marker.Call("updates.snapshot", extra).error != "INVALID_ARGUMENT") return 45;
         auto setting = epoch; setting[V("enabled")] = V(1);
         if (marker.Call("updates.setEnabled", setting).error != "INVALID_ARGUMENT") return 46;
-        auto download = epoch; download[V("version")] = V("0.2.0");
+        auto download = epoch; download[V("version")] = V("0.2");
         if (marker.Call("updates.download", download).error != "INVALID_ARGUMENT" || factories) return 47;
         if (!marker.Call("updates.cancel", epoch).error.empty() || !std::get<bool>(marker.Call("updates.drained", epoch).value) || factories) return 48;
         auto running = epoch; running[V("runtimeState")] = V("running"); marker.Call("runtime.snapshot", running);
@@ -322,12 +322,12 @@ int main() {
             std::get<std::string>(std::get<M>(stopped.value).at(V("code"))) != "CANCELLED" ||
             marker.Call("updates.check", epoch).error != "CANCELLED") return 53;
       }
-      sd::updates::Snapshot snapshot; snapshot.current = sd::updates::ParseVersion("0.1.0+1"); snapshot.state = "available";
-      sd::updates::Release release; release.version = sd::updates::ParseVersion("0.2.0+1");
+      sd::updates::Snapshot snapshot; snapshot.current = sd::updates::ParseVersion("0.1.0"); snapshot.state = "available";
+      sd::updates::Release release; release.version = sd::updates::ParseVersion("0.2.0");
       release.platform = "windows-x64"; release.bootstrapAbi = 1; release.storeFormat = 2; release.published = 123;
       release.setupSize = 456; release.notes = "signed notes"; release.url = "https://private-source.example/setup";
       release.setupHash.assign(64, 'a'); release.appHash.assign(64, 'b'); snapshot.offer = release;
-      snapshot.preparedVersion = "0.1.1+1"; snapshot.preparedCode = "RELEASE_REVOKED";
+      snapshot.preparedVersion = "0.1.1"; snapshot.preparedCode = "RELEASE_REVOKED";
       const auto encoded = EncodeUpdateSnapshot(snapshot);
       if (std::get<int64_t>(encoded.at(V("setupSize"))) != 456 || std::get<int64_t>(encoded.at(V("publishedUTC"))) != 123 ||
           std::get<int64_t>(encoded.at(V("bootstrapAbi"))) != 1 || std::get<int64_t>(encoded.at(V("storeFormat"))) != 2 ||

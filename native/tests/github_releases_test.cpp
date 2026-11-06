@@ -44,9 +44,9 @@ struct Signer {
     return std::string(legacy ? "SDCATALOG001\nunit\n" : "SDCATALOG002\nunit\n") + Hex(signature, 64) + '\n' + bytes;
   }
 };
-std::string Tag(const Version& version) { auto tag = "v" + version.text; tag.replace(tag.find('+'), 1, "%2B"); return tag; }
+std::string Tag(const Version& version) { return "v" + version.text; }
 std::string Url(const Version& version, const char* name) { return "https://github.com/unng-lab/serverdeck/releases/download/" + Tag(version) + "/" + name; }
-Release Entry(const char* version = "0.2.0+1") {
+Release Entry(const char* version = "0.2.0") {
   Release r; r.version = ParseVersion(version); r.platform = "windows-x64"; r.bootstrapAbi = 1; r.storeFormat = 2;
   r.published = 99900; r.setupSize = 12; r.setupHash = std::string(64, 'a'); r.appSize = 10; r.appHash = std::string(64, 'b');
   r.url = Url(r.version, "ServerDeckSetup.exe"); r.notes = "Test"; return r;
@@ -74,7 +74,7 @@ struct Run {
   std::atomic<bool> cancel{false}; Http* http;
   GitHubReleaseSource source;
   Run(const Policy& policy, std::vector<MetadataResponse> responses)
-    : http(new Http), source(policy, ParseVersion("0.1.0+1"), std::unique_ptr<Http>(http), [this] { return ticks; }, [this] { return utc; }) {
+    : http(new Http), source(policy, ParseVersion("0.1.0"), std::unique_ptr<Http>(http), [this] { return ticks; }, [this] { return utc; }) {
     http->responses = std::move(responses);
   }
 };
@@ -82,7 +82,7 @@ std::vector<MetadataResponse> Responses(const Json& api, const std::string& cata
 }
 int main() {
   try {
-    Signer signer; const auto policy = signer.PolicyValue(); const auto latest = Entry(), old = Entry("0.1.1+1");
+    Signer signer; const auto policy = signer.PolicyValue(); const auto latest = Entry(), old = Entry("0.1.1");
     const auto catalog = signer.Catalog({old, latest}); const auto api = Api(latest, catalog);
     {
       Run run(policy, Responses(api, catalog)); Require(run.source.Fetch(run.cancel) == catalog, "latest catalog");
@@ -95,7 +95,7 @@ int main() {
     {
       auto responses = Responses(api, catalog); responses.push_back({200, {}, sd::mcp::Encode(Api(old, {}, true))});
       Run run(policy, responses); Require(run.source.FetchFor(old, run.cancel) == catalog && run.http->requests.size() == 3 &&
-        run.http->requests.back().url == "https://api.github.com/repos/unng-lab/serverdeck/releases/tags/v0.1.1%2B1", "old consent retargeted");
+        run.http->requests.back().url == "https://api.github.com/repos/unng-lab/serverdeck/releases/tags/v0.1.1", "old consent retargeted");
     }
     for (const auto status : {403u, 404u, 429u, 500u, 302u}) {
       Run run(policy, {{status, "https://other.test", {}}}); Reject([&] { run.source.Fetch(run.cancel); }, "NETWORK_UNAVAILABLE");
@@ -118,17 +118,12 @@ int main() {
       bad["assets"] = Json::Array(129, Json::Object{{"name", "unrelated"}});
       Run many(policy, Responses(bad, catalog)); Reject([&] { many.source.Fetch(many.cancel); }, "INVALID_CATALOG");
     }
-    for (const auto* badUrl : {"https://github.com/other/serverdeck/releases/download/v0.2.0%2B1/ServerDeckSetup.exe",
+    for (const auto* badUrl : {"https://github.com/other/serverdeck/releases/download/v0.2.0/ServerDeckSetup.exe",
         "https://github.com/unng-lab/serverdeck/releases/download/v0.2.0%252B1/ServerDeckSetup.exe",
-        "https://github.com/unng-lab/serverdeck/releases/download/v0.2.0%2B1/ServerDeckSetup.exe?token=x"}) {
+        "https://github.com/unng-lab/serverdeck/releases/download/v0.2.0/ServerDeckSetup.exe?token=x"}) {
       auto bad = api.object(); auto assets = std::get<Json::Array>(bad["assets"].value); auto asset = assets.front().object();
       asset["browser_download_url"] = badUrl; assets.front() = asset; bad["assets"] = assets;
       Run run(policy, Responses(bad, catalog)); Reject([&] { run.source.Fetch(run.cancel); }, "INVALID_CATALOG");
-    }
-    {
-      auto bad = api.object(); auto assets = std::get<Json::Array>(bad["assets"].value); auto asset = assets.front().object();
-      auto url = latest.url; url.replace(url.find("%2B"), 3, "+"); asset["browser_download_url"] = url;
-      assets.front() = asset; bad["assets"] = assets; Run run(policy, Responses(bad, catalog)); Require(run.source.Fetch(run.cancel) == catalog, "literal plus tag");
     }
     {
       auto bad = api.object(); auto assets = std::get<Json::Array>(bad["assets"].value); assets.push_back(assets.front()); bad["assets"] = assets;
@@ -143,7 +138,7 @@ int main() {
       Reject([&] { signature.source.Fetch(signature.cancel); }, "INVALID_CATALOG");
       tampered = catalog; tampered[tampered.size() - 3] = 'A'; Run signedBytes(policy, Responses(Api(latest, tampered), tampered));
       Reject([&] { signedBytes.source.Fetch(signedBytes.cancel); }, "SOURCE_UNTRUSTED");
-      for (const auto& replacement : {signer.Catalog({Entry("0.1.0+2"), old, latest}), signer.Catalog({latest})}) {
+      for (const auto& replacement : {signer.Catalog({Entry("0.1.1"), old, latest}), signer.Catalog({latest})}) {
         Require(replacement.size() != catalog.size() && replacement.size() < kCatalogLimit, "replacement fixture bounds");
         Run changedSize(policy, Responses(api, replacement));
         Reject([&] { changedSize.source.Fetch(changedSize.cancel); }, "SOURCE_CHANGED");
@@ -201,7 +196,7 @@ int main() {
     }
     {
       auto bad = policy; bad.endpoint = "https://updates.example/catalog"; Reject([&] { ValidateGitHubPolicy(bad); }, "INVALID_CATALOG");
-      Reject([&] { MakeWinHttpCatalogSource(bad, ParseVersion("0.1.0+1")); }, "INVALID_CATALOG");
+      Reject([&] { MakeWinHttpCatalogSource(bad, ParseVersion("0.1.0")); }, "INVALID_CATALOG");
       bad = policy; bad.downloadHosts.push_back("other.example"); Reject([&] { ValidateGitHubPolicy(bad); }, "INVALID_CATALOG");
     }
     std::cout << "GitHub release synthetic unit checks passed\n"; return 0;

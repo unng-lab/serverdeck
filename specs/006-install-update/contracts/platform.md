@@ -91,7 +91,7 @@ failure from proved current version. No error replaces data with an empty databa
 ## Main-window installed version — FR-620
 
 Existing native initialize.release contains the canonical version of the running
-build (including +build); its value is independent of database and GitHub state.
+build (`major.minor.patch`, without suffixes); its value is independent of database and GitHub state.
 RuntimePlatform exposes release as ValueListenable<String?> with read-only nullable
 value. NativePlatform publishes it immediately after initialize context arrives,
 before monitoring/data/feature initialization completes. RuntimeView uses

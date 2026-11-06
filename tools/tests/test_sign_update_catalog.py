@@ -50,7 +50,7 @@ try {{
             self.assertTrue((Path(directory) / 'catalog').read_bytes().startswith(b'SDCATALOG002\n'))
             lines = ['SDRELEASES001', '1', '2', '6']
             for index, notes_size in enumerate([16384] * 5 + [15000]):
-                lines += [f'1.0.{index}+1', 'windows-x64', '1', '2', '1', '1', 'a' * 64,
+                lines += [f'1.0.{index}', 'windows-x64', '1', '2', '1', '1', 'a' * 64,
                           '1', 'b' * 64, 'https://updates.example/setup.exe',
                           base64.b64encode(b'n' * notes_size).decode('ascii')]
             near_limit = ('\n'.join(lines) + '\n').encode('ascii')

@@ -45,8 +45,8 @@ int main() {
   using namespace sd::install;
   std::filesystem::path temporary;
   try {
-    const auto old = Record("0.1.0+1", "old app", "old setup");
-    auto next = Record("0.2.0+2", "new app", "new setup");
+    const auto old = Record("0.1.0", "old app", "old setup");
+    auto next = Record("0.1.1", "new app", "new setup");
     next.consumedVersion = next.version.text; next.consumedSetupHash = next.setup.hash;
     Require(DecodeInstallation(EncodeInstallation(next)).consumedVersion == next.version.text, "metadata roundtrip");
     for (const auto& bad : {std::string(), std::string("SDINSTALL002\n{}\n"),

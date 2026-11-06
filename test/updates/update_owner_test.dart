@@ -58,7 +58,7 @@ class _Port implements UpdatePort {
     if (failSnapshots)
       throw const FormatException('synthetic snapshot failure');
     return UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       state: state,
       enabled: enabled,
       lastAttempt: attempt,
@@ -102,7 +102,7 @@ class _Port implements UpdatePort {
 }
 
 const _offer = UpdateOffer(
-  version: '0.2.0+1',
+  version: '0.2.0',
   notes: 'Исправления',
   publishedUtc: 90000,
   setupSize: 123456,
@@ -115,13 +115,13 @@ const _offer = UpdateOffer(
 
 UpdateOwner _owner(_Port port, _Clock clock) => UpdateOwner(
   port: port,
-  currentVersion: '0.1.0+1',
+  currentVersion: '0.1.0',
   utcNow: () => clock.utc,
   monotonicNow: () => clock.now,
   schedule: clock.schedule,
 );
 const _changedOffer = UpdateOffer(
-  version: '0.2.0+1',
+  version: '0.2.0',
   notes: 'Изменённое предложение',
   publishedUtc: 90001,
   setupSize: 654321,
@@ -157,7 +157,7 @@ void main() {
       final clock = _Clock(), port = _LifecyclePort(_Clock());
       final owner = UpdateOwner(
         port: port,
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         schedule: clock.schedule,
       );
       port.reply = Completer<UpdateSnapshot>();
@@ -173,7 +173,7 @@ void main() {
       await Future<void>.value();
       expect(port.drains, 0);
       port.reply!.complete(
-        const UpdateSnapshot(currentVersion: '0.1.0+1', enabled: false),
+        const UpdateSnapshot(currentVersion: '0.1.0', enabled: false),
       );
       await starting;
       for (var i = 0; i < 5; i++) {
@@ -214,7 +214,7 @@ void main() {
         } else {
           reply.complete(
             const UpdateSnapshot(
-              currentVersion: '0.1.0+1',
+              currentVersion: '0.1.0',
               state: UpdateState.ready,
               enabled: false,
               offer: _offer,
@@ -253,7 +253,7 @@ void main() {
         expect(owner.snapshot.lastAttempt, clock.utc);
         delayed.complete(
           UpdateSnapshot(
-            currentVersion: '0.1.0+1',
+            currentVersion: '0.1.0',
             enabled: true,
             state: UpdateState.failed,
             lastAttempt: port.attempt,
@@ -279,7 +279,7 @@ void main() {
     expect(owner.snapshot.active, isFalse);
     delayed.complete(
       const UpdateSnapshot(
-        currentVersion: '0.1.0+1',
+        currentVersion: '0.1.0',
         state: UpdateState.failed,
         enabled: false,
         code: 'UPDATE_NOT_CONFIGURED',
@@ -338,7 +338,7 @@ void main() {
       expect(port.downloads, 0);
       delayed.complete(
         const UpdateSnapshot(
-          currentVersion: '0.1.0+1',
+          currentVersion: '0.1.0',
           state: UpdateState.checking,
           enabled: false,
         ),
@@ -394,7 +394,7 @@ void main() {
         }
         delayed.complete(
           UpdateSnapshot(
-            currentVersion: '0.1.0+1',
+            currentVersion: '0.1.0',
             enabled: defer,
             lastAttempt: port.attempt,
             deferredUntil: port.deferred,
@@ -436,7 +436,7 @@ void main() {
       expect(port.cancels, 1);
       delayed.complete(
         const UpdateSnapshot(
-          currentVersion: '0.1.0+1',
+          currentVersion: '0.1.0',
           state: UpdateState.checking,
         ),
       );
@@ -554,7 +554,7 @@ void main() {
       );
       await request;
       await draining;
-      expect(owner.snapshot.currentVersion, '0.1.0+1');
+      expect(owner.snapshot.currentVersion, '0.1.0');
       expect(clock.active, isEmpty);
       await owner.check();
       expect(port.checks, 0);
@@ -567,9 +567,9 @@ void main() {
     () {
       final map = <Object?, Object?>{
         'state': 'available',
-        'currentVersion': '0.1.0+1',
+        'currentVersion': '0.1.0',
         'enabled': true,
-        'targetVersion': '0.2.0+1',
+        'targetVersion': '0.2.0',
         'notes': 'Исправления',
         'bytes': 0,
         'publishedUTC': 90000,
@@ -579,14 +579,14 @@ void main() {
         'storeFormat': 2,
         'compatibility': 'compatible',
         'compatibilityReason': 'Совместимо',
-        'preparedVersion': '0.1.1+1',
+        'preparedVersion': '0.1.1',
         'preparedCode': 'RELEASE_REVOKED',
       };
       final decoded = UpdateSnapshot.decode(map);
       expect(decoded.offer?.publishedUtc, 90000);
       expect(decoded.offer?.setupSize, 123456);
       expect(decoded.total, isNull);
-      expect(decoded.preparedVersion, '0.1.1+1');
+      expect(decoded.preparedVersion, '0.1.1');
       expect(decoded.withEnabled(false).preparedCode, 'RELEASE_REVOKED');
       final orphan = {...map}..remove('preparedVersion');
       expect(

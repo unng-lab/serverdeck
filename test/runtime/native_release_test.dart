@@ -5,7 +5,7 @@ import 'package:serverdeck/runtime/native_platform.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('serverdeck/version-unit');
-  for (final value in <String?>['7.6.5+4321', null, '']) {
+  for (final value in <String?>['7.6.4325', null, '']) {
     test('local running release projection handles $value', () async {
       var calls = 0;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

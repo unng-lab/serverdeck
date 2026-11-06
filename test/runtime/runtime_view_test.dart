@@ -34,7 +34,7 @@ void main() {
               'exePath': 'synthetic-program',
               'userSid': 'synthetic-user',
               'logonSid': 'synthetic-logon',
-              'release': '3.2.1+987',
+              'release': '3.2.987',
             };
           });
       addTearDown(() {
@@ -58,7 +58,7 @@ void main() {
       expect(runtime.state, RuntimeState.starting);
       await platform.initialize();
       await tester.pump();
-      expect(find.text('3.2.1+987'), findsOneWidget);
+      expect(find.text('3.2.987'), findsOneWidget);
       expect(find.text('Не определена'), findsNothing);
       expect(runtime.state, RuntimeState.starting);
       expect(opening.isCompleted, isFalse);
@@ -72,7 +72,7 @@ void main() {
   testWidgets('storage error and retry expose actual owner readiness', (
     tester,
   ) async {
-    final platform = FakePlatform()..release.value = '7.6.5+4321';
+    final platform = FakePlatform()..release.value = '7.6.4325';
     final store = FakeStore()..failOpen = true;
     final runtime = RuntimeCoordinator(
       platform: platform,
@@ -85,7 +85,7 @@ void main() {
     await tester.pumpWidget(ServerDeckApp(runtime: runtime, store: store));
     expect(find.text('Данные недоступны'), findsWidgets);
     expect(find.text('Версия ServerDeck'), findsOneWidget);
-    expect(find.text('7.6.5+4321'), findsOneWidget);
+    expect(find.text('7.6.4325'), findsOneWidget);
     expect(find.text('Повторить'), findsOneWidget);
     store.failOpen = false;
     await tester.tap(find.text('Повторить'));
@@ -93,7 +93,7 @@ void main() {
     expect(runtime.acceptsOperations, isTrue);
     expect(runtime.acceptsOperations, isTrue);
     expect(find.text('Приложение готово'), findsNothing);
-    expect(find.text('7.6.5+4321'), findsOneWidget);
+    expect(find.text('7.6.4325'), findsOneWidget);
     expect(store.opens, 2);
   });
   testWidgets(
@@ -111,10 +111,10 @@ void main() {
       await tester.pumpWidget(ServerDeckApp(runtime: runtime, store: store));
       expect(find.text('Не определена'), findsOneWidget);
       expect(store.opens, 0);
-      platform.release.value = '3.2.1+987';
+      platform.release.value = '3.2.987';
       await runtime.start();
       await tester.pumpAndSettle();
-      expect(find.text('3.2.1+987'), findsOneWidget);
+      expect(find.text('3.2.987'), findsOneWidget);
       expect(find.text('Не определена'), findsNothing);
       expect(store.opens, 1);
       await tester.pumpWidget(ServerDeckApp(runtime: runtime, store: store));
@@ -124,8 +124,8 @@ void main() {
   testWidgets('runtime rebinding retires the previous version projection', (
     tester,
   ) async {
-    final first = FakePlatform()..release.value = '1.2.3+4';
-    final second = FakePlatform()..release.value = '5.6.7+8';
+    final first = FakePlatform()..release.value = '1.2.6';
+    final second = FakePlatform()..release.value = '5.6.14';
     final firstStore = FakeStore(), secondStore = FakeStore();
     final firstRuntime = RuntimeCoordinator(
       platform: first,
@@ -146,16 +146,16 @@ void main() {
     await tester.pumpWidget(
       ServerDeckApp(runtime: firstRuntime, store: firstStore),
     );
-    expect(find.text('1.2.3+4'), findsOneWidget);
+    expect(find.text('1.2.6'), findsOneWidget);
     await tester.pumpWidget(
       ServerDeckApp(runtime: secondRuntime, store: secondStore),
     );
-    expect(find.text('5.6.7+8'), findsOneWidget);
-    expect(find.text('1.2.3+4'), findsNothing);
-    first.release.value = '9.9.9+9';
+    expect(find.text('5.6.14'), findsOneWidget);
+    expect(find.text('1.2.6'), findsNothing);
+    first.release.value = '9.9.17';
     await tester.pump();
-    expect(find.text('5.6.7+8'), findsOneWidget);
-    expect(find.text('9.9.9+9'), findsNothing);
+    expect(find.text('5.6.14'), findsOneWidget);
+    expect(find.text('9.9.17'), findsNothing);
     expect(firstStore.opens, 1);
     expect(secondStore.opens, 1);
   });

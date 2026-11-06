@@ -36,15 +36,15 @@ int main() {
   if (ServerDeckClassifyHostResultV1(SD_HOST_UPDATE_RESTART) != ServerDeckHostDisposition::updateRestart) return 5;
   sd::updates::RestartIntent restart; int authorizations = 0;
   const auto authorize = [&] { ++authorizations; return true; };
-  if (restart.Request("0.2.0+1", false, authorize) || authorizations || restart.requested()) return 6;
-  if (restart.Request("0.2.0+1", true, [] { return false; }) || restart.requested()) return 7;
-  if (!restart.Request("0.2.0+1", true, authorize) || !restart.requested() || authorizations != 1) return 8;
-  if (!restart.Request("0.2.0+1", false, authorize) || authorizations != 1 || restart.Request("0.3.0+1", false, authorize)) return 9;
+  if (restart.Request("0.2.0", false, authorize) || authorizations || restart.requested()) return 6;
+  if (restart.Request("0.2.0", true, [] { return false; }) || restart.requested()) return 7;
+  if (!restart.Request("0.2.0", true, authorize) || !restart.requested() || authorizations != 1) return 8;
+  if (!restart.Request("0.2.0", false, authorize) || authorizations != 1 || restart.Request("0.3.0", false, authorize)) return 9;
   for (const auto* cancellation : {"trayExit", "osSessionEnding"}) {
     (void)cancellation;
     restart.Cancel(); restart.Cancel();
-    if (restart.requested() || restart.Request("0.2.0+1", false, authorize)) return 10;
-    if (!restart.Request("0.2.0+1", true, authorize)) return 11;
+    if (restart.requested() || restart.Request("0.2.0", false, authorize)) return 10;
+    if (!restart.Request("0.2.0", true, authorize)) return 11;
   }
   // Exercise the real thread queue with a synthetic native window teardown;
   // no product, engine, visible window, modal dialog or process is launched.

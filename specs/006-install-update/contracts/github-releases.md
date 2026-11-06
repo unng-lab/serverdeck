@@ -20,7 +20,7 @@ Generic policy codec остаётся для unit fixtures; publishable packager
 factory отвергают другие endpoints/hosts. Keys/storeFormat — прежние immutable
 inputs; developer build без policy не обращается в сеть.
 
-Stable release: tag `v<canonical major.minor.patch+build>`, draft=false,
+Stable release: tag `v<major.minor.patch>` (first `v0.1.1`), draft=false,
 prerelease=false, published_at. GitHub latest определяет предлагаемый выпуск;
 история/время asset не определяют его. Равная/меньшая версия не предлагается;
 несовместимый latest даёт RELEASE_INCOMPATIBLE без выбора более старого выпуска.
@@ -46,8 +46,9 @@ API response≤512KiB, assets≤128. Unknown fields игнорируются; du
 published_at, assets. У обязательного asset: state=uploaded, name, size,
 digest `sha256:<lowercase64hex>`, browser_download_url. Catalog size1..128KiB,
 setup1..1GiB. URL HTTPS443, github.com, именно этот repo/tag/filename; без userinfo,
-query, fragment, дополнительных segments. Tag decode ровно один раз: `+`/`%2B`
-эквивалентны; signed setup URL canonical с `%2B`. Иной repo/tag отвергается.
+query, fragment, дополнительных segments. Tag decode ровно один раз; decoded tag должен быть `v<major.minor.patch>`.
+Signed setup URL canonical с обычным тегом без percent-encoding.
+Суффиксы `+build`/prerelease и иной repo/tag отвергаются.
 
 Catalog asset проверяется по API size/digest, затем по embedded key/signature.
 API digest не заменяет подпись. Latest tag имеет ровно одну запись в каталоге;

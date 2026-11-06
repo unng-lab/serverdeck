@@ -20,11 +20,11 @@ final class _Port implements UpdatePort {
   Future<UpdateSnapshot> snapshot() async {
     reads++;
     return const UpdateSnapshot(
-      currentVersion: '0.1.0+1',
+      currentVersion: '0.1.0',
       enabled: false,
       state: UpdateState.available,
       offer: UpdateOffer(
-        version: '0.2.0+1',
+        version: '0.2.0',
         notes: 'Synthetic release notes',
         publishedUtc: 1700000000,
         setupSize: 1234,
@@ -61,7 +61,7 @@ void main() {
   testWidgets('current version status is retained by the server workspace', (
     tester,
   ) async {
-    final platform = FakePlatform()..release.value = '7.6.5+4321';
+    final platform = FakePlatform()..release.value = '7.6.4325';
     final store = FakeStore();
     final runtime = RuntimeCoordinator(
       platform: platform,
@@ -102,10 +102,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Версия ServerDeck'), findsOneWidget);
-      expect(find.text('7.6.5+4321'), findsOneWidget);
+      expect(find.text('7.6.4325'), findsOneWidget);
       await tester.tap(find.text('Synthetic server'));
       await tester.pumpAndSettle();
-      expect(find.text('7.6.5+4321'), findsOneWidget);
+      expect(find.text('7.6.4325'), findsOneWidget);
       expect(store.opens, 1);
       expect(h.sessions, isEmpty);
     } finally {
@@ -128,7 +128,7 @@ void main() {
         poll: false,
       );
       final port = _Port();
-      final updates = UpdateOwner(port: port, currentVersion: '0.1.0+1');
+      final updates = UpdateOwner(port: port, currentVersion: '0.1.0');
       addTearDown(settings.dispose);
       addTearDown(updates.dispose);
       try {
@@ -162,10 +162,10 @@ void main() {
   testWidgets(
     'global updates start only after storage readiness and retire nested consent',
     (tester) async {
-      final platform = FakePlatform()..release.value = '7.6.5+4321';
+      final platform = FakePlatform()..release.value = '7.6.4325';
       final store = FakeStore()..failOpen = true;
       final port = _Port();
-      final updates = UpdateOwner(port: port, currentVersion: '0.1.0+1');
+      final updates = UpdateOwner(port: port, currentVersion: '0.1.0');
       final runtime = RuntimeCoordinator(
         platform: platform,
         store: store,
@@ -181,17 +181,17 @@ void main() {
         ),
       );
       expect(port.reads, 0);
-      expect(find.text('7.6.5+4321'), findsOneWidget);
+      expect(find.text('7.6.4325'), findsOneWidget);
       expect(find.text('Настройки приложения'), findsNothing);
       store.failOpen = false;
       await tester.tap(find.text('Повторить'));
       await tester.pumpAndSettle();
       expect(port.reads, 1);
-      expect(find.text('7.6.5+4321'), findsOneWidget);
-      expect(find.text('0.2.0+1'), findsNothing);
+      expect(find.text('7.6.4325'), findsOneWidget);
+      expect(find.text('0.2.0'), findsNothing);
       await tester.tap(find.text('Настройки приложения'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('0.1.0+1'), findsWidgets);
+      expect(find.textContaining('0.1.0'), findsWidgets);
       expect(find.text('Synthetic release notes'), findsOneWidget);
       await tester.ensureVisible(find.text('Подготовить обновление'));
       await tester.tap(find.text('Подготовить обновление'));

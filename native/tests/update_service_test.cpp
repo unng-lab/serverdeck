@@ -34,7 +34,7 @@ struct Signer {
     return "SDCATALOG001\nunit\n" + Hex(signature, 64) + '\n' + bytes;
   }
 };
-std::string Record(const char* version = "0.2.0+1", const char* abi = "1") {
+std::string Record(const char* version = "0.2.0", const char* abi = "1") {
   return std::string(version) + "\nwindows-x64\n" + abi + "\n2\n99900\n12\n" + std::string(64, 'a') +
     "\n10\n" + std::string(64, 'b') + "\nhttps://assets.example/setup.exe\n0KLQtdGB0YI=\n";
 }
@@ -126,7 +126,7 @@ int main() {
   try {
     Store store;
     Signer signer; const auto policy = signer.Policy();
-    const auto current = ParseVersion("0.1.0+1");
+    const auto current = ParseVersion("0.1.0");
     std::atomic<uint64_t> now{100000}; const auto clock = [&] { return now.load(); };
     auto pref = Preferences{false, 10, 20, 30}; const auto encoded = EncodePreferences(pref);
     Require(DecodePreferences(encoded).lastSuccess == 20 && !DecodePreferences(encoded).enabled, "preference roundtrip");
@@ -161,7 +161,7 @@ int main() {
       UpdateService service(policy, current, store, &source, clock);
       service.SetEnabled(false); Require(service.Check(), "manual disabled refused"); service.Drain();
       auto result = service.Read();
-      Require(result.state == "available" && result.offer && result.offer->version.text == "0.2.0+1", "offer");
+      Require(result.state == "available" && result.offer && result.offer->version.text == "0.2.0", "offer");
       Require(!result.preferences.enabled && result.preferences.lastAttempt == now && result.preferences.lastSuccess == now, "manual changes enabled/timestamps");
       Require(result.offer->published == 99900 && result.offer->setupSize == 12 && result.offer->platform == "windows-x64" &&
         result.offer->bootstrapAbi == 1 && result.offer->storeFormat == 2 && !result.total && result.bytes == 0, "signed offer fields");
@@ -170,7 +170,7 @@ int main() {
       Require(service.Check(), "manual deferral refused"); service.Drain();
       source.bytes = signer.Catalog("", 0); Require(service.Check(), "empty request"); service.Drain();
       Require(service.Read().state == "current" && !service.Read().offer, "signed empty not current");
-      ++now; source.bytes = signer.Catalog(Record("0.3.0+1", "2")); service.Check(); service.Drain();
+      ++now; source.bytes = signer.Catalog(Record("0.3.0", "2")); service.Check(); service.Drain();
       Require(service.Read().code == "RELEASE_INCOMPATIBLE" && !service.Read().offer &&
         service.Read().preferences.lastSuccess == 100000 && store.value.lastSuccess == 100000, "incompatible changed last success");
       source.bytes = "malformed response"; ++now; service.Check(); service.Drain();
@@ -194,14 +194,14 @@ int main() {
       Require(Revalidate(source, policy, consent, cancelled, clock).version == consent.version && source.requests == 1 &&
         source.validatedVersion == consent.version.text, "fresh exact-target apply request missing");
       source.bytes = signer.Catalog("", 0); Reject([&] { Revalidate(source, policy, consent, cancelled, clock); }, "RELEASE_REVOKED");
-      source.bytes = signer.Catalog(Record("0.3.0+1") + Record(), 2);
+      source.bytes = signer.Catalog(Record("0.3.0") + Record(), 2);
       Require(Revalidate(source, policy, consent, cancelled, clock).version == consent.version, "consent retargeted");
       source.beforeReturn = [&] { now = 100101; };
       Reject([&] { Revalidate(source, policy, consent, cancelled, clock); }, "SOURCE_EXPIRED");
       source.beforeReturn = {}; now = 100001;
       source.failure = "NETWORK_UNAVAILABLE"; Reject([&] { Revalidate(source, policy, consent, cancelled, clock); }, "NETWORK_UNAVAILABLE");
     }
-    const auto oldCatalog = signer.Catalog(Record()), newCatalog = signer.Catalog(Record("0.3.0+1") + Record(), 2);
+    const auto oldCatalog = signer.Catalog(Record()), newCatalog = signer.Catalog(Record("0.3.0") + Record(), 2);
     const auto oldRelease = ParseCatalog(oldCatalog, policy, now).releases.front();
     {
       Backend backend; backend.persisted = Pending(oldRelease, oldCatalog); backend.notice = {oldRelease.version.text, "NETWORK_UNAVAILABLE"};
@@ -219,17 +219,17 @@ int main() {
       UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); service.Drain();
       Require(service.Read().state == "ready" && source.requests == 0 && backend.downloads == 0, "restore started network/download");
       service.Check(); service.Drain();
-      Require(service.Read().offer->version.text == "0.3.0+1" && service.Read().preparedVersion == oldRelease.version.text && backend.downloads == 0,
+      Require(service.Read().offer->version.text == "0.3.0" && service.Read().preparedVersion == oldRelease.version.text && backend.downloads == 0,
         "check lost prior ready or downloaded without consent");
-      Reject([&] { service.Download("0.4.0+1"); }, "SOURCE_CHANGED");
-      service.Download("0.3.0+1"); backend.Entered();
+      Reject([&] { service.Download("0.4.0"); }, "SOURCE_CHANGED");
+      service.Download("0.3.0"); backend.Entered();
       Require(!service.AcceptRestart(oldRelease.version.text), "restart during active replacement");
       Require(service.Read().state == "verifying" && !service.Read().total && !service.TryDrain(), "progress/drain state");
       Reject([&] { service.Check(); }, "BUSY");
       service.Cancel(); backend.Release(); service.Drain();
       Require(service.Read().code == "CANCELLED" && backend.persisted->release.version == oldRelease.version &&
         service.Read().preparedVersion == oldRelease.version.text && backend.downloads == 1, "cancel consumed prior readiness");
-      Require(!service.AcceptRestart("0.4.0+1"), "wrong restart target accepted");
+      Require(!service.AcceptRestart("0.4.0"), "wrong restart target accepted");
       Require(service.AcceptRestart(oldRelease.version.text), "cancelled replacement blocked retained ready");
       Require(!service.AcceptRestart(oldRelease.version.text), "stopped service accepted again");
       Reject([&] { service.Check(); }, "CANCELLED");
@@ -238,7 +238,7 @@ int main() {
       Backend backend; backend.persisted = Pending(oldRelease, oldCatalog); backend.downloadFailure = "NETWORK_UNAVAILABLE";
       Artifacts artifacts; Source source; source.bytes = newCatalog;
       UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); service.Drain();
-      service.Check(); service.Drain(); service.Download("0.3.0+1"); service.Drain();
+      service.Check(); service.Drain(); service.Download("0.3.0"); service.Drain();
       Require(service.Read().state == "failed" && service.Read().code == "NETWORK_UNAVAILABLE" &&
         service.Read().preparedCode.empty() && service.AcceptRestart(oldRelease.version.text), "failed replacement blocked retained ready");
     }
@@ -261,7 +261,7 @@ int main() {
     }
     {
       Backend backend; backend.persisted = Pending(oldRelease, oldCatalog); Artifacts artifacts;
-      Source source; source.bytes = signer.Catalog(Record("0.3.0+1"));
+      Source source; source.bytes = signer.Catalog(Record("0.3.0"));
       UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); service.Drain();
       service.Check(); service.Drain();
       Require(service.Read().state == "available" && service.Read().preparedCode == "RELEASE_REVOKED", "replacement hid revocation");

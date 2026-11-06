@@ -18,11 +18,11 @@ void main() {
         return true;
       });
       final platform = NativePlatform(epoch: 'unit-owner', channel: channel);
-      expect(await platform.requestUpdateRestart('0.1.0+4'), isTrue);
+      expect(await platform.requestUpdateRestart('0.1.1'), isTrue);
       expect(calls.single.method, 'runtime.requestUpdateRestart');
       expect(calls.single.arguments, {
         'ownerEpoch': 'unit-owner',
-        'version': '0.1.0+4',
+        'version': '0.1.1',
       });
       expect(
         PlatformSnapshot.decode({
@@ -78,7 +78,7 @@ void main() {
       if (call.method == 'updates.snapshot') {
         return {
           'state': 'current',
-          'currentVersion': '0.1.0+1',
+          'currentVersion': '0.1.0',
           'enabled': false,
           'bytes': 0,
         };
@@ -92,7 +92,7 @@ void main() {
     );
     expect((await port.snapshot()).state, UpdateState.current);
     expect(await port.check(), isTrue);
-    expect(await port.download('0.2.0+1'), isTrue);
+    expect(await port.download('0.2.0'), isTrue);
     await port.cancel();
     await port.setEnabled(false);
     await port.defer();
@@ -107,7 +107,7 @@ void main() {
     expect(calls.map((c) => c.arguments), [
       {'ownerEpoch': 'unit-owner'},
       {'ownerEpoch': 'unit-owner'},
-      {'ownerEpoch': 'unit-owner', 'version': '0.2.0+1'},
+      {'ownerEpoch': 'unit-owner', 'version': '0.2.0'},
       {'ownerEpoch': 'unit-owner'},
       {'ownerEpoch': 'unit-owner', 'enabled': false},
       {'ownerEpoch': 'unit-owner'},
@@ -127,7 +127,7 @@ void main() {
         (_) async => throw PlatformException(code: 'STALE_EPOCH'),
       );
       await expectLater(
-        port.download('0.2.0+1'),
+        port.download('0.2.0'),
         throwsA(
           isA<PlatformException>().having((e) => e.code, 'code', 'STALE_EPOCH'),
         ),

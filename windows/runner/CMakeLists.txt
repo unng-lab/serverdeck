@@ -43,6 +43,20 @@ set_target_properties(${BINARY_NAME} PROPERTIES
   OUTPUT_NAME "serverdeck_host"
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
+# Product identity comes from pubspec; Flutter synthesizes a +1 build suffix
+# when none is declared. Do not expose that synthetic suffix as release identity.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../pubspec.yaml" SERVERDECK_VERSION_LINE REGEX "^version: ")
+string(REGEX REPLACE "^version: +" "" SERVERDECK_VERSION "${SERVERDECK_VERSION_LINE}")
+if(NOT SERVERDECK_VERSION MATCHES "^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$")
+  message(FATAL_ERROR "Product version must be stable major.minor.patch")
+endif()
+set(FLUTTER_VERSION "${SERVERDECK_VERSION}")
+set(FLUTTER_VERSION_MAJOR "${CMAKE_MATCH_1}")
+set(FLUTTER_VERSION_MINOR "${CMAKE_MATCH_2}")
+set(FLUTTER_VERSION_PATCH "${CMAKE_MATCH_3}")
+set(FLUTTER_VERSION_BUILD 0)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../../pubspec.yaml")
+
 # Add preprocessor definitions for the build version.
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MAJOR=${FLUTTER_VERSION_MAJOR}")

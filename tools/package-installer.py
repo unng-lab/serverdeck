@@ -24,9 +24,9 @@ GITHUB_HOSTS = {'github.com', 'release-assets.githubusercontent.com',
 
 def version_tuple(value):
     if not isinstance(value, str) or not re.fullmatch(
-            r'(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\+(0|[1-9][0-9]{0,4})', value):
+            r'(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})', value):
         raise ValueError('Invalid canonical version')
-    parts = tuple(int(part) for part in re.split(r'[.+]', value))
+    parts = tuple(int(part) for part in value.split('.'))
     if any(part > 65535 for part in parts):
         raise ValueError('Version exceeds supported range')
     return parts

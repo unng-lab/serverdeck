@@ -21,6 +21,10 @@ try {
     $storeMatch = [regex]::Match((Get-Content -Raw lib/storage/store_manifest.dart), 'const currentStorageFormat = ([0-9]+);')
     if (!$versionMatch.Success -or !$storeMatch.Success) { throw 'Missing release version/storage format' }
     $version = $versionMatch.Groups[1].Value
+    if ($version -cnotmatch '^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$' -or
+        @($version.Split('.') | Where-Object { [int]$_ -gt 65535 }).Count) {
+        throw 'New releases require stable major.minor.patch (0..65535), without build metadata or prerelease suffix'
+    }
     $storeFormat = $storeMatch.Groups[1].Value
     $evidence = Join-Path (Get-Location) 'output/release-evidence'
     New-Item -ItemType Directory -Force -Path $evidence | Out-Null

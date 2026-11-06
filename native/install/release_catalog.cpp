@@ -137,9 +137,8 @@ class Lines {
 Version ParseVersion(const std::string& value) {
   Version version;
   size_t start = 0;
-  for (size_t i = 0; i < 4; ++i) {
-    const auto separator = i < 2 ? '.' : '+';
-    const auto end = i == 3 ? value.size() : value.find(separator, start);
+  for (size_t i = 0; i < 3; ++i) {
+    const auto end = i == 2 ? value.size() : value.find('.', start);
     if (end == std::string::npos || end <= start || end - start > 5) Invalid();
     version.parts[i] = static_cast<uint16_t>(Number(value.substr(start, end - start), 65535));
     start = end + 1;
