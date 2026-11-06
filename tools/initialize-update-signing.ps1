@@ -31,11 +31,24 @@ public static class ServerDeckPublisherAcl {
     $existing = if (Test-Path -LiteralPath $Policy) { Get-Content -LiteralPath $Policy -Raw | ConvertFrom-Json } else { $null }
     if ($existing -and !(Test-Path -LiteralPath $privateFile)) { throw 'Restore original publisher key; refusing trust replacement' }
     $phase = 'directory'
-    if (!(Test-Path -LiteralPath $KeyDirectory)) { New-Item -ItemType Directory -Force -Path $KeyDirectory | Out-Null }
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
     $systemSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+    if (!(Test-Path -LiteralPath $KeyDirectory)) {
+        $phase = 'directory-create'
+        # Elevated Windows tokens may default newly created objects to a group
+        # owner. Bind the user and private DACL at creation, not after key writes.
+        $newDirectoryAcl = [Security.AccessControl.DirectorySecurity]::new()
+        $newDirectoryAcl.SetOwner($sid)
+        $newDirectoryAcl.SetAccessRuleProtection($true, $false)
+        foreach ($principal in @($sid, $systemSid)) {
+            $newDirectoryAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($principal, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+        }
+        [IO.FileSystemAclExtensions]::Create([IO.DirectoryInfo]::new([IO.Path]::GetFullPath($KeyDirectory)), $newDirectoryAcl)
+    }
+    $phase = 'directory-owner'
     $acl = Get-Acl -LiteralPath $KeyDirectory
     if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'Foreign publisher directory' }
+    $phase = 'directory-acl'
     $acl.SetAccessRuleProtection($true, $false)
     foreach ($rule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($rule) }
     foreach ($principal in @($sid, $systemSid)) {
@@ -47,7 +60,15 @@ public static class ServerDeckPublisherAcl {
     if (Test-Path -LiteralPath $privateFile) {
         $signer.ImportFromPem([IO.File]::ReadAllText($privateFile))
     } else {
-        $stream = [IO.File]::Open($privateFile, 'CreateNew', 'Write', 'None')
+        $newFileAcl = [Security.AccessControl.FileSecurity]::new()
+        $newFileAcl.SetOwner($sid)
+        $newFileAcl.SetAccessRuleProtection($true, $false)
+        foreach ($principal in @($sid, $systemSid)) {
+            $newFileAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($principal, 'FullControl', 'Allow'))
+        }
+        $stream = [IO.FileSystemAclExtensions]::Create([IO.FileInfo]::new([IO.Path]::GetFullPath($privateFile)),
+            [IO.FileMode]::CreateNew, [Security.AccessControl.FileSystemRights]::Write,
+            [IO.FileShare]::None, 4096, [IO.FileOptions]::None, $newFileAcl)
         try {
             $bytes = [Text.Encoding]::ASCII.GetBytes($signer.ExportPkcs8PrivateKeyPem())
             $stream.Write($bytes); $stream.Flush($true)

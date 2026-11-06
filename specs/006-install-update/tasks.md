@@ -224,3 +224,9 @@ T028/T029 выполняются вместе с соответствующим�
   directory в synthetic temp inputs; локальные23 Python units проходят, remote
   [unit workflow](https://github.com/unng-lab/serverdeck/actions/runs/42222799833)
   не прошёл. Не ослаблять owner/DACL/trust guards; не добавлять publication tests.
+
+  Реализация T093: новые каталог и PEM создаются с явным user SID и защищённым
+  user+SYSTEM DACL, без зависимости от default owner токена; существующие чужие
+  owner не принимаются. Synthetic units расширены проверками точных owner/ACL
+  и отказа foreign directory без создания ключа. Локально24 tooling units проходят;
+  remote CI проверяется после push, ранее упавший run не объявляется успешным.

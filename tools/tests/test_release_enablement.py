@@ -111,11 +111,43 @@ $public = [IO.File]::ReadAllText($policy)
 & {quote(TOOLS / 'initialize-update-signing.ps1')} -Policy $policy -KeyDirectory $keys -KeyId unit
 if ($LASTEXITCODE -or [IO.File]::ReadAllText($policy) -cne $public -or
     [Convert]::ToHexString([IO.File]::ReadAllBytes((Join-Path $keys 'unit.pem'))) -cne [Convert]::ToHexString($first)) {{ throw 'Key rotated' }}
-$acl = Get-Acl -LiteralPath (Join-Path $keys 'unit.pem')
-if (!$acl.AreAccessRulesProtected -or $acl.Access.Count -ne 2) {{ throw 'Private ACL' }}
+$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+foreach ($path in @($keys, (Join-Path $keys 'unit.pem'))) {{
+    $acl = Get-Acl -LiteralPath $path
+    if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -cne $sid.Value -or
+        !$acl.AreAccessRulesProtected -or $acl.Access.Count -ne 2) {{ throw 'Private owner/ACL' }}
+    $principals = @($acl.Access | ForEach-Object {{
+        if ($_.IsInherited -or $_.AccessControlType -ne 'Allow' -or $_.FileSystemRights -ne 'FullControl') {{ throw 'Private ACL rights' }}
+        $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+    }})
+    if ($sid.Value -cnotin $principals -or 'S-1-5-18' -cnotin $principals) {{ throw 'Private ACL principals' }}
+}}
 Remove-Item -LiteralPath (Join-Path $keys 'unit.pem')
 & {quote(TOOLS / 'initialize-update-signing.ps1')} -Policy $policy -KeyDirectory $keys -KeyId unit 2>$null
 if (!$LASTEXITCODE -or (Test-Path -LiteralPath (Join-Path $keys 'unit.pem')) -or [IO.File]::ReadAllText($policy) -cne $public) {{ throw 'Lost key silently replaced' }}
+exit 0
+"""
+            result = subprocess.run(['pwsh', '-NoProfile', '-Command', script], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn('PRIVATE KEY', result.stdout + result.stderr)
+
+    def test_existing_foreign_directory_is_rejected_before_creating_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            quote = lambda p: "'" + str(p).replace("'", "''") + "'"
+            script = f"""
+$ErrorActionPreference = 'Stop'
+$root = {quote(directory)}
+$policy = Join-Path $root 'public.json'; $keys = Join-Path $root 'keys'
+New-Item -ItemType Directory -Path $keys | Out-Null
+function global:Get-Acl {{
+    param([string]$LiteralPath)
+    $acl = Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $LiteralPath
+    $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-18'))
+    return $acl
+}}
+& {quote(TOOLS / 'initialize-update-signing.ps1')} -Policy $policy -KeyDirectory $keys -KeyId unit 2>$null
+if (!$LASTEXITCODE -or (Test-Path -LiteralPath (Join-Path $keys 'unit.pem')) -or
+    (Test-Path -LiteralPath $policy)) {{ throw 'Foreign publisher directory accepted or modified' }}
 exit 0
 """
             result = subprocess.run(['pwsh', '-NoProfile', '-Command', script], capture_output=True, text=True)
