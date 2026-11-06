@@ -183,6 +183,6 @@ T044 acceptance уточнено review: fresh CURRENT содержит publicat
 
 ## Patch release 0.2.1 — 2026-11-07
 
-- [ ] T050 Revalidate and independently review existing T048/T049 startup-marker fix on the current console baseline; include it in the user-requested0.2.1 commit/tag and record current checks/release evidence without overwriting historical results.
+- [X] T050 Revalidate and independently review existing T048/T049 startup-marker fix on the current console baseline; include it in the user-requested0.2.1 commit/tag and record current checks/release evidence without overwriting historical results.
 
 - [X] T051 Reject UTF8-BOM lookalikes by comparing native marker bytes without decoder normalization; regressions for running/clean BOM in both first preflight and pending publication. Rerun required checks/build and a fresh independent review (FR-221/222; confirmed patch review finding).
