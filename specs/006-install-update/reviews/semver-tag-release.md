@@ -37,3 +37,33 @@ SERVERDECK_UPDATE_SIGNING_KEY is absent at review time. Existing matching local 
 is available; its transfer to GitHub awaits explicit user authorization. Workflow
 fails closed if the secret is missing/wrong. No secret upload or remote publication
 was part of these checks. Unit/build results do not prove installation on a clean OS.
+
+
+## Actual tag release completion
+
+User authorized storing existing key in repository Actions secrets; secret name
+SERVERDECK_UPDATE_SIGNING_KEY verified present. Source commit f41da826 was pushed.
+First actual tag run42222319125 failed before publication: fresh Flutter tool
+bootstrap emitted stdout before machine JSON. T092 and commit1eac6aba add a checked
+human version call before the separate machine query and exit check. Local build,
+23 Python units, link/diff checks passed; fresh independent read-only review found
+no findings. No application behavior changed in this build-tool correction.
+
+The still-unpublished tag was advanced once to1eac6aba; no existing public release
+or assets were replaced. [Run42222799918](https://github.com/unng-lab/serverdeck/actions/runs/42222799918)
+completed success and published [v0.1.1](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.1)
+on2026-11-06. Published stable latest, not draft/prerelease. Two uploaded assets:
+ServerDeckSetup.exe57778688bytes, SHA256
+2428924d55d71a0a24bfc762e706f744e83e7a35f356fdd8636448cd8c8d97b6;
+serverdeck-update-catalog.txt1061bytes, SHA256
+5826854e0f7d33e2ad7c30c0cd6b953e0a9d6daebc1da1d83b075a1e3e8dabe6.
+Read-only verification of downloaded catalog confirmed API digest, signature against
+pinned public root, single0.1.1 record and setup size/hash/URL matching published API.
+No installed product was executed; this was the requested real release, not a test.
+
+Separate ordinary [unit run42222799833](https://github.com/unng-lab/serverdeck/actions/runs/42222799833)
+failed two existing publisher bootstrap units on windows-2022 during directory
+initialization. Its775 Flutter and2 MCP tests passed. Local23 tooling tests passed;
+remote tooling suite did not. The masked phase error does not establish the exact
+cause. T093 records investigation without weakening ownership/trust guards.
+The release workflow itself succeeded; whole-repository CI is not all green.

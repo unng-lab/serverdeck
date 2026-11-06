@@ -3,7 +3,7 @@
 **Feature**: `006-install-update`
 **Feature Branch**: текущая рабочая ветка; отдельная ветка не создавалась.
 **Created**: 2026-11-04
-**Status**: Реализовано FR-601–623; проверки, независимое ревью/fixloop и convergence завершены. Stable GitHub Release0.1.0+4 опубликован 2026-11-06; evidence в [reviews/update-restart.md](reviews/update-restart.md).
+**Status**: Реализовано FR-601–623; проверки, независимое ревью/fixloop и convergence завершены. Stable GitHub Release0.1.1 опубликован по тегу 2026-11-06; evidence и ограничения remote unit checks в [reviews/semver-tag-release.md](reviews/semver-tag-release.md).
 **Input**: Выделить установку и обновление программы в отдельную спецификацию.
 Пользователь выбрал проверку новой версии и установку по своему подтверждению.
 

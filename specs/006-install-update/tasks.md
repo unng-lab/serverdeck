@@ -210,7 +210,17 @@ T028/T029 выполняются вместе с соответствующим�
 - [X] T091 Выполнить обязательные format/analyze/Flutter/boundaries/Python/native,
   build/resource/link checks; независимое review/fix loop. Evidence: [reviews/semver-tag-release.md](reviews/semver-tag-release.md). Публикация не запускалась.
 
-- [ ] T092 Исправить первый запуск fresh Flutter SDK: bootstrap tool/pub output
+- [X] T092 Исправить первый запуск fresh Flutter SDK: bootstrap tool/pub output
   MUST завершиться отдельным вызовом до чтения `flutter --version --machine` JSON.
   Пересобрать installer, проверить Python units и links, выполнить fresh independent
   review; повторить выпуск ещё не опубликованного тега0.1.1 (FR-625).
+
+  Завершено: исправление прошло fresh independent review без замечаний;
+  [release workflow](https://github.com/unng-lab/serverdeck/actions/runs/42222799918)
+  завершён success, [v0.1.1](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.1)
+  опубликован, подпись/digests/assets проверены чтением результата.
+- [ ] T093 Исследовать и исправить два отказа существующих PublisherBootstrapTest
+  на GitHub windows-2022: initialize-update-signing.ps1 возвращает ошибку фазы
+  directory в synthetic temp inputs; локальные23 Python units проходят, remote
+  [unit workflow](https://github.com/unng-lab/serverdeck/actions/runs/42222799833)
+  не прошёл. Не ослаблять owner/DACL/trust guards; не добавлять publication tests.
