@@ -53,3 +53,13 @@ local signing key, publishable defaults/CI, audited signed metadata and bootstra
 See [actual configured artifact and independent review](update-enablement.md).
 This supersedes the earlier statement that delivery here is only a developer build.
 Publication of the prepared public assets remains a separate operator action.
+
+
+## Main-window version — 2026-11-06
+
+FR620/AC618/SC606 and T077–081 completed through specify/clarify/plan/checklist/tasks/
+analysis/implementation, independent review/fixloop and clean convergence. Existing
+spec quality16/safety14 plus version-quality8 all pass. Full running +build is now a
+local observable status projection independent of pending database open; no shared
+component API, native wire or database schema change. Release0.1.0+3 is published and preserves old2 assets
+and the exact signed old record. [Evidence and review](main-version.md).

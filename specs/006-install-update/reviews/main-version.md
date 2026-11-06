@@ -43,3 +43,23 @@ trust; this operational observation is not part of unit acceptance.
 Final convergence assesses actual source against006 spec/plan/tasks/constitution;
 no code gaps remain. Public delivery and final T080 closure follow the clean review;
 older release assets are immutable and the publisher private key stays local.
+
+
+## Final convergence and delivery
+
+Converge inspected current spec/plan/tasks/constitution and actual source: no remaining
+missing/partial/contradicts/unrequested code findings. No new convergence task/header
+was appended; tasks.md stayed byte-identical during assessment (SHA256
+2B158F044BBC213A203F99A3C0E51691E5774F9D2EF41440516B3C544387A379).
+T080 was then checked only after the actual public release completed. All81 tasks
+are checked; requirements16/safety14/version8 checklists have no open items.
+
+Code committed/pushed as46b91f1754244e5874d5d3d711ab0b2c4d00e977.
+Published stable [v0.1.0+3](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.0%2B3)
+with exactly setup and signed catalog, after draft asset size/digest verification.
+Anonymous latest with actual client API headers returnsv0.1.0+3. Previousv2 setup
+SHA2567459870343b1e51005206f63c7254bca79fd03bc7f2009fa8a35fde18d323bd0 and
+catalog SHA256c0ff43b0d2c01063bdace5464c64dc11a606fa4a2788e34b85d67581f976041b
+are unchanged. Private key was not uploaded. Public API/manifest checks are delivery
+observations, not product/installation/integration tests. User's installedv2 can
+requestv3 through existing confirmation/download/next-launch update flow.
