@@ -63,3 +63,16 @@ spec quality16/safety14 plus version-quality8 all pass. Full running +build is n
 local observable status projection independent of pending database open; no shared
 component API, native wire or database schema change. Release0.1.0+3 is published and preserves old2 assets
 and the exact signed old record. [Evidence and review](main-version.md).
+
+## Direct updates and confirmed restart — 2026-11-06
+
+FR621–623/AC619–620/SC607 and T082–088 completed through Spec Kit, constitution4.0.0
+narrow update restart exception, readiness review, implementation and review/fix loop.
+New main entry replaces ordinary ready label, preserves current running version and
+opens updates directly. Exact prepared-version confirmation uses shared safe shutdown;
+continuous owner handoff and existing fresh checks apply before canonical restart.
+WM_QUIT retry defect found by independent review was fixed and re-reviewed clean.
+Flutter775/native19/Python22 pass; format/analyze/boundaries/links and full publishable
+resource/import build pass. Stable0.1.0+4 published with prior releases/records preserved.
+Convergence clean, all88 tasks closed; no product launch or integration/design tests.
+[Detailed evidence](update-restart.md).

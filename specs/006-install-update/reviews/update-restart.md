@@ -55,3 +55,21 @@ closure PASS; setup SHA256482a40e881ae2da8d92ba9eb47f5a2024cc189c7cb7a7331a6642e
 Final catalog SHA256d9c4dae1e1337555bfd6f71062f5a44597c576ac439567b8e1b7fb77c7a042c6;
 prepare-release validated previous signature/key and retained prior immutable records.
 Public release is still pending; these are local artifact facts, not installation proof.
+
+## Publication and convergence
+
+[Stable v0.1.0+4](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.0%2B4)
+ID436385247, source commit51259999a9dc5128142297a28b0283918f2c4300. Draft had exactly
+two uploaded public assets; sizes/digests matched local audited setup and signed catalog
+before publishing. Setup57,778,688bytes; catalog3,703bytes, protocol2/3 immutable records.
+Anonymous latest with real client headers returns this stable release; downloaded public
+catalog matches exact local bytes. Previous +2/+3 asset digests remained unchanged.
+Private signing key never uploaded. These are publication metadata observations,
+not product/OS integration tests or proof this version is installed on the user's PC.
+
+Converge assessed current code against spec/plan/tasks/constitution after implementation;
+no unbuilt work.88tasks complete,0open. tasks.md byte-identical during converge
+SHA256da75c0f388ffdaf19ddb025e0af146af510e8d1504e1a55bba302122ce06630a.
+Specify/clarify/constitution/plan/checklist/tasks/analyze/implement/review-fix/converge
+finished; no hooks configured. T087/T088 closed only after completed clean review,
+corrected build, successful public release and anonymous metadata verification.
