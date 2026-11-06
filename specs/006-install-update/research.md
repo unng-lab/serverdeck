@@ -63,3 +63,14 @@ trusted installer. Конкретные production inputs — среда сбо�
 **Decision**: synthetic unit ports и temporary-file native tests, build/resource/import
 audit; не запускать продукт или live Isar из тестов. Это не доказательство интеграции
 на чистой ОС и не отложенный VM/e2e/smoke gate.
+
+
+## Main-window current version decision — 2026-11-06
+
+Decision: reuse native initialize.release via a nullable read-only platform getter,
+then compose C18/C10 inside existing C17 status. Rationale: the build already supplies
+one authoritative local version; no package-info dependency, extra channel request,
+DB dependency or cached UI/update-offer version is needed. Alternatives rejected:
+GitHub latest (target is not installed), stored settings (stale), new build-time Dart
+constant (duplicates existing native metadata), new shared component (C18 suffices).
+Before native context exists show unknown, preserve existing error/retry behavior.

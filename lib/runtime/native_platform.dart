@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 import '../updates/update_owner.dart';
 
@@ -95,7 +96,7 @@ class PlatformContext {
     required this.exePath,
     required this.userSid,
     required this.logonSid,
-    this.release = '0.1.0',
+    this.release = '',
   });
   final String epoch,
       dataRoot,
@@ -107,6 +108,7 @@ class PlatformContext {
 }
 
 abstract interface class RuntimePlatform {
+  ValueListenable<String?> get release;
   Stream<PlatformEvent> get events;
   Future<PlatformSnapshot> snapshot({String? runtimeState});
   Future<bool> hideToTray();
@@ -126,7 +128,11 @@ class NativePlatform implements RuntimePlatform {
   final String epoch;
   final _events = StreamController<PlatformEvent>.broadcast();
   PlatformContext? _context;
+  final _release = ValueNotifier<String?>(null);
   PlatformContext get context => _context!;
+  @override
+  ValueListenable<String?> get release => _release;
+
   @override
   Stream<PlatformEvent> get events => _events.stream;
 
@@ -142,8 +148,9 @@ class NativePlatform implements RuntimePlatform {
       exePath: value['exePath'] as String,
       userSid: value['userSid'] as String,
       logonSid: value['logonSid'] as String,
-      release: value['release'] as String? ?? '0.1.0',
+      release: value['release'] as String? ?? '',
     );
+    _release.value = context.release.isEmpty ? null : context.release;
     return context;
   }
 

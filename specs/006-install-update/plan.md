@@ -142,3 +142,16 @@ never rotates deployed trust automatically. prepare-release verifies final audit
 installer/resources, matching key and previous signed records before local signing.
 No private CI secret upload or release publication is needed for building; publishing
 prepared public assets remains a distinct authorized operator action.
+
+Main-window version amendment: lib/runtime/native_platform.dart adds nullable
+RuntimePlatform.release implemented from initialized local context; no guessed missing
+release. RuntimeView reuses C18/C10 in C17 status for both profile and readiness paths.
+Only test/runtime/fakes.dart implements the other RuntimePlatform; it receives a fake
+release. Functional widget tests cover full version, unknown, storage failure/retry,
+runtime rebinding and profile workspace; no shared/design/runtime protocol changes.
+Version0.1.0+3 is a new immutable release; prepare-release verifies and preserves the
+signed v0.1.0+2 catalog record. No schema/dependency/key/root/automatic-exit changes.
+
+Review correction: release is a read-only ValueListenable<String?>, published at
+native initialize completion independently of pending DB open; RuntimeView observes
+it with ValueListenableBuilder. No new wire events/sequence values or extra calls.

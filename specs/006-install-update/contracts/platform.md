@@ -86,3 +86,28 @@ SOURCE_EXPIRED, SOURCE_CHANGED, RELEASE_REVOKED, RELEASE_INCOMPATIBLE, INVALID_C
 INVALID_ARTIFACT, DISK_SPACE, OWNER_RUNNING, BUSY, STORAGE_IO, RECOVERY_REQUIRED,
 UNINSTALL_PARTIAL. Every failure preserves working old owner/data and distinguishes
 failure from proved current version. No error replaces data with an empty database.
+
+
+## Main-window installed version — FR-620
+
+Existing native initialize.release contains the canonical version of the running
+build (including +build); its value is independent of database and GitHub state.
+RuntimePlatform exposes release as ValueListenable<String?> with read-only nullable
+value. NativePlatform publishes it immediately after initialize context arrives,
+before monitoring/data/feature initialization completes. RuntimeView uses
+ValueListenableBuilder so an unfinished store.open cannot delay the known version.
+NativePlatform reads it from
+its initialized local PlatformContext; before initialize, or if release is missing/
+empty, it returns null. Missing initialize.release must not invent fallback0.1.0.
+Fake RuntimePlatform supplies synthetic release for functional units.
+
+RuntimeView composes existing C18 DeckKeyValue(label=«Версия ServerDeck»,
+value=release or «Не определена») with existing C10 status inside C17 status slot.
+It passes the same widget to normal profile workspace or readiness/error shell.
+No shared component API/theme/catalog change, no layout tests in feature scope.
+Source is runtime.platform.release, never update offer/prepared/snapshot version.
+Each rebuild/rebinding subscribes to current runtime metadata and detaches the old
+ValueListenable through the builder lifecycle; no extra native calls, network, timers,
+DB open or separate stored setting. Null/empty is a truthful temporary unknown state.
+Settings keep their existing signed/native current-version display; backend uses
+one build metadata source. Native wire methods/epoch/authorization unchanged.

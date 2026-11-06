@@ -172,3 +172,12 @@ T028/T029 выполняются вместе с соответствующим�
 - [X] T074 Сделать publishable стандартным профилем build-release и workflow, developer только explicit; включить public policy в app/setup, поднять build0.1.0+2 для установки поверх unconfigured0.1.0+1 (FR-601/607/618/619; AC-617).
 - [X] T075 Подготовить audited payload/signing command: exact final setup/app/policy identity, matching signing key, UTF8 notes, verified previous catalog/immutable records/version increase/bounds; сформировать локальные setup+signed catalog без private upload/publication (FR-608/618/619; AC-617).
 - [X] T076 Выполнить Python/native/Flutter/build/resource/link checks и independent review/fixloop поставки, проверить фактический publishable artifact с enabled GitHub policy; обновить evidence и завершение amendment (AC-617).
+
+## Phase 13: Main-window current version
+
+- [X] T077 [US2] Уточнить FR-620/AC-618/SC-606, source/unknown/rebinding/C18/C10/C17 contracts и reviewer checklist; specify/clarify/plan/tasks/analyze, links и independent readiness review до кода; evidence reviews/main-version.md.
+- [X] T078 [US2] В lib/runtime/native_platform.dart добавить read-only nullable RuntimePlatform.release/NativePlatform getter, убрать выдуманный fallback0.1.0 для отсутствующих сведений; test/runtime/fakes.dart обновить synthetic source. Добавить C18 с версией к status в lib/runtime/runtime_view.dart для обоих путей оболочки (FR-620).
+- [X] T079 [US2] Проверить данные/действия в test/runtime/runtime_view_test.dart и существующем fake profile/global settings fixture test/updates/runtime_updates_test.dart: full+build/unknown/data error+retry/rebind/workspace, отсутствие подмены target/лишних операций; no feature layout or real database (AC-618/SC-606).
+- [ ] T080 [US2] Подготовить pubspec0.1.0+3 и release/notes/0.1.0+3.md; выполнить format/analyze/Flutter/boundaries/Python/native/build/resource/links, independent implementation review/fixloop, converge; signed catalog сохраняет v0.1.0+2 и exact new bytes. Commit/push и выпустить новый GitHub Release по запросу пользователя, не заменять старые assets (FR-618/620; AC-618).
+
+- [X] T081 Закрыть main-version review R1: немедленная read-only ValueListenable публикация local release после native initialize, ValueListenableBuilder отдельно от завершения store.open; fake delayed-store/native-init widget regression до ready без дополнительных вызовов. Rerun checks/build и fresh review (FR-620/AC-618/SC-606).

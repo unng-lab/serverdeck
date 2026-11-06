@@ -68,3 +68,9 @@ RemovalTicket SDREMOVE001 binds UUID/cache-directory/removal-journal identity, o
 canonical Installation and SHA256 of original commit.v1. Stored outside install root in
 Known Folder temp cache; ≤8KiB canonical envelope. It grants only deterministic removal
 of the matching installation under both leases, never target-path selection.
+
+
+Current UI version is an ephemeral nullable projection of PlatformContext.release
+from the running executable. No persisted entity/schema/format change. It is not an
+update target or consent field. Unknown is represented by null/empty until native
+context is known; RuntimeView binds to its current runtime owner on every rebuild.

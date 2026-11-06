@@ -7,6 +7,10 @@ import 'package:serverdeck/mcp/settings_controller.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/updates/update_owner.dart';
 
+import 'package:serverdeck/shell/foundation_shell.dart';
+import 'package:serverdeck/profiles/profile_controller.dart';
+import 'package:serverdeck/profiles/profile_view.dart';
+
 import '../runtime/fakes.dart';
 import '../fixtures/feature_harness.dart';
 
@@ -54,6 +58,64 @@ final class _Port implements UpdatePort {
 }
 
 void main() {
+  testWidgets('current version status is retained by the server workspace', (
+    tester,
+  ) async {
+    final platform = FakePlatform()..release.value = '7.6.5+4321';
+    final store = FakeStore();
+    final runtime = RuntimeCoordinator(
+      platform: platform,
+      store: store,
+      epoch: 'owner',
+    );
+    addTearDown(runtime.dispose);
+    addTearDown(platform.controller.close);
+    await runtime.start();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.light,
+        home: RuntimeView(runtime: runtime),
+      ),
+    );
+    final status = tester
+        .widget<FoundationShell>(find.byType(FoundationShell))
+        .status!;
+    final h = FeatureHarness();
+    final id = await h.create();
+    h.repository.state.profiles[id]!.displayName = 'Synthetic server';
+    final controller = ProfileController(
+      operations: h.operations,
+      actor: h.actors.ui,
+      newId: h.newId,
+      changes: h.connections.changes,
+    );
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: BrandTheme.light,
+          home: ProfileViewPanel(
+            controller: controller,
+            pickKey: () async => null,
+            applicationStatus: status,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Версия ServerDeck'), findsOneWidget);
+      expect(find.text('7.6.5+4321'), findsOneWidget);
+      await tester.tap(find.text('Synthetic server'));
+      await tester.pumpAndSettle();
+      expect(find.text('7.6.5+4321'), findsOneWidget);
+      expect(store.opens, 1);
+      expect(h.sessions, isEmpty);
+    } finally {
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      final closing = h.dispose();
+      await tester.pump();
+      await closing;
+    }
+  });
   testWidgets(
     'updates and MCP remain reachable in the same global settings owner',
     (tester) async {
@@ -100,7 +162,8 @@ void main() {
   testWidgets(
     'global updates start only after storage readiness and retire nested consent',
     (tester) async {
-      final platform = FakePlatform(), store = FakeStore()..failOpen = true;
+      final platform = FakePlatform()..release.value = '7.6.5+4321';
+      final store = FakeStore()..failOpen = true;
       final port = _Port();
       final updates = UpdateOwner(port: port, currentVersion: '0.1.0+1');
       final runtime = RuntimeCoordinator(
@@ -118,11 +181,14 @@ void main() {
         ),
       );
       expect(port.reads, 0);
+      expect(find.text('7.6.5+4321'), findsOneWidget);
       expect(find.text('Настройки приложения'), findsNothing);
       store.failOpen = false;
       await tester.tap(find.text('Повторить'));
       await tester.pumpAndSettle();
       expect(port.reads, 1);
+      expect(find.text('7.6.5+4321'), findsOneWidget);
+      expect(find.text('0.2.0+1'), findsNothing);
       await tester.tap(find.text('Настройки приложения'));
       await tester.pumpAndSettle();
       expect(find.textContaining('0.1.0+1'), findsWidgets);

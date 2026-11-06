@@ -45,3 +45,11 @@ Ports for network/process/registry/shortcuts are fake; native file tests use syn
 temporary trees and data sentinels. No application/Explorer/session launch, live Isar,
 VM/e2e/smoke/process-kill or screen design gate. Results support isolated behavior and
 static composition, not actual installation/integration on clean Windows.
+
+
+Main-window version amendment: functional runtime/view/channel fakes verify full build
+number, unknown before initialization, storage failure/retry, runtime rebinding and
+normal workspace without a selected server. The display must not substitute a newer
+offer or trigger extra work. Only texts/actions/state assertions; no feature-layout
+checks. Release0.1.0+3 uses prepare-release.ps1 -PreviousCatalog pointing at the
+public v0.1.0+2 signed catalog, preserving its record byte-for-byte.

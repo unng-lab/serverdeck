@@ -179,16 +179,31 @@ class _RuntimeViewState extends State<RuntimeView> {
             ],
           )
         : content;
-    final status = DeckStatus(
-      label: switch (runtime.state) {
-        RuntimeState.running => 'Приложение готово',
-        RuntimeState.starting => 'Запуск',
-        RuntimeState.storageBlocked => 'Данные недоступны',
-        _ => 'Завершение работы',
-      },
-      tone: runtime.acceptsOperations
-          ? DeckTone.available
-          : DeckTone.unavailable,
+    final status = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ValueListenableBuilder<String?>(
+          valueListenable: runtime.platform.release,
+          builder: (context, release, _) => DeckKeyValue(
+            label: 'Версия ServerDeck',
+            value: release == null || release.isEmpty
+                ? 'Не определена'
+                : release,
+          ),
+        ),
+        DeckStatus(
+          label: switch (runtime.state) {
+            RuntimeState.running => 'Приложение готово',
+            RuntimeState.starting => 'Запуск',
+            RuntimeState.storageBlocked => 'Данные недоступны',
+            _ => 'Завершение работы',
+          },
+          tone: runtime.acceptsOperations
+              ? DeckTone.available
+              : DeckTone.unavailable,
+        ),
+      ],
     );
     final recovery = !runtime.trayAvailable
         ? DeckButton(
