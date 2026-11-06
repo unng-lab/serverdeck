@@ -134,3 +134,11 @@ Pre-runtime update presentation: typed MaintenanceReporter in startup_update;
 native/installer/status_window.cpp owns standard Win32 controls on a separate
 message-loop thread. It has no business owner or quit/restart action. Functional
 units assert revalidating/applying/recovering stages, without window/layout tests.
+
+Release enablement amendment: release/update-policy.json is a persistent public root,
+not a runtime user setting. Default build/workflow is publishable. Private key remains
+in local publisher storage outside the repo with restrictive ACL; initialize tool
+never rotates deployed trust automatically. prepare-release verifies final audited
+installer/resources, matching key and previous signed records before local signing.
+No private CI secret upload or release publication is needed for building; publishing
+prepared public assets remains a distinct authorized operator action.

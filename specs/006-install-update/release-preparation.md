@@ -2,60 +2,52 @@
 
 [GitHub contract](contracts/github-releases.md) определяет источник и формат.
 Это инструкция издателю; публикация в рамках текущей задачи не выполняется.
-Workflow release.yml собирает developer artifact, не production release.
+Workflow release.yml и обычный tools/build-release.ps1 теперь собирают publishable
+установщик с включённым GitHub source, используя release/update-policy.json из
+репозитория. Developer-профиль доступен только явно: -Profile developer.
 
-## Сборка
+## Ключ и публичная настройка
 
-Public policy schema1: endpoint
-`https://api.github.com/repos/unng-lab/serverdeck/releases/latest`, четыре
-downloadHosts из контракта, актуальный storeFormat и настоящие public P256 keys.
-Закрытый ключ хранится вне репозитория; demo root не создаётся.
-`./tools/build-release.ps1 -Profile publishable -UpdatePolicy <public-policy.json>`
-проверяет источник до сборки, встраивает одинаковую policy в app/setup и выдаёт
-`output/release/ServerDeckSetup.exe` и `output/release-evidence/setup-audit.json`.
-Policy/audit не нужны как runtime assets. После любого изменения binaries,
-включая Authenticode, повторить final resource/identity audit командами build-release
-до подготовки catalog. Catalog должен хешировать окончательные bytes.
+Постоянная public policy schema1 закрепляет GitHub endpoint/CDN hosts, format2 и
+ключ serverdeck-updates-v1. Закрытая часть хранится вне репозитория в пользовательском
+LocalApplicationData/ServerDeckPublisher/keys, с ACL только SID пользователя и SYSTEM.
+Она не загружается в GitHub, артефакты или логи. Первый bootstrap ключа выполняется
+однократно tools/initialize-update-signing.ps1. Повтор использует тот же ключ;
+потеря закрытой части при существующей public policy блокирует повторную инициализацию,
+а не заменяет root. Нужна защищённая резервная копия ключа. Ротация требует заранее
+доставить новый публичный ключ через доверенный выпуск согласно release contract.
 
-## Payload первого выпуска
-
-Этот PowerShell создаёт только локальный unsigned payload по publishable audit;
-сеть/публикация не выполняются. Заменить notes кратким описанием изменений.
+## Сборка и подготовка assets
 
 ```powershell
-$audit = Get-Content -Raw output/release-evidence/setup-audit.json | ConvertFrom-Json
-if ($audit.profile -ne 'publishable') { throw 'Publishable audit required' }
-$setup = Get-Item -LiteralPath output/release/ServerDeckSetup.exe
-if ($setup.Length -ne $audit.setup.size -or
-    (Get-FileHash -LiteralPath $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $audit.setup.sha256) {
-    throw 'Final setup differs from audit'
-}
-$policy = Get-Content -Raw output/release-evidence/trust-policy.json | ConvertFrom-Json
-$issued = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$notes = 'Краткое описание изменений выпуска'
-$notesBytes = [Text.Encoding]::UTF8.GetBytes($notes)
-if ($notesBytes.Length -gt 16384 -or $notes.Contains([char]0)) { throw 'Invalid release notes' }
-$tag = 'v' + $audit.version.Replace('+', '%2B')
-$fields = @('SDRELEASES002', "$issued", '1', $audit.version, 'windows-x64', '1',
-    "$($policy.storeFormat)", "$issued", "$($audit.setup.size)", $audit.setup.sha256,
-    "$($audit.application.size)", $audit.application.sha256,
-    "https://github.com/unng-lab/serverdeck/releases/download/$tag/ServerDeckSetup.exe",
-    [Convert]::ToBase64String($notesBytes))
-[IO.File]::WriteAllBytes('output/release/update-payload.txt',
-    [Text.Encoding]::ASCII.GetBytes(($fields -join "`n") + "`n"))
+./tools/build-release.ps1
+./tools/prepare-release.ps1 -FirstRelease
 ```
 
-Для следующих выпусков переносить неизменённые 11-строчные записи ранее
-разрешённых версий и увеличивать count, максимум32. Header/issued/count относятся
-к новому payload, старый envelope/signature не переносятся. Удаление записи
-намеренно отзывает старое согласие, даже если setup остался в GitHub. Не менять
-identity/bytes старой версии; исправление требует новой версии/tag.
+Первая команда встраивает ту же public policy в app/setup, проверяет physical
+resources/version/hash/import closure и выдаёт output/release/ServerDeckSetup.exe.
+Вторая сверяет окончательные bytes с publishable audit, policy/resources, сверяет
+локальный приватный ключ с публичным root, создаёт protocol2 payload и подписанный
+output/release/serverdeck-update-catalog.txt. Описание берётся из
+release/notes/<canonical-version>.md (UTF8≤16KiB). Оба файла готовы к размещению в
+одном GitHub Release; команды сами ничего не публикуют. Workflow выдаёт однозначно
+названный ServerDeck-windows-x64-update-enabled artifact с setup и public evidence;
+подписать его можно локально через prepare-release.ps1 с -Installer/-Audit, соответствующими
+скачанному artifact. CI не требует приватного ключа и не получает его.
 
-Подписать `tools/sign-update-catalog.ps1` с параметрами `-Payload`, `-PrivateKey`
-(локальный PEM путь из environment/secret store), `-KeyId` из policy и
-`-Catalog output/release/serverdeck-update-catalog.txt`. Tool проверяет
-keyId/P256/P1363/envelope bounds, не выводит ключ или его путь. Полное содержимое
-каталога дополнительно проверяет native verifier при получении.
+Для последующих выпусков передать -PreviousCatalog <latest-signed-catalog>.
+Подпись предыдущего static catalog проверяется по текущим pinned roots; прежние
+11-строчные записи копируются неизменно. Первый catalog из одной записи требует явного -FirstRelease; отсутствие обоих
+параметров блокирует подписание, а не молча отзывает ранее разрешённые записи.
+Версии должны увеличиваться; дубль или downgrade блокируется, всего≤32 records.
+Удаление старых записей требует явного решения издателя; изменять bytes старой
+публикации вместо новой версии запрещено. После Authenticode/любого изменения binaries
+повторить audit и подготовку metadata по окончательным bytes.
+
+Версия 0.1.0+2 повышает build number относительно установленной developer 0.1.0+1,
+чтобы полная ручная установка не была same-version byte conflict. Один раз установить
+этот update-enabled setup вручную: старая unconfigured программа не может обнаружить
+саму настройку источника через updater. Дальнейшие выпуски проверяются обычным путём.
 
 ## Состав релиза
 

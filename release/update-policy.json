@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "endpoint": "https://api.github.com/repos/unng-lab/serverdeck/releases/latest",
+  "downloadHosts": [
+    "github.com",
+    "release-assets.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "github-releases.githubusercontent.com"
+  ],
+  "storeFormat": 2,
+  "keys": [
+    {
+      "id": "serverdeck-updates-v1",
+      "p256": "049b777aa92f26a7dd641c9d92a7f8e65e4bee143b782ec60aef95e73183af653a0572d144d5abfa665b22293dc73ea64810aa72e50abae38736e35134c83c43"
+    }
+  ]
+}

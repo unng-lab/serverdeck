@@ -165,3 +165,10 @@ T028/T029 выполняются вместе с соответствующим�
 - [X] T070 Исправить HKCU string read в native/install/install_registration.cpp: учитывать фактический UTF-16 byte count второго RegGetValueW; synthetic read seam/fixtures в native/include/install_registration.h и native/tests/install_executor_test.cpp покрывают oversized probe и malformed/grown/error results (FR-603/604; AC-603/604).
 - [X] T071 Исправить принятие inherited lease в native/install/maintenance_handoff.cpp: сравнить fixed expected lock с HANDLE по volume/file ID при Windows packaged LocalCache redirection, сохранив reparse/rights/zero-size/exclusive-sharing/parent/permit проверки; synthetic hard-link alias и existing negative cases в native/tests/maintenance_handoff_test.cpp (FR-611/614; AC-611/613).
 - [X] T072 Выполнить native unit/build/link checks и independent read-only review исправлений адаптеров, устранить подтверждённые findings; evidence в reviews/installer-adapters.md. Пользовательская локальная диагностика не заменяет unit gate и не вводит integration/e2e gates.
+
+## Phase 12: Enable shipped GitHub updates
+
+- [X] T073 Закрепить постоянную public GitHub policy/реальный P256 root; private key вне repo с user/SYSTEM ACL, init переиспользует ключ и запрещает silent rotation/missing-key replacement; synthetic bootstrap/key-scope tests (FR-608/616/618/619).
+- [X] T074 Сделать publishable стандартным профилем build-release и workflow, developer только explicit; включить public policy в app/setup, поднять build0.1.0+2 для установки поверх unconfigured0.1.0+1 (FR-601/607/618/619; AC-617).
+- [X] T075 Подготовить audited payload/signing command: exact final setup/app/policy identity, matching signing key, UTF8 notes, verified previous catalog/immutable records/version increase/bounds; сформировать локальные setup+signed catalog без private upload/publication (FR-608/618/619; AC-617).
+- [X] T076 Выполнить Python/native/Flutter/build/resource/link checks и independent review/fixloop поставки, проверить фактический publishable artifact с enabled GitHub policy; обновить evidence и завершение amendment (AC-617).

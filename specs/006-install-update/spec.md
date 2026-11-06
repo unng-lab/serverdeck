@@ -3,7 +3,7 @@
 **Feature**: `006-install-update`
 **Feature Branch**: текущая рабочая ветка; отдельная ветка не создавалась.
 **Created**: 2026-11-04
-**Status**: Реализовано; применимые этапы Spec Kit, обязательные проверки, независимое ревью и convergence завершены.
+**Status**: Реализовано, включая подключённую public policy в стандартную поставку (FR-619, T073–076); проверки и независимое ревью завершены. Публикация prepared release assets — отдельное действие издателя.
 **Input**: Выделить установку и обновление программы в отдельную спецификацию.
 Пользователь выбрал проверку новой версии и установку по своему подтверждению.
 
@@ -241,6 +241,17 @@
   **AC-616**: stable latest обнаруживается, setup берётся из его assets; отсутствие
   новых релизов более недели не делает выпуск просроченным. Отказ GitHub, отзыв или
   подмена не заменяют программу и не удаляют готовый установщик.
+
+- **FR-619**: Обычная сборка для распространения и workflow MUST встраивать постоянную
+  public policy GitHub Releases и ключ издателя. UPDATE_NOT_CONFIGURED допустим только
+  для явно выбранного developer-профиля. Отсутствующая/невалидная policy в release
+  сборке блокирует сборку, а не даёт тихо отключённый updater. Private key хранится
+  отдельно и не публикуется; update-enabled installer и matching signed catalog
+  подготавливаются по окончательным audited bytes. Первая настройка уже установленной
+  unconfigured версии доставляется ручным полным установщиком с большей версией.
+  **AC-617**: Default/workflow artifact имеет publishable audit и identical embedded
+  GitHub policy app/setup; matching key подписывает metadata именно этих bytes,
+  developer требует explicit selection, отсутствие policy/mismatch блокирует выпуск.
 
 ### Key Entities
 

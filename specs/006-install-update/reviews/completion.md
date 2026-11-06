@@ -43,3 +43,13 @@ published configured production release. Operator GitHub policy/signing/release 
 are documented; no production signing key or live release was provisioned. No actual
 clean-OS installation/integration claim is made; only the permitted unit/static/build
 checks in verification.md establish the accepted scope.
+
+
+## Shipped update configuration correction — 2026-11-06
+
+The earlier developer-only scope was insufficient for the user's installed build.
+FR-619/AC-617 and completed T073–076 provide persistent public GitHub policy, protected
+local signing key, publishable defaults/CI, audited signed metadata and bootstrap build2.
+See [actual configured artifact and independent review](update-enablement.md).
+This supersedes the earlier statement that delivery here is only a developer build.
+Publication of the prepared public assets remains a separate operator action.

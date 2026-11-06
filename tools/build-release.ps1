@@ -1,6 +1,6 @@
 ﻿param(
     [string]$OutputDirectory = 'output/release',
-    [ValidateSet('developer', 'publishable')][string]$Profile = 'developer',
+    [ValidateSet('developer', 'publishable')][string]$Profile = 'publishable',
     [string]$UpdatePolicy
 )
 
@@ -12,7 +12,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "$Program failed (exit $LASTEXITCODE)" }
     }
     if ($Profile -eq 'publishable' -and !$UpdatePolicy) {
-        throw 'Publishable profile requires -UpdatePolicy with immutable public trust inputs'
+        $UpdatePolicy = Join-Path (Get-Location) 'release/update-policy.json'
+    }
+    if ($Profile -eq 'publishable' -and !(Test-Path -LiteralPath $UpdatePolicy -PathType Leaf)) {
+        throw 'Publishable build requires the checked-in public update policy; developer builds must be requested explicitly'
     }
     $versionMatch = [regex]::Match((Get-Content -Raw pubspec.yaml), '(?m)^version:\s*(\S+)\s*$')
     $storeMatch = [regex]::Match((Get-Content -Raw lib/storage/store_manifest.dart), 'const currentStorageFormat = ([0-9]+);')

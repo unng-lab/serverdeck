@@ -1,4 +1,4 @@
-name: Desktop build and native unit checks
+name: Windows installer with GitHub updates
 on:
   workflow_dispatch:
 permissions:
@@ -20,9 +20,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build developer installer and audit embedded application
+      - name: Build update-enabled installer and audit embedded trust
         shell: pwsh
-        run: ./tools/build-release.ps1
+        run: ./tools/build-release.ps1 -Profile publishable -UpdatePolicy release/update-policy.json
       - name: Application unit checks
         shell: pwsh
         run: |
@@ -33,7 +33,7 @@ jobs:
         run: ./tools/test-release.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: ServerDeck
+          name: ServerDeck-windows-x64-update-enabled
           path: |
             output/release/ServerDeckSetup.exe
             output/release-evidence/

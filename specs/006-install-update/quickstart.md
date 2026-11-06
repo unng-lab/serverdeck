@@ -2,9 +2,10 @@
 
 ## Prerequisites and commands
 
-Windows x64, pinned Flutter/Dart, MSVC/CMake/Python per002. Developer build needs no
-source or signing secret. Publishable build additionally needs update policy and
-operator P256 key per [release contract](contracts/releases.md), not user runtime inputs.
+Windows x64, pinned Flutter/Dart, MSVC/CMake/Python per002. Default publishable build uses the checked-in release/update-policy.json; no private
+key is needed for building. Explicit -Profile developer builds may omit policy. Local
+catalog preparation uses the publisher P256 key per [release contract](contracts/releases.md),
+not user runtime inputs.
 Production distribution uses only [GitHub Releases](contracts/github-releases.md):
 latest API and setup/catalog assets of unng-lab/serverdeck. Descriptions/changelog
 remain in the release. No separate update server or end-user GitHub credentials.
@@ -23,9 +24,11 @@ lychee "specs/**/*.md"
 ```
 
 `test-release.ps1` runs native unit-labeled fixtures, not historical integration helpers.
-Build should emit full developer ServerDeckSetup.exe, exact embedded ServerDeck.exe,
-matching resource hashes, x64/asInvoker and OS-only bootstrap imports. Developer missing
-policy is explicitly UPDATE_NOT_CONFIGURED, not a configured production release.
+Build should emit full publishable ServerDeckSetup.exe, exact embedded ServerDeck.exe,
+matching resource hashes, x64/asInvoker and OS-only bootstrap imports. Default/workflow audit must be publishable with matching embedded policy. Only an
+explicit developer build without policy reports UPDATE_NOT_CONFIGURED.
+./tools/prepare-release.ps1 -FirstRelease prepares matching signed metadata locally
+without upload; subsequent releases require -PreviousCatalog.
 
 ## Unit acceptance
 
