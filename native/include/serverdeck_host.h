@@ -25,18 +25,33 @@ enum ServerDeckHostResultV1 {
   SD_HOST_WINDOW_FAILED = 4,
   SD_HOST_MESSAGE_LOOP_FAILED = 5,
   SD_HOST_INITIALIZATION_FAILED = 6,
-  SD_HOST_RUNTIME_FAILED = 7
+  SD_HOST_RUNTIME_FAILED = 7,
+  SD_HOST_UPDATE_RESTART = 8
 };
 
-enum class ServerDeckHostDisposition { clean, startupFailure, runtimeFailure };
+enum class ServerDeckHostDisposition { clean, startupFailure, runtimeFailure, updateRestart };
 inline ServerDeckHostDisposition ServerDeckClassifyHostResultV1(int result) {
   switch (result) {
+    case SD_HOST_UPDATE_RESTART: return ServerDeckHostDisposition::updateRestart;
     case SD_HOST_OK: return ServerDeckHostDisposition::clean;
     case SD_HOST_INVALID_ARGS: case SD_HOST_COM_FAILED:
     case SD_HOST_WINDOW_FAILED: case SD_HOST_INITIALIZATION_FAILED:
       return ServerDeckHostDisposition::startupFailure;
     default: return ServerDeckHostDisposition::runtimeFailure;
   }
+}
+
+// An explicit pump quit leaves the native window alive until scope teardown.
+// Disable its normal WM_DESTROY quit before destruction so native retry UI can
+// run on this thread without inheriting a second WM_QUIT.
+template<class Window>
+int ServerDeckFinishHostPumpV1(int status, WPARAM quitCode, Window& window) {
+  if (status == -1) return SD_HOST_MESSAGE_LOOP_FAILED;
+  if (quitCode == SD_HOST_UPDATE_RESTART) {
+    window.SetQuitOnClose(false);
+    return SD_HOST_UPDATE_RESTART;
+  }
+  return SD_HOST_OK;
 }
 
 #ifdef SERVERDECK_HOST_EXPORTS

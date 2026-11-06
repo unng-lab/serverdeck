@@ -198,6 +198,14 @@ final class UpdateOwner implements Listenable, RuntimeCapability {
   UpdateSnapshot _snapshot;
   UpdateSnapshot get snapshot => _snapshot;
   String? error;
+  bool get canRestart =>
+      !_stopped &&
+      !_disposed &&
+      error == null &&
+      !_snapshot.active &&
+      _snapshot.preparedVersion != null &&
+      _snapshot.preparedVersion!.isNotEmpty &&
+      _snapshot.preparedCode == null;
   bool _started = false, _stopped = false, _disposed = false;
   bool _backgroundCheck = false;
   Future<void> _commands = Future<void>.value();

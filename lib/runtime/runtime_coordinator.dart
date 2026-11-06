@@ -36,6 +36,35 @@ class RuntimeCoordinator extends ChangeNotifier {
   bool trayAvailable = false;
   String? error;
   bool get acceptsOperations => state == RuntimeState.running;
+  bool updateRestartRequested = false;
+  Future<bool>? _restartRequest;
+  String? _restartVersion;
+
+  Future<bool> requestUpdateRestart(String version) {
+    if (_restartRequest != null)
+      return version == _restartVersion
+          ? _restartRequest!
+          : Future.value(false);
+    if (!acceptsOperations) return Future.value(false);
+    _restartVersion = version;
+    return _restartRequest = _requestUpdateRestart(version).whenComplete(() {
+      _restartRequest = null;
+      _restartVersion = null;
+    });
+  }
+
+  Future<bool> _requestUpdateRestart(String version) async {
+    bool accepted;
+    try {
+      accepted = await platform.requestUpdateRestart(version);
+    } catch (_) {
+      accepted = false;
+    }
+    if (!accepted) return false;
+    updateRestartRequested = true;
+    await requestExit();
+    return true;
+  }
 
   void register(RuntimeCapability capability) {
     if (state != RuntimeState.starting ||
@@ -108,7 +137,10 @@ class RuntimeCoordinator extends ChangeNotifier {
     _seq = value.seq;
     window = value.window;
     trayAvailable = value.trayAvailable;
-    if (value.osEnding || value.exitRequested) await requestExit();
+    if (value.osEnding || value.exitRequested) {
+      updateRestartRequested = !value.osEnding && value.updateRestartRequested;
+      await requestExit();
+    }
     notifyListeners();
   }
 
@@ -126,6 +158,10 @@ class RuntimeCoordinator extends ChangeNotifier {
     switch (event.type) {
       case 'trayExit':
       case 'osSessionEnding':
+        updateRestartRequested = false;
+        await requestExit();
+      case 'updateRestart':
+        updateRestartRequested = true;
         await requestExit();
       case 'trayOpen':
       case 'activationRequested':
@@ -239,8 +275,9 @@ class RuntimeCoordinator extends ChangeNotifier {
       state = RuntimeState.terminated;
     } catch (_) {
       state = RuntimeState.shutdownBlocked;
-      error =
-          'Не удалось безопасно завершить работу. Повторите «Выход» в трее.';
+      error = updateRestartRequested
+          ? 'Не удалось безопасно завершить работу. Повторите завершение обновления.'
+          : 'Не удалось безопасно завершить работу. Повторите «Выход» в трее.';
       try {
         await platform.restore();
       } catch (_) {

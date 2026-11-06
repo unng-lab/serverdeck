@@ -74,3 +74,13 @@ Current UI version is an ephemeral nullable projection of PlatformContext.releas
 from the running executable. No persisted entity/schema/format change. It is not an
 update target or consent field. Unknown is represented by null/empty until native
 context is known; RuntimeView binds to its current runtime owner on every rebuild.
+
+## Update restart (transient)
+
+Native restart intent: optional canonical prepared version, live-owner lifetime only.
+Acceptance requires persisted prepared release with no validation error and no worker;
+acceptance closes update admission. Plain tray exit/OS ending clear intent. No persistence
+or storage format change. Existing pending consent remains the sole apply authority.
+Host result8 means cleanup completed and an explicit update restart was accepted; it
+never grants arbitrary executable/path authority. Owner.lock moves to maintenance Lease
+without an unlocked interval, then existing pending helper inherits it.

@@ -53,3 +53,12 @@ normal workspace without a selected server. The display must not substitute a ne
 offer or trigger extra work. Only texts/actions/state assertions; no feature-layout
 checks. Release0.1.0+3 uses prepare-release.ps1 -PreviousCatalog pointing at the
 public v0.1.0+2 signed catalog, preserving its record byte-for-byte.
+
+## Direct update / restart amendment
+
+Use fake RuntimePlatform/UpdatePort for main entry labels, direct route, cancellation,
+prepared-version confirmation, rejection, lifecycle retirement and shutdown retry units.
+Native synthetic service/host/startup units cover atomic readiness, owner transfer,
+helper failure and no-host-reload path. Run required Flutter formatting/analyze/unit,
+native units, build/import/resource audits and `lychee "specs/**/*.md"`.
+No launch of product, integration/e2e or feature-layout checks is part of acceptance.

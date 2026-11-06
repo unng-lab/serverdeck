@@ -77,8 +77,8 @@ confirmation prompt, including when runtime/feature/update owner changes.
 current version always visible. Offer shows target/notes/signed setupSize, publication
 date through C28, platform and explicit compatibility details (ABI/storeFormat) through
 C18. C14 before download
-explicitly authorizes exact release apply next launch after user tray exit. Ready
-instructs tray exit, no direct quit/restart callback. Test texts/data/enabled callbacks,
+explicitly authorizes exact release apply next launch. Ready also offers an explicitly
+confirmed update restart under FR-622; normal tray exit/manual launch remains available. Test texts/data/enabled callbacks,
 not layout/design. Native installer uses OS confirmation/error dialogs before Flutter.
 
 Codes: UPDATE_NOT_CONFIGURED, NETWORK_UNAVAILABLE, TIMEOUT, CANCELLED, SOURCE_UNTRUSTED,
@@ -111,3 +111,55 @@ ValueListenable through the builder lifecycle; no extra native calls, network, t
 DB open or separate stored setting. Null/empty is a truthful temporary unknown state.
 Settings keep their existing signed/native current-version display; backend uses
 one build metadata source. Native wire methods/epoch/authorization unchanged.
+
+## Main update entry and restart — FR-621–623
+
+RuntimeView uses existing C02 DeckButton in C17 status slot, preserving C18 version.
+Labels by authoritative snapshot: idle/current «Обновления»; checking «Проверка обновлений…»;
+available «Доступно обновление»; downloading/verifying «Подготовка обновления…»;
+ready «Обновление готово»; failed/read failure «Ошибка обновления». A retained valid
+prepared version while idle/current/available uses «Обновление готово»; active phase
+and errors take priority. It opens UpdateView in a separate OwnedSettingsRoute,
+retired with the existing settings route on runtime/feature/update replacement or shutdown.
+No shared component changes. Settings remain secondary access to the same owner/actions.
+
+UpdateView accepts an optional runtime restart callback. Button exists only when
+preparedVersion is nonempty, preparedCode absent, state not checking/downloading/verifying,
+owner.error (read error) absent and owner accepting operations. Global state=failed/code
+from a failed/cancelled replacement does not invalidate the earlier prepared release
+when preparedCode is absent. Native readiness uses this same distinction; snapshot.code
+and failed alone do not block it. C14 names captured preparedVersion.
+After confirmation recheck mounted/owner identity/version/readiness; no automatic download
+or quit. Runtime callback delegates to RuntimeCoordinator.requestUpdateRestart(version).
+It calls RuntimePlatform.requestUpdateRestart(version); false/error leaves operations open
+and presents a retryable request error. Native method `runtime.requestUpdateRestart` takes
+only ownerEpoch and canonical `version`, returns accepted bool. Reject stale epoch/extra
+args as existing dispatcher; accepted only before exit, session ending or activation close,
+with already-created live UpdateService and matching prepared version. Service acceptance
+is atomic with command and snapshot mutex, rejects busy/preparedCode/unrestored/stopped, and
+latches StopAdmission. Here error means nonempty preparedCode or invalid restored
+prepared identity, not snapshot.code from an unrelated failed/cancelled replacement. No file hashing/network on window thread. A repeat for same latched
+version returns true, another version false. Native latches exitRequested and emits
+`updateRestart`; snapshot exitRequested and read-only updateRestartRequested bool recover dropped
+events, including the update-specific shutdownBlocked retry. Coordinator uses existing
+requestExit/10s cleanup. No general-purpose restart method. Failure before acceptance
+never starts shutdown. ShutdownBlocked offers «Повторить завершение обновления» via
+requestExit; it does not reopen closed capabilities. Native tray exit/session ending
+clear restart latch; finishExit checks it at the last native transition.
+
+After cleanup `runtime.finishExit` still requires shutdownComplete and closed activation.
+For restart it ends the host pump with new ABI result `SD_HOST_UPDATE_RESTART=8`;
+host_main propagates this only on successful pump termination. Before scoped
+window destruction it disables normal WM_DESTROY PostQuitMessage, so a second WM_QUIT
+cannot remain in the bootstrap thread and prematurely abort native retry/cancel UI. Args struct/ABI1 unchanged.
+Bootstrap classifies result as updateRestart, unloads host and COM, retains owner.lock,
+then reacquires maintenance (existing3s budget) without acquiring a second owner. It
+adopts that maintenance handle + existing owner.lock into Lease, releases old publication
+mutex/pipe only after host shutdown, and calls a dedicated restart handoff adapter.
+Adapter uses Executor.PrepareStartup and PendingStore.PrepareStartup, requires a valid
+pending newer than installed and matching mapped build, then StartPendingHandoff.
+No fallback to loading host in this process. On helper readiness success bootstrap exits;
+helper already uses exact inherited locks/parent/ready/permit and canonical relaunch.
+On error native retry/cancel repeats maintenance/pending/handoff only, holding owner until
+cancel/process exit; it must not enter ordinary startup retry that could reload Flutter.
+No new CLI mode, file format, trust root, migration or release endpoint.

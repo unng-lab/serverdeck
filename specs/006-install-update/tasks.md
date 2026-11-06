@@ -181,3 +181,18 @@ T028/T029 выполняются вместе с соответствующим�
 - [X] T080 [US2] Подготовить pubspec0.1.0+3 и release/notes/0.1.0+3.md; выполнить format/analyze/Flutter/boundaries/Python/native/build/resource/links, independent implementation review/fixloop, converge; signed catalog сохраняет v0.1.0+2 и exact new bytes. Commit/push и выпустить новый GitHub Release по запросу пользователя, не заменять старые assets (FR-618/620; AC-618).
 
 - [X] T081 Закрыть main-version review R1: немедленная read-only ValueListenable публикация local release после native initialize, ValueListenableBuilder отдельно от завершения store.open; fake delayed-store/native-init widget regression до ready без дополнительных вызовов. Rerun checks/build и fresh review (FR-620/AC-618/SC-606).
+
+## Phase 14: Direct update entry and safe restart (US5)
+
+- [X] T082 [US5] Уточнить FR-621–623/AC-619–620/SC-607, constitution V4.0.0 и contracts/platform.md; выполнить specify/clarify/plan/tasks/analyze, links и independent readiness review, evidence reviews/update-restart.md.
+- [X] T083 [US5] В lib/runtime/runtime_view.dart заменить ready status прямой C02 кнопкой обновлений с состояниями и отдельным OwnedSettingsRoute; lib/updates/update_view.dart и application_settings_view.dart подключить точное C14 подтверждение prepared version и callback, сохранив lifecycle и текущую версию (FR-621/622).
+- [X] T084 [US5] В lib/runtime/{native_platform,runtime_coordinator}.dart и windows/runner/platform_channel.* добавить typed prepared-version request, native/include/update_restart.h transient latch, snapshot recovery, epoch/OS/tray arbitration и shutdownBlocked retry; native/include/update_service.h + native/install/update_service.cpp атомарно принимают только готовый незанятый подготовленный выпуск (FR-622).
+- [X] T085 [US5] В native/include/serverdeck_host.h, windows/runner/host_main.cpp и native/bootstrap/main.cpp передать result8 после cleanup; native/include/installation.h и native/install/startup_update.cpp обеспечивают continuous owner adoption/new maintenance и existing five-handle restart handoff, bounded retry/cancel без повторного host (FR-623).
+- [X] T086 [US5] Добавить functional fake units в test/runtime и test/updates, synthetic native service/startup/host/instance units в native/tests, проверив AC-619/620: exact consent, busy/error/stale, single shutdown, retained-ready после failed/cancelled replacement, retry, tray/OS cancellation, continuous lease и handoff failure; no layout/e2e/real database.
+- [ ] T087 [US5] Подготовить pubspec0.1.0+4 и release notes, выполнить required format/analyze/Flutter/boundaries/native/Python/build/resource/link checks, independent review/fix loop и converge; evidence reviews/update-restart.md. Выпустить новый GitHub Release с сохранением immutable предыдущих catalog records (FR-618/621–623).
+
+Порядок: T082 → T083/T084 → T085 → T086 → T087. Юнит-проверка каждого слоя
+не требует запуска продукта; готовность всего изменения требует всех применимых checks
+и завершённого независимого review. История T001–081 сохраняется.
+
+- [X] T088 Закрыть independent implementation review R1: в native/include/serverdeck_host.h и windows/runner/host_main.cpp отключить обычный WM_DESTROY quit перед teardown после explicit restart pump quit. Native queue unit с synthetic window в native/tests/runtime_contract_test.cpp и native/CMakeLists.txt доказывает отсутствие второго WM_QUIT перед retry UI; повторить checks/build и fresh independent review (FR-623/AC-620).

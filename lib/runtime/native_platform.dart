@@ -15,12 +15,13 @@ class PlatformSnapshot {
     required this.trayAvailable,
     required this.osEnding,
     this.exitRequested = false,
+    this.updateRestartRequested = false,
   });
   final String epoch;
   final int seq;
   final WindowState window;
   final bool trayAvailable, osEnding;
-  final bool exitRequested;
+  final bool exitRequested, updateRestartRequested;
 
   factory PlatformSnapshot.decode(Map<Object?, Object?> value) =>
       PlatformSnapshot(
@@ -30,6 +31,7 @@ class PlatformSnapshot {
         trayAvailable: value['trayAvailable'] as bool,
         osEnding: value['osEnding'] as bool,
         exitRequested: value['exitRequested'] == true,
+        updateRestartRequested: value['updateRestartRequested'] == true,
       );
 }
 
@@ -116,9 +118,17 @@ abstract interface class RuntimePlatform {
   Future<bool> retryTray();
   Future<void> closeActivation();
   Future<void> finishExit();
+  Future<bool> requestUpdateRestart(String version);
 }
 
 class NativePlatform implements RuntimePlatform {
+  @override
+  Future<bool> requestUpdateRestart(String version) async =>
+      await _invoke<bool>('runtime.requestUpdateRestart', {
+        'version': version,
+      }) ==
+      true;
+
   NativePlatform({required this.epoch, MethodChannel? channel})
     : _channel = channel ?? const MethodChannel('serverdeck/platform.v1') {
     _channel.setMethodCallHandler(_onMethod);

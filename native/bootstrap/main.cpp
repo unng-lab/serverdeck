@@ -104,6 +104,25 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, wchar_t*, int) {
       FreeLibrary(host);
       RemoveDllDirectory(cookie);
       const auto outcome = ServerDeckClassifyHostResultV1(result);
+      if (outcome == ServerDeckHostDisposition::updateRestart) {
+        // The old Flutter host is gone. Keep owner.lock continuously held while
+        // reacquiring maintenance and handing it to the existing pending helper.
+        // This branch must never fall through to the normal startup/host retry.
+        std::unique_ptr<sd::install::Lease> restartLease;
+        for (;;) {
+          try {
+            if (!restartLease) restartLease = sd::install::Lease::Resume(paths, owner->lock);
+            owner.reset();
+            sd::install::Executor restartExecutor(files, *restartLease, registration, sd::install::ValidateEmbeddedSetup);
+            sd::install::PrepareUpdateRestart(restartExecutor, pending, *restartLease, paths, mappedVersion, *process);
+            return 0;
+          } catch (const std::exception& error) {
+            const auto message = L"Не удалось начать обновление после сохранения данных. "
+              L"Повторите попытку или отмените и запустите ServerDeck позже.\n\n" + StartupMessage(error.what());
+            if (MessageBoxW(nullptr, message.c_str(), L"ServerDeck — обновление", MB_RETRYCANCEL | MB_ICONERROR) != IDRETRY) return 1;
+          }
+        }
+      }
       if (outcome == ServerDeckHostDisposition::startupFailure) {
         // Throw only after unloading the failed host. Owner handles unwind
         // before the outer native retry/cancel UI is presented.

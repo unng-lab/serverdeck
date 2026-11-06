@@ -91,7 +91,8 @@ void main() {
     await tester.tap(find.text('Повторить'));
     await tester.pumpAndSettle();
     expect(runtime.acceptsOperations, isTrue);
-    expect(find.text('Приложение готово'), findsOneWidget);
+    expect(runtime.acceptsOperations, isTrue);
+    expect(find.text('Приложение готово'), findsNothing);
     expect(find.text('7.6.5+4321'), findsOneWidget);
     expect(store.opens, 2);
   });

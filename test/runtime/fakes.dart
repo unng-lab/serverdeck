@@ -12,7 +12,17 @@ class FakePlatform implements RuntimePlatform {
   bool tray = true, visible = true, exited = false, activationClosed = false;
   int seq = 0;
   bool exitLatch = false, failActivation = false, failExit = false;
-  int activationCloses = 0, exits = 0;
+  int activationCloses = 0, exits = 0, restartRequests = 0;
+  bool acceptRestart = true, restartIntent = false;
+  String? restartVersion;
+  @override
+  Future<bool> requestUpdateRestart(String version) async {
+    restartRequests++;
+    restartVersion = version;
+    restartIntent = acceptRestart;
+    return acceptRestart;
+  }
+
   @override
   Stream<PlatformEvent> get events => controller.stream;
   void emit(String type, {String epoch = 'owner', int? sequence}) {
@@ -29,6 +39,7 @@ class FakePlatform implements RuntimePlatform {
         trayAvailable: tray,
         osEnding: false,
         exitRequested: exitLatch,
+        updateRestartRequested: restartIntent,
       );
   @override
   Future<bool> hideToTray() async {

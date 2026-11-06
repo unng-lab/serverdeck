@@ -11,6 +11,7 @@
 #include "../../native/include/monitoring_run.h"
 #include <shellapi.h>
 #include "update_runtime.h"
+#include "../../native/include/update_restart.h"
 
 struct PlatformChannelHooks {
   std::function<HANDLE()> createEvent = [] { return CreateEventW(nullptr, TRUE, FALSE, nullptr); };
@@ -67,6 +68,7 @@ class PlatformChannel {
   UINT_PTR trayMonitor_ = 0;
   bool ready_ = false, tray_ = false, hidden_ = false, osEnding_ = false;
   bool exitRequested_ = false, activationClosed_ = false;
+  sd::updates::RestartIntent restart_;
   std::atomic<bool> stopping_{false};
   std::atomic<uint32_t> activationStatus_{1};
   sd::Handle stopEvent_;

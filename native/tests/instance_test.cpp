@@ -66,7 +66,20 @@ int main() {
       try { sd::install::Lease competitor(paths, true, 0); }
       catch (const sd::updates::Failure& error) { refused = std::string(error.what()) == "OWNER_RUNNING"; }
       if (!refused) result = 9;
+      {
+        sd::install::Lease busy(paths, false, 0); bool failed = false;
+        try { sd::install::Lease::Resume(paths, published->lock, 0); }
+        catch (const sd::updates::Failure& error) { failed = std::string(error.what()) == "BUSY"; }
+        if (!failed || !published->lock || published->lock->get() != original) result = 14;
+      }
+      auto resumed = sd::install::Lease::Resume(paths, published->lock, 0);
+      if (!resumed->Owns(paths, true) || resumed->owner() != original || published->lock) result = 15;
       published.reset();
+      bool competing = false;
+      try { sd::install::Lease competitor(paths, true, 0); }
+      catch (const sd::updates::Failure& error) { competing = std::string(error.what()) == "BUSY"; }
+      if (!competing) result = 16;
+      resumed.reset();
       sd::install::Lease afterExit(paths, true, 0);
       if (!afterExit.Owns(paths, true)) result = 10;
       bool invalid = false;

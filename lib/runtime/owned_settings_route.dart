@@ -12,6 +12,7 @@ class OwnedSettingsRoute {
   Future<void> show(
     BuildContext context, {
     required Widget child,
+    String title = 'Настройки приложения',
     required VoidCallback onChanged,
   }) async {
     if (_retired || _route != null) return;
@@ -20,7 +21,7 @@ class OwnedSettingsRoute {
     route = DialogRoute<void>(
       context: context,
       builder: (dialogContext) => DeckDialogLayout(
-        title: 'Настройки приложения',
+        title: title,
         child: SizedBox(
           height: MediaQuery.sizeOf(dialogContext).height * .6,
           child: Navigator(

@@ -11,6 +11,7 @@ import '../profiles/profile_view.dart';
 import '../mcp/settings_controller.dart';
 import 'application_settings_view.dart';
 import '../updates/update_owner.dart';
+import '../updates/update_view.dart';
 import '../monitoring/monitoring_owner.dart';
 import 'native_platform.dart';
 import 'owned_settings_route.dart';
@@ -39,6 +40,7 @@ class _RuntimeViewState extends State<RuntimeView> {
   ProfileController? _profiles;
   McpSettingsController? _settings;
   OwnedSettingsRoute _applicationSettings = OwnedSettingsRoute();
+  OwnedSettingsRoute _updateRoute = OwnedSettingsRoute();
   MonitoringOwner? get _monitoring =>
       widget.monitoring ?? widget.features?.monitoring;
   UpdateOwner? get _updates => widget.updates ?? widget.features?.updates;
@@ -57,7 +59,8 @@ class _RuntimeViewState extends State<RuntimeView> {
   void _syncMonitoring() => _monitoring?.setActive(
     runtime.acceptsOperations &&
         runtime.window != WindowState.trayHidden &&
-        !_applicationSettings.isOpen,
+        !_applicationSettings.isOpen &&
+        !_updateRoute.isOpen,
   );
   void _runtimeChanged() {
     if (!runtime.acceptsOperations) _release();
@@ -86,6 +89,8 @@ class _RuntimeViewState extends State<RuntimeView> {
   }
 
   void _release() {
+    _updateRoute.retire();
+    _updateRoute = OwnedSettingsRoute();
     _applicationSettings.retire();
     _applicationSettings = OwnedSettingsRoute();
     _profiles?.dispose();
@@ -112,15 +117,66 @@ class _RuntimeViewState extends State<RuntimeView> {
     );
   }
 
+  Future<void> _openUpdates() async {
+    if (_updateRoute.isOpen ||
+        _applicationSettings.isOpen ||
+        !runtime.acceptsOperations ||
+        _updates == null)
+      return;
+    final session = _updateRoute;
+    await session.show(
+      context,
+      title: 'Обновления',
+      child: UpdateView(
+        owner: _updates!,
+        onRestart: runtime.requestUpdateRestart,
+      ),
+      onChanged: () {
+        if (mounted && identical(session, _updateRoute)) _syncMonitoring();
+      },
+    );
+  }
+
+  Widget _updateEntry() {
+    final owner = _updates;
+    if (owner == null) return const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: owner,
+      builder: (context, _) {
+        final snapshot = owner.snapshot;
+        final label =
+            owner.error != null || snapshot.state == UpdateState.failed
+            ? 'Ошибка обновления'
+            : switch (snapshot.state) {
+                UpdateState.checking => 'Проверка обновлений…',
+                UpdateState.downloading ||
+                UpdateState.verifying => 'Подготовка обновления…',
+                _ when owner.canRestart => 'Обновление готово',
+                UpdateState.available => 'Доступно обновление',
+                _ => 'Обновления',
+              };
+        return DeckButton(
+          onPressed: runtime.acceptsOperations ? _openUpdates : null,
+          child: Text(label),
+        );
+      },
+    );
+  }
+
   Future<void> _openApplicationSettings() async {
-    if (_applicationSettings.isOpen ||
+    if (_updateRoute.isOpen ||
+        _applicationSettings.isOpen ||
         !runtime.acceptsOperations ||
         _updates == null)
       return;
     final session = _applicationSettings;
     await session.show(
       context,
-      child: ApplicationSettingsView(updates: _updates!, mcp: _settings),
+      child: ApplicationSettingsView(
+        updates: _updates!,
+        mcp: _settings,
+        onUpdateRestart: runtime.requestUpdateRestart,
+      ),
       onChanged: () {
         if (mounted && identical(session, _applicationSettings))
           _syncMonitoring();
@@ -158,6 +214,14 @@ class _RuntimeViewState extends State<RuntimeView> {
             : 'Завершаем работу',
         message: runtime.error ?? 'Сохраняем данные и закрываем подключения',
         tone: runtime.error == null ? DeckTone.running : DeckTone.error,
+        actions: [
+          if (runtime.state == RuntimeState.shutdownBlocked &&
+              runtime.updateRestartRequested)
+            DeckButton(
+              onPressed: runtime.requestExit,
+              child: const Text('Повторить завершение обновления'),
+            ),
+        ],
       );
     } else {
       content = const DeckNotice(
@@ -192,17 +256,20 @@ class _RuntimeViewState extends State<RuntimeView> {
                 : release,
           ),
         ),
-        DeckStatus(
-          label: switch (runtime.state) {
-            RuntimeState.running => 'Приложение готово',
-            RuntimeState.starting => 'Запуск',
-            RuntimeState.storageBlocked => 'Данные недоступны',
-            _ => 'Завершение работы',
-          },
-          tone: runtime.acceptsOperations
-              ? DeckTone.available
-              : DeckTone.unavailable,
-        ),
+        if (runtime.state == RuntimeState.running)
+          _updateEntry()
+        else
+          DeckStatus(
+            label: switch (runtime.state) {
+              RuntimeState.running => 'Приложение готово',
+              RuntimeState.starting => 'Запуск',
+              RuntimeState.storageBlocked => 'Данные недоступны',
+              _ => 'Завершение работы',
+            },
+            tone: runtime.acceptsOperations
+                ? DeckTone.available
+                : DeckTone.unavailable,
+          ),
       ],
     );
     final recovery = !runtime.trayAvailable

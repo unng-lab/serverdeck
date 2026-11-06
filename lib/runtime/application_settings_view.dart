@@ -8,8 +8,14 @@ import '../updates/update_view.dart';
 
 /// Content inside the runtime-owned settings route and its nested Navigator.
 class ApplicationSettingsView extends StatefulWidget {
-  const ApplicationSettingsView({super.key, required this.updates, this.mcp});
+  const ApplicationSettingsView({
+    super.key,
+    required this.updates,
+    this.mcp,
+    this.onUpdateRestart,
+  });
   final UpdateOwner updates;
+  final Future<bool> Function(String version)? onUpdateRestart;
   final McpSettingsController? mcp;
   @override
   State<ApplicationSettingsView> createState() =>
@@ -30,7 +36,10 @@ class _ApplicationSettingsViewState extends State<ApplicationSettingsView> {
         ),
       Expanded(
         child: _selected == 0 || widget.mcp == null
-            ? UpdateView(owner: widget.updates)
+            ? UpdateView(
+                owner: widget.updates,
+                onRestart: widget.onUpdateRestart,
+              )
             : McpSettingsView(controller: widget.mcp!),
       ),
     ],

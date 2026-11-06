@@ -136,7 +136,7 @@ M PlatformChannel::Snapshot() const {
     {V("seq"), V(static_cast<int64_t>(seq_))},
     {V("windowState"), V(hidden_ ? "trayHidden" : IsIconic(window_) ? "minimized" : "visible")},
     {V("trayAvailable"), V(tray_)}, {V("osEnding"), V(osEnding_)},
-    {V("exitRequested"), V(exitRequested_)}};
+    {V("exitRequested"), V(exitRequested_)}, {V("updateRestartRequested"), V(restart_.requested())}};
 }
 void PlatformChannel::Emit(const std::string& type) {
   M event{{V("version"), V(1)}, {V("ownerEpoch"), V(sd::Utf8(args_.ownerEpoch))},
@@ -304,6 +304,18 @@ void PlatformChannel::Handle(const flutter::MethodCall<V>& call,
       result->Success(V(available));
     } else if (name == "runtime.closeActivation") {
       CloseActivation(); result->Success();
+    } else if (name == "runtime.requestUpdateRestart") {
+      if (map.size() != 2) throw std::invalid_argument("INVALID_ARGUMENT");
+      const auto version = Text(map, "version");
+      try { sd::updates::ParseVersion(version); } catch (...) { throw std::invalid_argument("INVALID_ARGUMENT"); }
+      const bool wasRequested = restart_.requested();
+      const bool allowed = !exitRequested_ && !osEnding_ && !activationClosed_ && !updatesStopped_ && activationStatus_ == 1 && updates_;
+      const bool accepted = !osEnding_ && restart_.Request(version, allowed, [&] { return updates_->service->AcceptRestart(version); });
+      if (accepted && !wasRequested) {
+        exitRequested_ = true; activationStatus_ = 2; updatesStopped_ = true;
+      }
+      result->Success(V(accepted));
+      if (accepted && !wasRequested) Emit("updateRestart");
     } else if (name == "runtime.finishExit") {
       const auto* complete = Field(map, "shutdownComplete");
       if (!complete || !std::holds_alternative<bool>(*complete) || !std::get<bool>(*complete) ||
@@ -416,18 +428,18 @@ bool PlatformChannel::OnMessage(UINT message, WPARAM wparam, LPARAM lparam, LRES
       DestroyMenu(menu); PostMessageW(window_, WM_NULL, 0, 0);
       if (command == 1) { Restore(); Emit("trayOpen"); }
       if (command == 2) {
-        exitRequested_ = true; activationStatus_ = 2; Emit("trayExit");
+        restart_.Cancel(); exitRequested_ = true; activationStatus_ = 2; Emit("trayExit");
       }
     }
     return true;
   }
   if (message == WM_QUERYENDSESSION) {
-    osEnding_ = exitRequested_ = true; activationStatus_ = 2;
+    restart_.Cancel(); osEnding_ = exitRequested_ = true; activationStatus_ = 2;
     Emit("osSessionEnding"); *result = TRUE; return true;
   }
   if (message == WM_ENDSESSION) {
     // Windows remains authority for forced session termination.
-    if (wparam) { osEnding_ = exitRequested_ = true; Emit("osSessionEnding"); }
+    if (wparam) { restart_.Cancel(); osEnding_ = exitRequested_ = true; Emit("osSessionEnding"); }
     return true;
   }
   if (message == kActivationMessage) {
@@ -435,7 +447,11 @@ bool PlatformChannel::OnMessage(UINT message, WPARAM wparam, LPARAM lparam, LRES
     SetEvent(activationAckEvent_.get());
     return true;
   }
-  if (message == WM_APP + 43) { DestroyWindow(window_); return true; }
+  if (message == WM_APP + 43) {
+    if (restart_.requested() && !osEnding_) PostQuitMessage(SD_HOST_UPDATE_RESTART);
+    else DestroyWindow(window_);
+    return true;
+  }
   return false;
 }
 void PlatformChannel::CloseActivation() {

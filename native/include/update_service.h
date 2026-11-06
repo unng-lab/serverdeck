@@ -52,6 +52,7 @@ class UpdateService {
   void Cancel();
   void SetEnabled(bool enabled);
   void Defer();
+  bool AcceptRestart(const std::string& version);
   void StopAdmission();
   void Drain();
   bool TryDrain(); // Window-thread safe poll; joins only an already terminated worker.

@@ -332,7 +332,7 @@ int main() {
     Reject([&] { sd::install::ParseRawResource(image.data(), 64, L"SERVERDECK_BUILD_V1", 128); }, "INVALID_ARTIFACT");
     for (const auto* invalid : {"SDBUILD001\n0.2.0\n", "SDBUILD001\n0.2.0+1\nextra\n", "SDBUILD001\n0.2.0+1\r\n"})
       Reject([&] { sd::install::DecodeBuildVersion(invalid); }, "INVALID_ARTIFACT");
-    for (const auto* scenarioName : {"gui-ready", "gui-unconfigured", "gui-timeout", "gui-timeout-defer-io", "gui-timeout-defer-checkpoint", "gui-bad-cache", "helper-offline", "helper-invalid",
+    for (const auto* scenarioName : {"restart-ready", "restart-timeout", "restart-invalid", "gui-ready", "gui-unconfigured", "gui-timeout", "gui-timeout-defer-io", "gui-timeout-defer-checkpoint", "gui-bad-cache", "helper-offline", "helper-invalid",
         "helper-success", "helper-stale", "helper-registered", "helper-committed"}) {
       const auto scenario = root / sd::Wide(scenarioName); sd::SecureDirectory(scenario);
       const sd::install::Paths paths{scenario / L"install", scenario / L"data", scenario / L"programs", sd::UserSid()};
@@ -347,7 +347,23 @@ int main() {
       const auto ready = pending.Download(old, oldCatalog, 100000, transport, cancel, commit);
       sd::install::Lease lease(paths, true); sd::install::Executor executor(files, lease, registration, validator);
       Launch process; sd::install::StartupInvocation invocation; const std::string mode(scenarioName);
-      if (mode == "gui-ready") {
+      if (mode == "restart-ready" || mode == "restart-timeout" || mode == "restart-invalid") {
+        if (mode == "restart-invalid") {
+          files.WriteRecord(PendingPath(ready.consent.slot, L"owner.v1"), "invalid ownership\n");
+          Reject([&] { sd::install::PrepareUpdateRestart(executor, pending, lease, paths, baseline.version, process); }, "RECOVERY_REQUIRED");
+          Require(!process.calls, "invalid restart spawned helper");
+        } else {
+          if (mode == "restart-timeout") {
+            process.result = WAIT_TIMEOUT;
+            Reject([&] { sd::install::PrepareUpdateRestart(executor, pending, lease, paths, baseline.version, process); }, "TIMEOUT");
+            Require(lease.Owns(paths, true) && files.Exists(L"pending/consent.v1"), "restart failure lost owner/consent");
+            process.result = WAIT_OBJECT_0;
+          }
+          const auto before = process.calls;
+          sd::install::PrepareUpdateRestart(executor, pending, lease, paths, baseline.version, process);
+          Require(process.calls == before + 1 && executor.Current()->version == baseline.version && lease.Owns(paths, true), "restart mutated installation or lost owner");
+        }
+      } else if (mode == "gui-ready") {
         Require(sd::install::PrepareGuiStartup(executor, pending, lease, paths, baseline.version, invocation, process) == sd::install::StartupAction::handedOff &&
           process.calls == 1 && executor.Current()->version == baseline.version, "parent entered host or mutated before helper");
       } else if (mode == "gui-unconfigured") {

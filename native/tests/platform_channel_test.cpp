@@ -292,6 +292,11 @@ int main() {
       {
         PlatformChannel channel(nullptr, &marker, args, isolated);
         if (marker.Call("updates.check", {{V("ownerEpoch"), V("stale")}}).error != "STALE_EPOCH") return 44;
+        M restart = epoch; restart.emplace(V("version"), V("0.2.0+1"));
+        if (std::get<bool>(marker.Call("runtime.requestUpdateRestart", restart).value) || factories) return 57;
+        restart.emplace(V("path"), V("foreign.exe"));
+        if (marker.Call("runtime.requestUpdateRestart", restart).error != "INVALID_ARGUMENT") return 58;
+        if (marker.Call("runtime.requestUpdateRestart", {{V("ownerEpoch"), V("stale")}, {V("version"), V("0.2.0+1")}}).error != "STALE_EPOCH") return 59;
         auto extra = epoch; extra[V("url")] = V("https://other.test");
         if (marker.Call("updates.snapshot", extra).error != "INVALID_ARGUMENT") return 45;
         auto setting = epoch; setting[V("enabled")] = V(1);

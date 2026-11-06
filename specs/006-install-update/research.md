@@ -74,3 +74,12 @@ DB dependency or cached UI/update-offer version is needed. Alternatives rejected
 GitHub latest (target is not installed), stored settings (stale), new build-time Dart
 constant (duplicates existing native metadata), new shared component (C18 suffices).
 Before native context exists show unknown, preserve existing error/retry behavior.
+
+## 2026-11-06: update restart
+
+Decision: explicit prepared-update restart uses the existing five-handle installer handoff
+from bootstrap after host unload; same owner.lock is retained and adopted with newly
+acquired maintenance. Rationale: avoids a child activating the still-running owner and
+avoids replacing the mapped canonical executable before parent exit. No new restart CLI
+or parent-only protocol. Rejected naive CreateProcess at finishExit: it races singleton
+activation. No unresolved product questions: user chose the update button, no tray restart.

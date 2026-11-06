@@ -1,22 +1,3 @@
-<!--
-Sync Impact Report 2026-11-04
-Version 2.0.0 -> 3.0.0 (MAJOR: user replaces direct EXE delivery with an installer).
-Modified IV: one downloaded full offline setup; one installed self-contained application.
-Transient installation/update/uninstall maintenance processes are permitted, without a
-service, database ownership or automatic termination of the primary application.
-Other principles, including the user's compatible-storage amendment VI, are preserved.
-Templates/commands read the constitution at runtime and are unchanged.
--->
-<!--
-Sync Impact Report 2026-11-04
-Version 1.4.0 -> 2.0.0 (MAJOR: user redefines principle VI for data preservation).
-Modified VI: no backward compatibility -> version bump only for demonstrated
-incompatibility; compatible Isar additions preserve data and format without app migrations.
-Other principles unchanged. No templates/commands changed: they read this policy at runtime.
-Dependent storage implementation/spec corrections are a separate authorized work stage.
-No placeholders, deferred governance decisions or extension hooks.
--->
-
 # ServerDeck Constitution
 
 ## Core Principles
@@ -81,8 +62,8 @@ SSH, MCP и хранение MUST принадлежать одному экзе
 пересылка сообщений основному экземпляру через защищённый локальный канал, без
 окна, трея, Isar, своих SSH-сеансов или отдельного серверного состояния. Это не
 отдельный EXE/служба и не второй владелец приложения. Мост может завершать только
-себя по EOF/отказу канала; пользовательский выход основного приложения остаётся
-только в трее. Отсутствие владельца не разрешает мосту запускать основное приложение.
+себя по EOF/отказу канала; обычный пользовательский выход основного приложения остаётся
+в трее; исключение — явно подтверждённое обновление с перезапуском по принципу V. Отсутствие владельца не разрешает мосту запускать основное приложение.
 
 Релиз MUST распространяться одним полным офлайн-установщиком `ServerDeckSetup.exe`,
 который устанавливает самодостаточный `ServerDeck.exe`, включающий Flutter/Isar
@@ -103,8 +84,11 @@ SSH, MCP и хранение MUST принадлежать одному экзе
 
 Крестик окна и Alt+F4 MUST скрывать окно в системный трей, сохраняя экземпляр,
 SSH-сеансы и включённый MCP. Нормальное завершение приложения пользователем
-MUST быть доступно только через «Выход» в меню трея; MCP и главное окно не получают
-альтернативную команду завершения. Из трея MUST быть возможно восстановить окно.
+MUST быть доступно через «Выход» в меню трея. Единственное дополнительное действие
+главного окна — «Обновить и перезапустить» для уже проверенного подготовленного
+выпуска, по явному подтверждению пользователя. Оно MUST использовать тот же безопасный
+shutdown; установщик получает управление лишь после закрытия SSH/MCP и данных.
+Общая команда выхода/перезапуска в окне или MCP не допускается. Из трея MUST быть возможно восстановить окно.
 Нельзя скрывать последнее окно, если доступного значка трея нет.
 
 При выходе MUST прекращаться приём новых операций, отменяться незавершённые
@@ -179,4 +163,4 @@ MUST NOT выполняться без явного запроса. Неизве
 MINOR — добавление правил, PATCH — уточнение без изменения смысла.
 При ревью MUST проверяться соблюдение правил в пределах изменённого scope.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-04
+**Version**: 4.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-06

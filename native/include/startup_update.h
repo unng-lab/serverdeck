@@ -8,6 +8,9 @@ enum class StartupAction { host, handedOff, relaunch };
 struct StartupInvocation { bool deferred = false; std::string code; };
 StartupAction PrepareGuiStartup(Executor& executor, updates::PendingStore& pending, Lease& lease,
     const Paths& paths, const updates::Version& mappedVersion, StartupInvocation& invocation, HandoffPort& process, bool configured = true);
+// Post-host restart only: failure is reported to native retry/cancel, never host fallback.
+void PrepareUpdateRestart(Executor& executor, updates::PendingStore& pending, Lease& lease,
+    const Paths& paths, const updates::Version& mappedVersion, HandoffPort& process);
 // Called only after a validated helper has acknowledged readiness and observed
 // its actual parent terminate. False means verified old installation + deferOnce.
 bool ApplySelectedPending(Executor& executor, updates::PendingStore& pending, Lease& lease,

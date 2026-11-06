@@ -32,7 +32,7 @@ int WINAPI ServerDeckRunMainV1(const ServerDeckHostArgsV1* args) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
       }
-      if (status == -1) result = 5;
+      result = ServerDeckFinishHostPumpV1(status, message.wParam, window);
     }
   } catch (...) { result = pumping ? SD_HOST_RUNTIME_FAILED : SD_HOST_INITIALIZATION_FAILED; }
   CoUninitialize();

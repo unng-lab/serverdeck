@@ -30,8 +30,8 @@ UI обновлений переиспользует готовые компон
 - II/III: только unit/fake/static/build; никакого запуска продукта/реальной Isar из тестов.
 - IV: синхронизирован по пользовательскому решению installer → installed EXE;
   transient maintenance не открывает бизнес-данные и не является фоновой службой.
-- V: работающий owner завершается только пользователем через трей. Startup handoff
-  до host не является альтернативным выходом из UI.
+- V: обычный выход через трей; явно подтверждённое обновление с перезапуском —
+  узкое исключение constitution4.0.0, использующее общий безопасный shutdown.
 - VI: сохранение данных, без искусственного format bump/migration/reset.
 - Post-design gate: те же ограничения закреплены в контрактах и задачах.
 
@@ -155,3 +155,13 @@ signed v0.1.0+2 catalog record. No schema/dependency/key/root/automatic-exit cha
 Review correction: release is a read-only ValueListenable<String?>, published at
 native initialize completion independently of pending DB open; RuntimeView observes
 it with ValueListenableBuilder. No new wire events/sequence values or extra calls.
+
+## Amendment: direct update entry and safe restart
+
+FR-621 → RuntimeView separate owned update route + UpdateView, C02/C14/C18, T083.
+FR-622 → RuntimeCoordinator/RuntimePlatform typed request + native atomic UpdateService
+acceptance/latch, shared cleanup and retry, T084. FR-623 → host result8,
+bootstrap owner-to-maintenance transfer and dedicated restart adapter in startup_update,
+T085. Tests T086 cover AC-619–620 and SC-607; full release/check/review T087.
+T082 readiness precedes code; T083 and T084 may be developed independently, T085 follows
+native contract, T086 validates combined behavior. Shared design scope unchanged.

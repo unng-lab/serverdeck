@@ -60,6 +60,7 @@ class Lease {
  public:
   explicit Lease(const Paths& paths, bool vacantOwner, DWORD timeoutMs = 3000);
   static std::unique_ptr<Lease> Adopt(const Paths& paths, std::unique_ptr<Handle> maintenance, std::unique_ptr<Handle> owner);
+  static std::unique_ptr<Lease> Resume(const Paths& paths, std::unique_ptr<Handle>& owner, DWORD timeoutMs = 3000);
   void ReleaseMaintenance() { maintenance_.reset(); }
   HANDLE maintenance() const { return maintenance_ ? maintenance_->get() : INVALID_HANDLE_VALUE; }
   HANDLE owner() const { return owner_ ? owner_->get() : INVALID_HANDLE_VALUE; }

@@ -484,6 +484,14 @@ void UpdateService::Defer() {
   store_.Save(preferences); snapshot_.preferences = preferences;
   snapshot_.state = "idle"; snapshot_.code.clear(); snapshot_.offer.reset();
 }
+bool UpdateService::AcceptRestart(const std::string& version) {
+  const auto target = ParseVersion(version);
+  std::lock_guard<std::mutex> command(command_);
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (stopped_ || busy_ || !restored_ || !prepared_ || !snapshot_.preparedCode.empty() ||
+      !(prepared_->release.version == target) || !(snapshot_.current < target)) return false;
+  stopped_ = true; ++generation_; return true;
+}
 void UpdateService::StopAdmission() { std::lock_guard<std::mutex> lock(mutex_); stopped_ = true; ++generation_; }
 void UpdateService::Drain() { std::lock_guard<std::mutex> command(command_); if (worker_.joinable()) worker_.join(); }
 bool UpdateService::TryDrain() {

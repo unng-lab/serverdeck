@@ -271,6 +271,12 @@ Lease::Lease(const Paths& paths, bool vacantOwner, DWORD timeoutMs) : paths_(pat
   maintenance_ = Acquire(paths.data / L"maintenance.lock", timeoutMs, "BUSY");
   if (vacantOwner) owner_ = Acquire(paths.data / L"owner.lock", 0, "OWNER_RUNNING");
 }
+std::unique_ptr<Lease> Lease::Resume(const Paths& paths, std::unique_ptr<Handle>& owner, DWORD timeoutMs) {
+  auto lease = std::make_unique<Lease>(paths, false, timeoutMs);
+  if (!owner) throw updates::Failure("RECOVERY_REQUIRED");
+  ValidateLeaseHandle(owner->get(), paths.data / L"owner.lock");
+  lease->owner_ = std::move(owner); return lease;
+}
 bool Lease::Owns(const Paths& paths, bool vacantOwner) const {
   const auto equal = [](const std::filesystem::path& a, const std::filesystem::path& b) { return Within(a, b) && Within(b, a); };
   return maintenance_ && maintenance_->valid() && (!vacantOwner || (owner_ && owner_->valid())) &&

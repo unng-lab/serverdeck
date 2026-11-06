@@ -40,6 +40,14 @@ StartupAction PrepareGuiStartup(Executor& executor, updates::PendingStore& pendi
     return StartupAction::host;
   }
 }
+void PrepareUpdateRestart(Executor& executor, updates::PendingStore& pending, Lease& lease,
+    const Paths& paths, const updates::Version& mappedVersion, HandoffPort& process) {
+  const auto installed = executor.PrepareStartup();
+  if (!(installed.version == mappedVersion)) throw updates::Failure("RECOVERY_REQUIRED");
+  const auto candidate = pending.PrepareStartup(lease, installed);
+  if (!candidate || !(installed.version < candidate->release.version)) throw updates::Failure("SOURCE_CHANGED");
+  StartPendingHandoff(lease, paths, candidate->consent.slot, process);
+}
 bool ApplySelectedPending(Executor& executor, updates::PendingStore& pending, Lease& lease,
     const updates::PendingConsent& expected, const Package& package, const updates::Policy& policy,
     updates::CatalogSource& source, updates::UpdateService::Clock clock, MaintenanceReporter report) {

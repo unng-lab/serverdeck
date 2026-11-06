@@ -81,6 +81,7 @@ struct Backend : sd::updates::PendingPersistence {
   bool beforeCommit = false, afterCommit = false, blockRestore = false;
   bool ignoreCancel = false, failRestore = false;
   bool cleanupFailure = false;
+  std::string downloadFailure;
   bool enteredDownload = false, enteredRestore = false, released = false;
   std::mutex mutex; std::condition_variable changed;
   std::optional<sd::updates::PendingUpdate> Restore() override {
@@ -93,6 +94,7 @@ struct Backend : sd::updates::PendingPersistence {
       sd::updates::ArtifactTransport&, const std::atomic<bool>& cancel, const sd::updates::PendingCommit& commit,
       sd::updates::ArtifactProgress progress) override {
     std::unique_lock<std::mutex> lock(mutex); ++downloads;
+    if (!downloadFailure.empty()) throw sd::updates::Failure(downloadFailure.c_str());
     auto candidate = Pending(release, catalog, at); candidate.consent.slot = persisted ? 1 - persisted->consent.slot : 0;
     progress(0, {}); progress(release.setupSize, {});
     enteredDownload = true; changed.notify_all();
@@ -208,6 +210,7 @@ int main() {
       Require(service.Read().state == "failed" && service.Read().code == "NETWORK_UNAVAILABLE" &&
         service.Read().preparedVersion == oldRelease.version.text && service.Read().preparedCode == "NETWORK_UNAVAILABLE" && !source.requests,
         "fallback falsely restored ready or lost prepared identity");
+      Require(!service.AcceptRestart(oldRelease.version.text), "startup failed prepared restart accepted");
       service.Check(); service.Drain(); Require(service.Read().state == "ready" && service.Read().preparedCode.empty(), "fresh check did not clear startup failure");
     }
     {
@@ -220,11 +223,24 @@ int main() {
         "check lost prior ready or downloaded without consent");
       Reject([&] { service.Download("0.4.0+1"); }, "SOURCE_CHANGED");
       service.Download("0.3.0+1"); backend.Entered();
+      Require(!service.AcceptRestart(oldRelease.version.text), "restart during active replacement");
       Require(service.Read().state == "verifying" && !service.Read().total && !service.TryDrain(), "progress/drain state");
       Reject([&] { service.Check(); }, "BUSY");
       service.Cancel(); backend.Release(); service.Drain();
       Require(service.Read().code == "CANCELLED" && backend.persisted->release.version == oldRelease.version &&
         service.Read().preparedVersion == oldRelease.version.text && backend.downloads == 1, "cancel consumed prior readiness");
+      Require(!service.AcceptRestart("0.4.0+1"), "wrong restart target accepted");
+      Require(service.AcceptRestart(oldRelease.version.text), "cancelled replacement blocked retained ready");
+      Require(!service.AcceptRestart(oldRelease.version.text), "stopped service accepted again");
+      Reject([&] { service.Check(); }, "CANCELLED");
+    }
+    {
+      Backend backend; backend.persisted = Pending(oldRelease, oldCatalog); backend.downloadFailure = "NETWORK_UNAVAILABLE";
+      Artifacts artifacts; Source source; source.bytes = newCatalog;
+      UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); service.Drain();
+      service.Check(); service.Drain(); service.Download("0.3.0+1"); service.Drain();
+      Require(service.Read().state == "failed" && service.Read().code == "NETWORK_UNAVAILABLE" &&
+        service.Read().preparedCode.empty() && service.AcceptRestart(oldRelease.version.text), "failed replacement blocked retained ready");
     }
     for (const bool cleanupFailure : {false, true}) {
       Backend backend; backend.afterCommit = true; backend.cleanupFailure = cleanupFailure; Artifacts artifacts; Source source; source.bytes = oldCatalog;
@@ -249,6 +265,7 @@ int main() {
       UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); service.Drain();
       service.Check(); service.Drain();
       Require(service.Read().state == "available" && service.Read().preparedCode == "RELEASE_REVOKED", "replacement hid revocation");
+      Require(!service.AcceptRestart(oldRelease.version.text), "revoked prepared restart accepted");
       const auto success = service.Read().preferences.lastSuccess;
       ++now; source.bytes = signer.Catalog("", 0); service.Check(); service.Drain();
       Require(service.Read().state == "failed" && service.Read().code == "RELEASE_REVOKED" && service.Read().preferences.lastSuccess == success &&
@@ -261,6 +278,7 @@ int main() {
       UpdateService service(policy, current, store, &source, clock, &backend, &artifacts); backend.Entered(true);
       Require(!service.TryDrain(), "live restore treated as drained"); service.Cancel(); backend.Release(); service.Drain();
       Require(service.Read().code == "CANCELLED" && service.Read().preparedVersion.empty(), "late restore resurrected readiness");
+      Require(!service.AcceptRestart(oldRelease.version.text), "unrestored restart accepted");
     }
     {
       Backend backend; backend.failRestore = true; Artifacts artifacts; Source source; source.bytes = oldCatalog;

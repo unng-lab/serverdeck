@@ -9,6 +9,35 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test(
+    'restart request is restricted to owner epoch and exact version',
+    () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return true;
+      });
+      final platform = NativePlatform(epoch: 'unit-owner', channel: channel);
+      expect(await platform.requestUpdateRestart('0.1.0+4'), isTrue);
+      expect(calls.single.method, 'runtime.requestUpdateRestart');
+      expect(calls.single.arguments, {
+        'ownerEpoch': 'unit-owner',
+        'version': '0.1.0+4',
+      });
+      expect(
+        PlatformSnapshot.decode({
+          'ownerEpoch': 'unit-owner',
+          'seq': 2,
+          'windowState': 'visible',
+          'trayAvailable': true,
+          'osEnding': false,
+          'exitRequested': true,
+          'updateRestartRequested': true,
+        }).updateRestartRequested,
+        isTrue,
+      );
+    },
+  );
   testWidgets('native stop and drain use same epoch and wait for termination', (
     tester,
   ) async {

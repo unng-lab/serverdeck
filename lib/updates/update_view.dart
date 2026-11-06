@@ -31,14 +31,73 @@ String _failure(String? code) => switch (code) {
 /// Global settings content. The runtime owns its route and every nested prompt;
 /// this widget only presents state and requests explicit consent through C14.
 class UpdateView extends StatefulWidget {
-  const UpdateView({super.key, required this.owner});
+  const UpdateView({super.key, required this.owner, this.onRestart});
   final UpdateOwner owner;
+  final Future<bool> Function(String version)? onRestart;
   @override
   State<UpdateView> createState() => _UpdateViewState();
 }
 
 class _UpdateViewState extends State<UpdateView> {
   bool _pending = false;
+  String? _restartError;
+  bool _restartPrompt = false;
+  Future<void> _restart() async {
+    if (_restartPrompt) return;
+    _restartPrompt = true;
+    try {
+      await _restartConfirmed();
+    } finally {
+      _restartPrompt = false;
+    }
+  }
+
+  Future<void> _restartConfirmed() async {
+    final owner = widget.owner, version = widget.owner.snapshot.preparedVersion;
+    if (_pending ||
+        !owner.canRestart ||
+        version == null ||
+        widget.onRestart == null)
+      return;
+    final callback = widget.onRestart!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: false,
+      builder: (dialogContext) => DeckDialogLayout(
+        title: 'Обновить до $version и перезапустить?',
+        child: const Text(
+          'Данные будут сохранены, SSH-подключения и MCP закроются. '
+          'После перезапуска подключения не восстановятся автоматически.',
+        ),
+        actions: [
+          DeckButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена'),
+          ),
+          DeckButton(
+            kind: DeckButtonKind.primary,
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Обновить и перезапустить'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted ||
+        !identical(owner, widget.owner) ||
+        confirmed != true ||
+        !owner.canRestart ||
+        owner.snapshot.preparedVersion != version ||
+        callback != widget.onRestart)
+      return;
+    await _run(() async {
+      final accepted = await callback(version);
+      if (mounted)
+        setState(
+          () => _restartError = accepted ? null : 'Не удалось начать обновление. Обновите состояние и повторите попытку.',
+        );
+    });
+  }
+
   Future<void> _run(Future<void> Function() action) async {
     if (_pending) return;
     setState(() => _pending = true);
@@ -64,7 +123,7 @@ class _UpdateViewState extends State<UpdateView> {
             Text('Будет скачан полный установщик: ${offer.setupSize} байт.'),
             const Text(
               'После проверки этот выпуск установится при следующем запуске программы. '
-              'Когда будете готовы, выйдите через меню трея и снова запустите ServerDeck. '
+              'После подготовки можно обновить и перезапустить приложение или выйти через меню трея и запустить его позже. '
               'Профили, настройки и защищённые учётные данные сохранятся.',
             ),
           ],
@@ -197,15 +256,29 @@ class _UpdateViewState extends State<UpdateView> {
                     ? null
                     : snapshot.bytes / snapshot.total!,
               ),
+            if (_restartError != null)
+              DeckNotice(
+                title: 'Обновление не начато',
+                message: _restartError!,
+                tone: DeckTone.warning,
+              ),
             if (snapshot.state == UpdateState.ready)
-              const DeckNotice(
+              DeckNotice(
                 title: 'Установщик проверен',
-                message: 'Когда будете готовы, выйдите из ServerDeck через меню трея, затем снова запустите программу. Обновление применится до открытия данных.',
+                message: widget.onRestart == null
+                    ? 'Когда будете готовы, выйдите из ServerDeck через меню трея, затем снова запустите программу. Обновление применится до открытия данных.'
+                    : 'Можно обновить и перезапустить приложение сейчас или продолжить работу и запустить его позже. Обновление применится до открытия данных.',
                 nextStep: 'Текущие SSH-подключения продолжают работать до вашего выхода.',
                 tone: DeckTone.success,
               ),
             DeckActions(
               children: [
+                if (widget.onRestart != null && owner.canRestart)
+                  DeckButton(
+                    kind: DeckButtonKind.primary,
+                    onPressed: _pending ? null : _restart,
+                    child: const Text('Обновить и перезапустить'),
+                  ),
                 DeckButton(
                   onPressed: _pending || snapshot.active
                       ? null
