@@ -6,6 +6,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:pointycastle/digests/sha256.dart';
 
 import '../domain/models.dart';
+import '../console/console_port.dart';
 import '../journals/journal_models.dart';
 import '../journals/journal_port.dart';
 import '../journals/journal_protocol.dart';
@@ -155,7 +156,11 @@ abstract interface class MonitoringSshConnection {
 }
 
 final class StrictSshTransport
-    implements SshConnection, MonitoringSshConnection, JournalSshConnection {
+    implements
+        SshConnection,
+        MonitoringSshConnection,
+        JournalSshConnection,
+        ConsoleSshConnection {
   StrictSshTransport({
     required SSHSocket socket,
     required String username,
@@ -303,6 +308,175 @@ final class StrictSshTransport
   Future<void> get authenticated => _authenticated.future;
   Future<OperationFailure?> get ended => _ended.future;
   bool get isClosed => _stopped || _client.isClosed;
+
+  @override
+  ConsoleOpening openConsole({
+    String? path,
+    required void Function(Uint8List) onData,
+    required void Function() guard,
+  }) {
+    _checkAuth();
+    guard();
+    try {
+      final operation = _client.startOwnedPty(
+        SSHOwnedPtyOptions(
+          path: path,
+          onData: onData,
+          send: (payload, checkAction, committed, wait) => _sendConsolePacket(
+            payload,
+            () {
+              guard();
+              checkAction();
+            },
+            committed,
+            wait,
+          ),
+        ),
+      );
+      return _ConsoleOpening(operation);
+    } catch (error) {
+      throw _consoleOpenFailure(error);
+    }
+  }
+
+  Future<void> _sendConsolePacket(
+    Uint8List payload,
+    void Function() guard,
+    void Function() committed,
+    SSHOwnedPacketWait wait,
+  ) async {
+    while (true) {
+      await _waitConsoleReady(guard, wait, rekey: true);
+      var sent = false;
+      await _admitConsolePacket(wait, guard, () {
+        _checkAuth();
+        if (wait.remaining() <= Duration.zero) {
+          throw const OperationFailure(FailureCode.timeout);
+        }
+        if (_socket.hasPendingWrites || _client.ownedPacketBlocked) return;
+        guard();
+        sent = _socket.runImmediate(payload.length + 256, () {
+          final accepted = _client.trySendOwnedPacket(payload);
+          if (accepted) committed();
+          return accepted;
+        });
+      });
+      if (sent) {
+        await _waitConsoleReady(guard, wait, rekey: false);
+        return;
+      }
+    }
+  }
+
+  int _consoleAdmissions = 0;
+  int get consoleAdmissionCount => _consoleAdmissions;
+  int get consolePacketWaiterCount =>
+      _socket._drainListeners.length + _client.ownedPacketWaiterCount;
+
+  Future<void> _admitConsolePacket(
+    SSHOwnedPacketWait wait,
+    void Function() guard,
+    void Function() write,
+  ) async {
+    if (_consoleAdmissions >= 64)
+      throw const OperationFailure(FailureCode.resourceExhausted);
+    _consoleAdmissions++;
+    var active = true;
+    final result = Completer<void>();
+    void checkCancelled() {
+      try {
+        guard();
+      } catch (error, stack) {
+        if (!result.isCompleted) result.completeError(error, stack);
+      }
+    }
+
+    final off = wait.listenCancelled(checkCancelled);
+    final remaining = wait.remaining();
+    final timer = Timer(
+      remaining > Duration.zero ? remaining : Duration.zero,
+      () {
+        if (!result.isCompleted)
+          result.completeError(const OperationFailure(FailureCode.timeout));
+      },
+    );
+    unawaited(
+      Future<void>.sync(
+        () => _socket.admit(() {
+          if (!active) throw const WorkCancelled();
+          guard();
+          if (wait.remaining() <= Duration.zero)
+            throw const OperationFailure(FailureCode.timeout);
+          write();
+        }),
+      ).then(
+        (_) {
+          _consoleAdmissions--;
+          if (!result.isCompleted) result.complete();
+        },
+        onError: (Object error, StackTrace stack) {
+          _consoleAdmissions--;
+          if (!result.isCompleted) result.completeError(error, stack);
+        },
+      ),
+    );
+    try {
+      checkCancelled();
+      await result.future;
+    } finally {
+      active = false;
+      off();
+      timer.cancel();
+    }
+    // A queued gate callback may finish later. Its bounded reservation remains
+    // until then, and its inactive latch forbids encryption or a socket write.
+  }
+
+  Future<void> _waitConsoleReady(
+    void Function() guard,
+    SSHOwnedPacketWait wait, {
+    required bool rekey,
+  }) async {
+    final result = Completer<void>();
+    void check() {
+      if (result.isCompleted) return;
+      try {
+        _checkAuth();
+        guard();
+        if (wait.remaining() <= Duration.zero)
+          throw const OperationFailure(FailureCode.timeout);
+        if (_socket._stopped)
+          throw _socket._failure ??
+              const OperationFailure(FailureCode.networkError);
+        if (!_socket.hasPendingWrites &&
+            (!rekey || !_client.ownedPacketBlocked))
+          result.complete();
+      } catch (error, stack) {
+        result.completeError(error, stack);
+      }
+    }
+
+    final offDrain = _socket.listenDrained(check);
+    final offKex = _client.listenOwnedPacketReady(check);
+    final offCancel = wait.listenCancelled(check);
+    final remaining = wait.remaining();
+    final timer = Timer(
+      remaining > Duration.zero ? remaining : Duration.zero,
+      () {
+        if (!result.isCompleted)
+          result.completeError(const OperationFailure(FailureCode.timeout));
+      },
+    );
+    try {
+      check();
+      await result.future;
+    } finally {
+      offDrain();
+      offKex();
+      offCancel();
+      timer.cancel();
+    }
+  }
 
   @override
   Future<LinuxSample> collectMonitoring(
@@ -559,6 +733,76 @@ final class _AdmittedSocket implements SSHSocket {
   bool _stopped = false, _closed = false;
   int _bytes = 0, _count = 0;
   OperationFailure? _failure;
+  bool _immediate = false;
+  int _immediateMax = 0, _immediateAdds = 0;
+  bool get hasPendingWrites => _count != 0;
+  final _drainListeners = <void Function()>{};
+  bool _drainSignalScheduled = false;
+  void Function() listenDrained(void Function() callback) {
+    _drainListeners.add(callback);
+    return () => _drainListeners.remove(callback);
+  }
+
+  void _signalDrained() {
+    if (_drainSignalScheduled) return;
+    _drainSignalScheduled = true;
+    scheduleMicrotask(() {
+      _drainSignalScheduled = false;
+      for (final listener in List.of(_drainListeners)) {
+        if (_drainListeners.contains(listener)) listener();
+      }
+    });
+  }
+
+  /// Called only inside canonical connection admission. No await or user hook.
+  bool runImmediate(int maximumBytes, bool Function() serialize) {
+    if (_stopped || _immediate || _count != 0 || maximumBytes > maxBytes) {
+      throw const OperationFailure(FailureCode.conflict);
+    }
+    _count++;
+    _bytes += maximumBytes;
+    _immediate = true;
+    _immediateMax = maximumBytes;
+    _immediateAdds = 0;
+    var reserved = true;
+    void release() {
+      if (!reserved) return;
+      reserved = false;
+      _count--;
+      _bytes -= maximumBytes;
+      _signalDrained();
+    }
+
+    try {
+      final sent = serialize();
+      if (!sent) {
+        release();
+        return false;
+      }
+      if (_immediateAdds != 1) throw StateError('Invalid owned packet framing');
+      _tail = _tail.then((_) async {
+        try {
+          await raw.flush();
+        } catch (error) {
+          _stopped = true;
+          _failure ??= sshFailure(error);
+          failure(_failure!);
+        } finally {
+          release();
+        }
+      });
+      return true;
+    } catch (error) {
+      release();
+      _stopped = true;
+      _failure ??= sshFailure(error);
+      failure(_failure!);
+      rethrow;
+    } finally {
+      _immediate = false;
+    }
+  }
+
   static const maxBytes = 1024 * 1024, maxPackets = 64;
   @override
   Stream<Uint8List> get stream => raw.stream;
@@ -566,8 +810,19 @@ final class _AdmittedSocket implements SSHSocket {
   StreamSink<List<int>> get sink => _sink;
   @override
   Future<void> get done => raw.done;
-  void stopWrites() => _stopped = true;
+  void stopWrites() {
+    _stopped = true;
+    _signalDrained();
+  }
+
   void add(List<int> bytes) {
+    if (_immediate) {
+      if (_stopped || ++_immediateAdds != 1 || bytes.length > _immediateMax) {
+        throw StateError('Owned packet exceeded pre-encryption reservation');
+      }
+      raw.sink.add(Uint8List.fromList(bytes).asUnmodifiableView());
+      return;
+    }
     if (_stopped) return;
     if (_count >= maxPackets || bytes.length > maxBytes - _bytes) {
       final error = const OperationFailure(
@@ -605,6 +860,7 @@ final class _AdmittedSocket implements SSHSocket {
         active = false;
         _count--;
         _bytes -= packet.length;
+        _signalDrained();
         packet.fillRange(0, packet.length, 0);
       }
     });
@@ -670,4 +926,69 @@ final class _AdmittedSink implements StreamSink<List<int>> {
   Future<void> close() => owner.close();
   @override
   Future<void> get done => owner.done;
+}
+
+final class _ConsoleOpening implements ConsoleOpening {
+  const _ConsoleOpening(this.operation);
+  final SSHOwnedPtyOperation operation;
+  @override
+  Future<ConsoleChannel> get opened => operation.opened.then(
+    _ConsoleChannel.new,
+    onError: (Object error, StackTrace stack) =>
+        throw _consoleOpenFailure(error),
+  );
+  @override
+  void cancel() => operation.cancel();
+}
+
+ConsoleOpenFailure _consoleOpenFailure(Object error) =>
+    ConsoleOpenFailure(switch (error) {
+      SSHOwnedPtyError(reason: 'ptyDenied') => ConsoleOpenFailureCode.ptyDenied,
+      SSHOwnedPtyError(reason: 'shellDenied') =>
+        ConsoleOpenFailureCode.shellDenied,
+      SSHOwnedPtyError(reason: 'cleanupPending') =>
+        ConsoleOpenFailureCode.cleanupRequired,
+      SSHOwnedPtyError(reason: 'timeout') ||
+      TimeoutException() => ConsoleOpenFailureCode.timeout,
+      SSHOwnedPtyError(reason: 'invalidPacketSize') =>
+        ConsoleOpenFailureCode.unsupportedServer,
+      SSHOwnedPtyError(reason: 'cancelled') ||
+      WorkCancelled() => ConsoleOpenFailureCode.cancelled,
+      _ => ConsoleOpenFailureCode.networkError,
+    });
+
+final class _ConsoleChannel implements ConsoleChannel {
+  const _ConsoleChannel(this.session);
+  final SSHOwnedPtySession session;
+  @override
+  Future<void> get done => session.streamsDone;
+  @override
+  int? get exitCode => session.exitCode;
+  @override
+  String? get failure => session.failure;
+  @override
+  void abort() => session.abort();
+  @override
+  Future<ConsoleWriteOutcome> write(
+    Uint8List bytes, {
+    required void Function() guard,
+    required WorkCancellation cancellation,
+  }) async {
+    final token = SSHOwnedPtyCancellation();
+    final off = cancellation.listen(token.cancel);
+    try {
+      final result = await session.sendGuardedData(
+        bytes,
+        guard: guard,
+        cancellation: token,
+      );
+      return ConsoleWriteOutcome(result.acceptedBytes, result.status.name);
+    } finally {
+      off();
+    }
+  }
+
+  @override
+  Future<void> resize(int columns, int rows, void Function() guard) =>
+      session.resizeGuarded(columns, rows, guard);
 }

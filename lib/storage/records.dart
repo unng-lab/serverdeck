@@ -12,6 +12,7 @@ class AppSettings {
   int dataRevision = 1;
   int profilesListRevision = 1;
   String theme = 'dark';
+  String? terminalConfiguration;
   bool mcpEnabled = false;
   int createdAt = DateTime.now().toUtc().millisecondsSinceEpoch;
   int lastSuccessfulOpenAt = DateTime.now().toUtc().millisecondsSinceEpoch;

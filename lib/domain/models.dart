@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../console/console_models.dart';
+
 final _uuid = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
 );
@@ -27,7 +29,11 @@ enum FailureCode {
   protectionUnavailable('PROTECTION_UNAVAILABLE'),
   shuttingDown('SHUTTING_DOWN'),
   resourceExhausted('RESOURCE_EXHAUSTED'),
-  cleanupRequired('CLEANUP_REQUIRED');
+  cleanupRequired('CLEANUP_REQUIRED'),
+  consoleNotFound('CONSOLE_NOT_FOUND'),
+  consoleInactive('CONSOLE_INACTIVE'),
+  consoleInputBusy('CONSOLE_INPUT_BUSY'),
+  consoleReplayExpired('CONSOLE_REPLAY_EXPIRED');
 
   const FailureCode(this.wire);
   final String wire;
@@ -498,3 +504,11 @@ int nextRevision(int current) {
 
 bool isWellFormedUnicode(String value) =>
     !value.runes.any((rune) => rune >= 0xd800 && rune <= 0xdfff);
+
+/// Explicit console projections; credential records and arbitrary payload maps are excluded.
+final class ConsoleValue extends PublicValue {
+  const ConsoleValue(this.console);
+  final ConsoleProjection console;
+  @override
+  Map<String, Object?> toJson() => console.toJson();
+}

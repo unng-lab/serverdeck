@@ -67,6 +67,7 @@ final class GrantOwner
     required this.exePath,
     Uint8List Function()? randomSecret,
     ScheduleOwnedDeadline? schedule,
+    this.onClientInvalidated,
   }) : _random = randomSecret ?? _secret,
        _schedule = schedule ?? _timer;
   static const lifetimeMs = 90 * 24 * 60 * 60 * 1000;
@@ -81,6 +82,7 @@ final class GrantOwner
   final String userSid, logonSid, exePath;
   final Uint8List Function() _random;
   final ScheduleOwnedDeadline _schedule;
+  final void Function(String clientId)? onClientInvalidated;
   final _quarantine = <String>{},
       _closures = <String, Future<void>>{},
       _work = <Future<void>>{};
@@ -530,6 +532,7 @@ final class GrantOwner
 
   Future<void> _close(String clientId) async {
     _quarantine.add(clientId);
+    onClientInvalidated?.call(clientId);
     final work = _closures.putIfAbsent(clientId, () {
       final job = Future.wait([
         transport.closeClient(clientId),

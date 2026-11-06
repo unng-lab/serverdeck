@@ -29,6 +29,14 @@ final class ToolSchemas {
     'trust.accept',
     'trust.replace',
     'trust.retain',
+    'console.profiles',
+    'console.list',
+    'console.open',
+    'console.read',
+    'console.acquire',
+    'console.release',
+    'console.write',
+    'console.close',
   };
   final List<Map<String, dynamic>> tools;
   static Future<ToolSchemas> load() async => ToolSchemas(

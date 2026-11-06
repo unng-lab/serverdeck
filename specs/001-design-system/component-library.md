@@ -855,3 +855,11 @@ Hover/tap выбирает ближайший реальный timestamp;общ�
 Текстовая альтернатива «Значения истории» и owner actions сохраняются. Quality
 даёт owner,сохранённые точки не объявляются текущими. Пустота видна для каждой серии.
 Synthetic shared design/interaction checks только001/test_design/components.
+
+## C26 — Встроенный терминал (вариант 007)
+
+Вариант расширяет C26, не меняет существующий DeckCode. Реализация: lib/ui/deck_terminal.dart; engine vendored xterm4.0.0 MIT, требования/ограничения — [терминальный контракт007](../007-server-console/contracts/terminal.md).
+
+Входы: одна Terminal model owner,readOnly,onPaste,onResize,keyboard eligibility. События: owner-mediated input/paste/resize; TerminalView не создаёт SSH,grant,lease,retry/consent и не копирует историю. Shortcut paste, internal PasteTextIntent и platform/IME multiline edits идут через один onPaste callback; многострочное согласие — owner/C14,а не терминальный компонент. BrandTheme/C01 и локальные шрифты.
+
+Состояния: editable/readOnly/no focus; error/loading/closed снаружи компонентамиC10–12. Синтетическая приёмка: модель/ввод/callbacks/focus/readOnly/paste route,shared component themes/constraints отдельно в001. Нет feature-screen captures/layout acceptance. Реализовано R020/007T015; synthetic shared checks и независимое ревью выполнены вместе с007 (см. reviews/evidence.md и reviews/final.md этого пакета).

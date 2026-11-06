@@ -390,6 +390,40 @@ class SSHTransport {
   /// (if encryption has been negotiated), and writes the bytes to the underlying socket.
   /// If a key exchange is currently in progress, packets are queued and sent after
   /// the key exchange completes (except for key exchange control messages which bypass the queue).
+  bool get isKexInProgress => _kexInProgress;
+  final _ownedReadyListeners = <void Function()>{};
+  int get ownedReadyListenerCount => _ownedReadyListeners.length;
+  void Function() listenOwnedReady(void Function() callback) {
+    _ownedReadyListeners.add(callback);
+    return () => _ownedReadyListeners.remove(callback);
+  }
+
+  void _signalOwnedReady() {
+    scheduleMicrotask(() {
+      for (final listener in List.of(_ownedReadyListeners)) {
+        if (_ownedReadyListeners.contains(listener)) listener();
+      }
+    });
+  }
+
+  Future<void> waitForKexReady() {
+    if (isClosed) return Future.error(SSHStateError('Transport is closed'));
+    return _kexInProgress ? _waitForNewKeys() : Future.value();
+  }
+
+  /// False is effect-free: no cipher/sequence update and no rekey buffering.
+  bool trySendPacket(Uint8List payload) {
+    if (_kexInProgress) return false;
+    if (isClosed) throw SSHStateError('Transport is closed');
+    try {
+      sendPacket(payload);
+      return true;
+    } catch (error, stack) {
+      closeWithError(SSHInternalError(error), stack);
+      rethrow;
+    }
+  }
+
   void sendPacket(Uint8List data) {
     if (isClosed) {
       throw SSHStateError('Transport is closed');
@@ -621,6 +655,7 @@ class SSHTransport {
     _socketSubscription?.cancel();
     _socketSubscription = null;
     _doneCompleter.complete();
+    _signalOwnedReady();
     _failPendingRekey(
       SSHStateError('Transport closed before the key exchange completed'),
       StackTrace.current,
@@ -635,6 +670,7 @@ class SSHTransport {
     _socketSubscription?.cancel();
     _socketSubscription = null;
     _doneCompleter.completeError(error, stackTrace ?? StackTrace.current);
+    _signalOwnedReady();
     _failPendingRekey(error, stackTrace ?? StackTrace.current);
     socket.destroy();
   }
@@ -2070,6 +2106,7 @@ class SSHTransport {
 
     // Key exchange round finished.
     _kexInProgress = false;
+    _signalOwnedReady();
     _sentKexInit = false;
     _isFirstKex = false;
     _kex = null;

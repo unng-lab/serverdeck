@@ -44,6 +44,7 @@ AppSettings copySettings(AppSettings value) => AppSettings()
   ..dataRevision = value.dataRevision
   ..profilesListRevision = value.profilesListRevision
   ..theme = value.theme
+  ..terminalConfiguration = value.terminalConfiguration
   ..mcpEnabled = value.mcpEnabled
   ..createdAt = value.createdAt
   ..lastSuccessfulOpenAt = value.lastSuccessfulOpenAt;

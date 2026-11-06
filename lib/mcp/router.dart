@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../console/console_models.dart';
+import '../console/console_operations.dart';
+
 import '../domain/actor.dart';
 import '../domain/app_operations.dart';
 import '../domain/models.dart';
@@ -13,11 +16,13 @@ final class McpRouter {
     required this.grants,
     required this.schemas,
     required this.release,
+    this.consoles,
   });
   final AppOperations operations;
   final GrantOwner grants;
   final ToolSchemas schemas;
   final String release;
+  final ConsoleOperations? consoles;
   McpSession session(McpActor actor) => McpSession._(this, actor);
 }
 
@@ -26,12 +31,22 @@ final class _Request {
 }
 
 final class McpSession {
-  McpSession._(this.router, this.actor);
+  McpSession._(this.router, this.actor)
+    : _consoleBinding = ConsoleMcpBinding(actor);
   final McpRouter router;
   final McpActor actor;
   final _seen = <Object>{}, _active = <Object, _Request>{};
   int _phase = 0;
-  bool closed = false;
+  final ConsoleMcpBinding _consoleBinding;
+  bool _closed = false;
+  bool get closed => _closed;
+  set closed(bool value) {
+    if (!value || _closed) return;
+    _closed = true;
+    _consoleBinding.close();
+    router.consoles?.disconnectBinding(_consoleBinding);
+  }
+
   Object? _id(Object? value) {
     if (value is String && value.length <= 128) return ('s', value);
     if (value is num &&
@@ -136,6 +151,21 @@ final class McpSession {
               'structuredContent': value,
               'isError': value['ok'] != true,
             };
+            if (utf8.encode(jsonEncode(_result(id, result))).length >
+                1024 * 1024) {
+              value = {
+                'ok': false,
+                'error': const OperationFailure(FailureCode.resourceExhausted)
+                    .toJson(),
+              };
+              result = {
+                'content': [
+                  {'type': 'text', 'text': jsonEncode(value)},
+                ],
+                'structuredContent': value,
+                'isError': true,
+              };
+            }
           default:
             return _error(id, -32601, 'METHOD_NOT_FOUND');
         }
@@ -196,6 +226,7 @@ final class McpSession {
   ) async {
     final op = router.operations;
     final p = a['profileId'] as String?;
+    if (name.startsWith('console.')) return _consoleDispatch(actor, name, a);
     switch (name) {
       case 'profiles.list':
         return (await op.listProfiles(
@@ -315,5 +346,83 @@ final class McpSession {
       default:
         throw const SchemaFailure(r'$.name');
     }
+  }
+
+  Future<Map<String, Object?>> _consoleDispatch(
+    McpActor actor,
+    String name,
+    Map<String, dynamic> a,
+  ) async {
+    final op = router.consoles;
+    if (op == null)
+      return const OperationResult<ConsoleValue>.failure(
+        OperationFailure(FailureCode.consoleInactive),
+      ).toJson();
+    final caller = ConsoleCaller.mcp(actor, _consoleBinding);
+    final profile = a['profileId'] as String?,
+        session = a['sessionId'] as String?;
+    final generation = a['generation'] as int?;
+    final epoch = a['ownerEpoch'] as String?;
+    final sequence = a['operationSequence'] as int?;
+    final result = switch (name) {
+      'console.profiles' => await op.consoleProfiles(caller),
+      'console.list' => await op.listConsoles(caller, profile!),
+      'console.open' => await op.openConsole(
+        caller,
+        profile!,
+        shellProfileId: a['shellProfileId'] as String?,
+        ownerEpoch: epoch,
+        operationSequence: sequence,
+      ),
+      'console.read' => await op.readConsole(
+        caller,
+        profile!,
+        session!,
+        generation: generation!,
+        cursor: a['cursor'] as String?,
+        limit: a['limit'] as int? ?? 1000,
+      ),
+      'console.acquire' => await op.acquireConsole(
+        caller,
+        profile!,
+        session!,
+        generation: generation!,
+        ownerEpoch: epoch,
+        operationSequence: sequence,
+      ),
+      'console.release' => await op.releaseConsole(
+        caller,
+        profile!,
+        session!,
+        generation: generation!,
+        leaseToken: a['leaseToken'] as String,
+        ownerEpoch: epoch,
+        operationSequence: sequence,
+      ),
+      'console.write' => await op.writeConsole(
+        caller,
+        profile!,
+        session!,
+        generation: generation!,
+        leaseToken: a['leaseToken'] as String,
+        text: a['text'] as String?,
+        key: a['key'] as String?,
+        confirmedMultiline: a['confirmedMultiline'] as bool? ?? false,
+        ownerEpoch: epoch,
+        operationSequence: sequence,
+      ),
+      'console.close' => await op.closeConsole(
+        caller,
+        profile!,
+        session!,
+        generation: generation!,
+        leaseToken: a['leaseToken'] as String?,
+        confirmed: a['confirmed'] as bool? ?? false,
+        ownerEpoch: epoch,
+        operationSequence: sequence,
+      ),
+      _ => throw const SchemaFailure(r'$.name'),
+    };
+    return result.toJson();
   }
 }

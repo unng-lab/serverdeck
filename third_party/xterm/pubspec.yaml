@@ -1,0 +1,14 @@
+name: xterm
+description: Bounded vendored xterm.dart engine for ServerDeck.
+version: 4.0.0
+publish_to: none
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.19.0'
+dependencies:
+  convert: ^3.0.0
+  meta: ^1.3.0
+  quiver: ^3.0.0
+  equatable: ^2.0.3
+  flutter:
+    sdk: flutter

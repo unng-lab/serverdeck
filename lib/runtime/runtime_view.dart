@@ -56,12 +56,16 @@ class _RuntimeViewState extends State<RuntimeView> {
     if (runtime.acceptsOperations) unawaited(_updates?.start());
   }
 
-  void _syncMonitoring() => _monitoring?.setActive(
-    runtime.acceptsOperations &&
+  void _syncMonitoring() {
+    final active =
+        runtime.acceptsOperations &&
         runtime.window != WindowState.trayHidden &&
         !_applicationSettings.isOpen &&
-        !_updateRoute.isOpen,
-  );
+        !_updateRoute.isOpen;
+    _monitoring?.setActive(active);
+    widget.features?.consoles.setKeyboardActive(active);
+  }
+
   void _runtimeChanged() {
     if (!runtime.acceptsOperations) _release();
     _syncMonitoring();
@@ -175,6 +179,10 @@ class _RuntimeViewState extends State<RuntimeView> {
       child: ApplicationSettingsView(
         updates: _updates!,
         mcp: _settings,
+        terminalSettings: widget.features?.consoleSettings,
+        newTerminalProfileId: widget.features == null
+            ? null
+            : FeatureRuntime.newId,
         onUpdateRestart: runtime.requestUpdateRestart,
       ),
       onChanged: () {
@@ -284,6 +292,7 @@ class _RuntimeViewState extends State<RuntimeView> {
         pickKey: widget.features!.platform.pickPrivateKey,
         monitoring: _monitoring,
         journals: widget.features?.journals,
+        consoles: widget.features?.consoles,
         applicationStatus: status,
         onApplicationSettings: _openApplicationSettings,
         runtimeNotice: !runtime.trayAvailable

@@ -58,7 +58,7 @@ Public release is still pending; these are local artifact facts, not installatio
 
 ## Publication and convergence
 
-[Stable v0.1.0+4](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.0%2B4)
+Stable `v0.1.0+4` (historical release identifier; former link returns 404 as checked 2026-11-06)
 ID436385247, source commit51259999a9dc5128142297a28b0283918f2c4300. Draft had exactly
 two uploaded public assets; sizes/digests matched local audited setup and signed catalog
 before publishing. Setup57,778,688bytes; catalog3,703bytes, protocol2/3 immutable records.

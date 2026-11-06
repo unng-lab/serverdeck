@@ -52,7 +52,12 @@ const AppSettingsSchema = CollectionSchema(
       name: r'settingsRevision',
       type: IsarType.long,
     ),
-    r'theme': PropertySchema(id: 7, name: r'theme', type: IsarType.string),
+    r'terminalConfiguration': PropertySchema(
+      id: 7,
+      name: r'terminalConfiguration',
+      type: IsarType.string,
+    ),
+    r'theme': PropertySchema(id: 8, name: r'theme', type: IsarType.string),
   },
 
   estimateSize: _appSettingsEstimateSize,
@@ -76,6 +81,12 @@ int _appSettingsEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.terminalConfiguration;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.theme.length * 3;
   return bytesCount;
 }
@@ -93,7 +104,8 @@ void _appSettingsSerialize(
   writer.writeBool(offsets[4], object.mcpEnabled);
   writer.writeLong(offsets[5], object.profilesListRevision);
   writer.writeLong(offsets[6], object.settingsRevision);
-  writer.writeString(offsets[7], object.theme);
+  writer.writeString(offsets[7], object.terminalConfiguration);
+  writer.writeString(offsets[8], object.theme);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -111,7 +123,8 @@ AppSettings _appSettingsDeserialize(
   object.mcpEnabled = reader.readBool(offsets[4]);
   object.profilesListRevision = reader.readLong(offsets[5]);
   object.settingsRevision = reader.readLong(offsets[6]);
-  object.theme = reader.readString(offsets[7]);
+  object.terminalConfiguration = reader.readStringOrNull(offsets[7]);
+  object.theme = reader.readString(offsets[8]);
   return object;
 }
 
@@ -137,6 +150,8 @@ P _appSettingsDeserializeProp<P>(
     case 6:
       return (reader.readLong(offset)) as P;
     case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -647,6 +662,168 @@ extension AppSettingsQueryFilter
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'terminalConfiguration'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'terminalConfiguration'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'terminalConfiguration',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'terminalConfiguration',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'terminalConfiguration',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'terminalConfiguration', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  terminalConfigurationIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'terminalConfiguration',
+          value: '',
+        ),
+      );
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> themeEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -896,6 +1073,20 @@ extension AppSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByTerminalConfiguration() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'terminalConfiguration', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByTerminalConfigurationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'terminalConfiguration', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByTheme() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'theme', Sort.asc);
@@ -1015,6 +1206,20 @@ extension AppSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByTerminalConfiguration() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'terminalConfiguration', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByTerminalConfigurationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'terminalConfiguration', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByTheme() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'theme', Sort.asc);
@@ -1072,6 +1277,16 @@ extension AppSettingsQueryWhereDistinct
   distinctBySettingsRevision() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'settingsRevision');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByTerminalConfiguration({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'terminalConfiguration',
+        caseSensitive: caseSensitive,
+      );
     });
   }
 
@@ -1133,6 +1348,13 @@ extension AppSettingsQueryProperty
   QueryBuilder<AppSettings, int, QQueryOperations> settingsRevisionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'settingsRevision');
+    });
+  }
+
+  QueryBuilder<AppSettings, String?, QQueryOperations>
+  terminalConfigurationProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'terminalConfiguration');
     });
   }
 

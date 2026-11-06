@@ -130,7 +130,7 @@ void main() {
   }
 
   test(
-    'runtime registry is byte-identical to the authoritative thirteen tools',
+    'runtime registry is byte-identical to the authoritative twenty-one tools',
     () {
       expect(
         File('assets/mcp/tools.json').readAsBytesSync(),
@@ -149,11 +149,13 @@ void main() {
       expect((denied!['error'] as Map)['code'], -32002);
       await initialize();
       final result = await session.handle(rpc(2, 'tools/list', {}));
-      expect(((result!['result'] as Map)['tools'] as List).length, 13);
+      expect(((result!['result'] as Map)['tools'] as List).length, 21);
       expect(operations.calls, isEmpty);
     },
   );
-  for (final name in ToolSchemas.names) {
+  for (final name in ToolSchemas.names.where(
+    (name) => !name.startsWith('console.'),
+  )) {
     test(
       '$name validates, invokes the typed method once and returns structured domain failure',
       () async {

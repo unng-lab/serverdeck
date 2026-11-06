@@ -191,7 +191,7 @@ final class FeatureGrantTransport implements GrantTransport {
 /// Actual owners and gate over a detached snapshot repository. Network, native
 /// protection, grant files and time are synthetic; no Isar engine or TCP socket.
 final class FeatureHarness {
-  FeatureHarness({int epoch = 9000})
+  FeatureHarness({int epoch = 9000, void Function(String)? onClientInvalidated})
     : actors = ActorAuthority(featureId(epoch)) {
     connections = ConnectionOwner(
       actors: actors,
@@ -227,6 +227,7 @@ final class FeatureHarness {
       logonSid: 'synthetic-logon',
       exePath: r'C:\fixture\ServerDeck.exe',
       randomSecret: () => Uint8List.fromList(List.filled(32, 7)),
+      onClientInvalidated: onClientInvalidated,
       schedule: clock.schedule,
     );
     state = CanonicalOperationState(

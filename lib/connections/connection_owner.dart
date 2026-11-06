@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 
 import '../domain/actor.dart';
+import '../console/console_port.dart';
 import '../domain/app_operations.dart';
 import '../domain/models.dart';
 import '../journals/journal_models.dart';
@@ -102,7 +103,8 @@ final class ConnectionOwner
         ProfileConnectionPort,
         RuntimeCapability,
         MonitoringConnectionPort,
-        JournalConnectionPort {
+        JournalConnectionPort,
+        ConsoleConnectionPort {
   ConnectionOwner({
     required this.actors,
     required this.repository,
@@ -140,6 +142,59 @@ final class ConnectionOwner
   final _live = <_ConnectionEntry>{}, _pending = <Future<void>>{};
   final _quarantine = <String, Set<_ConnectionEntry>>{};
   final _changes = StreamController<void>.broadcast();
+  final _consoleChanges = StreamController<ConsoleInvalidation>.broadcast(
+    sync: true,
+  );
+  @override
+  Stream<ConsoleInvalidation> get consoleInvalidations =>
+      _consoleChanges.stream;
+
+  @override
+  ConsoleConnectionBinding bindConsole(Actor actor, String profileId) {
+    _validateProfile(profileId);
+    if (!getState().isAuthorizedNow(actor))
+      throw const OperationFailure(FailureCode.authRequired);
+    final e = _entries[profileId];
+    if (e == null) throw const OperationFailure(FailureCode.conflict);
+    void check() {
+      _check(e, auth: true);
+      if (e.state != ConnectionState.connected ||
+          e.sessionId == null ||
+          e.transport!.isClosed) {
+        throw const OperationFailure(FailureCode.conflict);
+      }
+    }
+
+    check();
+    final transport = e.transport;
+    if (transport is! ConsoleSshConnection) {
+      throw const OperationFailure(FailureCode.unsupportedServer);
+    }
+    return ConsoleConnectionBinding(
+      profileId: profileId,
+      connectionRevision: e.connectionRevision,
+      sshSessionId: e.sessionId!,
+      fence: e.fence,
+      check: check,
+      open: ({String? path, required onData, required guard}) {
+        check();
+        return (transport as ConsoleSshConnection).openConsole(
+          path: path,
+          onData: onData,
+          guard: () {
+            check();
+            guard();
+          },
+        );
+      },
+    );
+  }
+
+  void _consoleInvalidate(String profileId, {required bool clear}) {
+    if (!_disposed)
+      _consoleChanges.add(ConsoleInvalidation(profileId, clear: clear));
+  }
+
   final _monitoringJobs = <String, void Function(MonitoringReason)>{};
   final _journalJobs = <String, void Function(JournalStatus)>{};
   final _collectionTails = <String, Future<void>>{};
@@ -1062,6 +1117,7 @@ final class ConnectionOwner
       late ConnectionCleanup batch;
       context.linearize(() {
         final e = _entries[profileId];
+        _consoleInvalidate(profileId, clear: true);
         if (e != null)
           _invalidate(e, ConnectionState.disconnected, null, retarget: true);
         fence = VersionFence(
@@ -1096,6 +1152,10 @@ final class ConnectionOwner
     late List<_ConnectionEntry> entries;
     context.linearize(() {
       if (preserve != null) checkProof(context, preserve);
+      for (final profile in repository.read((r) => r.profiles())) {
+        if (profile.endpointId == endpointId)
+          _consoleInvalidate(profile.profileId, clear: true);
+      }
       entries = _live
           .where(
             (e) =>
@@ -1146,6 +1206,7 @@ final class ConnectionOwner
       }
       e.budget.finish();
       e.watchdog?.stop();
+      _consoleInvalidate(e.profileId, clear: false);
       e.cancellation.cancel();
       e.credential?.dispose();
       if (!(e.trustWait?.isCompleted ?? true)) e.trustWait!.complete(false);
@@ -1361,6 +1422,7 @@ final class ConnectionOwner
     if (!_disposed) {
       _disposed = true;
       await _changes.close();
+      await _consoleChanges.close();
     }
   }
 }

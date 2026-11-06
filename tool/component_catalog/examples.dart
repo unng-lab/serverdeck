@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:xterm/core.dart';
+
 import 'package:flutter/material.dart';
 
 import 'package:serverdeck/theme/brand_theme.dart';
@@ -26,6 +28,10 @@ class ComponentExample extends StatefulWidget {
 }
 
 class _ComponentExampleState extends State<ComponentExample> {
+  late final _terminal = Terminal(maxLines: 200)
+    ..write(
+      'Синтетический терминал C26\r\nТолько общая модель, без подключения.',
+    );
   final name = TextEditingController(text: 'atlas-web');
   final search = TextEditingController();
   final code = TextEditingController(text: '{\n  "name": "atlas-web"\n}');
@@ -1211,6 +1217,16 @@ class _ComponentExampleState extends State<ComponentExample> {
             label: 'Команда · только просмотр',
             text: 'systemctl status demo.service',
             allowCopy: false,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 180,
+            child: DeckTerminal(
+              terminal: _terminal,
+              readOnly: true,
+              onPaste: (_) async {},
+              onResize: (_, __) {},
+            ),
           ),
         ],
       ),

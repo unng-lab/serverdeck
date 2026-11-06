@@ -135,6 +135,38 @@ class SSHChannelController {
 
   final _done = Completer<void>();
   bool _boundedReplyExpected = false;
+  final _ownedWindowListeners = <void Function()>{};
+  int get ownedRemoteWindow => _remoteWindow;
+  bool get ownedClosed => _done.isCompleted || _hasSentEOF;
+  void commitOwnedWindow(int bytes) {
+    _remoteWindow -= bytes;
+  }
+
+  void Function() listenOwnedWindow(void Function() changed) {
+    _ownedWindowListeners.add(changed);
+    return () => _ownedWindowListeners.remove(changed);
+  }
+
+  void _notifyOwnedWindow() {
+    for (final listener in List.of(_ownedWindowListeners)) {
+      listener();
+    }
+  }
+
+  Future<bool> ownedRequest(Future<void> Function() send) async {
+    _terminalState.throwIfTerminated();
+    if (_boundedReplyExpected) throw SSHStateError('Concurrent owned request');
+    _boundedReplyExpected = true;
+    final reply = Future<bool>.value(_requestReplyQueue.next);
+    reply.ignore();
+    try {
+      await send();
+      return await reply;
+    } catch (_) {
+      destroy();
+      rethrow;
+    }
+  }
 
   Future<bool> sendExec(String command) {
     if (onData != null) {
@@ -333,6 +365,8 @@ class SSHChannelController {
     _requestReplyQueue.closeWithError(error, stackTrace);
     if (!_done.isCompleted) {
       _done.complete();
+      _notifyOwnedWindow();
+      _ownedWindowListeners.clear();
     }
   }
 
@@ -352,6 +386,7 @@ class SSHChannelController {
     }
 
     _remoteWindow = adjustedWindow;
+    _notifyOwnedWindow();
 
     if (_remoteWindow > 0) {
       _uploadLoop.activate();

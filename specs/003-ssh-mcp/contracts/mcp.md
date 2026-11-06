@@ -22,13 +22,14 @@ error с нечитаемым ID может не содержать id в error 
 новый request отклоняется до effects с -32000 SESSION_LIMIT и соединение закрывается,
 после чего клиент может открыть новую сессию с новым initialize. MutationId и24h
 дедупликация независимы от session/request IDs. Invalid JSON -32700; oversized line helper
-closes. No HTTP/OAuth/resources/prompts/sampling/roots/exec/delete/token-admin APIs.
+closes. No HTTP/OAuth/resources/prompts/sampling/roots/generic-exec/delete/token-admin APIs.
 Server never asks client to execute commands or reveal its environment.
 
 Tool registry authoritative: [mcp-tools.json](mcp-tools.json). Router rejects unknown
 names and extra keys; inputSchema produced with local $defs bundled in each schema,
 never unresolved refs to server filesystem/network. Shared operations/result semantics
-in [operations](operations.md). Publish only the13 listed tools; no hidden generic dispatcher.
+in [operations](operations.md). Registry contractVersion2 publishes the original13 tools
+with unchanged signatures plus8 [shared console tools](../../007-server-console/contracts/mcp-console.md), total21; no hidden generic dispatcher.
 
 Tool calls return `content:[{type:"text",text:<JSON of structured result>}]`,
 `structuredContent:<same JSON>` and `isError:!ok`. Domain error is structured error,
@@ -40,7 +41,10 @@ Calls require completed initialize and current grant authorization even on cache
 `notifications/cancelled` affects only matching active noncommitted call from same
 channel; no cross-channel request-id guessing. Operation-level cancelConnection can
 manage current attempt by explicit attemptId through authorized tool as spec permits.
-Pipe/stdio disconnect isn't implicit cancellation or transaction rollback.
+Pipe/stdio disconnect isn't implicit cancellation or transaction rollback for the original13 operations.
+For console operations, disconnect synchronously invalidates the transport's input lease,
+queued input and pending opening; an established console remains alive. Console mutations
+use the memory-only sequence ledger defined in007 rather than persisted mutation receipts.
 
 ## Async domain journeys
 
@@ -54,7 +58,11 @@ fields that resemble delete/reset. Boolean confirmed must literally true.
 
 ## Compatibility and response limits
 
-Max100profiles/page; public getters/list responses≤1MiB, error text≤256chars.
+Max100profiles/page; complete serialized JSON-RPC replies, including both text content
+and structuredContent, are≤1MiB; error text≤256chars. Console history is a bounded
+plain-text projection of authorized remote output, which can include server-echoed secrets;
+it never returns protected credential-store objects. Console mutations return the explicit
+ActionView from007 rather than the original MutationValue shape.
 Key bytes base64 input≤decoded1MiB; request frames≤2MiB. Connect state/challenge keys
 are bounded; public hostkey blob not required, fingerprint/type enough for UI/MCP.
 No dynamic discovery changes during session; unsupported optional MCP capability

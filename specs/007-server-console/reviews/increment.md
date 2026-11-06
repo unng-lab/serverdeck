@@ -1,0 +1,5 @@
+# Increment review — 2026-11-06
+
+Independent reviewer review_console_increment inspected the exact file list in .local/console-increment-files.txt read-only. Package design ready for continued implementation; increment had three confirmed P2 defects: restored cursor outside resized screen, zero remote packet size preventing input progress, selected console lost on renderer disposal. Fixed by clamping restored coordinates on both buffers, rejecting invalid PTY packet size plus per-fragment deadline/progress checks, and storing selection per profile in ConsoleOwner. Added synthetic engine/protocol and functional navigation regressions. Full MCP/lifecycle scope remains pending. Fresh review follows mandatory checks.
+
+Fresh reviewer review_console_increment_fixed confirmed R701–R703 and identified one P1: decoder.close during trust clear can execute incomplete UTF8 into a capped OSC and abort buffer clearing. R704 discards the memory-only decoder without interpreting residual bytes and resets parser/both buffers. Synthetic regression passes; final fresh review still required.

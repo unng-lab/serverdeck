@@ -1,0 +1,7 @@
+# Keep upstream source style; analyzer errors/warnings remain enabled.
+# The application rules remain enforced outside this vendored package.
+linter:
+  rules:
+    avoid_print: false
+    prefer_single_quotes: false
+    unawaited_futures: false

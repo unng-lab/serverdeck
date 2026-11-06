@@ -1257,6 +1257,7 @@ const componentDocumentation = <String, Map<String, Object>>{
     ],
     'parameters': [
       'DeckCode(label, controller/text, readOnly, maxHeight, validator, enabled, allowCopy)',
+      'DeckTerminal(terminal, readOnly, onPaste, onResize, keyboardEligible)',
     ],
     'events': ['onChanged', 'validator', 'copy актуального точного значения'],
     'variants': [
@@ -1266,11 +1267,13 @@ const componentDocumentation = <String, Map<String, Object>>{
       'validation',
       'copy',
       'bounded scroll',
+      'встроенный терминал',
     ],
     'limitations': [
       'Не IDE/exec',
       'controller и Form у owner',
       'никаких retries/секретов',
+      'DeckTerminal: общий renderer; SSH, ввод/consent и lifecycle принадлежат owner',
     ],
     'acceptanceCriteria': [
       'Edit→copy даёт новый raw text',

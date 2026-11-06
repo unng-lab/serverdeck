@@ -7,6 +7,8 @@ import '../journals/journal_owner.dart';
 import '../connections/host_signature.dart';
 import '../connections/private_signer.dart';
 import '../domain/actor.dart';
+import '../console/console_owner.dart';
+import '../console/console_settings.dart';
 import '../domain/app_operations.dart';
 import '../domain/canonical_state.dart';
 import '../domain/mutation_receipts.dart';
@@ -82,6 +84,7 @@ final class FeatureRuntime implements RuntimeCapability {
       userSid: platform.context.userSid,
       logonSid: platform.context.logonSid,
       exePath: platform.context.exePath,
+      onClientInvalidated: (clientId) => consoles.invalidateClient(clientId),
     );
     state = CanonicalOperationState(
       actors: actors,
@@ -116,6 +119,21 @@ final class FeatureRuntime implements RuntimeCapability {
       utcNow: utcNow,
     );
     operations = OwnedAppOperations(profiles, connections, trust);
+    consoleSettings = ConsoleSettingsOwner(
+      actors: actors,
+      gate: gate,
+      repository: repository,
+      onChanged: () => consoles.configurationChanged(),
+    );
+    consoles = ConsoleOwner(
+      actors: actors,
+      gate: gate,
+      state: state,
+      repository: repository,
+      connections: connections,
+      configuration: () => consoleSettings.snapshot,
+      newId: newId,
+    );
     monitoring = MonitoringOwner(
       historyStore: repository,
       operations: operations,
@@ -136,6 +154,8 @@ final class FeatureRuntime implements RuntimeCapability {
       currentVersion: platform.context.release,
     );
     _capabilities = [
+      consoles,
+      consoleSettings,
       updates,
       journals,
       monitoring,
@@ -166,6 +186,8 @@ final class FeatureRuntime implements RuntimeCapability {
   late final GrantOwner grants;
   late final McpPipeAdapter pipe;
   late final OwnedAppOperations operations;
+  late final ConsoleOwner consoles;
+  late final ConsoleSettingsOwner consoleSettings;
   late final MonitoringOwner monitoring;
   late final JournalsOwner journals;
   late final UpdateOwner updates;
@@ -191,6 +213,7 @@ final class FeatureRuntime implements RuntimeCapability {
     try {
       router = McpRouter(
         operations: operations,
+        consoles: consoles,
         grants: grants,
         schemas: await ToolSchemas.load(),
         release: platform.context.release,

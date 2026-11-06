@@ -31,3 +31,7 @@ finite fractional percentages and breakBefore; synthetic component units only.
 оси,порог90%,заливка непрерывных сегментов,hover/tap/keyboard выбор реального замера.
 Страница004 передаёт fullSize/windowEnd. Нет новых пакетов/схем/коллекторов.
 Synthetic001 проверяет размеры/оси/hover/focus;functional004 — только data/actions.
+
+## C26 terminal extension2026-11-06
+
+lib/ui/deck_terminal.dart — общий adapter готового xterm4 engine сTerminalView,BrandTheme иcustompaste. Owner остаётся007,его contracts/terminal.md задаёт границы модели/совместимости. Реестр docs/design/components/registry.json,synthetic catalog tool/component_catalog/examples.dart и test_design/components/terminal_test.dart обновляются однимscope001 R020,безстраниц007 в design suite.

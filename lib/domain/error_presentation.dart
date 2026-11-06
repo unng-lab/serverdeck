@@ -26,6 +26,22 @@ final class OperationPresentation {
         'Некорректное значение${error.field == null ? '' : ': ${field(error.field!)}'}.',
         'Исправьте указанное поле и повторите действие.',
       ),
+      FailureCode.consoleNotFound => const OperationPresentation(
+        'Консоль уже закрыта.',
+        'Выберите существующую консоль или откройте новую.',
+      ),
+      FailureCode.consoleInactive => const OperationPresentation(
+        'Консоль не принимает ввод.',
+        'Прочитайте доступный вывод; новый запуск выполняется отдельно.',
+      ),
+      FailureCode.consoleInputBusy => const OperationPresentation(
+        'Вводом управляет другой участник.',
+        'В интерфейсе можно взять управление; MCP может повторно запросить его после освобождения.',
+      ),
+      FailureCode.consoleReplayExpired => const OperationPresentation(
+        'Результат прежнего действия уже недоступен.',
+        'Проверьте состояние консоли; прежний ввод автоматически не повторяется.',
+      ),
       FailureCode.profileNotFound => const OperationPresentation(
         'Профиль уже удалён.',
         'Обновите список и выберите существующий профиль.',

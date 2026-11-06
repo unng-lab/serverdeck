@@ -51,3 +51,27 @@ calls receive cleanupPending until the protocol slot retires. Duplicate ACKs can
 accumulate as reply queue entries. All public bounded results use fixed failures,
 not remote exception text. Application adapter must supply only its fixed collector
 and must enforce canonical session/trust/cancellation admission.
+
+
+## 007 guarded interactive PTY
+
+startOwnedPty supplies synchronous receive callbacks before buffering, explicit
+15s opening cancellation, PTY acknowledgment before shell/quoted exec, bounded
+protocol slots including retired opens, late success cleanup and positive remote
+packet size validation. SSHOwnedPtySession accepts whole bounded input actions
+with removable remote-window/cancel listeners, positive per-fragment progress,
+15s deadline and a final guard for every packet. Device replies use the same app
+FIFO. trySendPacket returns false before encryption/sequence mutation during rekey;
+it never queues that payload. The strict application adapter reserves capacity
+before encryption and admits guard/encrypt/raw socket.add atomically, then flushes
+outside the command gate. It never drops or retries encrypted packets. Synthetic
+units cover cancellation/rekey/late-open/malformed packet size boundaries.
+
+Packet send callbacks also receive one SSHOwnedPacketWait deadline/cancellation
+control. Input checks the same monotonic deadline across fragments; setup uses
+its opening deadline. The strict adapter subscribes to removable rekey/drain/cancel
+signals, and a completed/expired wait removes timers/listeners. Synthetic clock
+injection exists only on the owned PTY options for adapter units. A timed-out
+queued gate callback is latched inactive; up to64 such active/retired admissions
+are retained until their original callbacks settle. Committed ciphertext keeps
+its flush/FIFO reservation independently from an action's returned unknown outcome.

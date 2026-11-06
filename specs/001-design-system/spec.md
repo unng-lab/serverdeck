@@ -12,3 +12,7 @@
 - Empty, pending, error, unknown и unavailable различаются согласно контрактам. Смена темы, ширины и выбора не создаёт внешних операций.
 
 [План](plan.md) · [Задачи](tasks.md) · [Запуск и проверки](quickstart.md).
+
+## C26 terminal extension — 2026-11-06
+
+Для [консоли007](../007-server-console/spec.md) добавить вариант интерактивного терминала C26 в lib/ui/deck_terminal.dart на готовом engine; контракт в component-library.md. Общий renderer получает модель/доступность/callbacks, не SSH/actors/leases. Только synthetic component tests и каталог; feature007 не получает дизайн gates. Реализовано R020/007T015; shared checks и независимое ревью завершены с007.

@@ -55,7 +55,7 @@ T080 was then checked only after the actual public release completed. All81 task
 are checked; requirements16/safety14/version8 checklists have no open items.
 
 Code committed/pushed as46b91f1754244e5874d5d3d711ab0b2c4d00e977.
-Published stable [v0.1.0+3](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.0%2B3)
+Published stable `v0.1.0+3` (historical release identifier; former link returns 404 as checked 2026-11-06)
 with exactly setup and signed catalog, after draft asset size/digest verification.
 Anonymous latest with actual client API headers returnsv0.1.0+3. Previousv2 setup
 SHA2567459870343b1e51005206f63c7254bca79fd03bc7f2009fa8a35fde18d323bd0 and

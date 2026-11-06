@@ -57,3 +57,7 @@
 ## C22 page graphs
 
 - [X] R019 Реализовать fullSize C22 в lib/ui/deck_history.dart и part lib/ui/deck_history_full.dart: три full-width графика,часовая ось UTC,0–100%,порог90%,gap-safe fill/line,hover/tap и keyboard cursor/readout,empty/partial/quality; synthetic shared tests test_design/components/history_full_test.dart и mandatory/shared checks,независимоеreview (004/T037).
+
+## C26 terminal extension
+
+- [x] R020 Добавить lib/ui/deck_terminal.dart терминальный вариант C26 на готовом engine по ../007-server-console/contracts/terminal.md; update docs/design/components/registry.json,tool/component_catalog/examples.dart,synthetic test_design/components/terminal_test.dart. Связано007/T002/T015; shared design checks только001,mandatoryformat/analyze/unit/links иindependentreview вместе007; никакихfeaturelayout/captures.

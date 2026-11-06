@@ -28,6 +28,8 @@ import 'package:dartssh2/src/socket/ssh_socket.dart';
 import 'package:dartssh2/src/ssh_userauth.dart';
 import 'package:meta/meta.dart';
 
+part 'ssh_owned_pty.dart';
+
 /// https://datatracker.ietf.org/doc/html/rfc4252#section-8
 typedef SSHPasswordRequestHandler = FutureOr<String?> Function();
 
@@ -402,6 +404,27 @@ class SSHClient {
   );
 
   final _channels = <int, SSHChannelController>{};
+  final _ownedPtys = <int, SSHOwnedPtyOperation>{};
+
+  SSHOwnedPtyOperation startOwnedPty(SSHOwnedPtyOptions options) {
+    if (_ownedPtys.length >= 16) throw const SSHOwnedPtyError('cleanupPending');
+    if (isClosed || !_authenticated.isCompleted)
+      throw const SSHOwnedPtyError('unavailable');
+    final id = _channelIdAllocator.allocate();
+    final op = SSHOwnedPtyOperation._(this, id, options);
+    _ownedPtys[id] = op;
+    op._start();
+    return op;
+  }
+
+  Future<void> waitForOwnedPacketReady() => _transport.waitForKexReady();
+  void Function() listenOwnedPacketReady(void Function() callback) =>
+      _transport.listenOwnedReady(callback);
+  int get ownedPacketWaiterCount => _transport.ownedReadyListenerCount;
+  bool trySendOwnedPacket(Uint8List payload) =>
+      _transport.trySendPacket(payload);
+  bool get ownedPacketBlocked => _transport.isKexInProgress;
+
   SSHBoundedExec? _boundedExec;
 
   /// One bounded monitoring operation per connection, including retired channels.
@@ -428,6 +451,7 @@ class SSHClient {
 
   void _retireBounded(int id) {
     if (_boundedExec?._id == id) _boundedExec = null;
+    _ownedPtys.remove(id);
   }
 
   final _authMethodsLeft = Queue<SSHAuthMethod>();
@@ -1869,24 +1893,29 @@ class SSHClient {
     }
 
     final bounded = _boundedExec?._id == localChannelId ? _boundedExec : null;
+    final owned = _ownedPtys[localChannelId];
     final channelController = SSHChannelController(
       localId: localChannelId,
-      localInitialWindowSize: bounded == null ? _initialWindowSize : 65536,
+      localInitialWindowSize:
+          bounded == null && owned == null ? _initialWindowSize : 65536,
       localMaximumPacketSize: _maximumPacketSize,
       remoteId: remoteChannelId,
       remoteInitialWindowSize: remoteInitialWindowSize,
       remoteMaximumPacketSize: remoteMaximumPacketSize,
       sendMessage: _sendMessage,
       onFlush: flush,
-      onData: bounded?._data,
-      onAbort: bounded == null
-          ? null
-          : () => bounded._fail(SSHBoundedExecFailure.invalidResponse),
+      onData: owned?._data ?? bounded?._data,
+      onAbort: owned != null
+          ? () => owned._stop('channelFailure')
+          : bounded == null
+              ? null
+              : () => bounded._fail(SSHBoundedExecFailure.invalidResponse),
       printDebug: printDebug,
     );
 
     _channels[localChannelId] = channelController;
     bounded?._accept(channelController);
+    owned?._accept(channelController);
     return channelController;
   }
 

@@ -99,6 +99,16 @@ final class MemoryAuthPeer implements SSHSocket {
     _send(_serverKex!);
   }
 
+  bool holdRekeyReply = false;
+  Completer<void>? rekeyHeld;
+  Uint8List? _heldRekey;
+  void releaseRekey() {
+    holdRekeyReply = false;
+    final packet = _heldRekey;
+    _heldRekey = null;
+    if (packet != null) _handle(packet);
+  }
+
   void _write(List<int> bytes) {
     if (_closing != null) return;
     try {
@@ -140,6 +150,11 @@ final class MemoryAuthPeer implements SSHSocket {
           _send(_serverKex!);
         }
       case 30:
+        if (holdRekeyReply) {
+          _heldRekey = Uint8List.fromList(payload);
+          if (!(rekeyHeld?.isCompleted ?? true)) rekeyHeld!.complete();
+          return;
+        }
         final clientPublic = SSH_Message_KexECDH_Init.decode(payload)
             .ecdhPublicKey;
         final secret = _kex.computeSecret(clientPublic);
@@ -316,8 +331,15 @@ final class MemoryAuthPeer implements SSHSocket {
 
   @override
   void destroy() => unawaited(close());
+  Completer<void>? holdFlush;
+  Completer<void>? flushEntered;
   @override
-  Future<void> flush() async {}
+  Future<void> flush() async {
+    if (holdFlush != null) {
+      if (!(flushEntered?.isCompleted ?? true)) flushEntered!.complete();
+      await holdFlush!.future;
+    }
+  }
 }
 
 final class _Crypto {

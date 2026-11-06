@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 import '../domain/models.dart';
+import '../console/console_owner.dart';
+import '../console/console_view.dart';
 import '../journals/journal_owner.dart';
 import '../journals/journal_view.dart';
 import '../shell/foundation_shell.dart';
@@ -21,6 +23,7 @@ class ProfileViewPanel extends StatefulWidget {
     required this.pickKey,
     this.monitoring,
     this.journals,
+    this.consoles,
     this.onApplicationSettings,
     this.applicationStatus,
     this.runtimeNotice,
@@ -28,6 +31,7 @@ class ProfileViewPanel extends StatefulWidget {
   final ProfileController controller;
   final MonitoringOwner? monitoring;
   final JournalsOwner? journals;
+  final ConsoleOwner? consoles;
   final Future<void> Function()? onApplicationSettings;
   final Widget? applicationStatus, runtimeNotice;
   final Future<Uint8List?> Function() pickKey;
@@ -48,6 +52,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
     'Журналы',
     'Задания',
     'Мониторинг',
+    'Консоль',
     'Настройки',
   ];
   final _shownPrompts = <String>{};
@@ -720,13 +725,14 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 Icons.description_outlined,
                 Icons.task_alt,
                 Icons.monitor_outlined,
+                Icons.terminal,
                 Icons.tune,
               ],
               selected: _section,
               onSelected: (v) => setState(() => _section = v),
             ),
             const SizedBox(height: 16),
-            if (_section == 4)
+            if (_section == 5)
               _details(d)
             else if (_section == 1 && widget.journals != null)
               JournalView(
@@ -734,6 +740,15 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 owner: widget.journals!,
                 profileId: d.profile.profileId,
                 connectionRevision: d.profile.connectionRevision,
+              )
+            else if (_section == 4 && widget.consoles != null)
+              ConsoleView(
+                key: ValueKey('console-${d.profile.profileId}'),
+                owner: widget.consoles!,
+                profileId: d.profile.profileId,
+                connectionRevision: d.profile.connectionRevision,
+                serverLabel: d.profile.displayName,
+                username: d.profile.username,
               )
             else if (_section == 3 && widget.monitoring != null)
               MonitoringHistoryPanel(
