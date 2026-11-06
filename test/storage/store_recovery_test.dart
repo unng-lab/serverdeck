@@ -14,6 +14,52 @@ void main() {
   test('empty root permits first publication', () async {
     expect(await preflightStore(root), isNull);
   });
+  for (final state in ['running', 'clean']) {
+    test(
+      '$state monitoring marker permits first database publication',
+      () async {
+        final marker = File('${root.path}/monitoring-run-v1.json');
+        final bytes = utf8.encode('{"version":1,"state":"$state"}');
+        await marker.writeAsBytes(bytes);
+        expect(await preflightStore(root), isNull);
+        expect(await marker.readAsBytes(), bytes);
+        await Directory('${root.path}/stores/${newStoreId()}')
+            .create(recursive: true);
+        await expectLater(preflightStore(root), throwsA(isA<StoreFailure>()));
+        expect(await marker.readAsBytes(), bytes);
+      },
+    );
+  }
+  for (final value in [
+    '{}',
+    '{"version":2,"state":"running"}',
+    'x' * 129,
+    '\ufeff{"version":1,"state":"running"}',
+    '\ufeff{"version":1,"state":"clean"}',
+  ]) {
+    test(
+      'invalid monitoring marker remains an explicit failure: $value',
+      () async {
+        final marker = File('${root.path}/monitoring-run-v1.json');
+        final bytes = utf8.encode(value);
+        await marker.writeAsBytes(bytes);
+        await expectLater(preflightStore(root), throwsA(isA<StoreFailure>()));
+        await expectLater(
+          validatePendingPublication(root, StoreManifest(newStoreId())),
+          throwsA(isA<StoreFailure>()),
+        );
+        expect(await marker.readAsBytes(), bytes);
+      },
+    );
+  }
+  test('marker name cannot disguise a directory or unknown file', () async {
+    await Directory('${root.path}/monitoring-run-v1.json').create();
+    await expectLater(preflightStore(root), throwsA(isA<StoreFailure>()));
+    await Directory('${root.path}/monitoring-run-v1.json').delete();
+    await File('${root.path}/unknown.json')
+        .writeAsString('{"version":1,"state":"running"}');
+    await expectLater(preflightStore(root), throwsA(isA<StoreFailure>()));
+  });
   test(
     'missing CURRENT with existing store never creates replacement',
     () async {

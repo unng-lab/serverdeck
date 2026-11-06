@@ -175,3 +175,14 @@ T044 acceptance уточнено review: fresh CURRENT содержит publicat
 ## Совместимое расширение схемы — 2026-11-04
 
 - [ ] T047 Отменить необоснованное повышение формата при additive collections: central currentStorageFormat2 policy в lib/storage/store_manifest.dart, AppSettings default lib/storage/records.dart и WorkspaceStore guard; сохранить исходные номера/данные без rewrite/reset/migration; fake acceptance test/storage/current_store_format_test.dart для текущего manifest/settings2 и неподдерживаемых форматов, metadata/security сохранения (FR-221/222,AC-221/222). Выполнить обязательные checks, независимое review/fix loop и сборку EXE; evidence reviews/compatible-format.md.
+
+## First startup with monitoring marker — 2026-11-06
+
+- [X] T048 Recognize the exact native monitoring run marker in store preflight and live pending publication in lib/storage/store_manifest.dart; preserve marker/data/format and all orphan/link guards. Cover first publication and failed-publication retries with synthetic files/fake backend in test/storage/store_recovery_test.dart and publication_retry_test.dart (FR-221/222; AC-221/222).
+- [X] T049 Run required Flutter/boundary/link checks, full release build and independent review for T048; record actual scope in reviews/monitoring-marker-startup.md. Restore the installed app through ordinary Windows Explorer; local user operation is separate from unit acceptance.
+
+## Patch release 0.2.1 — 2026-11-07
+
+- [ ] T050 Revalidate and independently review existing T048/T049 startup-marker fix on the current console baseline; include it in the user-requested0.2.1 commit/tag and record current checks/release evidence without overwriting historical results.
+
+- [X] T051 Reject UTF8-BOM lookalikes by comparing native marker bytes without decoder normalization; regressions for running/clean BOM in both first preflight and pending publication. Rerun required checks/build and a fresh independent review (FR-221/222; confirmed patch review finding).

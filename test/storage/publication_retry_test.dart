@@ -17,6 +17,10 @@ void main() {
         );
         final library = await File('${root.path}/synthetic-library')
             .writeAsString('unit');
+        final marker = File('${root.path}/data/monitoring-run-v1.json');
+        await marker.parent.create();
+        const markerBytes = '{"version":1,"state":"running"}';
+        await marker.writeAsString(markerBytes);
         var calls = 0;
         String? publication;
         final store = WorkspaceStore(
@@ -59,6 +63,7 @@ void main() {
         expect(selected!.storeId, publication);
         expect(await Directory('${root.path}/data/stores').list().length, 1);
         expect(calls, failure == 'afterCurrent' ? 1 : 2);
+        expect(await marker.readAsString(), markerBytes);
       },
     );
   }

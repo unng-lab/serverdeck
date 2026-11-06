@@ -81,6 +81,36 @@ Future<void> rejectLinks(String path) async {
   }
 }
 
+// Native monitoring publishes this bounded run marker before database startup.
+// It is not an unpublished database, and storage must leave its bytes intact.
+Future<bool> _isMonitoringRunMarker(FileSystemEntity entry) async {
+  if (entry is! File ||
+      entry.uri.pathSegments.last != 'monitoring-run-v1.json') {
+    return false;
+  }
+  await rejectLinks(entry.path);
+  final handle = await entry.open();
+  try {
+    final bytes = await handle.read(129);
+    if (bytes.length > 128) return false;
+    for (final expected in const [
+      '{"version":1,"state":"running"}',
+      '{"version":1,"state":"clean"}',
+    ]) {
+      if (bytes.length != expected.length) continue;
+      var index = 0;
+      while (index < bytes.length &&
+          bytes[index] == expected.codeUnitAt(index)) {
+        index++;
+      }
+      if (index == bytes.length) return true;
+    }
+    return false;
+  } finally {
+    await handle.close();
+  }
+}
+
 Future<StoreManifest?> preflightStore(Directory data) async {
   await rejectLinks(data.path);
   final current = File('${data.path}/CURRENT.json');
@@ -107,6 +137,7 @@ Future<StoreManifest?> preflightStore(Directory data) async {
   if (await data.exists()) {
     // Never guess which orphan or staging directory contains the user's data.
     await for (final entry in data.list(followLinks: false)) {
+      if (await _isMonitoringRunMarker(entry)) continue;
       if (entry is Directory &&
           entry.path == '${data.path}${Platform.pathSeparator}stores') {
         if (await entry.list(followLinks: false).isEmpty) continue;
@@ -128,6 +159,7 @@ Future<void> validatePendingPublication(
   final stage = 'staging-${pending.storeId}';
   await for (final entry in data.list(followLinks: false)) {
     await rejectLinks(entry.path);
+    if (await _isMonitoringRunMarker(entry)) continue;
     final name = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
     if (entry is! Directory || (name != 'stores' && name != stage)) {
       throw const StoreFailure('UNPUBLISHED_STORE');

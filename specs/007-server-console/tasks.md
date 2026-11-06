@@ -101,3 +101,7 @@ FR701→T012–017;702→T007–011/013–017;703→T003–006/008/014–016;704
 ## Phase 9: Convergence
 
 - [x] T044 Route multiline platform/IME text edits and internal PasteTextIntent through C26 owner-mediated paste consent, preserving ordinary Enter keys; add shared synthetic input and functional console tests for pre-consent/cancel/lease/session changes per FR-709/716/SC-705 (partial, HIGH).
+
+## Release provenance correction — 2026-11-07
+
+- [x] T045 Refresh third_party/dartssh2/UPSTREAM.json and patches/dartssh2-4.1.0-policy.patch against the verified4.1.0 archive for reviewed console patches/owned PTY; preserve source hashes/allowlist/reverse-patch checks. Validate tools/check-ssh-vendor.py and the publishable build, mandatory checks and independent review before v0.2.1 (FR-717; release supply, bug in v0.2.0).

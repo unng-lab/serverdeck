@@ -101,14 +101,15 @@
   },
   "patchedFiles": {
     "lib/src/ssh_errors.dart": "63266d6443c5000fdfa8e3d8aaf0252a619fcf40330d86af0cdf4ca9a97cad62",
-    "lib/src/ssh_client.dart": "69a929722717afd38a9833a0dd18f926451e5e980ea30e34312daaff56fdaa25",
-    "lib/src/ssh_transport.dart": "694e9a94f35bea2ef37fd4a57545ff2f83af9f769fd5ef79d8e34e1832d45e74",
-    "lib/src/ssh_channel.dart": "f70f3f6a920a31845fd53b7623e754f62a549ec1c32ae8ef62e3be13b24de138"
+    "lib/src/ssh_client.dart": "0b8e89edc5da3f4b6809d2fd9950ffbe4d56d17a98a788c4a20eef5c96f43be7",
+    "lib/src/ssh_transport.dart": "ac5061f923d2358f7e409be9354fe7c6a6f452da6f351b42642e2e995f46aa2f",
+    "lib/src/ssh_channel.dart": "a8c0d7432b5e32eb9da4e726a93280f084e0ac4bde0999e559ce1560bf1bcd50"
   },
-  "patchSHA256": "0ea5564362d5f61da6e9c36a003e47693f7e5619329bb5b8ebd371fb8203c18d",
+  "patchSHA256": "d0fe915479e2d791811ac4a9386454598b280847e7fc641dae3b35098b1ab290",
   "addedFiles": {
     "analysis_options.yaml": "ee0713c7c353785621f40c4a3f5d07ff966fa607682132f7904654c09394158b",
-    "SERVERDECK.md": "9a1fb68771ba491f34e338f785aa0b97ee665afab2e0acda855d8f39cc5cc0d2",
-    "THIRD_PARTY_NOTICES.txt": "aacf9bffef1527b6f17e00653fa8a040973dc2365f82e8684e638f9447e4354f"
+    "SERVERDECK.md": "ed4e0da45bb562cae4a1b494529be1eef9cad0e0a2f0bedb82846b388ac74035",
+    "THIRD_PARTY_NOTICES.txt": "aacf9bffef1527b6f17e00653fa8a040973dc2365f82e8684e638f9447e4354f",
+    "lib/src/ssh_owned_pty.dart": "d0340854cad7b9652ded103a9da345585bff750b708344aadafe21432dc9a88e"
   }
 }

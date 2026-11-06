@@ -68,3 +68,15 @@ AC-222: неподдерживаемый/unknown формат, повреждё�
 отклоняться; unsupported manifest не вызывает backend.open или публикацию.
 Unit fixtures проверяют adapter contract, а не реальную native durability.
 Основание штатных schema additions: [Isar data migration](https://isar.dev/recipes/data_migration.html).
+
+## Monitoring marker and first publication
+
+The fixed `data/monitoring-run-v1.json` belongs to native monitoring and is
+published before database startup. Missing CURRENT permits first publication when
+this is the only file (and stores is absent/empty). Only an ordinary non-link file
+of at most128bytes with the exact native version1 running/clean encoding is
+recognized. Storage preserves its bytes. The same rule applies when the live owner
+resumes its own pending UUID. Other files/directories and unrelated unpublished
+stores still block; selected-store validation, format2, existing data and manifests
+are unchanged. Synthetic tests cover both states, malformed/oversized/name/type
+lookalikes, an unrelated orphan and retries before/after rename/CURRENT publication.
