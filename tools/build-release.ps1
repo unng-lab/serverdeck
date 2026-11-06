@@ -36,7 +36,12 @@ try {
         Run-Checked python (@('tools/package-installer.py', '--canonicalize-policy', '--output', $evidence) + $policyArguments)
         $trustResource = "$evidence/trust.rc"
     }
-    $sdk = & flutter --version --machine | ConvertFrom-Json
+    # A fresh SDK can print bootstrap/pub output before machine JSON. Initialize
+    # its tool cache first, then read the version from a separate invocation.
+    Run-Checked flutter @('--version')
+    $sdkJson = & flutter --version --machine
+    if ($LASTEXITCODE -ne 0) { throw 'Flutter SDK version query failed' }
+    $sdk = ($sdkJson -join "`n") | ConvertFrom-Json
     if ($sdk.frameworkVersion -ne '3.47.7' -or $sdk.dartSdkVersion -ne '3.13.5') {
         throw 'Use Flutter 3.47.7 / Dart 3.13.5'
     }

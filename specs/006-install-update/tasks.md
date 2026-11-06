@@ -209,3 +209,8 @@ T028/T029 выполняются вместе с соответствующим�
   без тестов публикации и пробных релизов (FR-625).
 - [X] T091 Выполнить обязательные format/analyze/Flutter/boundaries/Python/native,
   build/resource/link checks; независимое review/fix loop. Evidence: [reviews/semver-tag-release.md](reviews/semver-tag-release.md). Публикация не запускалась.
+
+- [ ] T092 Исправить первый запуск fresh Flutter SDK: bootstrap tool/pub output
+  MUST завершиться отдельным вызовом до чтения `flutter --version --machine` JSON.
+  Пересобрать installer, проверить Python units и links, выполнить fresh independent
+  review; повторить выпуск ещё не опубликованного тега0.1.1 (FR-625).
