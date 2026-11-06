@@ -67,3 +67,9 @@ initialization. Its775 Flutter and2 MCP tests passed. Local23 tooling tests pass
 remote tooling suite did not. The masked phase error does not establish the exact
 cause. T093 records investigation without weakening ownership/trust guards.
 The release workflow itself succeeded; whole-repository CI is not all green.
+
+
+T093 follow-up: the directory/key ownership correction and completed green CI are
+recorded in [publisher-key-owner](publisher-key-owner.md). The failure above is
+historical; CI42225752992 on f71355bc passed both formerly failing units and the
+complete functional/shared-component workflow.

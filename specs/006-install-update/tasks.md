@@ -219,7 +219,7 @@ T028/T029 выполняются вместе с соответствующим�
   [release workflow](https://github.com/unng-lab/serverdeck/actions/runs/42222799918)
   завершён success, [v0.1.1](https://github.com/unng-lab/serverdeck/releases/tag/v0.1.1)
   опубликован, подпись/digests/assets проверены чтением результата.
-- [ ] T093 Исследовать и исправить два отказа существующих PublisherBootstrapTest
+- [X] T093 Исследовать и исправить два отказа существующих PublisherBootstrapTest
   на GitHub windows-2022: initialize-update-signing.ps1 возвращает ошибку фазы
   directory в synthetic temp inputs; локальные23 Python units проходят, remote
   [unit workflow](https://github.com/unng-lab/serverdeck/actions/runs/42222799833)
@@ -230,3 +230,8 @@ T028/T029 выполняются вместе с соответствующим�
   owner не принимаются. Synthetic units расширены проверками точных owner/ACL
   и отказа foreign directory без создания ключа. Локально24 tooling units проходят;
   remote CI проверяется после push, ранее упавший run не объявляется успешным.
+
+  Завершено: commit f71355bc, fresh independent review без замечаний;
+  [remote CI42225752992](https://github.com/unng-lab/serverdeck/actions/runs/42225752992)
+  success,24 tooling units включая обе ранее падавшие проверки прошли.
+  Evidence: [reviews/publisher-key-owner.md](reviews/publisher-key-owner.md).
