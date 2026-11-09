@@ -82,7 +82,9 @@ final class McpSession {
             frame['params'] is! Map<String, dynamic>))
       return _error(null, -32600, 'INVALID_REQUEST');
     final method = frame['method'] as String,
-        params = (frame['params'] as Map<String, dynamic>?) ?? {};
+        params = Map<String, dynamic>.of(
+          (frame['params'] as Map<String, dynamic>?) ?? {},
+        );
     if (!frame.containsKey('id')) {
       if (method == 'notifications/initialized' && _phase == 1) _phase = 2;
       if (method == 'notifications/cancelled') {
@@ -104,6 +106,21 @@ final class McpSession {
     final scoped = actor.cancellable(() => request.cancelled);
     try {
       await router.grants.authorize(scoped, AuthorizationPoint.admission);
+      if (params.containsKey('_meta')) {
+        final metadata = params.remove('_meta');
+        if (metadata is! Map<String, dynamic>)
+          return _error(id, -32602, 'INVALID_PARAMS');
+        if (metadata.containsKey('progressToken')) {
+          final token = metadata['progressToken'];
+          if (token is! String &&
+              !(token is num &&
+                  token.isFinite &&
+                  token >= -9007199254740991 &&
+                  token <= 9007199254740991 &&
+                  token == token.truncateToDouble()))
+            return _error(id, -32602, 'INVALID_PARAMS');
+        }
+      }
       Object result;
       if (method == 'initialize') {
         if (_phase != 0 ||

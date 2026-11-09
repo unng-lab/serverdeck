@@ -325,3 +325,11 @@ Dependencies: T069→T070–074→T075→T076→T077. Product implementation seq
   в lib/profiles/profile_view.dart согласно contracts/server-workspace.md;
   001/R016 и002/T046 исправляют shared API и asset delivery. Реализация до тестов,
   mandatory checks/build/static audit, independent review; без новых разделов/данных.
+
+## MCP request metadata correction
+
+- [X] T083 Принимать стандартное request-level `_meta` в lib/mcp/router.dart
+  согласно contracts/ipc.md, отдельно от business arguments и actor authority.
+  Добавить fake-only router units для discovery/ping/call, malformed metadata,
+  безопасных границ progressToken, отзыва доступа и strict arguments. Выполнить
+  обязательные format/analyze/unit/link checks и независимый review/fix loop.

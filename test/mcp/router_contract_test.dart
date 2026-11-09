@@ -114,12 +114,13 @@ void main() {
     );
   });
   tearDown(() => h.dispose());
-  Future<void> initialize() async {
+  Future<void> initialize({Map<String, dynamic>? metadata}) async {
     final result = await session.handle(
       rpc(0, 'initialize', {
         'protocolVersion': '2025-11-25',
         'capabilities': {},
         'clientInfo': {'name': 'fixture', 'version': '1'},
+        if (metadata != null) '_meta': metadata,
       }),
     );
     expect((result!['result'] as Map)['protocolVersion'], '2025-11-25');
@@ -150,6 +151,127 @@ void main() {
       await initialize();
       final result = await session.handle(rpc(2, 'tools/list', {}));
       expect(((result!['result'] as Map)['tools'] as List).length, 27);
+      expect(operations.calls, isEmpty);
+    },
+  );
+  test(
+    'request metadata is accepted without changing tool arguments',
+    () async {
+      await initialize(metadata: {'vendor/example': true});
+      var id = 1;
+      for (final token in [0, 'catalog', -9007199254740991, 9007199254740991]) {
+        for (final method in ['tools/list', 'ping', 'tools/call']) {
+          final params = <String, dynamic>{
+            '_meta': {
+              'progressToken': token,
+              'vendor/example': {
+                'actor': 'synthetic-untrusted',
+                'nested': [null],
+              },
+            },
+            if (method == 'tools/call') ...{
+              'name': 'profiles.list',
+              'arguments': <String, dynamic>{},
+            },
+          };
+          final response = await session.handle(rpc(id++, method, params));
+          expect(response!.containsKey('result'), isTrue, reason: '$response');
+          expect(params.containsKey('_meta'), isTrue);
+          expect(response.toString(), isNot(contains('synthetic-untrusted')));
+        }
+      }
+      expect(operations.calls.length, 4);
+      expect(
+        operations.calls.every((c) => c.namedArguments[#limit] == 50),
+        isTrue,
+      );
+    },
+  );
+  test(
+    'empty and vendor-only metadata are valid on catalogue requests',
+    () async {
+      await initialize(metadata: {});
+      var id = 1;
+      for (final metadata in <Map<String, dynamic>>[
+        {},
+        {'vendor/example': null},
+      ]) {
+        final result = await session.handle(
+          rpc(id++, 'tools/list', {'_meta': metadata}),
+        );
+        expect(((result!['result'] as Map)['tools'] as List).length, 27);
+      }
+      for (final params in [
+        {'cursor': 'unknown'},
+        {'cursor': null},
+        {'unknown': true},
+      ]) {
+        final result = await session.handle(rpc(id++, 'tools/list', params));
+        expect((result!['error'] as Map)['code'], -32602);
+      }
+    },
+  );
+  test('invalid initialization metadata leaves handshake available', () async {
+    final invalid = await session.handle(
+      rpc(1, 'initialize', {
+        'protocolVersion': '2025-11-25',
+        'capabilities': {},
+        'clientInfo': {'name': 'fixture', 'version': '1'},
+        '_meta': null,
+      }),
+    );
+    expect((invalid!['error'] as Map)['code'], -32602);
+    await initialize();
+  });
+  test('malformed metadata is rejected before tool dispatch', () async {
+    await initialize();
+    var id = 1;
+    for (final metadata in <Object?>[
+      null,
+      true,
+      [],
+      'invalid',
+      {'progressToken': null},
+      {'progressToken': true},
+      {'progressToken': 1.5},
+      {'progressToken': []},
+      {'progressToken': 9007199254740992},
+      {'progressToken': -9223372036854775808},
+    ]) {
+      for (final method in ['tools/list', 'ping', 'tools/call']) {
+        final response = await session.handle(
+          rpc(id++, method, {
+            '_meta': metadata,
+            if (method == 'tools/call') ...{
+              'name': 'profiles.list',
+              'arguments': <String, dynamic>{},
+            },
+          }),
+        );
+        expect((response!['error'] as Map)['code'], -32602);
+      }
+    }
+    expect(operations.calls, isEmpty);
+  });
+  test(
+    'metadata grants no authority and does not relax argument validation',
+    () async {
+      await initialize();
+      final invalid = await session.handle(
+        rpc(1, 'tools/call', {
+          '_meta': {'actor': 'ui'},
+          'name': 'profiles.list',
+          'arguments': {'_meta': {}},
+        }),
+      );
+      expect((invalid!['error'] as Map)['code'], -32602);
+      await h.grants.setEnabled(h.actors.ui, false);
+      final denied = await session.handle(
+        rpc(2, 'tools/list', {
+          '_meta': {'actor': 'ui', 'progressToken': 0},
+        }),
+      );
+      expect((denied!['error'] as Map)['code'], -32001);
       expect(operations.calls, isEmpty);
     },
   );

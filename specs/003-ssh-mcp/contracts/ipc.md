@@ -45,6 +45,23 @@ checks current grant anyway. Shutdown/disable closes pipe and helper; stdio EOF 
 ends helper, no app exit. Main cancels explicit CancelledNotification only for pending
 noncommitted request, not durable effect already committed.
 
+## MCP request metadata
+
+The Dart router accepts the optional MCP 2025-11-25 request parameter `_meta`
+on `initialize`, `ping`, `tools/list` and `tools/call`. It must be an object;
+its optional `progressToken` is a string or an integer in the interoperable
+JSON range −9007199254740991…9007199254740991. Other metadata entries are opaque
+JSON values. Invalid metadata returns `-32602 INVALID_PARAMS` after normal
+request admission authorization. Metadata is consumed separately from method
+parameters, never forwarded into tool arguments, persisted, echoed, or used to
+derive actor identity or permissions. Progress notifications are not emitted.
+
+The complete tool catalogue is returned in one `tools/list` response without
+`nextCursor`; request cursors remain unsupported and return `INVALID_PARAMS`.
+Unknown method parameters and unknown tool arguments retain existing validation.
+Unit acceptance covers metadata-bearing discovery, ping and tool dispatch,
+malformed metadata/tokens, unchanged argument validation and revoked access.
+
 ## Main native ↔ Dart extension
 
 Channel `serverdeck/platform.v1` adds `mcp.publishOwner`, `mcp.removeOwner`,
