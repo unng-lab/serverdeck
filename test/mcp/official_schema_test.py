@@ -19,10 +19,10 @@ class OfficialToolSchemaTest(unittest.TestCase):
         cls.official = json.loads(data)
         cls.registry = json.loads((ROOT / "assets/mcp/tools.json").read_bytes())
 
-    def test_all_twenty_one_tool_definitions_and_tools_list(self):
+    def test_all_twenty_seven_tool_definitions_and_tools_list(self):
         tools = self.registry["tools"]
-        self.assertEqual(len(tools), 21)
-        self.assertEqual(len({tool["name"] for tool in tools}), 21)
+        self.assertEqual(len(tools), 27)
+        self.assertEqual(len({tool["name"] for tool in tools}), 27)
         schema = {**self.official, "$ref": "#/$defs/Tool"}
         validator = Draft202012Validator(schema)
         for tool in tools:

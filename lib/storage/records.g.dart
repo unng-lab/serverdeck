@@ -16447,3 +16447,6716 @@ extension JournalSourceQueryProperty
     });
   }
 }
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types, experimental_member_use
+
+extension GetSoftwareCardRecordCollection on Isar {
+  IsarCollection<SoftwareCardRecord> get softwareCardRecords =>
+      this.collection();
+}
+
+const SoftwareCardRecordSchema = CollectionSchema(
+  name: r'SoftwareCardRecord',
+  id: -7341559130891345665,
+  properties: {
+    r'configPaths': PropertySchema(
+      id: 0,
+      name: r'configPaths',
+      type: IsarType.stringList,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
+      name: r'createdAt',
+      type: IsarType.long,
+    ),
+    r'dataPaths': PropertySchema(
+      id: 2,
+      name: r'dataPaths',
+      type: IsarType.stringList,
+    ),
+    r'endpointId': PropertySchema(
+      id: 3,
+      name: r'endpointId',
+      type: IsarType.string,
+    ),
+    r'host': PropertySchema(id: 4, name: r'host', type: IsarType.string),
+    r'name': PropertySchema(id: 5, name: r'name', type: IsarType.string),
+    r'port': PropertySchema(id: 6, name: r'port', type: IsarType.long),
+    r'profileId': PropertySchema(
+      id: 7,
+      name: r'profileId',
+      type: IsarType.string,
+    ),
+    r'revision': PropertySchema(id: 8, name: r'revision', type: IsarType.long),
+    r'service': PropertySchema(id: 9, name: r'service', type: IsarType.string),
+    r'softwareId': PropertySchema(
+      id: 10,
+      name: r'softwareId',
+      type: IsarType.string,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 11,
+      name: r'updatedAt',
+      type: IsarType.long,
+    ),
+    r'username': PropertySchema(
+      id: 12,
+      name: r'username',
+      type: IsarType.string,
+    ),
+    r'version': PropertySchema(id: 13, name: r'version', type: IsarType.string),
+  },
+
+  estimateSize: _softwareCardRecordEstimateSize,
+  serialize: _softwareCardRecordSerialize,
+  deserialize: _softwareCardRecordDeserialize,
+  deserializeProp: _softwareCardRecordDeserializeProp,
+  idName: r'id',
+  indexes: {
+    r'softwareId': IndexSchema(
+      id: 3379527538188932991,
+      name: r'softwareId',
+      unique: true,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'softwareId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
+    r'profileId': IndexSchema(
+      id: 6052971939042612300,
+      name: r'profileId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'profileId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
+    r'createdAt': IndexSchema(
+      id: -3433535483987302584,
+      name: r'createdAt',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'createdAt',
+          type: IndexType.value,
+          caseSensitive: false,
+        ),
+      ],
+    ),
+  },
+  links: {},
+  embeddedSchemas: {},
+
+  getId: _softwareCardRecordGetId,
+  getLinks: _softwareCardRecordGetLinks,
+  attach: _softwareCardRecordAttach,
+  version: '3.4.1',
+);
+
+int _softwareCardRecordEstimateSize(
+  SoftwareCardRecord object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.configPaths.length * 3;
+  {
+    for (var i = 0; i < object.configPaths.length; i++) {
+      final value = object.configPaths[i];
+      bytesCount += value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.dataPaths.length * 3;
+  {
+    for (var i = 0; i < object.dataPaths.length; i++) {
+      final value = object.dataPaths[i];
+      bytesCount += value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.endpointId.length * 3;
+  bytesCount += 3 + object.host.length * 3;
+  bytesCount += 3 + object.name.length * 3;
+  bytesCount += 3 + object.profileId.length * 3;
+  {
+    final value = object.service;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.softwareId.length * 3;
+  bytesCount += 3 + object.username.length * 3;
+  {
+    final value = object.version;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  return bytesCount;
+}
+
+void _softwareCardRecordSerialize(
+  SoftwareCardRecord object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeStringList(offsets[0], object.configPaths);
+  writer.writeLong(offsets[1], object.createdAt);
+  writer.writeStringList(offsets[2], object.dataPaths);
+  writer.writeString(offsets[3], object.endpointId);
+  writer.writeString(offsets[4], object.host);
+  writer.writeString(offsets[5], object.name);
+  writer.writeLong(offsets[6], object.port);
+  writer.writeString(offsets[7], object.profileId);
+  writer.writeLong(offsets[8], object.revision);
+  writer.writeString(offsets[9], object.service);
+  writer.writeString(offsets[10], object.softwareId);
+  writer.writeLong(offsets[11], object.updatedAt);
+  writer.writeString(offsets[12], object.username);
+  writer.writeString(offsets[13], object.version);
+}
+
+SoftwareCardRecord _softwareCardRecordDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = SoftwareCardRecord();
+  object.configPaths = reader.readStringList(offsets[0]) ?? [];
+  object.createdAt = reader.readLong(offsets[1]);
+  object.dataPaths = reader.readStringList(offsets[2]) ?? [];
+  object.endpointId = reader.readString(offsets[3]);
+  object.host = reader.readString(offsets[4]);
+  object.id = id;
+  object.name = reader.readString(offsets[5]);
+  object.port = reader.readLong(offsets[6]);
+  object.profileId = reader.readString(offsets[7]);
+  object.revision = reader.readLong(offsets[8]);
+  object.service = reader.readStringOrNull(offsets[9]);
+  object.softwareId = reader.readString(offsets[10]);
+  object.updatedAt = reader.readLong(offsets[11]);
+  object.username = reader.readString(offsets[12]);
+  object.version = reader.readStringOrNull(offsets[13]);
+  return object;
+}
+
+P _softwareCardRecordDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 1:
+      return (reader.readLong(offset)) as P;
+    case 2:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _softwareCardRecordGetId(SoftwareCardRecord object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _softwareCardRecordGetLinks(
+  SoftwareCardRecord object,
+) {
+  return [];
+}
+
+void _softwareCardRecordAttach(
+  IsarCollection<dynamic> col,
+  Id id,
+  SoftwareCardRecord object,
+) {
+  object.id = id;
+}
+
+extension SoftwareCardRecordByIndex on IsarCollection<SoftwareCardRecord> {
+  Future<SoftwareCardRecord?> getBySoftwareId(String softwareId) {
+    return getByIndex(r'softwareId', [softwareId]);
+  }
+
+  SoftwareCardRecord? getBySoftwareIdSync(String softwareId) {
+    return getByIndexSync(r'softwareId', [softwareId]);
+  }
+
+  Future<bool> deleteBySoftwareId(String softwareId) {
+    return deleteByIndex(r'softwareId', [softwareId]);
+  }
+
+  bool deleteBySoftwareIdSync(String softwareId) {
+    return deleteByIndexSync(r'softwareId', [softwareId]);
+  }
+
+  Future<List<SoftwareCardRecord?>> getAllBySoftwareId(
+    List<String> softwareIdValues,
+  ) {
+    final values = softwareIdValues.map((e) => [e]).toList();
+    return getAllByIndex(r'softwareId', values);
+  }
+
+  List<SoftwareCardRecord?> getAllBySoftwareIdSync(
+    List<String> softwareIdValues,
+  ) {
+    final values = softwareIdValues.map((e) => [e]).toList();
+    return getAllByIndexSync(r'softwareId', values);
+  }
+
+  Future<int> deleteAllBySoftwareId(List<String> softwareIdValues) {
+    final values = softwareIdValues.map((e) => [e]).toList();
+    return deleteAllByIndex(r'softwareId', values);
+  }
+
+  int deleteAllBySoftwareIdSync(List<String> softwareIdValues) {
+    final values = softwareIdValues.map((e) => [e]).toList();
+    return deleteAllByIndexSync(r'softwareId', values);
+  }
+
+  Future<Id> putBySoftwareId(SoftwareCardRecord object) {
+    return putByIndex(r'softwareId', object);
+  }
+
+  Id putBySoftwareIdSync(SoftwareCardRecord object, {bool saveLinks = true}) {
+    return putByIndexSync(r'softwareId', object, saveLinks: saveLinks);
+  }
+
+  Future<List<Id>> putAllBySoftwareId(List<SoftwareCardRecord> objects) {
+    return putAllByIndex(r'softwareId', objects);
+  }
+
+  List<Id> putAllBySoftwareIdSync(
+    List<SoftwareCardRecord> objects, {
+    bool saveLinks = true,
+  }) {
+    return putAllByIndexSync(r'softwareId', objects, saveLinks: saveLinks);
+  }
+}
+
+extension SoftwareCardRecordQueryWhereSort
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QWhere> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhere>
+  anyCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'createdAt'),
+      );
+    });
+  }
+}
+
+extension SoftwareCardRecordQueryWhere
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QWhereClause> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  idEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  idNotEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  idGreaterThan(Id id, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  idLessThan(Id id, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  softwareIdEqualTo(String softwareId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'softwareId', value: [softwareId]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  softwareIdNotEqualTo(String softwareId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [],
+                upper: [softwareId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [softwareId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [softwareId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [],
+                upper: [softwareId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  profileIdEqualTo(String profileId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'profileId', value: [profileId]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  profileIdNotEqualTo(String profileId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  createdAtEqualTo(int createdAt) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'createdAt', value: [createdAt]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  createdAtNotEqualTo(int createdAt) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [],
+                upper: [createdAt],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [createdAt],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [createdAt],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [],
+                upper: [createdAt],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  createdAtGreaterThan(int createdAt, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [createdAt],
+          includeLower: include,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  createdAtLessThan(int createdAt, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [],
+          upper: [createdAt],
+          includeUpper: include,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterWhereClause>
+  createdAtBetween(
+    int lowerCreatedAt,
+    int upperCreatedAt, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [lowerCreatedAt],
+          includeLower: includeLower,
+          upper: [upperCreatedAt],
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+}
+
+extension SoftwareCardRecordQueryFilter
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QFilterCondition> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'configPaths',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'configPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'configPaths',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'configPaths', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'configPaths', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'configPaths', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'configPaths', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'configPaths', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'configPaths', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'configPaths', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  configPathsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'configPaths',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  createdAtEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'createdAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  createdAtGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'createdAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  createdAtLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'createdAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  createdAtBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'createdAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dataPaths',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'dataPaths',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'dataPaths',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dataPaths', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'dataPaths', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'dataPaths', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'dataPaths', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'dataPaths', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'dataPaths', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'dataPaths', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  dataPathsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'dataPaths',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'endpointId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'endpointId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'endpointId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  endpointIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'endpointId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'host',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'host',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'host', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  hostIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'host', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  idEqualTo(Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  idGreaterThan(Id value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  idLessThan(Id value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'name',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'name',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'name',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'name', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  nameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'name', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  portEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'port', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  portGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'port',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  portLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'port',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  portBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'port',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'profileId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'profileId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'profileId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  profileIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'profileId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  revisionEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'revision', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  revisionGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'revision',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  revisionLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'revision',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  revisionBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'revision',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'service'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'service'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'service',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'service',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'service',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'service', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  serviceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'service', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'softwareId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'softwareId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'softwareId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  softwareIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'softwareId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  updatedAtEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'updatedAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  updatedAtGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'updatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  updatedAtLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'updatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  updatedAtBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'updatedAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'username',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'username',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'username', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  usernameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'username', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'version'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'version'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'version',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'version',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'version',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'version', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterFilterCondition>
+  versionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'version', value: ''),
+      );
+    });
+  }
+}
+
+extension SoftwareCardRecordQueryObject
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QFilterCondition> {}
+
+extension SoftwareCardRecordQueryLinks
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QFilterCondition> {}
+
+extension SoftwareCardRecordQuerySortBy
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QSortBy> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByEndpointId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByEndpointIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByProfileId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByProfileIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByRevision() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'revision', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByRevisionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'revision', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByService() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'service', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByServiceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'service', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortBySoftwareId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortBySoftwareIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByUsername() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByUsernameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'version', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  sortByVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'version', Sort.desc);
+    });
+  }
+}
+
+extension SoftwareCardRecordQuerySortThenBy
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QSortThenBy> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByEndpointId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByEndpointIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByProfileId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByProfileIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByRevision() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'revision', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByRevisionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'revision', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByService() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'service', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByServiceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'service', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenBySoftwareId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenBySoftwareIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByUsername() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByUsernameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'version', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QAfterSortBy>
+  thenByVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'version', Sort.desc);
+    });
+  }
+}
+
+extension SoftwareCardRecordQueryWhereDistinct
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct> {
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByConfigPaths() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'configPaths');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByDataPaths() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dataPaths');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByEndpointId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'endpointId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByHost({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'host', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByName({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'name', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'port');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByProfileId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'profileId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByRevision() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'revision');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByService({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'service', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctBySoftwareId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'softwareId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'updatedAt');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByUsername({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'username', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QDistinct>
+  distinctByVersion({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'version', caseSensitive: caseSensitive);
+    });
+  }
+}
+
+extension SoftwareCardRecordQueryProperty
+    on QueryBuilder<SoftwareCardRecord, SoftwareCardRecord, QQueryProperty> {
+  QueryBuilder<SoftwareCardRecord, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, List<String>, QQueryOperations>
+  configPathsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'configPaths');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, int, QQueryOperations> createdAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, List<String>, QQueryOperations>
+  dataPathsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dataPaths');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations>
+  endpointIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'endpointId');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations> hostProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'host');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations> nameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, int, QQueryOperations> portProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'port');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations>
+  profileIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'profileId');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, int, QQueryOperations> revisionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'revision');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String?, QQueryOperations>
+  serviceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'service');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations>
+  softwareIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'softwareId');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, int, QQueryOperations> updatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'updatedAt');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String, QQueryOperations>
+  usernameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'username');
+    });
+  }
+
+  QueryBuilder<SoftwareCardRecord, String?, QQueryOperations>
+  versionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'version');
+    });
+  }
+}
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types, experimental_member_use
+
+extension GetSoftwareEventRecordCollection on Isar {
+  IsarCollection<SoftwareEventRecord> get softwareEventRecords =>
+      this.collection();
+}
+
+const SoftwareEventRecordSchema = CollectionSchema(
+  name: r'SoftwareEventRecord',
+  id: -9032500009770399314,
+  properties: {
+    r'action': PropertySchema(id: 0, name: r'action', type: IsarType.string),
+    r'actorKind': PropertySchema(
+      id: 1,
+      name: r'actorKind',
+      type: IsarType.string,
+    ),
+    r'changedFields': PropertySchema(
+      id: 2,
+      name: r'changedFields',
+      type: IsarType.stringList,
+    ),
+    r'clientId': PropertySchema(
+      id: 3,
+      name: r'clientId',
+      type: IsarType.string,
+    ),
+    r'createdAt': PropertySchema(
+      id: 4,
+      name: r'createdAt',
+      type: IsarType.long,
+    ),
+    r'endpointId': PropertySchema(
+      id: 5,
+      name: r'endpointId',
+      type: IsarType.string,
+    ),
+    r'eventId': PropertySchema(id: 6, name: r'eventId', type: IsarType.string),
+    r'host': PropertySchema(id: 7, name: r'host', type: IsarType.string),
+    r'kind': PropertySchema(id: 8, name: r'kind', type: IsarType.string),
+    r'outcome': PropertySchema(id: 9, name: r'outcome', type: IsarType.string),
+    r'port': PropertySchema(id: 10, name: r'port', type: IsarType.long),
+    r'profileId': PropertySchema(
+      id: 11,
+      name: r'profileId',
+      type: IsarType.string,
+    ),
+    r'softwareId': PropertySchema(
+      id: 12,
+      name: r'softwareId',
+      type: IsarType.string,
+    ),
+    r'softwareName': PropertySchema(
+      id: 13,
+      name: r'softwareName',
+      type: IsarType.string,
+    ),
+    r'summary': PropertySchema(id: 14, name: r'summary', type: IsarType.string),
+    r'username': PropertySchema(
+      id: 15,
+      name: r'username',
+      type: IsarType.string,
+    ),
+  },
+
+  estimateSize: _softwareEventRecordEstimateSize,
+  serialize: _softwareEventRecordSerialize,
+  deserialize: _softwareEventRecordDeserialize,
+  deserializeProp: _softwareEventRecordDeserializeProp,
+  idName: r'id',
+  indexes: {
+    r'eventId': IndexSchema(
+      id: -2707901133518603130,
+      name: r'eventId',
+      unique: true,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'eventId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
+    r'profileId': IndexSchema(
+      id: 6052971939042612300,
+      name: r'profileId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'profileId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
+    r'softwareId': IndexSchema(
+      id: 3379527538188932991,
+      name: r'softwareId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'softwareId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
+    r'createdAt': IndexSchema(
+      id: -3433535483987302584,
+      name: r'createdAt',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'createdAt',
+          type: IndexType.value,
+          caseSensitive: false,
+        ),
+      ],
+    ),
+  },
+  links: {},
+  embeddedSchemas: {},
+
+  getId: _softwareEventRecordGetId,
+  getLinks: _softwareEventRecordGetLinks,
+  attach: _softwareEventRecordAttach,
+  version: '3.4.1',
+);
+
+int _softwareEventRecordEstimateSize(
+  SoftwareEventRecord object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  {
+    final value = object.action;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.actorKind.length * 3;
+  bytesCount += 3 + object.changedFields.length * 3;
+  {
+    for (var i = 0; i < object.changedFields.length; i++) {
+      final value = object.changedFields[i];
+      bytesCount += value.length * 3;
+    }
+  }
+  {
+    final value = object.clientId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.endpointId.length * 3;
+  bytesCount += 3 + object.eventId.length * 3;
+  bytesCount += 3 + object.host.length * 3;
+  bytesCount += 3 + object.kind.length * 3;
+  {
+    final value = object.outcome;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.profileId.length * 3;
+  {
+    final value = object.softwareId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.softwareName;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.summary.length * 3;
+  bytesCount += 3 + object.username.length * 3;
+  return bytesCount;
+}
+
+void _softwareEventRecordSerialize(
+  SoftwareEventRecord object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeString(offsets[0], object.action);
+  writer.writeString(offsets[1], object.actorKind);
+  writer.writeStringList(offsets[2], object.changedFields);
+  writer.writeString(offsets[3], object.clientId);
+  writer.writeLong(offsets[4], object.createdAt);
+  writer.writeString(offsets[5], object.endpointId);
+  writer.writeString(offsets[6], object.eventId);
+  writer.writeString(offsets[7], object.host);
+  writer.writeString(offsets[8], object.kind);
+  writer.writeString(offsets[9], object.outcome);
+  writer.writeLong(offsets[10], object.port);
+  writer.writeString(offsets[11], object.profileId);
+  writer.writeString(offsets[12], object.softwareId);
+  writer.writeString(offsets[13], object.softwareName);
+  writer.writeString(offsets[14], object.summary);
+  writer.writeString(offsets[15], object.username);
+}
+
+SoftwareEventRecord _softwareEventRecordDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = SoftwareEventRecord();
+  object.action = reader.readStringOrNull(offsets[0]);
+  object.actorKind = reader.readString(offsets[1]);
+  object.changedFields = reader.readStringList(offsets[2]) ?? [];
+  object.clientId = reader.readStringOrNull(offsets[3]);
+  object.createdAt = reader.readLong(offsets[4]);
+  object.endpointId = reader.readString(offsets[5]);
+  object.eventId = reader.readString(offsets[6]);
+  object.host = reader.readString(offsets[7]);
+  object.id = id;
+  object.kind = reader.readString(offsets[8]);
+  object.outcome = reader.readStringOrNull(offsets[9]);
+  object.port = reader.readLong(offsets[10]);
+  object.profileId = reader.readString(offsets[11]);
+  object.softwareId = reader.readStringOrNull(offsets[12]);
+  object.softwareName = reader.readStringOrNull(offsets[13]);
+  object.summary = reader.readString(offsets[14]);
+  object.username = reader.readString(offsets[15]);
+  return object;
+}
+
+P _softwareEventRecordDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readStringOrNull(offset)) as P;
+    case 1:
+      return (reader.readString(offset)) as P;
+    case 2:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 3:
+      return (reader.readStringOrNull(offset)) as P;
+    case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
+    case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _softwareEventRecordGetId(SoftwareEventRecord object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _softwareEventRecordGetLinks(
+  SoftwareEventRecord object,
+) {
+  return [];
+}
+
+void _softwareEventRecordAttach(
+  IsarCollection<dynamic> col,
+  Id id,
+  SoftwareEventRecord object,
+) {
+  object.id = id;
+}
+
+extension SoftwareEventRecordByIndex on IsarCollection<SoftwareEventRecord> {
+  Future<SoftwareEventRecord?> getByEventId(String eventId) {
+    return getByIndex(r'eventId', [eventId]);
+  }
+
+  SoftwareEventRecord? getByEventIdSync(String eventId) {
+    return getByIndexSync(r'eventId', [eventId]);
+  }
+
+  Future<bool> deleteByEventId(String eventId) {
+    return deleteByIndex(r'eventId', [eventId]);
+  }
+
+  bool deleteByEventIdSync(String eventId) {
+    return deleteByIndexSync(r'eventId', [eventId]);
+  }
+
+  Future<List<SoftwareEventRecord?>> getAllByEventId(
+    List<String> eventIdValues,
+  ) {
+    final values = eventIdValues.map((e) => [e]).toList();
+    return getAllByIndex(r'eventId', values);
+  }
+
+  List<SoftwareEventRecord?> getAllByEventIdSync(List<String> eventIdValues) {
+    final values = eventIdValues.map((e) => [e]).toList();
+    return getAllByIndexSync(r'eventId', values);
+  }
+
+  Future<int> deleteAllByEventId(List<String> eventIdValues) {
+    final values = eventIdValues.map((e) => [e]).toList();
+    return deleteAllByIndex(r'eventId', values);
+  }
+
+  int deleteAllByEventIdSync(List<String> eventIdValues) {
+    final values = eventIdValues.map((e) => [e]).toList();
+    return deleteAllByIndexSync(r'eventId', values);
+  }
+
+  Future<Id> putByEventId(SoftwareEventRecord object) {
+    return putByIndex(r'eventId', object);
+  }
+
+  Id putByEventIdSync(SoftwareEventRecord object, {bool saveLinks = true}) {
+    return putByIndexSync(r'eventId', object, saveLinks: saveLinks);
+  }
+
+  Future<List<Id>> putAllByEventId(List<SoftwareEventRecord> objects) {
+    return putAllByIndex(r'eventId', objects);
+  }
+
+  List<Id> putAllByEventIdSync(
+    List<SoftwareEventRecord> objects, {
+    bool saveLinks = true,
+  }) {
+    return putAllByIndexSync(r'eventId', objects, saveLinks: saveLinks);
+  }
+}
+
+extension SoftwareEventRecordQueryWhereSort
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QWhere> {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhere>
+  anyCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'createdAt'),
+      );
+    });
+  }
+}
+
+extension SoftwareEventRecordQueryWhere
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QWhereClause> {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  idEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  idNotEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  idGreaterThan(Id id, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  idLessThan(Id id, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  eventIdEqualTo(String eventId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'eventId', value: [eventId]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  eventIdNotEqualTo(String eventId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'eventId',
+                lower: [],
+                upper: [eventId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'eventId',
+                lower: [eventId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'eventId',
+                lower: [eventId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'eventId',
+                lower: [],
+                upper: [eventId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  profileIdEqualTo(String profileId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'profileId', value: [profileId]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  profileIdNotEqualTo(String profileId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  softwareIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'softwareId', value: [null]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  softwareIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'softwareId',
+          lower: [null],
+          includeLower: false,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  softwareIdEqualTo(String? softwareId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'softwareId', value: [softwareId]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  softwareIdNotEqualTo(String? softwareId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [],
+                upper: [softwareId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [softwareId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [softwareId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'softwareId',
+                lower: [],
+                upper: [softwareId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  createdAtEqualTo(int createdAt) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'createdAt', value: [createdAt]),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  createdAtNotEqualTo(int createdAt) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [],
+                upper: [createdAt],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [createdAt],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [createdAt],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'createdAt',
+                lower: [],
+                upper: [createdAt],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  createdAtGreaterThan(int createdAt, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [createdAt],
+          includeLower: include,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  createdAtLessThan(int createdAt, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [],
+          upper: [createdAt],
+          includeUpper: include,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterWhereClause>
+  createdAtBetween(
+    int lowerCreatedAt,
+    int upperCreatedAt, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'createdAt',
+          lower: [lowerCreatedAt],
+          includeLower: includeLower,
+          upper: [upperCreatedAt],
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+}
+
+extension SoftwareEventRecordQueryFilter
+    on
+        QueryBuilder<
+          SoftwareEventRecord,
+          SoftwareEventRecord,
+          QFilterCondition
+        > {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'action'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'action'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'action',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'action',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'action',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'action', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'action', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'actorKind',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'actorKind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'actorKind',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'actorKind', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  actorKindIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'actorKind', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'changedFields',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'changedFields',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'changedFields',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'changedFields', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'changedFields', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'changedFields', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'changedFields', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'changedFields', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'changedFields', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'changedFields', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  changedFieldsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'changedFields',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'clientId'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'clientId'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'clientId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'clientId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'clientId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'clientId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  clientIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'clientId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  createdAtEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'createdAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  createdAtGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'createdAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  createdAtLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'createdAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  createdAtBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'createdAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'endpointId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'endpointId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'endpointId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'endpointId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  endpointIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'endpointId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'eventId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'eventId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'eventId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'eventId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  eventIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'eventId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'host',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'host',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'host',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'host', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  hostIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'host', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  idEqualTo(Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  idGreaterThan(Id value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  idLessThan(Id value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'kind',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'kind',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'kind',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'kind', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  kindIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'kind', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'outcome'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'outcome'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'outcome',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'outcome',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'outcome',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'outcome', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  outcomeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'outcome', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  portEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'port', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  portGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'port',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  portLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'port',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  portBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'port',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'profileId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'profileId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'profileId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  profileIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'profileId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'softwareId'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'softwareId'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'softwareId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'softwareId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'softwareId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'softwareId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'softwareId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'softwareName'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'softwareName'),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'softwareName',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'softwareName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'softwareName',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'softwareName', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  softwareNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'softwareName', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'summary',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'summary',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'summary',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'summary', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  summaryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'summary', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'username',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'username',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'username',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'username', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterFilterCondition>
+  usernameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'username', value: ''),
+      );
+    });
+  }
+}
+
+extension SoftwareEventRecordQueryObject
+    on
+        QueryBuilder<
+          SoftwareEventRecord,
+          SoftwareEventRecord,
+          QFilterCondition
+        > {}
+
+extension SoftwareEventRecordQueryLinks
+    on
+        QueryBuilder<
+          SoftwareEventRecord,
+          SoftwareEventRecord,
+          QFilterCondition
+        > {}
+
+extension SoftwareEventRecordQuerySortBy
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QSortBy> {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByAction() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'action', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByActionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'action', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByActorKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'actorKind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByActorKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'actorKind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByClientId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clientId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByClientIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clientId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByEndpointId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByEndpointIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByEventId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'eventId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByEventIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'eventId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByOutcome() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcome', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByOutcomeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcome', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByProfileId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByProfileIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySoftwareId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySoftwareIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySoftwareName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySoftwareNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'summary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortBySummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'summary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByUsername() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  sortByUsernameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.desc);
+    });
+  }
+}
+
+extension SoftwareEventRecordQuerySortThenBy
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QSortThenBy> {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByAction() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'action', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByActionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'action', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByActorKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'actorKind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByActorKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'actorKind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByClientId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clientId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByClientIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clientId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByEndpointId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByEndpointIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'endpointId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByEventId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'eventId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByEventIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'eventId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByOutcome() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcome', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByOutcomeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcome', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'port', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByProfileId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByProfileIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySoftwareId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySoftwareIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySoftwareName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySoftwareNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'softwareName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'summary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenBySummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'summary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByUsername() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QAfterSortBy>
+  thenByUsernameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'username', Sort.desc);
+    });
+  }
+}
+
+extension SoftwareEventRecordQueryWhereDistinct
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct> {
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByAction({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'action', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByActorKind({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'actorKind', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByChangedFields() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'changedFields');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByClientId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'clientId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByEndpointId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'endpointId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByEventId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'eventId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByHost({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'host', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByKind({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'kind', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByOutcome({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'outcome', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'port');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByProfileId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'profileId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctBySoftwareId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'softwareId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctBySoftwareName({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'softwareName', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctBySummary({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'summary', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QDistinct>
+  distinctByUsername({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'username', caseSensitive: caseSensitive);
+    });
+  }
+}
+
+extension SoftwareEventRecordQueryProperty
+    on QueryBuilder<SoftwareEventRecord, SoftwareEventRecord, QQueryProperty> {
+  QueryBuilder<SoftwareEventRecord, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String?, QQueryOperations>
+  actionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'action');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  actorKindProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'actorKind');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, List<String>, QQueryOperations>
+  changedFieldsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'changedFields');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String?, QQueryOperations>
+  clientIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'clientId');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, int, QQueryOperations> createdAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  endpointIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'endpointId');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  eventIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'eventId');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations> hostProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'host');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations> kindProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'kind');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String?, QQueryOperations>
+  outcomeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'outcome');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, int, QQueryOperations> portProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'port');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  profileIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'profileId');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String?, QQueryOperations>
+  softwareIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'softwareId');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String?, QQueryOperations>
+  softwareNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'softwareName');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  summaryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'summary');
+    });
+  }
+
+  QueryBuilder<SoftwareEventRecord, String, QQueryOperations>
+  usernameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'username');
+    });
+  }
+}

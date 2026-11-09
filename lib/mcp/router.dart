@@ -7,6 +7,8 @@ import '../console/console_operations.dart';
 import '../domain/actor.dart';
 import '../domain/app_operations.dart';
 import '../domain/models.dart';
+import '../software/software_models.dart';
+import '../software/software_owner.dart';
 import 'grant_owner.dart';
 import 'tool_schemas.dart';
 
@@ -17,12 +19,14 @@ final class McpRouter {
     required this.schemas,
     required this.release,
     this.consoles,
+    this.software,
   });
   final AppOperations operations;
   final GrantOwner grants;
   final ToolSchemas schemas;
   final String release;
   final ConsoleOperations? consoles;
+  final SoftwareOwner? software;
   McpSession session(McpActor actor) => McpSession._(this, actor);
 }
 
@@ -227,6 +231,7 @@ final class McpSession {
     final op = router.operations;
     final p = a['profileId'] as String?;
     if (name.startsWith('console.')) return _consoleDispatch(actor, name, a);
+    if (name.startsWith('software.')) return _softwareDispatch(actor, name, a);
     switch (name) {
       case 'profiles.list':
         return (await op.listProfiles(
@@ -345,6 +350,80 @@ final class McpSession {
         )).toJson();
       default:
         throw const SchemaFailure(r'$.name');
+    }
+  }
+
+  Future<Map<String, Object?>> _softwareDispatch(
+    McpActor actor,
+    String name,
+    Map<String, dynamic> a,
+  ) async {
+    final owner = router.software;
+    if (owner == null)
+      return const OperationResult<SoftwareValue>.failure(
+        OperationFailure(FailureCode.shuttingDown),
+      ).toJson();
+    final profile = a['profileId'] as String?;
+    try {
+      switch (name) {
+        case 'software.list':
+          return (await owner.list(
+            actor,
+            profile!,
+            limit: a['limit'] as int? ?? 25,
+            cursor: a['cursor'] as String?,
+          )).toJson();
+        case 'software.get':
+          return (await owner.get(actor, a['softwareId'] as String)).toJson();
+        case 'software.save':
+          final card = a['card'] as Map<String, dynamic>;
+          return (await owner.save(
+            actor,
+            profile!,
+            SoftwareCardInput(
+              name: card['name'] as String,
+              version: card['version'] as String?,
+              service: card['service'] as String?,
+              dataPaths: (card['dataPaths'] as List).cast<String>(),
+              configPaths: (card['configPaths'] as List).cast<String>(),
+            ),
+            softwareId: a['softwareId'] as String?,
+            expectedRevision: a['expectedRevision'] as int?,
+            mutationId: a['mutationId'] as String,
+          )).toJson();
+        case 'software.delete':
+          return (await owner.delete(
+            actor,
+            profile!,
+            a['softwareId'] as String,
+            expectedRevision: a['expectedRevision'] as int,
+            mutationId: a['mutationId'] as String,
+          )).toJson();
+        case 'software.history.list':
+          return (await owner.history(
+            actor,
+            profile!,
+            softwareId: a['softwareId'] as String?,
+            limit: a['limit'] as int? ?? 25,
+            cursor: a['cursor'] as String?,
+          )).toJson();
+        case 'software.history.add':
+          return (await owner.addNote(
+            actor,
+            profile!,
+            SoftwareNoteInput(
+              action: a['action'] as String,
+              summary: a['summary'] as String,
+              outcome: a['outcome'] as String,
+            ),
+            softwareId: a['softwareId'] as String?,
+            mutationId: a['mutationId'] as String,
+          )).toJson();
+        default:
+          throw const SchemaFailure(r'$.name');
+      }
+    } on OperationFailure catch (error) {
+      return OperationResult<MutationValue>.failure(error).toJson();
     }
   }
 

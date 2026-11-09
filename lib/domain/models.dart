@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../console/console_models.dart';
+import '../software/software_models.dart';
 
 final _uuid = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
@@ -12,6 +13,7 @@ bool isCanonicalUuid(String value) =>
 enum FailureCode {
   invalidArgument('INVALID_ARGUMENT'),
   profileNotFound('PROFILE_NOT_FOUND'),
+  softwareNotFound('SOFTWARE_NOT_FOUND'),
   conflict('CONFLICT'),
   authRequired('AUTH_REQUIRED'),
   accessRevoked('ACCESS_REVOKED'),
@@ -42,6 +44,7 @@ enum FailureCode {
 enum FailureReason { none, clockRollback, connectionCleanup, grantCleanup }
 
 enum OperationField {
+  softwareId,
   profileId,
   displayName,
   host,
@@ -511,4 +514,12 @@ final class ConsoleValue extends PublicValue {
   final ConsoleProjection console;
   @override
   Map<String, Object?> toJson() => console.toJson();
+}
+
+/// Only typed software projections cross the shared domain gate.
+final class SoftwareValue extends PublicValue {
+  const SoftwareValue(this.software);
+  final SoftwareProjection software;
+  @override
+  Map<String, Object?> toJson() => software.toJson();
 }

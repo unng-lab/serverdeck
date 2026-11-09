@@ -145,6 +145,53 @@ class JournalSource {
   String payload = '{"version":1,"checkpoint":{},"entries":[],"partial":false}';
 }
 
+@collection
+class SoftwareCardRecord {
+  Id id = Isar.autoIncrement;
+  @Index(unique: true)
+  String softwareId = '';
+  @Index()
+  String profileId = '';
+  String endpointId = '';
+  String host = '';
+  int port = 22;
+  String username = '';
+  String name = '';
+  String? version;
+  String? service;
+  List<String> dataPaths = [];
+  List<String> configPaths = [];
+  int revision = 1;
+  @Index()
+  int createdAt = 0;
+  int updatedAt = 0;
+}
+
+@collection
+class SoftwareEventRecord {
+  Id id = Isar.autoIncrement;
+  @Index(unique: true)
+  String eventId = '';
+  @Index()
+  String profileId = '';
+  String endpointId = '';
+  String host = '';
+  int port = 22;
+  String username = '';
+  @Index()
+  String? softwareId;
+  String? softwareName;
+  String kind = 'note';
+  String? action;
+  String summary = '';
+  String? outcome;
+  List<String> changedFields = [];
+  String actorKind = 'ui';
+  String? clientId;
+  @Index()
+  int createdAt = 0;
+}
+
 const workspaceSchemas = [
   AppSettingsSchema,
   ProfileSchema,
@@ -155,4 +202,6 @@ const workspaceSchemas = [
   SecurityStateSchema,
   MonitoringHistoryRecordSchema,
   JournalSourceSchema,
+  SoftwareCardRecordSchema,
+  SoftwareEventRecordSchema,
 ];

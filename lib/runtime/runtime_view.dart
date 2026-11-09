@@ -293,6 +293,7 @@ class _RuntimeViewState extends State<RuntimeView> {
         monitoring: _monitoring,
         journals: widget.features?.journals,
         consoles: widget.features?.consoles,
+        software: widget.features?.software,
         applicationStatus: status,
         onApplicationSettings: _openApplicationSettings,
         runtimeNotice: !runtime.trayAvailable

@@ -22,6 +22,7 @@ import '../profiles/credential_input.dart';
 import '../profiles/key_parse_worker.dart';
 import '../profiles/profile_owner.dart';
 import '../storage/domain_repository.dart';
+import '../software/software_owner.dart';
 import '../trust/trust_owner.dart';
 import '../monitoring/monitoring_owner.dart';
 import '../updates/update_owner.dart';
@@ -100,6 +101,13 @@ final class FeatureRuntime implements RuntimeCapability {
       onFailure: (error, stack) => diagnostics.record('command', error, stack),
     );
     final receipts = ReceiptBook(signer, utcNow);
+    software = SoftwareOwner(
+      gate: gate,
+      repository: repository,
+      receipts: receipts,
+      newId: newId,
+      utcNow: utcNow,
+    );
     trust = TrustOwner(
       repository: repository,
       getGate: () => gate,
@@ -154,6 +162,7 @@ final class FeatureRuntime implements RuntimeCapability {
       currentVersion: platform.context.release,
     );
     _capabilities = [
+      software,
       consoles,
       consoleSettings,
       updates,
@@ -177,6 +186,7 @@ final class FeatureRuntime implements RuntimeCapability {
   late final ActorAuthority actors;
   late final CanonicalOperationState state;
   late final DomainCommandGate gate;
+  late final SoftwareOwner software;
   late final CancellableKeyParser parser;
   late final HostSignatureVerifier verifier;
   late final PrivateSigner privateSigner;
@@ -212,6 +222,7 @@ final class FeatureRuntime implements RuntimeCapability {
     await journals.start();
     try {
       router = McpRouter(
+        software: software,
         operations: operations,
         consoles: consoles,
         grants: grants,

@@ -37,6 +37,12 @@ final class ToolSchemas {
     'console.release',
     'console.write',
     'console.close',
+    'software.list',
+    'software.get',
+    'software.save',
+    'software.delete',
+    'software.history.list',
+    'software.history.add',
   };
   final List<Map<String, dynamic>> tools;
   static Future<ToolSchemas> load() async => ToolSchemas(
@@ -47,7 +53,14 @@ final class ToolSchemas {
       tools.firstWhere((t) => t['name'] == name);
   Map<String, dynamic> arguments(String name, Map<String, dynamic> input) {
     final schema = tool(name)['inputSchema'] as Map<String, dynamic>;
+    if (name.startsWith('software.')) {
+      for (final field in ['limit', 'expectedRevision']) {
+        if (input.containsKey(field) && input[field] is! int)
+          _bad(r'$.' + field);
+      }
+    }
     _check(input, schema, schema, r'$', 0);
+    if (name.startsWith('software.')) return input;
     return _integers(input) as Map<String, dynamic>;
   }
 

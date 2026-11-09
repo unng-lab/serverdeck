@@ -46,6 +46,10 @@ final class OperationPresentation {
         'Профиль уже удалён.',
         'Обновите список и выберите существующий профиль.',
       ),
+      FailureCode.softwareNotFound => const OperationPresentation(
+        'Карточка ПО уже удалена или недоступна в этом профиле.',
+        'Обновите список ПО и выберите существующую карточку.',
+      ),
       FailureCode.conflict => const OperationPresentation(
         'Данные или подтверждение уже изменились.',
         'Обновите профиль. Для доверия или passphrase используйте новый запрос.',
@@ -122,6 +126,7 @@ final class OperationPresentation {
   }
 
   static String field(OperationField value) => switch (value) {
+    OperationField.softwareId => 'карточка ПО',
     OperationField.displayName => 'название',
     OperationField.host => 'хост',
     OperationField.port => 'порт',

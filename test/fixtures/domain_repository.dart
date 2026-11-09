@@ -10,6 +10,8 @@ final class MemoryDomain {
   AppSettings settings = AppSettings();
   SecurityState security = SecurityState()..protectedReceiptHmacKey = [1];
   final profiles = <String, Profile>{};
+  final softwareCards = <String, SoftwareCardRecord>{};
+  final softwareEvents = <String, SoftwareEventRecord>{};
   final journalSources = <String, JournalSource>{};
   final credentials = <String, Credential>{};
   final endpoints = <String, EndpointTrust>{};
@@ -17,6 +19,12 @@ final class MemoryDomain {
   final receipts = <(String, String), MutationReceipt>{};
   final histories = <String, MonitoringHistoryRecord>{};
   MemoryDomain clone() => MemoryDomain()
+    ..softwareCards.addAll(
+      softwareCards.map((k, v) => MapEntry(k, copySoftwareCard(v))),
+    )
+    ..softwareEvents.addAll(
+      softwareEvents.map((k, v) => MapEntry(k, copySoftwareEvent(v))),
+    )
     ..journalSources.addAll(
       journalSources.map((k, v) => MapEntry(k, copyJournalSource(v))),
     )
@@ -121,6 +129,101 @@ final class MemoryDomainRepository implements DomainRepository {
 }
 
 final class _MemoryRecords implements DomainTransaction {
+  @override
+  SoftwareCardRecord? softwareCard(String id) {
+    check();
+    final value = state.softwareCards[id];
+    return value == null ? null : copySoftwareCard(value);
+  }
+
+  @override
+  int softwareCardCount({String? profileId}) {
+    check();
+    return state.softwareCards.values
+        .where((v) => profileId == null || v.profileId == profileId)
+        .length;
+  }
+
+  @override
+  List<SoftwareCardRecord> softwareCards(
+    String profileId, {
+    int offset = 0,
+    int limit = 100,
+  }) {
+    check();
+    final values =
+        state.softwareCards.values
+            .where((v) => v.profileId == profileId)
+            .toList()
+          ..sort((a, b) {
+            final c = a.createdAt.compareTo(b.createdAt);
+            return c == 0 ? a.softwareId.compareTo(b.softwareId) : c;
+          });
+    return values.skip(offset).take(limit).map(copySoftwareCard).toList();
+  }
+
+  @override
+  List<SoftwareEventRecord> softwareEvents(
+    String profileId, {
+    String? softwareId,
+    int offset = 0,
+    int limit = 100,
+  }) {
+    check();
+    final values =
+        state.softwareEvents.values
+            .where(
+              (v) =>
+                  v.profileId == profileId &&
+                  (softwareId == null || v.softwareId == softwareId),
+            )
+            .toList()
+          ..sort((a, b) {
+            final c = b.createdAt.compareTo(a.createdAt);
+            return c == 0 ? b.eventId.compareTo(a.eventId) : c;
+          });
+    return values.skip(offset).take(limit).map(copySoftwareEvent).toList();
+  }
+
+  @override
+  int softwareEventCount() {
+    check();
+    return state.softwareEvents.length;
+  }
+
+  @override
+  void putSoftwareCard(SoftwareCardRecord value) {
+    write('software');
+    state.softwareCards[value.softwareId] = copySoftwareCard(value);
+  }
+
+  @override
+  void deleteSoftwareCard(String id) {
+    write('delete software');
+    state.softwareCards.remove(id);
+  }
+
+  @override
+  void putSoftwareEvent(SoftwareEventRecord value) {
+    write('software event');
+    state.softwareEvents[value.eventId] = copySoftwareEvent(value);
+  }
+
+  @override
+  void pruneSoftwareEvents(int keep) {
+    write('prune software events');
+    final values = state.softwareEvents.values.toList()
+      ..sort((a, b) {
+        final c = a.createdAt.compareTo(b.createdAt);
+        return c == 0 ? a.eventId.compareTo(b.eventId) : c;
+      });
+    for (final v in values.take(
+      values.length > keep ? values.length - keep : 0,
+    )) {
+      state.softwareEvents.remove(v.eventId);
+    }
+  }
+
   @override
   List<JournalSource> journalSources() {
     check();
@@ -337,6 +440,8 @@ final class _MemoryRecords implements DomainTransaction {
   @override
   void deleteProfile(String id) {
     write('delete profile');
+    state.softwareCards.removeWhere((_, v) => v.profileId == id);
+    state.softwareEvents.removeWhere((_, v) => v.profileId == id);
     state.journalSources.removeWhere((_, s) => s.profileId == id);
     state.histories.remove(id);
     state.profiles.remove(id);
@@ -439,3 +544,41 @@ JournalSource copyJournalSource(JournalSource v) => JournalSource()
   ..name = v.name
   ..enabled = v.enabled
   ..payload = v.payload;
+
+SoftwareCardRecord copySoftwareCard(SoftwareCardRecord v) =>
+    SoftwareCardRecord()
+      ..id = v.id
+      ..softwareId = v.softwareId
+      ..profileId = v.profileId
+      ..endpointId = v.endpointId
+      ..host = v.host
+      ..port = v.port
+      ..username = v.username
+      ..name = v.name
+      ..version = v.version
+      ..service = v.service
+      ..dataPaths = List.of(v.dataPaths)
+      ..configPaths = List.of(v.configPaths)
+      ..revision = v.revision
+      ..createdAt = v.createdAt
+      ..updatedAt = v.updatedAt;
+
+SoftwareEventRecord copySoftwareEvent(SoftwareEventRecord v) =>
+    SoftwareEventRecord()
+      ..id = v.id
+      ..eventId = v.eventId
+      ..profileId = v.profileId
+      ..endpointId = v.endpointId
+      ..host = v.host
+      ..port = v.port
+      ..username = v.username
+      ..softwareId = v.softwareId
+      ..softwareName = v.softwareName
+      ..kind = v.kind
+      ..action = v.action
+      ..summary = v.summary
+      ..outcome = v.outcome
+      ..changedFields = List.of(v.changedFields)
+      ..actorKind = v.actorKind
+      ..clientId = v.clientId
+      ..createdAt = v.createdAt;

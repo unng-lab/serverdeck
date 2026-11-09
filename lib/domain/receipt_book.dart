@@ -12,7 +12,10 @@ enum ReceiptMethod {
   updateProfile('profiles.update'),
   acceptTrust('trust.accept'),
   replaceTrust('trust.replace'),
-  retainTrust('trust.retain');
+  retainTrust('trust.retain'),
+  saveSoftware('software.save'),
+  deleteSoftware('software.delete'),
+  addSoftwareNote('software.history.add');
 
   const ReceiptMethod(this.wire);
   final String wire;

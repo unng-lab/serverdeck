@@ -7,6 +7,20 @@ import 'workspace_store.dart';
 
 /// Root/owners only. Returned records are detached; none is a public projection.
 abstract interface class DomainRead {
+  SoftwareCardRecord? softwareCard(String softwareId);
+  int softwareCardCount({String? profileId});
+  List<SoftwareCardRecord> softwareCards(
+    String profileId, {
+    int offset = 0,
+    int limit = 100,
+  });
+  List<SoftwareEventRecord> softwareEvents(
+    String profileId, {
+    String? softwareId,
+    int offset = 0,
+    int limit = 100,
+  });
+  int softwareEventCount();
   List<JournalSource> journalSources();
   JournalSource? journalSource(String sourceId);
   AppSettings get settings;
@@ -24,6 +38,10 @@ abstract interface class DomainRead {
 }
 
 abstract interface class DomainTransaction implements DomainRead {
+  void putSoftwareCard(SoftwareCardRecord value);
+  void deleteSoftwareCard(String softwareId);
+  void putSoftwareEvent(SoftwareEventRecord value);
+  void pruneSoftwareEvents(int keep);
   void putJournalSource(JournalSource value);
   void deleteJournalSource(String sourceId);
   void putSettings(AppSettings value);
@@ -83,6 +101,79 @@ final class WorkspaceDomainRepository implements DomainRepository {
 final class _IsarRecords implements DomainTransaction {
   const _IsarRecords(this.db);
   final Isar db;
+  @override
+  SoftwareCardRecord? softwareCard(String id) =>
+      db.softwareCardRecords.getBySoftwareIdSync(id);
+  @override
+  int softwareCardCount({String? profileId}) => profileId == null
+      ? db.softwareCardRecords.countSync()
+      : db.softwareCardRecords.where().profileIdEqualTo(profileId).countSync();
+  @override
+  List<SoftwareCardRecord> softwareCards(
+    String profileId, {
+    int offset = 0,
+    int limit = 100,
+  }) => db.softwareCardRecords
+      .where()
+      .profileIdEqualTo(profileId)
+      .sortByCreatedAt()
+      .thenBySoftwareId()
+      .offset(offset)
+      .limit(limit)
+      .findAllSync();
+  @override
+  List<SoftwareEventRecord> softwareEvents(
+    String profileId, {
+    String? softwareId,
+    int offset = 0,
+    int limit = 100,
+  }) {
+    if (softwareId == null) {
+      return db.softwareEventRecords
+          .where()
+          .profileIdEqualTo(profileId)
+          .sortByCreatedAtDesc()
+          .thenByEventIdDesc()
+          .offset(offset)
+          .limit(limit)
+          .findAllSync();
+    }
+    return db.softwareEventRecords
+        .where()
+        .softwareIdEqualTo(softwareId)
+        .filter()
+        .profileIdEqualTo(profileId)
+        .sortByCreatedAtDesc()
+        .thenByEventIdDesc()
+        .offset(offset)
+        .limit(limit)
+        .findAllSync();
+  }
+
+  @override
+  int softwareEventCount() => db.softwareEventRecords.countSync();
+  @override
+  void putSoftwareCard(SoftwareCardRecord value) =>
+      db.softwareCardRecords.putSync(value);
+  @override
+  void deleteSoftwareCard(String id) =>
+      db.softwareCardRecords.deleteBySoftwareIdSync(id);
+  @override
+  void putSoftwareEvent(SoftwareEventRecord value) =>
+      db.softwareEventRecords.putSync(value);
+  @override
+  void pruneSoftwareEvents(int keep) {
+    final excess = softwareEventCount() - keep;
+    if (excess > 0) {
+      db.softwareEventRecords
+          .where()
+          .sortByCreatedAt()
+          .thenByEventId()
+          .limit(excess)
+          .deleteAllSync();
+    }
+  }
+
   @override
   List<JournalSource> journalSources() =>
       db.journalSources.where().findAllSync();
@@ -192,6 +283,8 @@ final class _IsarRecords implements DomainTransaction {
 
   @override
   void deleteProfile(String id) {
+    db.softwareCardRecords.where().profileIdEqualTo(id).deleteAllSync();
+    db.softwareEventRecords.where().profileIdEqualTo(id).deleteAllSync();
     db.journalSources.where().profileIdEqualTo(id).deleteAllSync();
     db.monitoringHistoryRecords.deleteByProfileIdSync(id);
     db.profiles.deleteByProfileIdSync(id);

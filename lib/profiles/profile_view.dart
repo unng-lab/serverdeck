@@ -6,6 +6,8 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import '../domain/models.dart';
 import '../console/console_owner.dart';
 import '../console/console_view.dart';
+import '../software/software_owner.dart';
+import '../software/software_view.dart';
 import '../journals/journal_owner.dart';
 import '../journals/journal_view.dart';
 import '../shell/foundation_shell.dart';
@@ -24,6 +26,7 @@ class ProfileViewPanel extends StatefulWidget {
     this.monitoring,
     this.journals,
     this.consoles,
+    this.software,
     this.onApplicationSettings,
     this.applicationStatus,
     this.runtimeNotice,
@@ -32,6 +35,7 @@ class ProfileViewPanel extends StatefulWidget {
   final MonitoringOwner? monitoring;
   final JournalsOwner? journals;
   final ConsoleOwner? consoles;
+  final SoftwareOwner? software;
   final Future<void> Function()? onApplicationSettings;
   final Widget? applicationStatus, runtimeNotice;
   final Future<Uint8List?> Function() pickKey;
@@ -732,7 +736,18 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
               onSelected: (v) => setState(() => _section = v),
             ),
             const SizedBox(height: 16),
-            if (_section == 5)
+            if (_section == 0 && widget.software != null)
+              SoftwareView(
+                key: ValueKey('software-${d.profile.profileId}'),
+                owner: widget.software!,
+                actor: widget.controller.actor,
+                profile: d.profile,
+                newId: widget.controller.newId,
+                onConsole: widget.consoles == null
+                    ? null
+                    : () => setState(() => _section = 4),
+              )
+            else if (_section == 5)
               _details(d)
             else if (_section == 1 && widget.journals != null)
               JournalView(
