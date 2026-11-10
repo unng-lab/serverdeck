@@ -333,3 +333,28 @@ Dependencies: T069→T070–074→T075→T076→T077. Product implementation seq
   Добавить fake-only router units для discovery/ping/call, malformed metadata,
   безопасных границ progressToken, отзыва доступа и strict arguments. Выполнить
   обязательные format/analyze/unit/link checks и независимый review/fix loop.
+
+## Ограниченное автопереподключение SSH — 2026-11-10
+
+- [X] T086 Реализовать FR-348–350 в ConnectionOwner: cleanup, 8 попыток,
+  exponential backoff с jitter, stable reset, fencing и отмена, обычные trust/auth.
+- [X] T087 Реализовать FR-351: additive ConnectionView.reconnectAttempt,
+  существующие C-статусы/notice/actions и текст мониторинга. Покрыть fake-only
+  units данные, переходы, предел, отмену, безопасность и ошибки.
+- [X] T088 Выполнить format/analyze/flutter test/lychee и независимый read-only
+  review/fix loop; записать фактические результаты и ограничения.
+
+- [X] T089 Исправить замечания независимого ревью: внутренний reconnect не
+  зависит от общей profileRevision при rename в FIFO gate; сохранить публичный
+  expectedRevision и проверить queued-rename fake unit. Новые требования имеют
+  уникальные FR-348–351; прежние FR-339–347 и история задач сохранены.
+
+Результаты T088 после T089 (2026-11-10): format 506 файлов/0 изменений,
+flutter analyze — No issues, flutter test — 938 passed; lychee — 381 total,
+375 OK, 6 excluded, 0 errors; check-test-boundaries — 117 файлов, passed;
+python test/mcp/official_schema_test.py — 2 passed; git diff --check — passed.
+Все результаты — units/static/link проверки, без integration/e2e/real SSH.
+Первое независимое ревью: 2 замечания (queued rename, повторяющиеся FR IDs),
+исправлены T089. Повторное независимое read-only ревью завершено:
+«Замечаний не найдено», «Готовность к реализации: готов». Подтверждённых
+нерешённых замечаний нет. Ревью не выполняло собственный запуск тестов.

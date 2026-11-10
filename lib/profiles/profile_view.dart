@@ -415,7 +415,14 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
               ? DeckTone.available
               : DeckTone.neutral,
         ),
-        if (c.failureCode != null)
+        if (c.reconnectAttempt != null)
+          DeckNotice(
+            title: 'Восстанавливаем SSH-соединение',
+            message: 'Автоматическая попытка ${c.reconnectAttempt} из 8.',
+            nextStep: 'Можно остановить повторное подключение кнопкой ниже.',
+            tone: DeckTone.neutral,
+          ),
+        if (c.failureCode != null && c.reconnectAttempt == null)
           DeckNotice(
             title: 'Состояние подключения',
             message: OperationPresentation.of(OperationFailure(c.failureCode!))
@@ -466,7 +473,9 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 kind: DeckButtonKind.primary,
                 child: const Text('Подключиться'),
               ),
-            if (c.attemptId != null && c.state != ConnectionState.connected)
+            if (c.attemptId != null &&
+                c.sessionId == null &&
+                c.state != ConnectionState.connected)
               DeckButton(
                 onPressed: widget.controller.pending
                     ? null
@@ -524,6 +533,13 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
         icon: Icons.help_outline,
         tone: DeckTone.unknown,
         text: false,
+      );
+    if (connection.reconnectAttempt != null)
+      return (
+        label: 'Переподключение ${connection.reconnectAttempt}/8',
+        icon: Icons.sync,
+        tone: DeckTone.neutral,
+        text: true,
       );
     if (connection.state == ConnectionState.failed)
       return (

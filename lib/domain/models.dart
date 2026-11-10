@@ -258,12 +258,16 @@ final class ConnectionView extends PublicValue {
     this.failureCode,
     this.challenge,
     this.pendingInput,
+    this.reconnectAttempt,
   });
   final ConnectionState state;
   final String? attemptId, sessionId;
   final FailureCode? failureCode;
   final TrustChallenge? challenge;
   final PendingInput? pendingInput;
+
+  /// Pending/in-flight automatic retry, 1 through 8; absent after completion.
+  final int? reconnectAttempt;
   @override
   Map<String, Object?> toJson() => {
     'state': state.name,
@@ -272,6 +276,7 @@ final class ConnectionView extends PublicValue {
     if (failureCode != null) 'failureCode': failureCode!.wire,
     if (challenge != null) 'challenge': challenge!.toJson(),
     if (pendingInput != null) 'pendingInput': pendingInput!.toJson(),
+    if (reconnectAttempt != null) 'reconnectAttempt': reconnectAttempt,
   };
 }
 

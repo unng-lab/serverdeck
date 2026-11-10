@@ -378,7 +378,7 @@ String _connectionLabel(ConnectionState state) => switch (state) {
   MonitoringReason.disconnected => (
     'Нет подключения',
     'Текущие нагрузки неизвестны.',
-    'Выберите сервер и нажмите «Подключиться». Автоматического повторного подключения не будет.',
+    'После обрыва SSH выполняются ограниченные автоповторы. Состояние и ручное подключение доступны в настройках сервера.',
     DeckTone.neutral,
   ),
   MonitoringReason.paused => (

@@ -381,27 +381,33 @@ void main() {
     expect(cursor, isNull);
     expect(seen.length, 30);
   });
-  test(
-    'registry version3 has27 tools with unchanged original21 definitions',
-    () {
-      expect(registry['contractVersion'], 3);
-      expect(schemas.tools.length, 27);
-      final digest = SHA256Digest()
-          .process(
-            Uint8List.fromList(
-              utf8.encode(jsonEncode(schemas.tools.take(21).toList())),
-            ),
-          )
-          .map((b) => b.toRadixString(16).padLeft(2, '0'))
-          .join();
-      expect(
-        digest,
-        '806aad3ff37cc6430f184f48639e9f99bd87e0531137798b90f0d58527339080',
-      );
-      expect(
-        File('specs/003-ssh-mcp/contracts/mcp-tools.json').readAsStringSync(),
-        File('assets/mcp/tools.json').readAsStringSync(),
-      );
-    },
-  );
+  test('registry version3 retains original21 definitions except additive reconnect status', () {
+    expect(registry['contractVersion'], 3);
+    expect(schemas.tools.length, 27);
+    final original =
+        jsonDecode(jsonEncode(schemas.tools.take(21).toList())) as List;
+    for (final tool in original) {
+      final definition =
+          (tool['outputSchema'][r'$defs'] as Map)['ConnectionView'];
+      if (definition == null) continue;
+      final properties = definition['properties'] as Map;
+      expect(properties.remove('reconnectAttempt'), {
+        'type': 'integer',
+        'minimum': 1,
+        'maximum': 8,
+      });
+    }
+    final digest = SHA256Digest()
+        .process(Uint8List.fromList(utf8.encode(jsonEncode(original))))
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    expect(
+      digest,
+      '806aad3ff37cc6430f184f48639e9f99bd87e0531137798b90f0d58527339080',
+    );
+    expect(
+      File('specs/003-ssh-mcp/contracts/mcp-tools.json').readAsStringSync(),
+      File('assets/mcp/tools.json').readAsStringSync(),
+    );
+  });
 }

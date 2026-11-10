@@ -377,3 +377,12 @@ P49/T081: _rowStatus различает null observation иknown unpinned. Не�
 canonical connected/needPassphrase на inferred needTrust из отсутствующего/cached
 TrustView. Explicit needTrust и known disconnected unpinned сохраняют badge;
 failed getTrust иstale cached unpinned покрываются isolated fake widgets.
+
+
+P50/T086–T088: bounded jittered reconnect in ConnectionOwner; volatile intent
+with generation/revision/authority fences, cleanup before scheduling, eight retries,
+one-minute stability reset. ConnectionView optional reconnectAttempt feeds existing
+C-status/notice/actions in profile_view.dart; monitoring text reflects shared recovery.
+Requirements FR-348–351 and contracts/ssh.md define policy and compatibility.
+Fake monotonic clock/transport units cover normal recovery and cancellation/failure
+boundaries. No schema migration, new dependency or automatic console/input replay.

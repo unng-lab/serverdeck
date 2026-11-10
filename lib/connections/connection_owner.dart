@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
@@ -120,10 +121,12 @@ final class ConnectionOwner
     CreateSshConnection? createTransport,
     Duration Function()? monotonicNow,
     ScheduleOwnedDeadline? schedule,
+    double Function()? reconnectRandom,
   }) : _beginDial = beginDial,
        _factory = createTransport,
        _now = monotonicNow,
-       _schedule = schedule ?? _timer;
+       _schedule = schedule ?? _timer,
+       _reconnectRandom = reconnectRandom ?? Random().nextDouble;
   final ActorAuthority actors;
   final DomainRepository repository;
   final DomainCommandGate Function() getGate;
@@ -138,6 +141,12 @@ final class ConnectionOwner
   final CreateSshConnection? _factory;
   final Duration Function()? _now;
   final ScheduleOwnedDeadline _schedule;
+  final double Function() _reconnectRandom;
+  final _clock = Stopwatch()..start();
+  final _reconnects = <String, _Reconnect>{};
+  static const maxReconnectAttempts = 8;
+  static const reconnectStableDuration = Duration(minutes: 1);
+  Duration get _elapsed => _now?.call() ?? _clock.elapsed;
   final _entries = <String, _ConnectionEntry>{}, _generations = <String, int>{};
   final _live = <_ConnectionEntry>{}, _pending = <Future<void>>{};
   final _quarantine = <String, Set<_ConnectionEntry>>{};
@@ -542,6 +551,11 @@ final class ConnectionOwner
           : e.failure,
       challenge: challenge(e.profileId),
       pendingInput: e.input,
+      reconnectAttempt:
+          _reconnects[e.profileId]?.attempt ??
+          (e.sessionId == null && !e.cancelled && e.reconnectAttempts > 0
+              ? e.reconnectAttempts
+              : null),
     );
   }
 
@@ -641,11 +655,12 @@ final class ConnectionOwner
   }
 
   Future<OperationResult<ConnectionView>> _connect(
-    Actor actor,
+    CommandActor actor,
     String profileId, {
     required int expectedRevision,
     WorkCancellation? autoCancellation,
     void Function()? onAutoCancelled,
+    _Reconnect? reconnect,
   }) async {
     _ConnectionEntry? started;
     final result = await getGate().submit(actor, (context) {
@@ -668,7 +683,8 @@ final class ConnectionOwner
         );
       _validateProfile(profileId);
       final versions = _versions(profileId);
-      if (versions.profileRevision != expectedRevision)
+      if (reconnect != null) _checkReconnect(reconnect);
+      if (reconnect == null && versions.profileRevision != expectedRevision)
         throw const OperationFailure(
           FailureCode.conflict,
           field: OperationField.expectedRevision,
@@ -684,6 +700,8 @@ final class ConnectionOwner
       return context.linearize(
         () {
           checkAuto();
+          if (reconnect != null) _checkReconnect(reconnect);
+          _cancelReconnect(profileId);
           _pruneTerminalBindings();
           final records = repository.read((r) {
             final p = r.profile(profileId)!;
@@ -699,6 +717,8 @@ final class ConnectionOwner
             _id(),
             _advance(profileId),
           );
+          e.reconnectAttempts = reconnect?.attempt ?? 0;
+          if (reconnect != null) e.fence = _fence(e, versions);
           e.budget = NetworkBudget(
             onExpired: (_) =>
                 _terminate(e, ConnectionState.failed, FailureCode.timeout),
@@ -715,7 +735,7 @@ final class ConnectionOwner
         },
         fence: VersionFence(
           profileId: profileId,
-          profileRevision: expectedRevision,
+          profileRevision: reconnect == null ? expectedRevision : null,
         ),
       );
     });
@@ -826,6 +846,7 @@ final class ConnectionOwner
           if (transport.isClosed || !e.budget.tryComplete())
             throw const OperationFailure(FailureCode.timeout);
           e.sessionId = _id();
+          e.connectedAt = _elapsed;
           e.actor = actors.owner;
           e.state = ConnectionState.connected;
           e.failure = null;
@@ -963,6 +984,7 @@ final class ConnectionOwner
       }
       final lease = e.budget.pauseForPrompt(PromptKind.trust);
       if (lease == null) throw const OperationFailure(FailureCode.timeout);
+      e.reconnectAttempts = 0;
       e.trustLease = lease;
       e.trustWait = Completer<bool>();
       e.state = ConnectionState.needTrust;
@@ -982,6 +1004,7 @@ final class ConnectionOwner
           throw const OperationFailure(FailureCode.conflict);
         final lease = e.budget.pauseForPrompt(PromptKind.passphrase);
         if (lease == null) throw const OperationFailure(FailureCode.timeout);
+        e.reconnectAttempts = 0;
         e.phraseLease = lease;
         e.phrase = Completer<String?>();
         e.phrase!.future.ignore();
@@ -1152,6 +1175,10 @@ final class ConnectionOwner
     late List<_ConnectionEntry> entries;
     context.linearize(() {
       if (preserve != null) checkProof(context, preserve);
+      for (final retry in List.of(_reconnects.values)) {
+        if (retry.entry.endpointId == endpointId)
+          _cancelReconnect(retry.entry.profileId);
+      }
       for (final profile in repository.read((r) => r.profiles())) {
         if (profile.endpointId == endpointId)
           _consoleInvalidate(profile.profileId, clear: true);
@@ -1195,6 +1222,8 @@ final class ConnectionOwner
     FailureCode? failure, {
     bool retarget = false,
   }) {
+    if (identical(_reconnects[e.profileId]?.entry, e))
+      _cancelReconnect(e.profileId);
     if (!e.cancelled) {
       e.cancelled = true;
       try {
@@ -1242,8 +1271,88 @@ final class ConnectionOwner
     FailureCode? failure,
   ) {
     if (e.cancelled) return;
+    final recoverable =
+        (e.sessionId != null || e.reconnectAttempts > 0) &&
+        (failure == FailureCode.networkError || failure == FailureCode.timeout);
+    final attempts =
+        e.connectedAt != null &&
+            _elapsed - e.connectedAt! >= reconnectStableDuration
+        ? 0
+        : e.reconnectAttempts;
     _invalidate(e, state, failure);
-    _track(_closeBatch([e]).catchError((Object _) {}));
+    final retry = recoverable && attempts < maxReconnectAttempts && !_stopped
+        ? _Reconnect(e, attempts + 1, generation(e.profileId))
+        : null;
+    if (retry != null) _reconnects[e.profileId] = retry;
+    _notify();
+    _track(() async {
+      try {
+        await _closeBatch([e]);
+        if (retry == null) return;
+        _checkReconnect(retry);
+        final cap = min(30000, 1000 * (1 << (retry.attempt - 1)));
+        final delay = Duration(
+          microseconds: (cap * 1000 * (0.5 + _reconnectRandom() * 0.5)).floor(),
+        );
+        retry.due = _elapsed + delay;
+        _armReconnect(retry);
+      } catch (_) {
+        if (identical(_reconnects[e.profileId], retry))
+          _cancelReconnect(e.profileId);
+      }
+    }());
+  }
+
+  void _cancelReconnect(String profileId) {
+    _reconnects.remove(profileId)?.cancel?.call();
+    _notify();
+  }
+
+  void _armReconnect(_Reconnect retry) {
+    final left = retry.due - _elapsed;
+    retry.cancel = _schedule(left > Duration.zero ? left : Duration.zero, () {
+      retry.cancel = null;
+      if (!identical(_reconnects[retry.entry.profileId], retry)) return;
+      if (_elapsed < retry.due) {
+        _armReconnect(retry);
+      } else {
+        _track(_retry(retry));
+      }
+    });
+  }
+
+  void _checkReconnect(_Reconnect retry) {
+    _admit();
+    final e = retry.entry;
+    if (!identical(_reconnects[e.profileId], retry) ||
+        !identical(_entries[e.profileId], e))
+      throw const OperationFailure(FailureCode.conflict);
+    VersionFence(
+      profileId: e.profileId,
+      connectionRevision: e.connectionRevision,
+      credentialRevision: e.credentialRevision,
+      endpointId: e.endpointId,
+      trustRevision: e.fence.trustRevision,
+      observationRevision: e.fence.observationRevision,
+      attemptGeneration: retry.generation,
+    ).check(_versions(e.profileId));
+    if (isQuarantined(e.endpointId)) throw _cleanup;
+  }
+
+  Future<void> _retry(_Reconnect retry) async {
+    final id = retry.entry.profileId;
+    try {
+      _checkReconnect(retry);
+      final result = await _connect(
+        actors.owner,
+        id,
+        expectedRevision: _versions(id).profileRevision,
+        reconnect: retry,
+      );
+      if (!result.ok && identical(_reconnects[id], retry)) _cancelReconnect(id);
+    } catch (_) {
+      if (identical(_reconnects[id], retry)) _cancelReconnect(id);
+    }
   }
 
   static const _cleanup = OperationFailure(
@@ -1340,6 +1449,10 @@ final class ConnectionOwner
 
   void _markQuarantine(_ConnectionEntry e) {
     if (!_live.contains(e)) return;
+    for (final retry in List.of(_reconnects.values)) {
+      if (retry.entry.endpointId == e.endpointId)
+        _cancelReconnect(retry.entry.profileId);
+    }
     final affected = _live.where((v) => v.endpointId == e.endpointId).toList();
     final group = _quarantine.putIfAbsent(e.endpointId, () => {});
     for (final entry in affected) {
@@ -1380,6 +1493,9 @@ final class ConnectionOwner
   @override
   Future<void> stopAdmission() async {
     _stopped = true;
+    for (final id in List.of(_reconnects.keys)) {
+      _cancelReconnect(id);
+    }
     for (final cancel in List.of(_journalJobs.values)) {
       cancel(JournalStatus.paused);
     }
@@ -1430,6 +1546,14 @@ final class ConnectionOwner
 final class _PhraseWait {
   const _PhraseWait(this.result);
   final Future<String?> result;
+}
+
+final class _Reconnect {
+  _Reconnect(this.entry, this.attempt, this.generation);
+  final _ConnectionEntry entry;
+  final int attempt, generation;
+  late Duration due;
+  void Function()? cancel;
 }
 
 final class _ConnectionEntry {
@@ -1486,6 +1610,8 @@ final class _ConnectionEntry {
       targetState = ConnectionState.disconnected;
   FailureCode? failure, targetFailure;
   String? sessionId;
+  int reconnectAttempts = 0;
+  Duration? connectedAt;
   bool cancelled = false, trusted = false;
   Future<void>? closing;
   BudgetPrompt? trustLease, phraseLease;

@@ -294,7 +294,7 @@ final class Policy implements ConnectionTrustPolicy {
 }
 
 final class Harness {
-  Harness({this.autoDial = true}) {
+  Harness({this.autoDial = true, double Function()? reconnectRandom}) {
     policy = Policy(this);
     owner = ConnectionOwner(
       actors: actors,
@@ -314,6 +314,7 @@ final class Harness {
       utcNow: utc,
       monotonicNow: clock.now,
       schedule: clock.schedule,
+      reconnectRandom: reconnectRandom ?? () => 0,
       beginDial: (host, port) async {
         final d = Dial();
         dials.add(d);
@@ -1047,24 +1048,367 @@ void main() {
       await h.dispose();
     }
   });
-  test('watchdog waits fifteen seconds and lost reply maps network failure without reconnect', () async {
+  test(
+    'watchdog waits fifteen seconds and loss schedules delayed recovery',
+    () async {
+      final h = Harness();
+      try {
+        final s = await h.connected();
+        h.clock.advance(const Duration(seconds: 15));
+        await turns();
+        expect(s.pings, 1);
+        expect(h.owner.connection(id(1)).state, ConnectionState.connected);
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        expect(h.owner.connection(id(1)).failureCode, FailureCode.networkError);
+        expect(h.owner.connection(id(1)).state, ConnectionState.disconnected);
+        expect(h.dials, hasLength(1));
+        expect(h.owner.liveResources, 0);
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+  test(
+    'recovery uses fresh session and reports additive retry metadata',
+    () async {
+      final h = Harness();
+      try {
+        final old = await h.connected(actor: h.mcp);
+        final sessionId = h.owner.connection(id(1)).sessionId;
+        h.grants.revoked = true;
+        old.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        final pending = h.owner.connection(id(1));
+        expect(pending.reconnectAttempt, 1);
+        expect(pending.toJson()['reconnectAttempt'], 1);
+        expect(h.owner.liveResources, 0);
+        h.clock.advance(const Duration(milliseconds: 499));
+        await turns();
+        expect(h.dials, hasLength(1));
+        h.clock.advance(const Duration(milliseconds: 1));
+        await turns();
+        expect(h.dials, hasLength(2));
+        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+        final fresh = h.sessions.last;
+        await fresh.authenticate();
+        await turns();
+        final connected = h.owner.connection(id(1));
+        expect(connected.state, ConnectionState.connected);
+        expect(connected.sessionId, isNot(sessionId));
+        expect(connected.reconnectAttempt, isNull);
+        expect(connected.toJson(), isNot(contains('reconnectAttempt')));
+        expect(old.closes, 1);
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test(
+    'network and timeout retries stop at eight with capped jittered backoff',
+    () async {
+      final h = Harness(reconnectRandom: () => 0.5);
+      try {
+        var current = await h.connected();
+        for (var n = 1; n <= 8; n++) {
+          current.terminal.complete(
+            OperationFailure(
+              n.isOdd ? FailureCode.networkError : FailureCode.timeout,
+            ),
+          );
+          await turns();
+          expect(h.owner.connection(id(1)).reconnectAttempt, n);
+          final cap = n <= 5 ? 1000 * (1 << (n - 1)) : 30000;
+          final wait = cap * 3 ~/ 4;
+          h.clock.advance(Duration(milliseconds: wait - 1));
+          await turns();
+          expect(h.dials, hasLength(n));
+          h.clock.advance(const Duration(milliseconds: 1));
+          await turns();
+          expect(h.dials, hasLength(n + 1));
+          current = h.sessions.last;
+        }
+        current.terminal.complete(
+          const OperationFailure(FailureCode.networkError),
+        );
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+        h.clock.advance(const Duration(minutes: 5));
+        await turns();
+        expect(h.dials, hasLength(9));
+        expect(h.owner.liveResources, 0);
+        final manual = await h.connected();
+        manual.terminal.complete(
+          const OperationFailure(FailureCode.networkError),
+        );
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test(
+    'short recovered sessions retain count and stable minute resets it',
+    () async {
+      final h = Harness();
+      try {
+        var current = await h.connected();
+        for (var n = 1; n <= 2; n++) {
+          current.terminal.complete(
+            const OperationFailure(FailureCode.networkError),
+          );
+          await turns();
+          expect(h.owner.connection(id(1)).reconnectAttempt, n);
+          h.clock.advance(Duration(milliseconds: 500 * (1 << (n - 1))));
+          await turns();
+          current = h.sessions.last;
+          await current.authenticate();
+          await turns();
+        }
+        h.clock.advance(const Duration(minutes: 1));
+        await turns();
+        current.terminal.complete(
+          const OperationFailure(FailureCode.networkError),
+        );
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test(
+    'watchdog timeout schedules recovery without waiting for ended',
+    () async {
+      final h = Harness();
+      try {
+        final s = await h.connected();
+        s.holdPing = Completer<void>();
+        h.clock.advance(const Duration(seconds: 15));
+        await turns();
+        h.clock.advance(const Duration(seconds: 10));
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        expect(h.dials, hasLength(2));
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test(
+    'rename queued ahead of recovery admission retains its retry series',
+    () async {
+      final h = Harness();
+      final release = Completer<void>();
+      try {
+        final s = await h.connected();
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        final entered = Completer<void>();
+        final rename = h.gate.prepare(h.actors.ui, (context) async {
+          entered.complete();
+          await release.future;
+          return context.linearize(() {
+            h.repository.state.profiles[id(1)]!.profileRevision++;
+            return const MutationValue(entityId: 'renamed', revision: 2);
+          });
+        });
+        await entered.future;
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        expect(h.dials, hasLength(1));
+        release.complete();
+        await rename;
+        await turns();
+        expect(h.dials, hasLength(2));
+        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+        await h.sessions.last.authenticate();
+        await turns();
+        expect(h.owner.connection(id(1)).state, ConnectionState.connected);
+      } finally {
+        if (!release.isCompleted) release.complete();
+        await h.dispose();
+      }
+    },
+  );
+
+  for (final action in [
+    'disconnect',
+    'mutation',
+    'trust',
+    'shutdown',
+    'manual',
+  ]) {
+    test('$action cancels delayed recovery including a stale timer', () async {
+      final h = Harness();
+      try {
+        final s = await h.connected();
+        final sid = h.owner.connection(id(1)).sessionId!;
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        final timer = h.clock.timers.lastWhere((t) => !t.cancelled);
+        switch (action) {
+          case 'disconnect':
+            expect(
+              (await h.owner.disconnect(h.actors.ui, id(1), sessionId: sid)).ok,
+              isTrue,
+            );
+          case 'mutation':
+            await h.owner.closeForMutation(h.actors.ui, id(1), 1);
+          case 'trust':
+            final cleanup = await h.gate.prepare(
+              h.actors.ui,
+              (ctx) => h.owner.invalidateEndpoint(
+                ctx,
+                h.repository.state.profiles[id(1)]!.endpointId,
+              ),
+            );
+            await cleanup.close();
+          case 'shutdown':
+            await h.owner.stopAdmission();
+          case 'manual':
+            await h.connect();
+            await turns();
+        }
+        timer.callback();
+        h.clock.advance(const Duration(seconds: 1));
+        await turns();
+        expect(h.dials, hasLength(action == 'manual' ? 2 : 1));
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+      } finally {
+        await h.dispose();
+      }
+    });
+  }
+
+  test(
+    'rename retains recovery but credential revision change fences it',
+    () async {
+      final h = Harness();
+      try {
+        final s = await h.connected();
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        h.repository.state.profiles[id(1)]!.profileRevision++;
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        expect(h.dials, hasLength(2));
+        final fresh = h.sessions.last;
+        await fresh.authenticate();
+        await turns();
+        fresh.terminal.complete(
+          const OperationFailure(FailureCode.networkError),
+        );
+        await turns();
+        h.repository.state.credentials[id(101)]!.secretRevision++;
+        h.clock.advance(const Duration(seconds: 1));
+        await turns();
+        expect(h.dials, hasLength(2));
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test(
+    'early retry timer re-arms and cleanup must finish before delay starts',
+    () async {
+      final h = Harness();
+      try {
+        final s = await h.connected();
+        s.holdClose = Completer<void>();
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        h.clock.advance(const Duration(seconds: 1));
+        await turns();
+        expect(h.dials, hasLength(1));
+        s.holdClose!.complete();
+        await turns();
+        final timer = h.clock.timers.lastWhere((t) => !t.cancelled);
+        timer.callback();
+        await turns();
+        expect(h.dials, hasLength(1));
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        expect(h.dials, hasLength(2));
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
+  test('cleanup failure and primary network failure never retry', () async {
     final h = Harness();
     try {
-      final s = await h.connected();
-      h.clock.advance(const Duration(seconds: 15));
+      final first = await h.ready();
+      first.terminal.complete(const OperationFailure(FailureCode.networkError));
       await turns();
-      expect(s.pings, 1);
-      expect(h.owner.connection(id(1)).state, ConnectionState.connected);
-      s.terminal.complete(const OperationFailure(FailureCode.networkError));
+      h.clock.advance(const Duration(seconds: 1));
       await turns();
-      expect(h.owner.connection(id(1)).failureCode, FailureCode.networkError);
-      expect(h.owner.connection(id(1)).state, ConnectionState.disconnected);
       expect(h.dials, hasLength(1));
-      expect(h.owner.liveResources, 0);
+      final connected = await h.connected();
+      connected.failClose = true;
+      connected.terminal.complete(
+        const OperationFailure(FailureCode.networkError),
+      );
+      await turns();
+      h.clock.advance(const Duration(seconds: 1));
+      await turns();
+      expect(
+        h.owner.connection(id(1)).failureCode,
+        FailureCode.cleanupRequired,
+      );
+      expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+      expect(h.dials, hasLength(2));
     } finally {
       await h.dispose();
     }
   });
+
+  test(
+    'authentication failure and passphrase prompt end automatic retries',
+    () async {
+      final h = Harness();
+      try {
+        var s = await h.connected();
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        s = h.sessions.last;
+        s.terminal.complete(const OperationFailure(FailureCode.authFailed));
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+        s = await h.connected();
+        s.terminal.complete(const OperationFailure(FailureCode.networkError));
+        await turns();
+        h.clock.advance(const Duration(milliseconds: 500));
+        await turns();
+        s = h.sessions.last;
+        await s.options.verifyHost(observation());
+        final phrase = s.options.requestPassphrase();
+        phrase.ignore();
+        await turns();
+        expect(h.owner.connection(id(1)).state, ConnectionState.needPassphrase);
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+        h.clock.advance(const Duration(minutes: 5));
+        await turns();
+        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+        expect(h.dials, hasLength(4));
+      } finally {
+        await h.dispose();
+      }
+    },
+  );
+
   test(
     'timeout cancels pending dial immediately while unprotect is still owned',
     () async {

@@ -639,6 +639,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -1454,6 +1459,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -2268,6 +2278,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -3073,6 +3088,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -3870,6 +3890,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -4663,6 +4688,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -5469,6 +5499,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -6266,6 +6301,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -7063,6 +7103,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -7856,6 +7901,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -8681,6 +8731,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -9510,6 +9565,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [
@@ -10335,6 +10395,11 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "reconnectAttempt": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
               }
             },
             "required": [

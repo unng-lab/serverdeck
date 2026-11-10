@@ -30,7 +30,7 @@ final class WorkflowOperations extends Fake implements AppOperations {
       failConnect = false,
       holdConnecting = false;
   int connects = 0, accepts = 0, replacements = 0, cancels = 0, phrases = 0;
-  int retentions = 0;
+  int retentions = 0, disconnects = 0;
   int creates = 0, updates = 0, deletes = 0;
   String nonce = 'synthetic-nonce';
   Completer<void>? connectReply, detailReply;
@@ -303,6 +303,18 @@ final class WorkflowOperations extends Fake implements AppOperations {
   }
 
   @override
+  Future<OperationResult<ConnectionView>> disconnect(
+    Actor actor,
+    String id, {
+    required String sessionId,
+  }) async {
+    expect(connection.sessionId, sessionId);
+    disconnects++;
+    connection = const ConnectionView(state: ConnectionState.disconnected);
+    return ok(connection);
+  }
+
+  @override
   Future<OperationResult<ConnectionView>> providePassphrase(
     Actor actor,
     String id, {
@@ -465,6 +477,41 @@ Future<void> finish(WidgetTester tester) async {
 }
 
 void main() {
+  for (final waiting in [true, false]) {
+    testWidgets('retry status exposes exact stop action waiting=$waiting', (
+      tester,
+    ) async {
+      final ops = WorkflowOperations()..pin = 'SHA256:public-pin';
+      ops.profile = ops.make();
+      ops.connection = ConnectionView(
+        state: waiting
+            ? ConnectionState.disconnected
+            : ConnectionState.connecting,
+        attemptId: 'attempt',
+        sessionId: waiting ? 'old-session' : null,
+        failureCode: waiting ? FailureCode.networkError : null,
+        reconnectAttempt: 3,
+      );
+      final c = await mount(tester, ops);
+      expect(find.text('Переподключение 3/8'), findsOneWidget);
+      await c.select(profileId);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Настройки'));
+      await tester.pumpAndSettle();
+      expect(find.text('Автоматическая попытка 3 из 8.'), findsOneWidget);
+      expect(find.text('Состояние подключения'), findsNothing);
+      final stop = find.text(waiting ? 'Отключиться' : 'Отменить подключение');
+      if (waiting) expect(find.text('Отменить подключение'), findsNothing);
+      await tester.ensureVisible(stop);
+      await tester.tap(stop);
+      await tester.pumpAndSettle();
+      expect(ops.disconnects, waiting ? 1 : 0);
+      expect(ops.cancels, waiting ? 0 : 1);
+      expect(find.text('Автоматическая попытка 3 из 8.'), findsNothing);
+      await finish(tester);
+    });
+  }
+
   for (final state in [
     ConnectionState.connected,
     ConnectionState.needPassphrase,

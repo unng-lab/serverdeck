@@ -93,7 +93,8 @@ No raw Future timeout while leaked socket continues authenticating.
 Disable library keepAliveInterval. Owner sends one ping every15s after last completed
 ping; single ping timeout10s. First missed reply closes session, gives NETWORK_ERROR;
 upper bound half-open≤25s after last successful interval start, within spec90s.
-No automatic connect/reconnect. Cancel/disconnect/shutdown/credential/endpoint changes
+Initial failed attempts are not retried. Established sessions recover under FR-348–351
+in [spec](../spec.md), owned exclusively by ConnectionOwner. Cancel/disconnect/shutdown/credential/endpoint changes
 advance generation before closing and before stale callback can publish success.
 
 ## Unit verification scenarios
@@ -236,8 +237,8 @@ new timeout and cannot authorize success. Either termination fences/cancels all
 captured late timers.
 Watchdog sends first ping fifteen seconds after creation, waits at most ten seconds,
 and schedules the next interval after successful completion. One ping in flight,
-first failure/late response stops the watchdog and calls owner failure once; no
-reconnect. Timer rearming and ping result generations are separate so an early
+first failure/late response stops the watchdog and calls owner failure once; the
+watchdog itself never reconnects. ConnectionOwner owns bounded recovery. Timer rearming and ping result generations are separate so an early
 timer delivery cannot discard a still-valid ping result. Owner maps failure to
 NETWORK_ERROR and closes the session; both obligations remain T010. These helpers
 do not by themselves implement attempt/session ownership or socket cleanup.
@@ -370,3 +371,32 @@ consumer's exit. Units distinguish all three getter failures from completed erro
 Flutter StandardMethodCodec may return unmodifiable typed-data views. NativePlatform must return a detached, writable Uint8List owned by its caller for secret.protect, secret.unprotect and credential.pickKey (null cancellation remains null). Consumers may wipe their owned buffers on success, failure, cancellation and form disposal. Never mutate codec-owned storage. No wire-format, DPAPI purpose, storage schema or migration changes. Regression units use the actual Flutter codec with synthetic native replies and fake repository; the form's key selection → save → close and password save must commit protected bytes without UnsupportedError. No real credentials, native OS calls or real database are used in tests.
 
 Current private-key API: parsePrivateKey only. Every stored private credential requires publicKeyBytes; explicit PublicKeyHint is required by transport/identity constructors. readPublicKeyHint requires supplied public metadata and only validates it against the current input envelope; no old-record inference path. [Current input](key-input.md), [modal workflow](profile-workflow.md).
+
+
+## Bounded reconnect contract
+
+ConnectionOwner retains one volatile recovery intent/profile after an established
+session fails with NETWORK_ERROR or TIMEOUT. Exact cleanup must finish successfully
+before the jittered delay and fresh dial. Attempts 1..8 use uniform [cap/2, cap),
+cap=min(30000ms,1000ms*2^(n-1)); stable connected time >=60s resets the next series.
+Network/timeout failures during recovery consume the next attempt; any other error
+or failed admission stops. Trust/passphrase prompt ends automatic recovery and
+uses existing explicit decision flow with the existing five-minute deadline.
+
+At admission check identity of retained entry/intent, owner epoch/running status,
+attempt generation, endpoint, connectionRevision, credentialRevision, trustRevision,
+observationRevision and quarantine. Recheck under the gate before starting DNS/dial.
+Rename uses the latest profileRevision without changing these bindings. Reuse
+normal 30s network budget, strict host verification, credentials protection and
+64-resource limit. No cached passphrase, command replay, restored console or lease.
+Established MCP sessions already belong to OwnerActor: source grant revocation does
+not terminate recovery; unestablished MCP attempts retain grant authorization.
+
+Cancel/disconnect/profile mutation/endpoint invalidation/quarantine/shutdown cancels
+the recovery intent before resource cleanup. Manual connection supersedes delayed
+recovery only after exact old handles close. Timers are monotonic and stale/early
+callbacks cannot admit a dial. Recovery does not survive restart or depend on the
+monitoring route being visible. UI exposes optional ConnectionView.reconnectAttempt
+(integer 1..8) during delay/in-flight retry; cancelConnection applies to a pending
+attempt and disconnect to the retained old session ID while waiting. Existing
+clients may ignore this additive field; no storage/schema/release dependency change.

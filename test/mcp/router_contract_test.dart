@@ -144,6 +144,31 @@ void main() {
     },
   );
   test(
+    'connection output schema accepts only bounded optional reconnect status',
+    () {
+      for (final attempt in [null, 1, 8]) {
+        router.schemas.output('connections.get', {
+          'ok': true,
+          'value': {
+            'state': 'disconnected',
+            if (attempt != null) 'reconnectAttempt': attempt,
+          },
+          'meta': {'dataRevision': 1, 'ownerEpoch': h.actors.ownerEpoch},
+        });
+      }
+      for (final attempt in [0, 9, '1']) {
+        expect(
+          () => router.schemas.output('connections.get', {
+            'ok': true,
+            'value': {'state': 'disconnected', 'reconnectAttempt': attempt},
+            'meta': {'dataRevision': 1, 'ownerEpoch': h.actors.ownerEpoch},
+          }),
+          throwsA(isA<SchemaFailure>()),
+        );
+      }
+    },
+  );
+  test(
     'tools require initialization, and discovery exposes only the allowlist',
     () async {
       final denied = await session.handle(rpc(1, 'tools/list', {}));

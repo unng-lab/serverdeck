@@ -11,7 +11,7 @@ native peer/auth. Поле actor из JSON запрещено. Widgets/router н
 Endpoint: normalizedHost,port,endpointId. Public ProfileView: profileId,revision,
 connectionRevision,displayName,host,port,username,authKind,hasCredential,endpointId;
 никаких password/key/passphrase/protectedBytes. ConnectionView: state,attemptId?,
-sessionId?,failureCode?,challenge?,pendingInput?; TrustView: acceptedFingerprint?,observedKeyType?,
+sessionId?,failureCode?,challenge?,pendingInput?,reconnectAttempt? (integer 1..8); TrustView: acceptedFingerprint?,observedKeyType?,
 keyType?,trustRevision,observationRevision,changed,observedFingerprint?,detectedAt?.
 В каждой projection dataRevision и ownerEpoch. Times int64 UTC ms, UUID lowercasev4.
 Connection state: disconnected,connecting,needTrust,needPassphrase,authenticating,
