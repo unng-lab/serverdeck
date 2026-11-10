@@ -94,3 +94,11 @@ storage; в US2 UI tests на fake могут готовиться отдель�
 - [X] T029 Применить Unicode/NUL invariant ко всем строкам public DTO, включая target/author/snapshot/CRUD summary в lib/software/software_models.dart; synthetic unit cases в test/software/software_models_test.dart (T003, FR-804/809; замечание independent foundation review).
 
 - [X] T030 Исправить liveness MCP pagination: snapshotRevision курсора опирается на existing profilesListRevision, атомарно продвигаемый профильными и software mutation; auth-clock оставляет snapshot стабильным. lib/software/software_owner.dart, contracts/tools.md, plan.md, data-model.md; test/software/software_mcp_test.dart проверяет полный обход больших страниц без усечения/дубликатов (FR-805/808).
+
+## Компактные карточки — 2026-11-10 (новая работа)
+
+Выполненные T001–T030 относятся к базовой функции. Статус редизайна отражён в T031–T033.
+
+- [X] T031 [US2] В lib/software/software_view.dart заменить `_card` на одну C09 с C19 и сводкой название/версия/исходный адрес/предупреждение другой цели; убрать вложенную рамку C07, технические поля и четыре действия перенести в «Подробности» по contracts/tools.md. Сохранить полные/selectable значения, UTC/fallback, callbacks и pending/currentTarget; локальное раскрытие по softwareId, refresh сохраняет оставшиеся id, профиль/страница/фильтр сбрасывают. Существующие API компонентов 001 без изменений (FR-813; AC-814/815; SC-806).
+- [X] T032 [US2] После T031 обновить test/software/software_view_test.dart: раскрывать перед действиями; проверить initial collapsed, полный набор данных/unknown/несколько путей, независимое раскрытие/сворачивание, Enter/Space/semantics, отсутствие owner/SSH/журнальных эффектов раскрытия, refresh по id и сброс контекста, другую цель, pending и прежние CRUD/conflict/history/console callbacks. Только functional fake tests, без layout/golden/overflow/matrix feature gates (FR-805/806/813; AC-805–808/814/815).
+- [X] T033 После T031–T032 выполнить root dart format --output=none --set-exit-if-changed ., flutter analyze, flutter test, tools/check-test-boundaries.ps1, lychee "specs/**/*.md"; зафиксировать реальные результаты в stages.md и провести fresh независимый review/fix loop кода и пакета по AGENTS.md (FR-813; AC-814/815; SC-806). Историческую приёмку T001–T030 не выдавать за проверку редизайна.

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/domain/receipt_book.dart';
 import 'package:serverdeck/software/software_models.dart';
@@ -6,8 +9,6 @@ import 'package:serverdeck/software/software_owner.dart';
 import 'package:serverdeck/software/software_view.dart';
 import 'package:serverdeck/theme/brand_theme.dart';
 import 'package:serverdeck/ui/deck_components.dart';
-
-import 'dart:typed_data';
 
 import 'package:serverdeck/domain/actor.dart';
 import 'package:serverdeck/domain/app_operations.dart';
@@ -34,6 +35,8 @@ final class WidgetOperationState implements OperationState {
   bool isAuthorizedNow(CommandActor actor) => h.actors.owns(actor);
   @override
   Future<void> authorize(CommandActor actor, AuthorizationPoint point) async {
+    h.authorizations++;
+    if (h.authorizationWait != null) await h.authorizationWait;
     if (h.failure != null) throw h.failure!;
     if (!isAuthorizedNow(actor))
       throw const OperationFailure(FailureCode.authRequired);
@@ -42,6 +45,8 @@ final class WidgetOperationState implements OperationState {
 
 final class SoftwareWidgetHarness {
   OperationFailure? failure;
+  Future<void>? authorizationWait;
+  int authorizations = 0;
   SoftwareWidgetHarness() {
     repository.state.profiles[profile.profileId] = Profile()
       ..profileId = profile.profileId
@@ -155,11 +160,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<String> seed(WidgetTester tester, {String name = 'Redis'}) async =>
-      (await tester.runAsync(
-        () => owner.save(
-          h.actors.ui,
-          profile,
+  Future<String> seed(
+    WidgetTester tester, {
+    String name = 'Redis',
+    SoftwareCardInput? input,
+  }) async => (await tester.runAsync(
+    () => owner.save(
+      h.actors.ui,
+      profile,
+      input ??
           SoftwareCardInput(
             name: name,
             version: null,
@@ -167,9 +176,292 @@ void main() {
             dataPaths: [],
             configPaths: [],
           ),
+      mutationId: h.newId(),
+    ),
+  ))!.value!.entityId;
+
+  Finder card(String id) => find.byKey(ValueKey('software-card-$id'));
+
+  Finder details(String id) =>
+      find.descendant(of: card(id), matching: find.text('Подробности'));
+
+  Future<void> toggle(WidgetTester tester, String id) async {
+    final target = details(id);
+    await tester.ensureVisible(target);
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  Finder action(String id, String label) => find.descendant(
+    of: card(id),
+    matching: find.widgetWithText(DeckButton, label),
+  );
+
+  testSoftwareWidgets(
+    'compact summary and independent disclosure have no effects',
+    (tester) async {
+      final first = await seed(tester);
+      final second = await seed(tester, name: 'Nginx');
+      var consoleCalls = 0;
+      await show(tester, console: () => consoleCalls++);
+      expect(find.text('Версия: Не указана'), findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: card(first),
+          matching: find.text('root@server.invalid:22'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card(second),
+          matching: find.text('root@server.invalid:22'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Служба'), findsNothing);
+      expect(find.text('Изменить карточку'), findsNothing);
+      final reads = h.authorizations;
+      final revision = h.repository.state.settings.dataRevision;
+      final events = h.repository.state.softwareEvents.length;
+      await toggle(tester, first);
+      expect(action(first, 'Изменить карточку'), findsOneWidget);
+      expect(action(second, 'Изменить карточку'), findsNothing);
+      expect(find.text('Не указана'), findsOneWidget);
+      expect(find.text('Нет сведений'), findsNWidgets(2));
+      await toggle(tester, second);
+      expect(find.text('Изменить карточку'), findsNWidgets(2));
+      await toggle(tester, first);
+      expect(action(first, 'Изменить карточку'), findsNothing);
+      expect(action(second, 'Изменить карточку'), findsOneWidget);
+      expect(h.authorizations, reads);
+      expect(h.repository.state.settings.dataRevision, revision);
+      expect(h.repository.state.softwareEvents.length, events);
+      expect(consoleCalls, 0);
+    },
+  );
+
+  testSoftwareWidgets(
+    'details preserve full literal values, paths and UTC fallback',
+    (tester) async {
+      final name = 'Long software ${'n' * 80}';
+      final version = 'v${'1' * 250}';
+      final path = '/data/${'x' * 900}';
+      final id = await seed(
+        tester,
+        input: SoftwareCardInput(
+          name: name,
+          version: version,
+          service: 'redis-server.service',
+          dataPaths: [path, '/data/second'],
+          configPaths: ['/etc/redis/a.conf', '/etc/redis/b.conf'],
+        ),
+      );
+      await show(tester);
+      expect(find.text(name), findsOneWidget);
+      expect(find.text('Версия: $version'), findsOneWidget);
+      await toggle(tester, id);
+      final values = tester
+          .widgetList<DeckKeyValue>(
+            find.descendant(of: card(id), matching: find.byType(DeckKeyValue)),
+          )
+          .toList();
+      expect(
+        values.singleWhere((v) => v.label == 'Данные').value,
+        '$path\n/data/second',
+      );
+      expect(values.singleWhere((v) => v.label == 'Данные').selectable, isTrue);
+      expect(
+        values.singleWhere((v) => v.label == 'Конфиги').value,
+        '/etc/redis/a.conf\n/etc/redis/b.conf',
+      );
+      expect(
+        values.singleWhere((v) => v.label == 'Исходный хост').value,
+        'root@server.invalid:22',
+      );
+      expect(
+        values.singleWhere((v) => v.label == 'Исходный хост').selectable,
+        isTrue,
+      );
+      expect(find.text('redis-server.service'), findsOneWidget);
+      final timestamp = tester.widget<DeckTimestamp>(
+        find.descendant(of: card(id), matching: find.byType(DeckTimestamp)),
+      );
+      expect(timestamp.value!.isUtc, isTrue);
+      expect(
+        timestamp.value!.millisecondsSinceEpoch,
+        h.repository.state.softwareCards[id]!.updatedAt,
+      );
+      h.repository.state.softwareCards[id]!.updatedAt = 9007199254740991;
+      await click(tester, 'Обновить ПО');
+      expect(find.text('9007199254740991 ms UTC'), findsOneWidget);
+      expect(action(id, 'История карточки'), findsOneWidget);
+    },
+  );
+
+  testSoftwareWidgets(
+    'keyboard toggles disclosure and exposes expanded semantics',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final id = await seed(tester);
+        await show(tester);
+        final labels = MaterialLocalizations.of(tester.element(details(id)));
+        expect(
+          tester.getSemantics(details(id)),
+          isSemantics(hint: labels.expandedHint),
+        );
+        // Focus the existing C19 interactive tile, without assuming a tab position.
+        final focus = Focus.of(tester.element(details(id)));
+        focus.requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(action(id, 'Изменить карточку'), findsOneWidget);
+        expect(
+          tester.getSemantics(details(id)),
+          isSemantics(hint: labels.collapsedHint),
+        );
+        expect(
+          find.descendant(
+            of: card(id),
+            matching: find.bySemanticsLabel(RegExp('Подробности')),
+          ),
+          findsWidgets,
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(action(id, 'Изменить карточку'), findsNothing);
+        expect(
+          tester.getSemantics(details(id)),
+          isSemantics(hint: labels.expandedHint),
+        );
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testSoftwareWidgets('pending preserves action rules and console callback', (
+    tester,
+  ) async {
+    final id = await seed(tester);
+    var consoleCalls = 0;
+    await show(tester, console: () => consoleCalls++);
+    await toggle(tester, id);
+    await click(tester, 'Изменить карточку');
+    final blocked = Completer<void>();
+    h.authorizationWait = blocked.future;
+    try {
+      final save = tester.widget<DeckButton>(
+        find.widgetWithText(DeckButton, 'Сохранить карточку'),
+      );
+      save.onPressed!();
+      await tester.pump();
+      for (final label in [
+        'Изменить карточку',
+        'Удалить карточку',
+        'История карточки',
+      ]) {
+        expect(tester.widget<DeckButton>(action(id, label)).onPressed, isNull);
+      }
+      tester.widget<DeckButton>(action(id, 'Открыть консоль')).onPressed!();
+      expect(consoleCalls, 1);
+    } finally {
+      h.authorizationWait = null;
+      blocked.complete();
+      await tester.runAsync(() => featureTurns());
+      await tester.pumpAndSettle();
+    }
+    expect(h.repository.state.softwareCards[id]!.revision, 2);
+    expect(
+      tester.widget<DeckButton>(action(id, 'Изменить карточку')).onPressed,
+      isNotNull,
+    );
+  });
+
+  testSoftwareWidgets('profile change and return reset disclosure', (
+    tester,
+  ) async {
+    final id = await seed(tester);
+    final old = h.profile;
+    final other = ProfileView(
+      profileId: featureId(2),
+      revision: 1,
+      connectionRevision: 1,
+      displayName: 'Other',
+      host: old.host,
+      port: old.port,
+      username: old.username,
+      authKind: old.authKind,
+      hasCredential: true,
+      endpointId: old.endpointId,
+    );
+    h.repository.state.profiles[other.profileId] = Profile()
+      ..profileId = other.profileId
+      ..endpointId = other.endpointId
+      ..normalizedHost = other.host
+      ..username = other.username;
+    await show(tester);
+    await toggle(tester, id);
+    await show(tester, target: other);
+    expect(card(id), findsNothing);
+    expect(find.text('Карточек ПО нет'), findsOneWidget);
+    await show(tester);
+    expect(details(id), findsOneWidget);
+    expect(action(id, 'Изменить карточку'), findsNothing);
+  });
+
+  testSoftwareWidgets(
+    'refresh preserves remaining ids and filter resets disclosure',
+    (tester) async {
+      final id = await seed(tester);
+      await show(tester);
+      await toggle(tester, id);
+      await tester.runAsync(
+        () => owner.save(
+          h.actors.ui,
+          profile,
+          SoftwareCardInput(
+            name: 'New name',
+            version: '2',
+            service: 'new-service',
+            dataPaths: [],
+            configPaths: [],
+          ),
+          softwareId: id,
+          expectedRevision: 1,
           mutationId: h.newId(),
         ),
-      ))!.value!.entityId;
+      );
+      await tester.runAsync(() => featureTurns());
+      await tester.pumpAndSettle();
+      expect(find.text('New name'), findsOneWidget);
+      expect(find.text('new-service'), findsOneWidget);
+      final newId = await seed(tester, name: 'New card');
+      await tester.runAsync(() => featureTurns());
+      await tester.pumpAndSettle();
+      expect(action(id, 'Изменить карточку'), findsOneWidget);
+      expect(action(newId, 'Изменить карточку'), findsNothing);
+      final search = find.descendant(
+        of: find.byType(DeckSearch),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(search, 'New');
+      await tester.pumpAndSettle();
+      expect(find.text('Изменить карточку'), findsNothing);
+      await toggle(tester, id);
+      await tester.enterText(search, 'absent');
+      await tester.pumpAndSettle();
+      await tester.enterText(search, '');
+      await tester.pumpAndSettle();
+      expect(find.text('Изменить карточку'), findsNothing);
+      await toggle(tester, id);
+      await click(tester, 'Удалить карточку');
+      expect(card(id), findsNothing);
+      expect(action(newId, 'Изменить карточку'), findsNothing);
+    },
+  );
 
   testSoftwareWidgets(
     'loading and failed reads never claim an empty inventory; refresh recovers',
@@ -197,6 +489,7 @@ void main() {
     (tester) async {
       final id = await seed(tester);
       await show(tester);
+      await toggle(tester, id);
       await click(tester, 'Изменить карточку');
       await tester.enterText(
         find.byKey(const ValueKey('software-name')),
@@ -285,10 +578,17 @@ void main() {
   testSoftwareWidgets(
     'filter searches only displayed page and pagination reaches remaining card',
     (tester) async {
+      final ids = <String>[];
       for (var i = 0; i < 26; i++) {
-        await seed(tester, name: 'Seed$i');
+        ids.add(await seed(tester, name: 'Seed$i'));
       }
       await show(tester);
+      await toggle(tester, ids.first);
+      await click(tester, 'Далее');
+      expect(action(ids.last, 'Изменить карточку'), findsNothing);
+      await toggle(tester, ids.last);
+      await click(tester, 'Назад');
+      expect(action(ids.first, 'Изменить карточку'), findsNothing);
       await tester.enterText(
         find.descendant(
           of: find.byType(DeckSearch),
@@ -299,7 +599,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ничего не найдено'), findsOneWidget);
       await click(tester, 'Далее');
-      expect(find.widgetWithText(DeckListItem, 'Seed25'), findsOneWidget);
+      expect(
+        find.descendant(of: card(ids.last), matching: find.text('Seed25')),
+        findsOneWidget,
+      );
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -335,6 +638,8 @@ void main() {
         console: () => fail('Old target must not open current console'),
       );
       expect(find.text('Другой хост профиля'), findsOneWidget);
+      expect(action(id, 'Изменить карточку'), findsNothing);
+      await toggle(tester, id);
       expect(
         tester
             .widget<DeckButton>(find.byKey(ValueKey('software-console-$id')))
@@ -359,6 +664,7 @@ void main() {
     (tester) async {
       final id = await seed(tester);
       await show(tester);
+      await toggle(tester, id);
       await click(tester, 'История карточки');
       await click(tester, 'Написать сообщение');
       await tester.enterText(
@@ -414,7 +720,11 @@ void main() {
       expect(h.repository.state.softwareCards.values.single.configPaths, [
         '/etc/redis/redis.conf',
       ]);
-      expect(find.text('test-version'), findsOneWidget);
+      expect(find.text('Версия: test-version'), findsOneWidget);
+      await toggle(
+        tester,
+        h.repository.state.softwareCards.values.single.softwareId,
+      );
       await click(tester, 'Удалить карточку');
       expect(h.repository.state.softwareCards, isEmpty);
       expect(h.repository.state.softwareEvents.length, 2);

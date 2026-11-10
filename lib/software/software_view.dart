@@ -11,7 +11,7 @@ import 'software_models.dart';
 import 'software_owner.dart';
 import 'software_analysis.dart';
 
-/// C02/C03/C04/C05/C07/C08/C09/C10/C11/C12/C13/C16/C18/C20/C28.
+/// C02/C03/C04/C05/C07/C08/C09/C10/C11/C12/C13/C16/C18/C19/C20/C28.
 /// Shell navigation delegates to the existing C26 owner; no commands are generated.
 class SoftwareView extends StatefulWidget {
   const SoftwareView({
@@ -50,6 +50,8 @@ class _SoftwareViewState extends State<SoftwareView> {
   SoftwarePage? _cards, _history;
   OperationFailure? _loadError, _actionError;
   final _cardCursors = <String?>[null], _historyCursors = <String?>[null];
+  final _expandedCards = <String>{};
+  int _expansionEpoch = 0;
   int _cardPage = 0, _historyPage = 0, _epoch = 0, _loadId = 0;
   String _query = '', _action = 'other', _outcome = 'unknown';
   String? _editing,
@@ -97,6 +99,7 @@ class _SoftwareViewState extends State<SoftwareView> {
       _noteMutationId = null;
       _cards = null;
       _history = null;
+      _resetExpansion();
       _actionError = null;
       _query = '';
       _search.clear();
@@ -124,6 +127,7 @@ class _SoftwareViewState extends State<SoftwareView> {
 
   Future<void> _load({bool reset = false}) async {
     if (reset) {
+      if (_cardPage != 0) _resetExpansion();
       _cardPage = 0;
       _historyPage = 0;
       _cardCursors
@@ -150,7 +154,14 @@ class _SoftwareViewState extends State<SoftwareView> {
     setState(() {
       _loading = false;
       _loadError = values[0].error ?? values[1].error;
-      if (values[0].ok) _cards = values[0].value!.software as SoftwarePage;
+      if (values[0].ok) {
+        _cards = values[0].value!.software as SoftwarePage;
+        final ids = _cards!.items
+            .whereType<SoftwareCardView>()
+            .map((card) => card.softwareId)
+            .toSet();
+        _expandedCards.removeWhere((id) => !ids.contains(id));
+      }
       if (values[1].ok) _history = values[1].value!.software as SoftwarePage;
     });
   }
@@ -315,10 +326,16 @@ class _SoftwareViewState extends State<SoftwareView> {
       if (history) {
         _historyPage = page;
       } else {
+        if (_cardPage != page) _resetExpansion();
         _cardPage = page;
       }
     });
     unawaited(_load());
+  }
+
+  void _resetExpansion() {
+    _expandedCards.clear();
+    _expansionEpoch++;
   }
 
   String _time(int millis) {
@@ -344,17 +361,34 @@ class _SoftwareViewState extends State<SoftwareView> {
   }
 
   Widget _card(SoftwareCardView card) => DeckSurface(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    key: ValueKey('software-card-${card.softwareId}'),
+    child: DeckExpander(
+      key: ValueKey((card.softwareId, _expansionEpoch)),
+      initiallyExpanded: _expandedCards.contains(card.softwareId),
+      onExpansionChanged: (expanded) => setState(() {
+        if (expanded) {
+          _expandedCards.add(card.softwareId);
+        } else {
+          _expandedCards.remove(card.softwareId);
+        }
+      }),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(card.card.name),
+          Text('Версия: ${card.card.version ?? 'Не указана'}'),
+          Text('${card.username}@${card.host}:${card.port}'),
+          if (!card.currentTarget)
+            const DeckStatus(label: 'Другой хост профиля'),
+          const Text('Подробности'),
+        ],
+      ),
       children: [
-        DeckListItem(
-          title: card.card.name,
-          description: '${card.username}@${card.host}:${card.port}',
+        DeckKeyValue(
+          label: 'Исходный хост',
+          value: '${card.username}@${card.host}:${card.port}',
+          selectable: true,
         ),
-        DeckStatus(
-          label: card.currentTarget ? 'Исходный хост' : 'Другой хост профиля',
-        ),
-        DeckKeyValue(label: 'Версия', value: card.card.version ?? 'Не указана'),
         DeckKeyValue(label: 'Служба', value: card.card.service ?? 'Не указана'),
         DeckKeyValue(
           label: 'Данные',
@@ -377,6 +411,9 @@ class _SoftwareViewState extends State<SoftwareView> {
               onPressed: _pending || !card.currentTarget
                   ? null
                   : () => _start(card),
+              disabledReason: !card.currentTarget
+                  ? 'Карточка относится к другому хосту'
+                  : null,
               child: const Text('Изменить карточку'),
             ),
             DeckButton(
@@ -596,7 +633,10 @@ class _SoftwareViewState extends State<SoftwareView> {
         DeckSearch(
           controller: _search,
           label: 'Фильтр показанной страницы',
-          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+          onChanged: (v) => setState(() {
+            _query = v.toLowerCase();
+            _resetExpansion();
+          }),
         ),
         if (_loading) const DeckCollectionState(state: DeckDataState.loading),
         if (!_loading && _cards != null && cards.isEmpty)

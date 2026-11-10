@@ -221,3 +221,105 @@ Extensions.yml отсутствует: registered before/after hooks нет.
 Код после полного независимого review не менялся. Итог ограничен реализованной
 функцией и unit/static-приёмкой; реальная связка на чистой ОС этим не доказана.
 Никаких публикаций, releases, коммитов или операций на реальном сервере не выполнялось.
+
+## Спецификация компактных карточек — 2026-11-10
+
+По запросу пользователя и примеру текущей карточки добавлен FR-813,
+AC-814/815, SC-806 и нормативный UI-контракт в contracts/tools.md. Plan/quickstart
+описывают применение существующих C09/C19 и функциональную приёмку;
+T031–T033 добавлены открытыми, без стирания выполненной истории.
+Код не менялся: предыдущие отчёты completion/converge относятся к базовой функции,
+не доказывают реализацию или проверку нового редизайна. Модель, MCP, хранение,
+runtime prerequisites и зависимости не меняются. Новый scope: сводка и раскрытие
+технических сведений/действий, локальное состояние, прежние ограничения другой цели.
+
+## Spec Kit — компактные карточки: реализация и проверки
+
+Цель пользователя от 2026-11-10: пройти все применимые этапы для редизайна.
+Specify/Plan/Tasks: обновлены текущие артефакты, T031–T033 добавлены к истории.
+Предварительное независимое review спецификаций /root/review_compact_software_specs:
+замечаний0, пакет готов к реализации; проверены шесть изменённых документов,
+полный пакет и API общих компонентов.
+
+Clarify: повторный coverage scan — вопросов0. Scope/данные/идентичность/UX,
+доступность, auth/privacy, зависимости, recovery/concurrency, ограничения,
+терминология и критерии завершения определены в spec/model/contracts/plan.
+Новых обязательных решений не обнаружено; размер и схема локальных данных,
+протоколы/совместимость и runtime prerequisites остаются прежними.
+Checklist: базовые requirements16/16 и software14/14 прочитаны как gate;
+новый reviewer-owned [compact-cards](checklists/compact-cards.md) содержит6 пунктов
+качества требований, ожидающих независимой оценки. Это не отметки реализации.
+
+Analyze (read-only): prerequisites -RequireSpec -RequireTasks -IncludeTasks
+разрешили текущий пакет. Покрыты19 требований (13FR+6SC), 33 задачи, coverage100%,
+ambiguities0, duplications0, contradictions0, critical0, unmapped tasks0,
+constitution conflicts0. Базовая карта выше сохраняется; FR-813/SC-806 →
+T031–T033 → AC-814/815. Исправления продуктовых требований Analyze не потребовались.
+
+Implement T031/T032: SoftwareView использует C09/C19 с полной сводкой и
+раскрываемыми C18/C28/DeckActions; вложенная карточка заголовка удалена.
+Раскрытие по id сохраняется на refresh, сбрасывается при смене контекста;
+исчезнувшие id удаляются. Формы/owner/MCP/storage/console не менялись.
+В software_view_test.dart6 новых функциональных cases, всего14: данные/unknown/
+literal paths/UTC fallback, независимость раскрытия без эффектов, keyboard и
+semantic state через стандартные localized hints C19, pending/console callback,
+смена профиля и возврат, refresh/filter/deletion. Прежние8 cases обновлены для
+раскрытия; paging case также проверяет сброс при переходе и возврате.
+
+Реальные проверки текущего кода:
+
+- `dart format --output=none --set-exit-if-changed .`: exit0,506 файлов,0 изменений.
+- `flutter analyze`: exit0,No issues found.
+- `flutter test`: exit0,944 passed; лог `.local/software-008-compact-full-test.log`.
+- `flutter test test/software/software_view_test.dart`: exit0,14 passed до
+  замены deprecated semantics matcher; полный suite944 подтверждает итоговый matcher.
+- `tools/check-test-boundaries.ps1`: exit0,117 Dart files.
+- `git diff --check`: exit0 на изменениях кода до финального документационного отчёта.
+
+Ранние прогоны выявили nullable DateTime в тесте, слишком широкий finder текста,
+неверный способ focus, lifecycle SemanticsHandle и deprecated matcher/import;
+исправлено. Текущие успешные результаты получены после исправлений.
+Это unit/static scope: продукт, реальные SSH/Isar, layout/captures и release
+не запускались; эти проверки не являются gates.
+
+Converge (read-only): после Implement повторно проверены текущие source owners,
+DTO, repository, router/composition, UI и tests против 13FR/15AC/6SC и плана,
+включая все33 задачи и6 принципов конституции. По текущей реализации gaps0
+(missing/partial/contradicts/unrequested=0); новый convergence-раздел не добавлен.
+tasks.md SHA256 до/после оценки:
+`008366BB6952815F0BAD25F45D95351C38B259F422C105AB4AD4B9B1209A52B3`.
+Независимый review/fix loop и его отражение в T033 пока не завершены.
+
+Extensions.yml отсутствует: зарегистрированных before/after hooks нет.
+Конституция не меняется; Taskstoissues неприменим, публикация issues не запрошена.
+
+## Компактные карточки — независимое review и завершение
+
+/root/review_compact_cards_implementation выполнил fresh read-only review всех9
+изменённых/новых файлов, пакета008, общих API и затронутых границ owner/router/
+runtime/repository. Замечаний0; готовность подтверждена, незавершённого кода
+в проверенном scope не обнаружено. Reviewer самостоятельно прочитал итог944
+в логе полного unit suite; остальные checks оценил по переданным реальным результатам.
+Явно одобрены все CHK001–006 compact-cards; существующие requirements16/16 и
+software14/14 остаются одобренными. По разрешению reviewer отмечены6/6 и закрыт
+T033, код после review не менялся. Review/fix loop завершён без открытых findings.
+
+Полный link check перед review: exit0,387 total/163 unique/381OK/0errors/
+6exclusions/2redirects; diff-check и boundary check также exit0.
+
+| Этап редизайна | Итог |
+|---|---|
+| Specify | FR-813, AC-814/815, SC-806, текущий UI-контракт |
+| Clarify | Coverage scan,0 обязательных вопросов |
+| Checklist | requirements16/16, software14/14, compact-cards6/6; reviewer approval |
+| Plan / Research / Model | Композиция C09/C19 и lifecycle; existing API достаточно, новых схем/зависимостей нет |
+| Tasks | T031–T033 выполнены; общая история33/33 сохранена |
+| Analyze | 19FR/SC,33tasks,coverage100%,findings0 |
+| Implement | SoftwareView и14 функциональных widget cases |
+| Converge | 13FR/15AC/6SC и задачи/план/конституция: gaps0, tasks не менялись самой оценкой |
+| Checks | format/analyze/unit944/boundary/links/diff-check прошли |
+| Independent review | fresh review:0 findings; checklist одобрен, код завершён |
+
+Все применимые этапы текущего редизайна завершены. Вывод ограничен unit/static
+scope; запуск продукта на чистой ОС и реальные SSH/Isar не доказаны.
+Коммит, публикация issues и релиз не выполнялись.
