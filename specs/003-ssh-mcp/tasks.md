@@ -334,6 +334,19 @@ Dependencies: T069→T070–074→T075→T076→T077. Product implementation seq
   безопасных границ progressToken, отзыва доступа и strict arguments. Выполнить
   обязательные format/analyze/unit/link checks и независимый review/fix loop.
 
+## Одновременные чаты одного MCP-клиента — 2026-11-10
+
+- [X] T084 Удалить квоту 2 канала на разрешение из native/bootstrap/mcp_pipe.cpp
+  и lib/mcp/pipe_adapter.dart; сохранить общий предел 8 каналов и независимую
+  авторизацию каждой сессии. Обновить spec/plan/mcp-access/contracts/ipc
+  (FR-326/331/333). Fake-only units: все 8 сессий одного клиента работают,
+  одинаковые request IDs изолированы, девятый канал не закрывает существующие,
+  освобождённый слот используется повторно, closeClient закрывает все сессии.
+- [X] T085 Выполнить обязательные format/analyze/flutter test, boundary/schema/tooling
+  units, native build/unit CTest и lychee; независимое read-only review/fix loop.
+  Сохранить фактические результаты в reviews/multi-chat-mcp.md. Без integration/e2e.
+
+
 ## Ограниченное автопереподключение SSH — 2026-11-10
 
 - [X] T086 Реализовать FR-348–350 в ConnectionOwner: cleanup, 8 попыток,

@@ -38,7 +38,10 @@ UTF8 frame decoder limits buffering before newline, not after allocating unbound
 Stdout has ONLY unwrapped MCP payload lines, no internal authorization frames/banner.
 Before initialize errors: sanitized stderr + exit code; never synthetic non-MCP stdout.
 
-Limits main8channels,2pergrant; native main queued frames≤16/channel, overflow closes
+Limits main8channels total, with no per-grant quota: one client may use all8
+channels for independent MCP sessions. Admission beyond8 closes only the new channel;
+closing one session releases its slot without closing siblings. Grant revocation,
+rotation and expiry still close every affected session. Native main queued frames≤16/channel, overflow closes
 violator, no effect from dropped command. Already admitted mutation preserves atomicity.
 Idle channels expiry timer closes at grant deadline; every frame/commit/data response
 checks current grant anyway. Shutdown/disable closes pipe and helper; stdio EOF only

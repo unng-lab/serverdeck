@@ -189,14 +189,59 @@ void main() {
       expect(h.repository.state.profiles, isEmpty);
     },
   );
-  test('two-channel grant limit rejects the third reservation', () async {
-    await authenticate(featureId(701));
-    await authenticate(featureId(702));
-    await authenticate(featureId(703));
-    expect(port.closed, contains(featureId(703)));
-    expect(port.closed, isNot(contains(featureId(701))));
-    expect(port.closed, isNot(contains(featureId(702))));
+  test('one grant supports eight independent MCP sessions', () async {
+    for (var i = 701; i <= 708; i++) {
+      final id = featureId(i);
+      await authenticate(id);
+      expect(port.output[id]!.first['kind'], 'authorized');
+      await initialize(id);
+      frame(id, {
+        'kind': 'mcp',
+        'payload': {
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'tools/list',
+          'params': {},
+        },
+      });
+    }
+    await featureTurns(70);
+    expect(port.closed, isEmpty);
+    for (var i = 701; i <= 708; i++) {
+      final response = port.output[featureId(i)]!.last['payload'] as Map;
+      expect(response['id'], 1);
+      expect((response['result'] as Map)['tools'], isNotEmpty);
+      expect(response.containsKey('error'), isFalse);
+    }
+    await adapter.closeClient(client);
+    expect(port.closed.toSet(), {
+      for (var i = 701; i <= 708; i++) featureId(i),
+    });
   });
+  test(
+    'global channel limit preserves sessions and a released slot is reusable',
+    () async {
+      for (var i = 701; i <= 708; i++) {
+        await authenticate(featureId(i));
+      }
+      final rejected = featureId(709);
+      await authenticate(rejected);
+      expect(port.closed, [rejected]);
+      expect(port.output[rejected], isNull);
+
+      port.event(getEpoch(), 'mcpChannelClosed', featureId(701));
+      await featureTurns();
+      final replacement = featureId(710);
+      await authenticate(replacement);
+      expect(port.output[replacement]!.first['kind'], 'authorized');
+      await initialize(featureId(702));
+      expect(port.closed, [rejected]);
+      expect(
+        (port.output[featureId(702)]!.last['payload'] as Map)['result'],
+        contains('serverInfo'),
+      );
+    },
+  );
   test('first-frame deadline and grant expiry close idle channels', () async {
     final pending = featureId(701);
     port.event(getEpoch(), 'mcpChannelOpened', pending, {

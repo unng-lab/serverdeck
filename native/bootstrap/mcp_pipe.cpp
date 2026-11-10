@@ -85,7 +85,7 @@ struct Broker::Impl {
   struct Channel {
     Channel(std::string value, std::unique_ptr<Handle> handle) : id(std::move(value)), pipe(std::move(handle)), stop(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
       workers([this] { Stop(); }, [this] { std::lock_guard<std::mutex> lock(closeMutex); pipe.reset(); }) { if (!stop.valid()) Fail(); }
-    std::string id, client; std::unique_ptr<Handle> pipe; Handle stop; bool authorized = false;
+    std::string id; std::unique_ptr<Handle> pipe; Handle stop; bool authorized = false;
     std::atomic<bool> closed{false}; FrameReservations frames;
     std::mutex outputMutex, closeMutex; std::condition_variable outputReady; std::deque<std::string> output;
     OwnedIoWorkers workers;
@@ -142,8 +142,6 @@ struct Broker::Impl {
       const auto& object = auth.object(); const auto client = auth.at("clientId").string();
       if (object.size() != 6 || auth.at("kind").string() != "auth" || auth.at("version").integer() != 1 ||
           auth.at("ownerEpoch").string() != epoch || !CanonicalUuid(client) || auth.at("grantVersion").integer() < 1 || auth.at("secret").string().size() != 43) Fail();
-      { std::lock_guard<std::mutex> lock(mutex); size_t count = 0; for (const auto& [id, other] : channels) { (void)id; if (!other->closed && other->client == client) ++count; }
-        if (count >= 2) Fail(); c->client = client; }
       Push({"mcpFrame", c->id, frame, {}, {}}, c);
       for (;;) {
         frame = lines.Read(c->pipe->get(), c->stop.get()); const auto value = Decode(frame);

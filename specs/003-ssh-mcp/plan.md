@@ -25,7 +25,7 @@
   Нет feature screen design acceptance.
 - **Target**: Windows10/11x64, один user/main owner, только тот же logon для MCP.
 - **Performance**: network budget30s, prompt5min, half-open watchdog≤25s (внутри90s),
-  auth handshake5s; 8 bridge channels/2 per grant, frame≤2MiB, writer queue≤64.
+  auth handshake5s; 8 bridge channels total, no per-grant quota, frame≤2MiB, writer queue≤64.
 - **Constraints**: no shell/exec/terminal, no HTTP listener, no remote pipe,
   no auth fallback, no secret read/copy, no host deletion through MCP.
 - **Scope**: все34 FR003; зависит от полностью реализованной002. Визуальный контракт C01–C30 не меняется; функциональная privacy-поправка C03 оформлена в scope001/R013 (T045).

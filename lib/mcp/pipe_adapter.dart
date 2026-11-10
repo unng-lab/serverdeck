@@ -191,14 +191,6 @@ final class McpPipeAdapter implements GrantTransport, RuntimeCapability {
           secret is! String ||
           !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(secret))
         throw const FormatException();
-      // Reserve the per-grant slot before asynchronous DPAPI or authentication.
-      if (_channels.values
-              .where((v) => !v.closed && v.clientId == client)
-              .length >=
-          2) {
-        await _deny(c);
-        return;
-      }
       c.clientId = client;
       c.authenticating = true;
       final bytes = base64Url.decode('$secret=');
