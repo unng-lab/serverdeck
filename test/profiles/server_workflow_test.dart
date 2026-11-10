@@ -490,15 +490,15 @@ void main() {
         attemptId: 'attempt',
         sessionId: waiting ? 'old-session' : null,
         failureCode: waiting ? FailureCode.networkError : null,
-        reconnectAttempt: 3,
+        reconnectAttempt: 13,
       );
       final c = await mount(tester, ops);
-      expect(find.text('Переподключение 3/8'), findsOneWidget);
+      expect(find.text('Переподключение 13'), findsOneWidget);
       await c.select(profileId);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Настройки'));
       await tester.pumpAndSettle();
-      expect(find.text('Автоматическая попытка 3 из 8.'), findsOneWidget);
+      expect(find.text('Автоматическая попытка 13.'), findsOneWidget);
       expect(find.text('Состояние подключения'), findsNothing);
       final stop = find.text(waiting ? 'Отключиться' : 'Отменить подключение');
       if (waiting) expect(find.text('Отменить подключение'), findsNothing);
@@ -507,7 +507,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(ops.disconnects, waiting ? 1 : 0);
       expect(ops.cancels, waiting ? 0 : 1);
-      expect(find.text('Автоматическая попытка 3 из 8.'), findsNothing);
+      expect(find.text('Автоматическая попытка 13.'), findsNothing);
       await finish(tester);
     });
   }

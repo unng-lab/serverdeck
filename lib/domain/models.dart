@@ -266,7 +266,7 @@ final class ConnectionView extends PublicValue {
   final TrustChallenge? challenge;
   final PendingInput? pendingInput;
 
-  /// Pending/in-flight automatic retry, 1 through 8; absent after completion.
+  /// Pending/in-flight retry number, saturating at the safe JSON integer limit.
   final int? reconnectAttempt;
   @override
   Map<String, Object?> toJson() => {

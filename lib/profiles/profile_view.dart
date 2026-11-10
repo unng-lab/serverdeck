@@ -420,7 +420,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
         if (c.reconnectAttempt != null)
           DeckNotice(
             title: 'Восстанавливаем SSH-соединение',
-            message: 'Автоматическая попытка ${c.reconnectAttempt} из 8.',
+            message: 'Автоматическая попытка ${c.reconnectAttempt}.',
             nextStep: 'Можно остановить повторное подключение кнопкой ниже.',
             tone: DeckTone.neutral,
           ),
@@ -538,7 +538,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
       );
     if (connection.reconnectAttempt != null)
       return (
-        label: 'Переподключение ${connection.reconnectAttempt}/8',
+        label: 'Переподключение ${connection.reconnectAttempt}',
         icon: Icons.sync,
         tone: DeckTone.neutral,
         text: true,

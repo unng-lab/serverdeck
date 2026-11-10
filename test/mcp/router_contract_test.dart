@@ -146,7 +146,7 @@ void main() {
   test(
     'connection output schema accepts only bounded optional reconnect status',
     () {
-      for (final attempt in [null, 1, 8]) {
+      for (final attempt in [null, 1, 8, 9, 100, 9007199254740991]) {
         router.schemas.output('connections.get', {
           'ok': true,
           'value': {
@@ -156,7 +156,7 @@ void main() {
           'meta': {'dataRevision': 1, 'ownerEpoch': h.actors.ownerEpoch},
         });
       }
-      for (final attempt in [0, 9, '1']) {
+      for (final attempt in [0, 9007199254740992, '1']) {
         expect(
           () => router.schemas.output('connections.get', {
             'ok': true,

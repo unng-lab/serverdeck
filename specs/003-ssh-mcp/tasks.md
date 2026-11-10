@@ -371,3 +371,20 @@ python test/mcp/official_schema_test.py — 2 passed; git diff --check — passe
 исправлены T089. Повторное независимое read-only ревью завершено:
 «Замечаний не найдено», «Готовность к реализации: готов». Подтверждённых
 нерешённых замечаний нет. Ревью не выполняло собственный запуск тестов.
+
+
+## Бесконечные повторы после восьмой попытки — 2026-11-11
+
+- [X] T090 Изменить FR-348/351 и reconnect contract: без ограничения количества
+  повторов, прежние cap=30s/jitter/stable reset/stop fences. Ограничить exponent
+  перед shift; счётчик насыщать на 9007199254740991 без прекращения retry.
+  Обновить UI C07/C10/C14/C21, MCP schemas и units на 100 последовательных
+  отказов, отмену после прежнего лимита и границы публичного счётчика.
+- [X] T091 Выполнить format/analyze/flutter test/lychee и независимый review/fix
+  loop; записать фактические результаты и ограничения.
+
+Результаты T091 (2026-11-11): format — 508 файлов/0 изменений; analyze —
+No issues; flutter test — 961 passed; lychee — 402 total/396 OK/6 excluded,
+0 errors; boundaries — 118 файлов passed; official schema — 2 passed;
+diff check — passed. Независимое read-only ревью: замечаний нет, готов.
+Область доказательств: fake units/static/links, без integration/e2e/real SSH.

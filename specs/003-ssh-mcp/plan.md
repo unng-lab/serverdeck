@@ -379,10 +379,15 @@ TrustView. Explicit needTrust и known disconnected unpinned сохраняют 
 failed getTrust иstale cached unpinned покрываются isolated fake widgets.
 
 
-P50/T086–T088: bounded jittered reconnect in ConnectionOwner; volatile intent
-with generation/revision/authority fences, cleanup before scheduling, eight retries,
+P50/T086–T088: jittered reconnect with capped backoff in ConnectionOwner; volatile intent
+with generation/revision/authority fences, cleanup before scheduling, unlimited retries,
 one-minute stability reset. ConnectionView optional reconnectAttempt feeds existing
 C-status/notice/actions in profile_view.dart; monitoring text reflects shared recovery.
 Requirements FR-348–351 and contracts/ssh.md define policy and compatibility.
 Fake monotonic clock/transport units cover normal recovery and cancellation/failure
 boundaries. No schema migration, new dependency or automatic console/input replay.
+
+P51/T090: после восьмой попытки продолжать повторы без предела количества,
+с cap=30s и прежним jitter; ограничить exponent до shift, счётчик насыщать
+на максимальном safe JSON integer. UI не показывает общий лимит; MCP schemas
+расширяют диапазон reconnectAttempt, без новых storage/runtime dependencies.

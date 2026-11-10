@@ -238,7 +238,7 @@ captured late timers.
 Watchdog sends first ping fifteen seconds after creation, waits at most ten seconds,
 and schedules the next interval after successful completion. One ping in flight,
 first failure/late response stops the watchdog and calls owner failure once; the
-watchdog itself never reconnects. ConnectionOwner owns bounded recovery. Timer rearming and ping result generations are separate so an early
+watchdog itself never reconnects. ConnectionOwner owns recovery with capped backoff. Timer rearming and ping result generations are separate so an early
 timer delivery cannot discard a still-valid ping result. Owner maps failure to
 NETWORK_ERROR and closes the session; both obligations remain T010. These helpers
 do not by themselves implement attempt/session ownership or socket cleanup.
@@ -373,12 +373,15 @@ Flutter StandardMethodCodec may return unmodifiable typed-data views. NativePlat
 Current private-key API: parsePrivateKey only. Every stored private credential requires publicKeyBytes; explicit PublicKeyHint is required by transport/identity constructors. readPublicKeyHint requires supplied public metadata and only validates it against the current input envelope; no old-record inference path. [Current input](key-input.md), [modal workflow](profile-workflow.md).
 
 
-## Bounded reconnect contract
+## Reconnect contract with capped backoff
 
 ConnectionOwner retains one volatile recovery intent/profile after an established
 session fails with NETWORK_ERROR or TIMEOUT. Exact cleanup must finish successfully
-before the jittered delay and fresh dial. Attempts 1..8 use uniform [cap/2, cap),
-cap=min(30000ms,1000ms*2^(n-1)); stable connected time >=60s resets the next series.
+before the jittered delay and fresh dial. Attempts continue indefinitely and use uniform [cap/2, cap),
+cap=min(30000ms,1000ms*2^(n-1)); attempts after eight keep the 30s cap.
+Bound the exponent before shifting to avoid integer overflow for long outages.
+The displayed counter saturates at 9007199254740991 without stopping retries.
+Stable connected time >=60s resets the next series.
 Network/timeout failures during recovery consume the next attempt; any other error
 or failed admission stops. Trust/passphrase prompt ends automatic recovery and
 uses existing explicit decision flow with the existing five-minute deadline.
@@ -397,6 +400,6 @@ the recovery intent before resource cleanup. Manual connection supersedes delaye
 recovery only after exact old handles close. Timers are monotonic and stale/early
 callbacks cannot admit a dial. Recovery does not survive restart or depend on the
 monitoring route being visible. UI exposes optional ConnectionView.reconnectAttempt
-(integer 1..8) during delay/in-flight retry; cancelConnection applies to a pending
+(integer 1..9007199254740991) during delay/in-flight retry; cancelConnection applies to a pending
 attempt and disconnect to the retained old session ID while waiting. Existing
 clients may ignore this additive field; no storage/schema/release dependency change.

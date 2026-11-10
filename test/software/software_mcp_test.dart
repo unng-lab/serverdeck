@@ -394,7 +394,7 @@ void main() {
       expect(properties.remove('reconnectAttempt'), {
         'type': 'integer',
         'minimum': 1,
-        'maximum': 8,
+        'maximum': 9007199254740991,
       });
     }
     final digest = SHA256Digest()

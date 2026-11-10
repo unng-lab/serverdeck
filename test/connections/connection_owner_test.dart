@@ -1105,50 +1105,56 @@ void main() {
     },
   );
 
-  test(
-    'network and timeout retries stop at eight with capped jittered backoff',
-    () async {
-      final h = Harness(reconnectRandom: () => 0.5);
-      try {
-        var current = await h.connected();
-        for (var n = 1; n <= 8; n++) {
-          current.terminal.complete(
-            OperationFailure(
-              n.isOdd ? FailureCode.networkError : FailureCode.timeout,
-            ),
-          );
-          await turns();
-          expect(h.owner.connection(id(1)).reconnectAttempt, n);
-          final cap = n <= 5 ? 1000 * (1 << (n - 1)) : 30000;
-          final wait = cap * 3 ~/ 4;
-          h.clock.advance(Duration(milliseconds: wait - 1));
-          await turns();
-          expect(h.dials, hasLength(n));
-          h.clock.advance(const Duration(milliseconds: 1));
-          await turns();
-          expect(h.dials, hasLength(n + 1));
-          current = h.sessions.last;
-        }
+  test('network and timeout retries continue past eight and sixty-four with capped jitter', () async {
+    final h = Harness(reconnectRandom: () => 0.5);
+    try {
+      var current = await h.connected();
+      for (var n = 1; n <= 100; n++) {
         current.terminal.complete(
-          const OperationFailure(FailureCode.networkError),
+          OperationFailure(
+            n.isOdd ? FailureCode.networkError : FailureCode.timeout,
+          ),
         );
         await turns();
-        expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
-        h.clock.advance(const Duration(minutes: 5));
+        expect(h.owner.connection(id(1)).reconnectAttempt, n);
+        final cap = n <= 5 ? 1000 * (1 << (n - 1)) : 30000;
+        final wait = cap * 3 ~/ 4;
+        h.clock.advance(Duration(milliseconds: wait - 1));
         await turns();
-        expect(h.dials, hasLength(9));
-        expect(h.owner.liveResources, 0);
-        final manual = await h.connected();
-        manual.terminal.complete(
-          const OperationFailure(FailureCode.networkError),
-        );
+        expect(h.dials, hasLength(n));
+        h.clock.advance(const Duration(milliseconds: 1));
         await turns();
-        expect(h.owner.connection(id(1)).reconnectAttempt, 1);
-      } finally {
-        await h.dispose();
+        expect(h.dials, hasLength(n + 1));
+        current = h.sessions.last;
       }
-    },
-  );
+      current.terminal.complete(
+        const OperationFailure(FailureCode.networkError),
+      );
+      await turns();
+      expect(h.owner.connection(id(1)).reconnectAttempt, 101);
+      expect(h.owner.liveResources, 0);
+      expect(
+        (await h.owner.cancelConnection(
+          h.actors.ui,
+          id(1),
+          attemptId: h.owner.connection(id(1)).attemptId!,
+        )).ok,
+        isTrue,
+      );
+      h.clock.advance(const Duration(minutes: 5));
+      await turns();
+      expect(h.dials, hasLength(101));
+      expect(h.owner.connection(id(1)).reconnectAttempt, isNull);
+      final manual = await h.connected();
+      manual.terminal.complete(
+        const OperationFailure(FailureCode.networkError),
+      );
+      await turns();
+      expect(h.owner.connection(id(1)).reconnectAttempt, 1);
+    } finally {
+      await h.dispose();
+    }
+  });
 
   test(
     'short recovered sessions retain count and stable minute resets it',

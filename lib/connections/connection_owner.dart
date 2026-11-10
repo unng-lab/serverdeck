@@ -144,7 +144,7 @@ final class ConnectionOwner
   final double Function() _reconnectRandom;
   final _clock = Stopwatch()..start();
   final _reconnects = <String, _Reconnect>{};
-  static const maxReconnectAttempts = 8;
+  static const maxReconnectAttemptNumber = 9007199254740991;
   static const reconnectStableDuration = Duration(minutes: 1);
   Duration get _elapsed => _now?.call() ?? _clock.elapsed;
   final _entries = <String, _ConnectionEntry>{}, _generations = <String, int>{};
@@ -1280,8 +1280,12 @@ final class ConnectionOwner
         ? 0
         : e.reconnectAttempts;
     _invalidate(e, state, failure);
-    final retry = recoverable && attempts < maxReconnectAttempts && !_stopped
-        ? _Reconnect(e, attempts + 1, generation(e.profileId))
+    final retry = recoverable && !_stopped
+        ? _Reconnect(
+            e,
+            min(attempts + 1, maxReconnectAttemptNumber),
+            generation(e.profileId),
+          )
         : null;
     if (retry != null) _reconnects[e.profileId] = retry;
     _notify();
@@ -1290,7 +1294,7 @@ final class ConnectionOwner
         await _closeBatch([e]);
         if (retry == null) return;
         _checkReconnect(retry);
-        final cap = min(30000, 1000 * (1 << (retry.attempt - 1)));
+        final cap = min(30000, 1000 * (1 << min(5, retry.attempt - 1)));
         final delay = Duration(
           microseconds: (cap * 1000 * (0.5 + _reconnectRandom() * 0.5)).floor(),
         );
