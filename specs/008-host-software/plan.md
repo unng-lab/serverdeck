@@ -157,26 +157,40 @@ C10/C11/C12 для состояний/ошибок, C18/C20/C28 для свед�
 Нарушений конституции и исключений нет. План ограничен расширением существующего
 приложения; shell и доверие остаются у существующих владельцев.
 
-## Компактные карточки — 2026-11-10
+## Коллекция ПО — уточнение пользователя 2026-11-10
 
-FR-813/SC-806 уточняют W4 UI: в `lib/software/software_view.dart` заменить
-композицию `_card` на одну C09 с C19, сводкой в title/subtitle и подробностями
-по [контракту](contracts/tools.md#компактная-карточка-по--2026-11-10).
-Использовать существующие C09/C19/C18/C28/C10/C02 и DeckActions; общий C07 остаётся
-доступен остальным спискам, вложенная карточка заголовка ПО удаляется.
-Ответственность presentation остаётся у SoftwareView; DTO, SoftwareOwner,
-репозиторий, MCP и консоль сохраняют действующие контракты.
+Текущий FR-813/SC-806 заменяет ранее реализованный accordion карточек готовым
+C06 `DeckCollection<SoftwareCardView>` с adaptive layout. Порция visible, idOf,
+четыре колонки, selectedIds и C02 «Подробности» передаются из SoftwareView.
+Сортировка и checkbox selection не добавляются. Только selectedSoftwareId
+и общая область C09/C18/C28/DeckActions ниже таблицы; API C06 не меняется.
+Lifecycle и ограничения — в [контракте](contracts/tools.md#компактная-карточка-по--2026-11-10).
+Реализация и обновление functional tests — новая T038; выполненные T031–T033
+сохраняются как история прежней композиции. Тесты проверяют колонки/значения,
+single selection, refresh/reset, callbacks/currentTarget/pending и доступность
+без layout/golden/overflow/matrix. Shared design gate без изменения001 не нужен.
 
-Локальное раскрытие хранится по softwareId в пределах показанного списка,
-сохранение/сброс задаёт UI-контракт. Существующие callbacks и pending/currentTarget
-проверки переносятся вместе с действиями. История и форма остаются прежними.
-В `test/software/software_view_test.dart` обновить взаимодействия с действиями:
-сначала раскрыть нужную карточку; на fake owners проверить данные, раскрытие,
-отсутствие эффектов от него, изменение данных при refresh, сброс контекста,
-другую цель, pending, CRUD/conflict/history/console. Не проверять размеры,
-координаты, overflow, темы/viewport или screenshots feature screen.
+## Компактные события — 2026-11-10
 
-Новые задачи T031–T033 следуют после выполненных T001–T030. Проверки реализации:
-root format/analyze/flutter test, boundary check; после документов lychee;
-затем отдельный независимый review/fix loop. Общие компоненты/тема/каталог не
-меняются, отдельный shared design gate для этой композиции не требуется.
+FR-814/SC-807 расширяют W4 только в SoftwareView: вынести текущую композицию
+журнала в `_event(SoftwareEventView)` в `lib/software/software_view.dart`.
+Использовать готовую строку C07 compact для списка, C02 для действия подробностей,
+C18 для полного selectable текста и метаданных под соответствующей строкой;
+сводка C07 title/description/statusLabel из type/name, source/time/outcome и Unicode-safe preview по
+[контракту](contracts/tools.md#компактное-событие-истории--2026-11-10).
+Превью — чистая presentation-функция, не изменяющая DTO. C20 с фиксированной
+высотой текста в этой композиции заменяется C18; общий C20 не меняется.
+
+Отдельный set eventId отвечает за lifecycle по UI-контракту;
+не связывать их со сбросом сводок карточек. Очистку исчезнувших id выполнять
+при успешной загрузке страницы, не при ошибке. Existing `_historyFor`, `_page`
+и `_load` обслуживают прежние запросы; раскрытие вызывает только setState.
+Новые события после save/note закрыты, остальные остаются раскрытыми при refresh.
+
+Модель/права/receipts/transactions/storage quotas/версия протокола не меняются.
+Пределы summary2048 UTF8 bytes и event8KiB сохраняются; отдельного reader API нет.
+Новое локальное состояние описано в data-model.md, обоснование выбора — research.md.
+Только fake functional unit/widget tests в test/software/software_view_test.dart;
+общие компоненты, темы и каталог не меняются, shared design gate не требуется.
+Порядок: T034 (tests RED) → T035 (C07 и GREEN) → T038 (таблица ПО и tests)
+→ T036 (обязательные checks и review). T037 — уже выполненное исправление спеки.

@@ -180,7 +180,8 @@ void main() {
     ),
   ))!.value!.entityId;
 
-  Finder card(String id) => find.byKey(ValueKey('software-card-$id'));
+  Finder card(String id) => find.byKey(ValueKey('deck-row-$id'));
+  Finder cardPanel(String id) => find.byKey(ValueKey('software-details-$id'));
 
   Finder details(String id) =>
       find.descendant(of: card(id), matching: find.text('Подробности'));
@@ -193,18 +194,337 @@ void main() {
   }
 
   Finder action(String id, String label) => find.descendant(
-    of: card(id),
+    of: cardPanel(id),
     matching: find.widgetWithText(DeckButton, label),
   );
 
+  String seedEvent({
+    String kind = 'note',
+    String? softwareId,
+    String? softwareName = 'Snapshot name',
+    String summary = 'Synthetic message',
+    bool mcp = false,
+    String outcome = 'success',
+    int? createdAt,
+  }) {
+    final id = h.newId();
+    h.repository.state.softwareEvents[id] = SoftwareEventRecord()
+      ..eventId = id
+      ..profileId = profile
+      ..endpointId = h.profile.endpointId
+      ..host = 'original.invalid'
+      ..port = 2222
+      ..username = 'saved-user'
+      ..softwareId = softwareId
+      ..softwareName = softwareName
+      ..kind = kind
+      ..action = kind == 'note' ? 'install' : null
+      ..outcome = kind == 'note' ? outcome : null
+      ..changedFields = kind == 'updated' ? ['version', 'service'] : []
+      ..actorKind = mcp ? 'mcp' : 'ui'
+      ..clientId = mcp ? featureId(77) : null
+      ..summary = summary
+      ..createdAt = createdAt ?? h.clock.now() + h.sequence;
+    return id;
+  }
+
+  Finder event(String id) => find.byKey(ValueKey('software-event-$id'));
+  Finder eventDetails(String id) => find.descendant(
+    of: event(id),
+    matching: find.text('Подробности события'),
+  );
+  Future<void> toggleEvent(WidgetTester tester, String id) async {
+    await tester.ensureVisible(eventDetails(id));
+    await tester.tap(eventDetails(id));
+    await tester.pumpAndSettle();
+  }
+
+  Finder eventText(String id, String text) =>
+      find.descendant(of: event(id), matching: find.textContaining(text));
+  DeckKeyValue eventValue(WidgetTester tester, String id, String label) =>
+      tester
+          .widgetList<DeckKeyValue>(
+            find.descendant(of: event(id), matching: find.byType(DeckKeyValue)),
+          )
+          .singleWhere((value) => value.label == label);
+
   testSoftwareWidgets(
-    'compact summary and independent disclosure have no effects',
+    'event summary covers kinds, author, UTC and reported outcomes',
+    (tester) async {
+      final ids = {
+        for (final kind in ['created', 'updated', 'deleted', 'note'])
+          kind: seedEvent(kind: kind, mcp: kind == 'note'),
+      };
+      final host = seedEvent(
+        softwareName: null,
+        outcome: 'failed',
+        createdAt: 9007199254740991,
+      );
+      await show(tester);
+      for (final entry in {
+        'created': 'Карточка создана',
+        'updated': 'Карточка изменена',
+        'deleted': 'Карточка удалена',
+        'note': 'Сообщение',
+      }.entries) {
+        final id = ids[entry.key]!;
+        expect(eventText(id, '${entry.value} · Snapshot name'), findsOneWidget);
+        expect(
+          eventText(
+            id,
+            entry.key == 'note' ? 'MCP: ${featureId(77)}' : 'Пользователь',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: event(id), matching: find.byType(DeckKeyValue)),
+          findsNothing,
+        );
+        if (entry.key != 'note') {
+          expect(eventText(id, ' · Сообщённый исход: success'), findsNothing);
+        }
+      }
+      expect(
+        eventText(ids['note']!, ' · Сообщённый исход: success'),
+        findsOneWidget,
+      );
+      expect(eventText(host, 'Сообщение · Хост'), findsOneWidget);
+      expect(eventText(host, ' · Сообщённый исход: failed'), findsOneWidget);
+      expect(eventText(host, ' · 9007199254740991 ms UTC'), findsOneWidget);
+      await toggleEvent(tester, ids['updated']!);
+      expect(
+        eventValue(tester, ids['updated']!, 'Изменённые поля').value,
+        'version, service',
+      );
+      await toggleEvent(tester, ids['note']!);
+      expect(
+        eventValue(tester, ids['note']!, 'Источник').value,
+        'MCP: ${featureId(77)}',
+      );
+      expect(eventValue(tester, ids['note']!, 'Действие').value, 'install');
+      expect(
+        eventValue(tester, ids['note']!, 'Сообщённый исход').value,
+        'success',
+      );
+      final millis = h.repository.state.softwareEvents[ids['note']]!.createdAt;
+      expect(
+        eventValue(tester, ids['note']!, 'Время события UTC').value,
+        DateTime.fromMillisecondsSinceEpoch(
+          millis,
+          isUtc: true,
+        ).toIso8601String(),
+      );
+    },
+  );
+
+  testSoftwareWidgets(
+    'event preview has Unicode-safe 160 limit and full selectable literal text',
+    (tester) async {
+      final exactly = '🙂' * 160;
+      final longer = '${'🙂' * 160}z';
+      final exactId = seedEvent(summary: exactly);
+      final longId = seedEvent(summary: longer);
+      const literal = '  line one\r\n\tline two   [link](bad://literal)  ';
+      final literalId = seedEvent(summary: literal);
+      final emptyId = seedEvent(summary: ' \r\n\t ');
+      await show(tester);
+      expect(eventText(exactId, exactly), findsOneWidget);
+      expect(eventText(longId, '${'🙂' * 159}…'), findsOneWidget);
+      expect(
+        eventText(literalId, 'line one line two [link](bad://literal)'),
+        findsOneWidget,
+      );
+      expect(eventText(emptyId, 'Без текста'), findsOneWidget);
+      await toggleEvent(tester, longId);
+      expect(eventValue(tester, longId, 'Сообщение').value, longer);
+      expect(eventValue(tester, longId, 'Сообщение').selectable, isTrue);
+      await toggleEvent(tester, literalId);
+      expect(eventValue(tester, literalId, 'Сообщение').value, literal);
+      expect(
+        eventValue(tester, literalId, 'Цель').value,
+        'saved-user@original.invalid:2222',
+      );
+      expect(eventValue(tester, literalId, 'Цель').selectable, isTrue);
+    },
+  );
+
+  testSoftwareWidgets(
+    'event disclosure is independent, keyboard accessible and effect-free',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final id = await seed(tester);
+        final first = seedEvent(softwareId: id);
+        final second = seedEvent(softwareId: id);
+        var console = 0;
+        await show(tester, console: () => console++);
+        final reads = h.authorizations;
+        final revision = h.repository.state.settings.dataRevision;
+        final events = h.repository.state.softwareEvents.length;
+        expect(
+          tester.getSemantics(eventDetails(first)),
+          isSemantics(hasExpandedState: true, isExpanded: false),
+        );
+        Focus.of(tester.element(eventDetails(first))).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(eventDetails(first)),
+          isSemantics(hasExpandedState: true, isExpanded: true),
+        );
+        expect(eventText(first, 'Цель'), findsOneWidget);
+        expect(eventText(second, 'Цель'), findsNothing);
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(eventText(first, 'Цель'), findsNothing);
+        final rowTitle = eventText(first, 'Сообщение · Snapshot name');
+        await tester.ensureVisible(rowTitle);
+        await tester.tap(rowTitle);
+        await tester.pumpAndSettle();
+        expect(eventText(first, 'Цель'), findsOneWidget);
+        await toggleEvent(tester, first);
+        await toggleEvent(tester, first);
+        await toggleEvent(tester, second);
+        await toggle(tester, id);
+        expect(eventText(first, 'Цель'), findsOneWidget);
+        expect(eventText(second, 'Цель'), findsOneWidget);
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(DeckSearch),
+            matching: find.byType(TextField),
+          ),
+          'absent',
+        );
+        await tester.pumpAndSettle();
+        expect(eventText(first, 'Цель'), findsOneWidget);
+        expect(h.authorizations, reads);
+        expect(h.repository.state.settings.dataRevision, revision);
+        expect(h.repository.state.softwareEvents.length, events);
+        expect(console, 0);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testSoftwareWidgets(
+    'event refresh preserves ids, failures retain disclosure and removed ids are forgotten',
+    (tester) async {
+      final first = seedEvent();
+      await show(tester);
+      await toggleEvent(tester, first);
+      final second = seedEvent();
+      await click(tester, 'Обновить ПО');
+      expect(eventText(first, 'Цель'), findsOneWidget);
+      expect(eventText(second, 'Цель'), findsNothing);
+      h.failure = const OperationFailure(FailureCode.storageUnavailable);
+      await click(tester, 'Обновить ПО');
+      expect(eventText(first, 'Цель'), findsOneWidget);
+      h.failure = null;
+      await click(tester, 'Обновить ПО');
+      expect(eventText(first, 'Цель'), findsOneWidget);
+      final removed = h.repository.state.softwareEvents.remove(first)!;
+      await click(tester, 'Обновить ПО');
+      expect(event(first), findsNothing);
+      h.repository.state.softwareEvents[first] = removed;
+      await click(tester, 'Обновить ПО');
+      expect(eventText(first, 'Цель'), findsNothing);
+    },
+  );
+
+  testSoftwareWidgets('event history filters and profile reset disclosure', (
+    tester,
+  ) async {
+    final cardId = await seed(tester);
+    final id = seedEvent(softwareId: cardId);
+    await show(tester);
+    await toggleEvent(tester, id);
+    await toggle(tester, cardId);
+    await click(tester, 'История карточки');
+    expect(eventText(id, 'Цель'), findsNothing);
+    await toggleEvent(tester, id);
+    await click(tester, 'История хоста');
+    expect(eventText(id, 'Цель'), findsNothing);
+    await toggleEvent(tester, id);
+    final old = h.profile;
+    final other = ProfileView(
+      profileId: featureId(2),
+      revision: 1,
+      connectionRevision: 1,
+      displayName: 'Other',
+      host: old.host,
+      port: old.port,
+      username: old.username,
+      authKind: old.authKind,
+      hasCredential: true,
+      endpointId: old.endpointId,
+    );
+    h.repository.state.profiles[other.profileId] = Profile()
+      ..profileId = other.profileId
+      ..endpointId = other.endpointId
+      ..normalizedHost = other.host
+      ..username = other.username;
+    await show(tester, target: other);
+    expect(event(id), findsNothing);
+    await show(tester);
+    expect(eventText(id, 'Цель'), findsNothing);
+  });
+
+  testSoftwareWidgets(
+    'history pagination resets events independently of card pagination',
+    (tester) async {
+      for (var i = 0; i < 26; i++) {
+        await seed(tester, name: 'Page card $i');
+      }
+      h.repository.state.softwareEvents.clear();
+      final ids = [for (var i = 0; i < 26; i++) seedEvent(summary: 'Event $i')];
+      await show(tester);
+      await toggleEvent(tester, ids.last);
+      tester
+          .widgetList<DeckPagination>(find.byType(DeckPagination))
+          .first
+          .onPageChanged(1);
+      await tester.runAsync(() => featureTurns());
+      await tester.pumpAndSettle();
+      expect(eventText(ids.last, 'Цель'), findsOneWidget);
+      Future<void> pageHistory(int page) async {
+        tester
+            .widgetList<DeckPagination>(find.byType(DeckPagination))
+            .last
+            .onPageChanged(page);
+        await tester.runAsync(() => featureTurns());
+        await tester.pumpAndSettle();
+      }
+
+      await pageHistory(1);
+      expect(event(ids.last), findsNothing);
+      await toggleEvent(tester, ids.first);
+      await pageHistory(0);
+      expect(eventText(ids.last, 'Цель'), findsNothing);
+      await pageHistory(1);
+      expect(eventText(ids.first, 'Цель'), findsNothing);
+    },
+  );
+
+  testSoftwareWidgets(
+    'software table exposes columns and single selection without effects',
     (tester) async {
       final first = await seed(tester);
       final second = await seed(tester, name: 'Nginx');
       var consoleCalls = 0;
       await show(tester, console: () => consoleCalls++);
-      expect(find.text('Версия: Не указана'), findsNWidgets(2));
+      final table = tester.widget<DeckCollection<SoftwareCardView>>(
+        find.byType(DeckCollection<SoftwareCardView>),
+      );
+      expect(table.columns.map((column) => column.label), [
+        'Название',
+        'Версия',
+        'Служба',
+        'Хост',
+      ]);
+      expect(table.rows.map((row) => row.softwareId), [first, second]);
+      expect(find.text('Не указана'), findsNWidgets(4));
       expect(
         find.descendant(
           of: card(first),
@@ -219,7 +539,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Служба'), findsNothing);
+      expect(find.text('Данные'), findsNothing);
       expect(find.text('Изменить карточку'), findsNothing);
       final reads = h.authorizations;
       final revision = h.repository.state.settings.dataRevision;
@@ -227,13 +547,27 @@ void main() {
       await toggle(tester, first);
       expect(action(first, 'Изменить карточку'), findsOneWidget);
       expect(action(second, 'Изменить карточку'), findsNothing);
-      expect(find.text('Не указана'), findsOneWidget);
+      expect(
+        tester
+            .widgetList<DeckKeyValue>(
+              find.descendant(
+                of: cardPanel(first),
+                matching: find.byType(DeckKeyValue),
+              ),
+            )
+            .singleWhere((value) => value.label == 'Служба')
+            .value,
+        'Не указана',
+      );
       expect(find.text('Нет сведений'), findsNWidgets(2));
       await toggle(tester, second);
-      expect(find.text('Изменить карточку'), findsNWidgets(2));
-      await toggle(tester, first);
       expect(action(first, 'Изменить карточку'), findsNothing);
       expect(action(second, 'Изменить карточку'), findsOneWidget);
+      await toggle(tester, second);
+      expect(find.text('Изменить карточку'), findsNothing);
+      await toggle(tester, first);
+      await click(tester, 'Закрыть подробности');
+      expect(find.text('Изменить карточку'), findsNothing);
       expect(h.authorizations, reads);
       expect(h.repository.state.settings.dataRevision, revision);
       expect(h.repository.state.softwareEvents.length, events);
@@ -259,11 +593,17 @@ void main() {
       );
       await show(tester);
       expect(find.text(name), findsOneWidget);
-      expect(find.text('Версия: $version'), findsOneWidget);
+      expect(
+        find.descendant(of: card(id), matching: find.text(version)),
+        findsOneWidget,
+      );
       await toggle(tester, id);
       final values = tester
           .widgetList<DeckKeyValue>(
-            find.descendant(of: card(id), matching: find.byType(DeckKeyValue)),
+            find.descendant(
+              of: cardPanel(id),
+              matching: find.byType(DeckKeyValue),
+            ),
           )
           .toList();
       expect(
@@ -283,9 +623,18 @@ void main() {
         values.singleWhere((v) => v.label == 'Исходный хост').selectable,
         isTrue,
       );
-      expect(find.text('redis-server.service'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: cardPanel(id),
+          matching: find.text('redis-server.service'),
+        ),
+        findsOneWidget,
+      );
       final timestamp = tester.widget<DeckTimestamp>(
-        find.descendant(of: card(id), matching: find.byType(DeckTimestamp)),
+        find.descendant(
+          of: cardPanel(id),
+          matching: find.byType(DeckTimestamp),
+        ),
       );
       expect(timestamp.value!.isUtc, isTrue);
       expect(
@@ -300,16 +649,15 @@ void main() {
   );
 
   testSoftwareWidgets(
-    'keyboard toggles disclosure and exposes expanded semantics',
+    'keyboard selects software and exposes selected row semantics',
     (tester) async {
       final semantics = tester.ensureSemantics();
       try {
         final id = await seed(tester);
         await show(tester);
-        final labels = MaterialLocalizations.of(tester.element(details(id)));
         expect(
-          tester.getSemantics(details(id)),
-          isSemantics(hint: labels.expandedHint),
+          tester.getSemantics(card(id)),
+          isSemantics(hasSelectedState: true, isSelected: false),
         );
         // Focus the existing C19 interactive tile, without assuming a tab position.
         final focus = Focus.of(tester.element(details(id)));
@@ -319,8 +667,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(action(id, 'Изменить карточку'), findsOneWidget);
         expect(
-          tester.getSemantics(details(id)),
-          isSemantics(hint: labels.collapsedHint),
+          tester.getSemantics(card(id)),
+          isSemantics(hasSelectedState: true, isSelected: true),
         );
         expect(
           find.descendant(
@@ -333,8 +681,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(action(id, 'Изменить карточку'), findsNothing);
         expect(
-          tester.getSemantics(details(id)),
-          isSemantics(hint: labels.expandedHint),
+          tester.getSemantics(card(id)),
+          isSemantics(hasSelectedState: true, isSelected: false),
         );
       } finally {
         semantics.dispose();
@@ -436,8 +784,14 @@ void main() {
       );
       await tester.runAsync(() => featureTurns());
       await tester.pumpAndSettle();
-      expect(find.text('New name'), findsOneWidget);
-      expect(find.text('new-service'), findsOneWidget);
+      expect(
+        find.descendant(of: cardPanel(id), matching: find.text('New name')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardPanel(id), matching: find.text('new-service')),
+        findsOneWidget,
+      );
       final newId = await seed(tester, name: 'New card');
       await tester.runAsync(() => featureTurns());
       await tester.pumpAndSettle();
@@ -672,6 +1026,11 @@ void main() {
         'Изменён конфиг Redis',
       );
       await click(tester, 'Добавить сообщение');
+      final noteId = h.repository.state.softwareEvents.values
+          .singleWhere((e) => e.kind == 'note')
+          .eventId;
+      expect(eventText(noteId, ' · Сообщённый исход: unknown'), findsOneWidget);
+      await toggleEvent(tester, noteId);
       expect(
         h.repository.state.softwareEvents.values
             .singleWhere((e) => e.kind == 'note')
@@ -682,7 +1041,10 @@ void main() {
       expect(find.text('unknown'), findsOneWidget);
       expect(find.text('Пользователь'), findsWidgets);
       await click(tester, 'Удалить карточку');
-      expect(find.text('Изменён конфиг Redis'), findsOneWidget);
+      expect(
+        eventValue(tester, noteId, 'Сообщение').value,
+        'Изменён конфиг Redis',
+      );
       expect(find.text('История: Redis'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
     },
@@ -720,7 +1082,7 @@ void main() {
       expect(h.repository.state.softwareCards.values.single.configPaths, [
         '/etc/redis/redis.conf',
       ]);
-      expect(find.text('Версия: test-version'), findsOneWidget);
+      expect(find.text('test-version'), findsOneWidget);
       await toggle(
         tester,
         h.repository.state.softwareCards.values.single.softwareId,

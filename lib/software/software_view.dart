@@ -11,7 +11,7 @@ import 'software_models.dart';
 import 'software_owner.dart';
 import 'software_analysis.dart';
 
-/// C02/C03/C04/C05/C07/C08/C09/C10/C11/C12/C13/C16/C18/C19/C20/C28.
+/// C02/C03/C04/C05/C06/C07/C08/C09/C10/C11/C12/C13/C16/C18/C19/C20/C28.
 /// Shell navigation delegates to the existing C26 owner; no commands are generated.
 class SoftwareView extends StatefulWidget {
   const SoftwareView({
@@ -50,8 +50,8 @@ class _SoftwareViewState extends State<SoftwareView> {
   SoftwarePage? _cards, _history;
   OperationFailure? _loadError, _actionError;
   final _cardCursors = <String?>[null], _historyCursors = <String?>[null];
-  final _expandedCards = <String>{};
-  int _expansionEpoch = 0;
+  String? _selectedSoftwareId;
+  final _expandedEvents = <String>{};
   int _cardPage = 0, _historyPage = 0, _epoch = 0, _loadId = 0;
   String _query = '', _action = 'other', _outcome = 'unknown';
   String? _editing,
@@ -100,6 +100,7 @@ class _SoftwareViewState extends State<SoftwareView> {
       _cards = null;
       _history = null;
       _resetExpansion();
+      _resetEventExpansion();
       _actionError = null;
       _query = '';
       _search.clear();
@@ -128,6 +129,7 @@ class _SoftwareViewState extends State<SoftwareView> {
   Future<void> _load({bool reset = false}) async {
     if (reset) {
       if (_cardPage != 0) _resetExpansion();
+      if (_historyPage != 0) _resetEventExpansion();
       _cardPage = 0;
       _historyPage = 0;
       _cardCursors
@@ -160,9 +162,16 @@ class _SoftwareViewState extends State<SoftwareView> {
             .whereType<SoftwareCardView>()
             .map((card) => card.softwareId)
             .toSet();
-        _expandedCards.removeWhere((id) => !ids.contains(id));
+        if (!ids.contains(_selectedSoftwareId)) _selectedSoftwareId = null;
       }
-      if (values[1].ok) _history = values[1].value!.software as SoftwarePage;
+      if (values[1].ok) {
+        _history = values[1].value!.software as SoftwarePage;
+        final ids = _history!.items
+            .whereType<SoftwareEventView>()
+            .map((event) => event.eventId)
+            .toSet();
+        _expandedEvents.removeWhere((id) => !ids.contains(id));
+      }
     });
   }
 
@@ -307,6 +316,7 @@ class _SoftwareViewState extends State<SoftwareView> {
 
   void _historyFor(SoftwareCardView? card) {
     setState(() {
+      if (_historySoftwareId != card?.softwareId) _resetEventExpansion();
       _historySoftwareId = card?.softwareId;
       _historyName = card?.card.name;
       _note = false;
@@ -324,6 +334,7 @@ class _SoftwareViewState extends State<SoftwareView> {
     }
     setState(() {
       if (history) {
+        if (_historyPage != page) _resetEventExpansion();
         _historyPage = page;
       } else {
         if (_cardPage != page) _resetExpansion();
@@ -334,8 +345,11 @@ class _SoftwareViewState extends State<SoftwareView> {
   }
 
   void _resetExpansion() {
-    _expandedCards.clear();
-    _expansionEpoch++;
+    _selectedSoftwareId = null;
+  }
+
+  void _resetEventExpansion() {
+    _expandedEvents.clear();
   }
 
   String _time(int millis) {
@@ -360,30 +374,61 @@ class _SoftwareViewState extends State<SoftwareView> {
     }
   }
 
-  Widget _card(SoftwareCardView card) => DeckSurface(
-    key: ValueKey('software-card-${card.softwareId}'),
-    child: DeckExpander(
-      key: ValueKey((card.softwareId, _expansionEpoch)),
-      initiallyExpanded: _expandedCards.contains(card.softwareId),
-      onExpansionChanged: (expanded) => setState(() {
-        if (expanded) {
-          _expandedCards.add(card.softwareId);
-        } else {
-          _expandedCards.remove(card.softwareId);
-        }
-      }),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(card.card.name),
-          Text('Версия: ${card.card.version ?? 'Не указана'}'),
-          Text('${card.username}@${card.host}:${card.port}'),
-          if (!card.currentTarget)
-            const DeckStatus(label: 'Другой хост профиля'),
-          const Text('Подробности'),
+  void _selectSoftware(String id) => setState(() {
+    _selectedSoftwareId = _selectedSoftwareId == id ? null : id;
+  });
+
+  Widget _softwareTable(List<SoftwareCardView> cards) =>
+      DeckCollection<SoftwareCardView>(
+        rows: cards,
+        idOf: (card) => card.softwareId,
+        selectedIds: {if (_selectedSoftwareId != null) _selectedSoftwareId!},
+        columns: [
+          DeckColumn(
+            id: 'name',
+            label: 'Название',
+            value: (card) => card.card.name,
+          ),
+          DeckColumn(
+            id: 'version',
+            label: 'Версия',
+            value: (card) => card.card.version ?? 'Не указана',
+          ),
+          DeckColumn(
+            id: 'service',
+            label: 'Служба',
+            value: (card) => card.card.service ?? 'Не указана',
+          ),
+          DeckColumn(
+            id: 'host',
+            label: 'Хост',
+            value: (card) => '${card.username}@${card.host}:${card.port}',
+            builder: (context, card) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${card.username}@${card.host}:${card.port}'),
+                if (!card.currentTarget)
+                  const DeckStatus(label: 'Другой хост профиля'),
+              ],
+            ),
+          ),
         ],
-      ),
+        actions: (card) => [
+          DeckButton(
+            onPressed: () => _selectSoftware(card.softwareId),
+            child: const Text('Подробности'),
+          ),
+        ],
+      );
+
+  Widget _softwareDetails(SoftwareCardView card) => DeckSurface(
+    key: ValueKey('software-details-${card.softwareId}'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        DeckSectionHeader(title: 'Подробности: ${card.card.name}'),
+        DeckKeyValue(label: 'Название', value: card.card.name),
+        DeckKeyValue(label: 'Версия', value: card.card.version ?? 'Не указана'),
         DeckKeyValue(
           label: 'Исходный хост',
           value: '${card.username}@${card.host}:${card.port}',
@@ -434,9 +479,96 @@ class _SoftwareViewState extends State<SoftwareView> {
             ),
           ],
         ),
+        DeckButton(
+          onPressed: () => setState(() => _selectedSoftwareId = null),
+          child: const Text('Закрыть подробности'),
+        ),
       ],
     ),
   );
+  String _eventPreview(String summary) {
+    final normalized = summary.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) return 'Без текста';
+    final points = normalized.runes;
+    return points.length <= 160
+        ? normalized
+        : '${String.fromCharCodes(points.take(159))}…';
+  }
+
+  String _eventSource(SoftwareEventView event) =>
+      event.actorKind == 'ui' ? 'Пользователь' : 'MCP: ${event.clientId}';
+
+  String _eventTitle(SoftwareEventView event) =>
+      '${switch (event.kind) {
+        'created' => 'Карточка создана',
+        'updated' => 'Карточка изменена',
+        'deleted' => 'Карточка удалена',
+        _ => 'Сообщение',
+      }} · ${event.softwareName ?? 'Хост'}';
+
+  void _toggleEvent(String id) => setState(() {
+    if (!_expandedEvents.remove(id)) _expandedEvents.add(id);
+  });
+
+  Widget _event(SoftwareEventView event) => Column(
+    key: ValueKey('software-event-${event.eventId}'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      DeckListItem(
+        compact: true,
+        title: _eventTitle(event),
+        description: _eventPreview(event.summary),
+        statusLabel:
+            '${_eventSource(event)} · ${_time(event.createdAt)}${event.outcome == null ? '' : ' · Сообщённый исход: ${event.outcome}'}',
+        selected: _expandedEvents.contains(event.eventId),
+        onTap: () => _toggleEvent(event.eventId),
+        trailing: MergeSemantics(
+          child: Semantics(
+            expanded: _expandedEvents.contains(event.eventId),
+            child: DeckButton(
+              onPressed: () => _toggleEvent(event.eventId),
+              child: const Text('Подробности события'),
+            ),
+          ),
+        ),
+      ),
+      if (_expandedEvents.contains(event.eventId))
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DeckKeyValue(
+              label: 'Событие',
+              value: '${event.kind} · ${event.softwareName ?? 'Хост'}',
+            ),
+            DeckKeyValue(
+              label: 'Цель',
+              value: '${event.username}@${event.host}:${event.port}',
+              selectable: true,
+            ),
+            if (event.action != null)
+              DeckKeyValue(label: 'Действие', value: event.action!),
+            if (event.outcome != null)
+              DeckKeyValue(label: 'Сообщённый исход', value: event.outcome!),
+            if (event.changedFields.isNotEmpty)
+              DeckKeyValue(
+                label: 'Изменённые поля',
+                value: event.changedFields.join(', '),
+              ),
+            DeckKeyValue(label: 'Источник', value: _eventSource(event)),
+            DeckKeyValue(
+              label: 'Время события UTC',
+              value: _time(event.createdAt),
+            ),
+            DeckKeyValue(
+              label: 'Сообщение',
+              value: event.summary,
+              selectable: true,
+            ),
+          ],
+        ),
+    ],
+  );
+
   Widget _formWidget() => DeckFormSection(
     title: _editing == null ? 'Новая карточка ПО' : 'Изменение карточки ПО',
     description:
@@ -646,7 +778,11 @@ class _SoftwareViewState extends State<SoftwareView> {
           ),
         if (!_loading && cards.isNotEmpty && visible.isEmpty)
           const DeckCollectionState(state: DeckDataState.noResults),
-        for (final card in visible) _card(card),
+        if (visible.isNotEmpty) _softwareTable(visible),
+        for (final card in visible.where(
+          (card) => card.softwareId == _selectedSoftwareId,
+        ))
+          _softwareDetails(card),
         DeckPagination(
           page: _cardPage,
           hasMore: _cards?.nextCursor != null,
@@ -683,40 +819,7 @@ class _SoftwareViewState extends State<SoftwareView> {
         for (final event
             in _history?.items.whereType<SoftwareEventView>() ??
                 <SoftwareEventView>[])
-          DeckSurface(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DeckKeyValue(
-                  label: 'Событие',
-                  value: '${event.kind} · ${event.softwareName ?? 'Хост'}',
-                ),
-                DeckKeyValue(
-                  label: 'Цель',
-                  value: '${event.username}@${event.host}:${event.port}',
-                ),
-                if (event.action != null)
-                  DeckKeyValue(label: 'Действие', value: event.action!),
-                if (event.outcome != null)
-                  DeckKeyValue(
-                    label: 'Сообщённый исход',
-                    value: event.outcome!,
-                  ),
-                if (event.changedFields.isNotEmpty)
-                  DeckKeyValue(
-                    label: 'Изменённые поля',
-                    value: event.changedFields.join(', '),
-                  ),
-                DeckLogMessage(
-                  message: event.summary,
-                  source: event.actorKind == 'ui'
-                      ? 'Пользователь'
-                      : 'MCP: ${event.clientId}',
-                  eventTime: _time(event.createdAt),
-                ),
-              ],
-            ),
-          ),
+          _event(event),
         DeckPagination(
           page: _historyPage,
           hasMore: _history?.nextCursor != null,

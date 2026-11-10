@@ -323,3 +323,136 @@ T033, код после review не менялся. Review/fix loop заверш
 Все применимые этапы текущего редизайна завершены. Вывод ограничен unit/static
 scope; запуск продукта на чистой ОС и реальные SSH/Isar не доказаны.
 Коммит, публикация issues и релиз не выполнялись.
+
+## Компактные события — новый Spec Kit scope 2026-11-10
+
+Пользователь запросил компактные события, обновление спецификаций и цель пройти
+все этапы. Предыдущие completion/release evidence относятся к базе/карточкам,
+не к новому редизайну событий. Код на этапе подготовки пакета не менялся.
+
+Specify: FR-814, AC-816/817, SC-807. Plan/Research/Model: C09/C19/C18,
+локальный eventId lifecycle и presentation-only preview; новые runtime/API/
+зависимости/миграции не требуются. Tasks: добавлены T034–T036 к выполненной истории.
+Clarify: coverage scan scope/data/UX/accessibility/privacy/recovery/constraints/
+compatibility/completion — Clear; вопросов0, обязательных пробелов не обнаружено.
+Checklist: новый [compact-events](checklists/compact-events.md),6 reviewer-owned
+критериев качества; базовый requirements16/16 повторно оценён автором без изменения
+маркеров, custom checklist ожидает независимой оценки до Implement.
+Analyze: read-only сверка текущих spec/plan/tasks/constitution: 21FR/SC
+(14FR+7SC),36 tasks,coverage100%,ambiguities0,duplications0,critical0,
+unmapped tasks0,constitution conflicts0. Новая цепочка FR-814/SC-807 → T034–T036
+→ AC-816/817; остальные карты сохраняются. Analyze не редактировал артефакты.
+Prerequisites разрешили текущий пакет; .specify/feature.json указывает008,
+extensions.yml отсутствует, зарегистрированных before/after hooks нет.
+Constitution/taskstoissues не требуют действий: правила не меняются,
+публикация issues не запрошена. До Implement необходим fresh review пакета.
+
+Первое pre-implementation review /root/review_compact_events_specs выявило1 P2:
+SC-807/T034 ограничивали итог160, контракт давал160+«…». Подтверждено и закрыто
+T037: лимит160 включает многоточие, границы160/161 закреплены в spec/contract/
+quickstart и задаче исправления без удаления истории. Требуется fresh reviewer;
+исходные claims coverage scan о полной однозначности до исправления не являются
+окончательным approval. Общий task count теперь37; FR/SC21 и coverage100% сохраняются.
+
+## Уточнение выбора коллекций — 2026-11-10
+
+Пользователь отклонил отдельные accordion-карточки как основной вид коллекции
+и явно выбрал таблицу ПО с названием/версией/службой/хостом. Текущие FR-813,
+AC-814/815, SC-806, контракт/plan/research/model/quickstart обновлены напрямую:
+C06 для ПО с одной областью выбранной записи, C07 compact для списка событий
+с локальными подробностями C18 и действием C02. Новая T038 сохраняет выполненную
+историю T031–T033; новые event tasks034–036 продолжают ту же цель.
+Всего38 tasks,21FR/SC; цепочки FR-813→T038 и FR-814→T034–T036 полны.
+Analyze/Clarify повторно сверили новую спецификацию без обязательных пробелов.
+
+До уточнения подготовлены6 новых event functional tests (RED на старом UI),
+затем промежуточная C19 реализация:20 widget tests passed. Это промежуточное
+evidence, не приёмка выбранных C06/C07. Код ещё предстоит заменить на C06/C07.
+Предыдущее fresh spec review review_compact_events_specs_fixed после T037:
+замечаний0, preview лимит согласован, requirements16/16. После смены коллекций
+compact-events checklist возвращён reviewer на оценку, добавлен CHK007 о C06/C07.
+Нужен новый pre-implementation review изменённых решений.
+
+## C06/C07 — Implement и Converge
+
+/root/review_collections_specs завершил новый read-only review пакета: findings0,
+готов к реализации; явно одобрены все7 CHK compact-events и requirements16/16.
+Маркеры checklist применены по его разрешению; implement прочитал все4 чеклиста
+как gate без unchecked items (16+14+6+7). Предыдущий выбор C19 заменён по прямому
+указанию пользователя, без удаления выполненной истории.
+
+T034/T035/T038: SoftwareView теперь использует C06 DeckCollection с четырьмя
+колонками, одной выбранной записью и общей областью C18/C28/действий; события
+используют C07 compact/C02 и C18 подробности под строкой. Preview160 Unicode
+code points включает многоточие; данные не меняются. Отдельные состояния
+selectedSoftwareId/expandedEvents сохраняют refresh/reset/prune. Изменений
+SoftwareOwner, DTO, MCP, storage, runtime и API общих компонентов нет.
+
+Функциональная приёмка:20 software_view cases, включая6 новых event cases.
+Покрыты kind/source/UTC/outcome, границы160/161 с emoji, whitespace/full literal
+selectable текст, pointer по строке и button, Enter/Space/semantics, независимость
+событий и выбора ПО, refresh/error/new/disappeared id, history filter/page/profile
+reset и сохранение событий при смене страницы/фильтра ПО. Прежние CRUD/conflict/
+pending/old-target/history/console и поля таблицы/single selection/close сохранены.
+
+Реальные итоговые проверки кода:
+
+- `dart format --output=none --set-exit-if-changed .`: exit0,507 files,0 changed.
+- `flutter analyze`: exit0,No issues found.
+- `flutter test`: exit0,950 passed; `.local/software-events-full-test.log`.
+- `tools/check-test-boundaries.ps1`: exit0,117 Dart files.
+- Промежуточный `flutter test test/software/software_view_test.dart`: exit0,20 passed;
+  после добавления row-pointer и независимости card paging итоговый полный suite
+  выше также прошёл. Лог `.local/software-collections-widget.log`.
+- RED до реализации preview: exit1, отсутствие компактного summary;
+  `.local/software-events-red.log`. Последующие тестовые finder/semantics ошибки
+  исправлены до успешных итоговых checks.
+
+В рабочем дереве параллельно меняются тема/кнопки и shared design tests001 другим
+заданием; эти файлы не редактировались данным заданием и не входят в его review.
+Root checks выше проверили доступное рабочее дерево; не являются отдельной
+приёмкой или review параллельного scope001. Shared design tests этим заданием
+не запускались. Нет запуска продукта/real SSH/Isar/integration/layout/release gates.
+
+Converge после Implement: read-only source assessment текущих UI/owners/models/
+repository/router/composition и fake tests против14FR+17AC+7SC,38 задач и6
+принципов конституции: missing/partial/contradicts/unrequested=0. Новые buildable
+решения C06/single selection, C07/preview/lifecycle реализованы; T036 ещё ожидает
+заключения независимого reviewer. Converge не добавлял заголовков или задач:
+SHA256 tasks.md до/после `5D2108297EBC6B35FED7FE39923ED70E3DFF3FD2902E9918A7AA2DADAA6B217F`.
+Последующая отметка выполненных задач — отдельный implementation tracking.
+
+## C06/C07 — итоговый independent review и закрытие цели
+
+/root/review_collections_implementation завершил fresh read-only review кода,
+функциональных тестов, пакета008 и связанных owner/model/repository/router/
+composition/shared API границ: замечаний0, обязательных пробелов нет,
+реализация соответствует текущим требованиям. Reviewer независимо прочитал950
+passed в unit-логе и выполнил scope diff-check exit0; остальные checks оценил
+по переданным результатам. Параллельный scope001 исключён из заключения.
+
+По его явному разрешению административно закрыт T036, обновлён status.
+После review application code не менялся. Подтверждённый spec finding о preview
+закрыт T037 и двумя последующими чистыми review спецификации; финальный review
+кода новых findings не обнаружил. Review/fix loop завершён.
+
+Перед финальным review ссылки: exit0,394total166unique388OK0errors6excluded/
+2redirects; git diff --check exit0. Итоговая документационная проверка после
+закрытия статуса выполняется теми же командами.
+
+| Этап | Результат текущего scope |
+|---|---|
+| Specify | FR-813/814, AC-814–817, SC-806/807 согласованы с выбранными коллекциями |
+| Clarify | Явный ответ пользователя: таблица ПО с четырьмя полями; остальных обязательных вопросов0 |
+| Checklist | requirements16/16, compact-events7/7 одобрены независимыми reviewers; исторические checklist сохранены |
+| Plan / Research / Model / Contracts | C06/single selection ПО, C07/C02/C18 для событий, presentation-only lifecycle/preview |
+| Tasks | T034–T038 выполнены; вся история38/38 сохранена |
+| Analyze | 21FR/SC,38tasks,coverage100%, актуальных contradictions/ambiguities0 |
+| Implement | ПО — таблица, события — компактный список, полные подробности по запросу |
+| Converge | gaps0, дополнительных задач не потребовалось |
+| Checks | format507/0, analyze0, unit950, boundaries117, links/diff-check0 |
+| Independent review/fix | Итоговое review0 findings; подтверждённое замечание спеки закрыто |
+
+Все применимые этапы цели завершены в unit/static scope. Рабочие изменения этого
+задания не коммитились и не публиковались; релиз0.3.3 остаётся предыдущим выпуском.
+Реальная связка продукта на чистой ОС этим заключением не доказана.
