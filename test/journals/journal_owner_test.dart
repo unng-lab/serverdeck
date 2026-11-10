@@ -82,6 +82,86 @@ class JournalHarness {
 }
 
 void main() {
+  test(
+    'ensureService serializes duplicates and preserves paused source at quota',
+    () async {
+      final h = JournalHarness();
+      addTearDown(h.dispose);
+      final revision = h.repository.state.profiles['a']!.connectionRevision;
+      final results = await Future.wait([
+        h.owner.ensureService('a', 'a.service', connectionRevision: revision),
+        h.owner.ensureService('a', 'a.service', connectionRevision: revision),
+      ]);
+      expect(results.toSet().length, 1);
+      final id = results.first;
+      await h.repository.write((r) {
+        r.putJournalSource(r.journalSource(id)!..enabled = false);
+      });
+      for (var i = 0; i < 15; i++) {
+        await h.owner.add('a', JournalKind.journal, 's$i.service', 'S$i');
+      }
+      expect(
+        await h.owner.ensureService(
+          'a',
+          'a.service',
+          connectionRevision: revision,
+        ),
+        id,
+      );
+      expect(h.repository.state.journalSources[id]!.enabled, isFalse);
+      await expectLater(
+        h.owner.ensureService(
+          'a',
+          'extra.service',
+          connectionRevision: revision,
+        ),
+        throwsStateError,
+      );
+      await expectLater(
+        h.owner.ensureService(
+          'a',
+          'a.service',
+          connectionRevision: revision + 1,
+        ),
+        throwsStateError,
+      );
+      expect(h.owner.sources('a').length, 16);
+      expect(h.connection.requests, isEmpty);
+    },
+  );
+
+  test(
+    'ensureService guards delayed revision and rolls back failed save',
+    () async {
+      final h = JournalHarness();
+      addTearDown(h.dispose);
+      final revision = h.repository.state.profiles['a']!.connectionRevision;
+      final wait = Completer<void>();
+      h.repository.beforeWrite = () => wait.future;
+      final pending = h.owner.ensureService(
+        'a',
+        'a.service',
+        connectionRevision: revision,
+      );
+      final failed = expectLater(pending, throwsStateError);
+      h.repository.state.profiles['a']!.connectionRevision++;
+      wait.complete();
+      await failed;
+      h.repository.beforeWrite = null;
+      expect(h.owner.sources('a'), isEmpty);
+      h.repository.failCommit = true;
+      await expectLater(
+        h.owner.ensureService(
+          'a',
+          'a.service',
+          connectionRevision: revision + 1,
+        ),
+        throwsStateError,
+      );
+      expect(h.owner.sources('a'), isEmpty);
+    },
+  );
+
   test('new session reloads old server tail despite a saved cursor', () async {
     final h = JournalHarness();
     addTearDown(h.dispose);

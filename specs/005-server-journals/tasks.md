@@ -108,3 +108,9 @@ T038–T040 document the completed but rejected message-search interpretation. P
 - [x] T047 Выполнить обязательные format/analyze/test/boundaries/lychee и независимое review с fix loop.
 
 - [x] T048 Закрыть P2 первого независимого review: согласовать lifecycle FR-512 с FR-506/507 (initial tail200 и offline hour+tail200 после отзыва доверия). Выполнить до завершения T047.
+
+## Phase 15 — Service navigation from ПО
+
+- [X] T049 Реализовать JournalsOwner.ensureService с shared add path в lib/journals/journal_owner.dart: atomic profile/revision/duplicate lookup before quota, reuse without mutation; new enabled default. Unit test/journals/journal_owner_test.dart (FR-516; AC-516;008 AC-818).
+- [X] T050 Реализовать optional initialService в lib/journals/journal_view.dart с search/selection/error, request epoch, context и manual cancellation; unit test/journals/journal_view_test.dart. Не менять transport/caps/trust/connect (FR-516; AC-516).
+- [X] T051 Совместно с008 T041 выполнить mandatory unit/static/link проверки и независимый review/fix loop кода/пакетов; записать scope и реальные результаты, без layout/integration/release gates.

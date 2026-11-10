@@ -53,3 +53,8 @@ JournalView owns C05 DeckSearch controller and transient `trim().toLowerCase()` 
 ## Tail refinement 2026-11-10
 
 FR-506/507: новая SSH-сессия всегда читает tail200 без cursor/--since, даже при сохранённом checkpoint; последующие запросы после cursor ограничены200. Metadata recovery читает1. UI первоначально показывает200 и не утверждает отсутствие событий за час. Локальный projection и physical prune сохраняют последний час плюс последние200 на источник независимо от возраста; caps выше имеют приоритет. Правила относятся и к file-строкам, но файл по-прежнему начинает с EOF без backfill. Expiry deadline относится только к записям вне хвоста и fragmentAt; удаление/revision reset по-прежнему убирают detail немедленно.
+
+## Переход из списка ПО
+
+Следовать [service-logs008](../../008-host-software/contracts/service-logs.md).
+Это внутренний UI/owner контракт, без изменения transport/read protocol/store.

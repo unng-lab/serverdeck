@@ -194,3 +194,25 @@ C18 для полного selectable текста и метаданных под
 общие компоненты, темы и каталог не меняются, shared design gate не требуется.
 Порядок: T034 (tests RED) → T035 (C07 и GREEN) → T038 (таблица ПО и tests)
 → T036 (обязательные checks и review). T037 — уже выполненное исправление спеки.
+
+## Переход к логам службы — 2026-11-10
+
+Обновить текущие C06 columns до name/version/service, перенести C10 old-target
+в name builder, сохранить исходный адрес в C18 details. SoftwareView получает
+optional ValueChanged<String> onLogs и проверяет unit через validateJournalTarget
+из005, currentTarget, pending и доступность callback. Row C02 «Логи» передаёт
+точную строку service, без shell или изменения owner ПО.
+ProfileViewPanel связывает callback с section1 и transient initialService,
+ограниченным profileId/connectionRevision; ручной выбор вкладки и retire workspace
+сбрасывают intent. JournalView принимает optional initialService, ставит local
+search и выбирает результат JournalsOwner.ensureService. Init/didUpdate/context
+и локальный request epoch защищают async-ответы; manual source/search отменяют
+ожидание автоматического выбора. Устаревший ответ не меняет UI.
+JournalsOwner.ensureService атомарно проверяет ожидаемую connectionRevision,
+переиспользует journal(profileId,exact unit) до quota проверки либо создаёт новый
+через общий add path. Enabled/revision/name/payload существующего источника не
+меняются. Новые — обычный enabled=true source с текущими caps и read-only collector.
+Контракт: [service-logs](contracts/service-logs.md); связанный scope005 обновляется.
+Новых storage/MCP schemas, зависимостей, сортировки или общих компонентов нет.
+T039–T041: implementation/functional tests/checks+independent review. Только unit
+fakes данных/действий, без layout/integration acceptance.

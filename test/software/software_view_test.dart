@@ -122,6 +122,7 @@ void main() {
     WidgetTester tester, {
     Future<void> Function(String)? copyText,
     VoidCallback? console,
+    ValueChanged<String>? logs,
     ProfileView? target,
     bool settle = true,
   }) async {
@@ -138,6 +139,7 @@ void main() {
               newId: h.newId,
               copyText: copyText,
               onConsole: console,
+              onLogs: logs,
             ),
           ),
         ),
@@ -187,9 +189,12 @@ void main() {
       find.descendant(of: card(id), matching: find.text('Подробности'));
 
   Future<void> toggle(WidgetTester tester, String id) async {
-    final target = details(id);
-    await tester.ensureVisible(target);
-    await tester.tap(target);
+    final table = tester.widget<DeckCollection<SoftwareCardView>>(
+      find.byType(DeckCollection<SoftwareCardView>),
+    );
+    final row = table.rows.singleWhere((row) => row.softwareId == id);
+    final open = table.actions!(row).whereType<DeckButton>().first;
+    open.onPressed!();
     await tester.pumpAndSettle();
   }
 
@@ -247,6 +252,59 @@ void main() {
             find.descendant(of: event(id), matching: find.byType(DeckKeyValue)),
           )
           .singleWhere((value) => value.label == label);
+
+  testSoftwareWidgets(
+    'logs passes exact valid unit and explains unavailable cases',
+    (tester) async {
+      final units = <String>[];
+      final id = await seed(
+        tester,
+        input: SoftwareCardInput(
+          name: 'Redis',
+          version: null,
+          service: 'redis@main.service',
+          dataPaths: [],
+          configPaths: [],
+        ),
+      );
+      await show(tester, logs: units.add);
+      DeckButton button() =>
+          tester.widget<DeckButton>(find.byKey(ValueKey('software-logs-$id')));
+      expect(button().onPressed, isNotNull);
+      button().onPressed!();
+      expect(units, ['redis@main.service']);
+      expect(h.repository.state.softwareEvents.length, 1);
+      await show(tester);
+      expect(button().onPressed, isNull);
+      expect(button().disabledReason, 'Журналы недоступны');
+      h.repository.state.softwareCards[id]!.service = 'redis; rm -rf /';
+      await show(tester, logs: units.add);
+      await click(tester, 'Обновить ПО');
+      expect(button().onPressed, isNull);
+      expect(button().disabledReason, contains('.service'));
+      h.repository.state.softwareCards[id]!.service = null;
+      await click(tester, 'Обновить ПО');
+      expect(button().disabledReason, 'Служба не указана');
+      h.repository.state.profiles[profile]!.endpointId = '1' * 64;
+      await click(tester, 'Обновить ПО');
+      expect(button().disabledReason, 'Карточка относится к другому хосту');
+      expect(
+        find.descendant(
+          of: card(id),
+          matching: find.text('Другой хост профиля'),
+        ),
+        findsOneWidget,
+      );
+      await toggle(tester, id);
+      expect(
+        find.descendant(
+          of: cardPanel(id),
+          matching: find.text('root@server.invalid:22'),
+        ),
+        findsWidgets,
+      );
+    },
+  );
 
   testSoftwareWidgets(
     'event summary covers kinds, author, UTC and reported outcomes',
@@ -521,23 +579,25 @@ void main() {
         'Название',
         'Версия',
         'Служба',
-        'Хост',
       ]);
       expect(table.rows.map((row) => row.softwareId), [first, second]);
-      expect(find.text('Не указана'), findsNWidgets(4));
+      for (final row in table.rows) {
+        expect(table.columns[1].value(row), 'Не указана');
+        expect(table.columns[2].value(row), 'Не указана');
+      }
       expect(
         find.descendant(
           of: card(first),
           matching: find.text('root@server.invalid:22'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(
           of: card(second),
           matching: find.text('root@server.invalid:22'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.text('Данные'), findsNothing);
       expect(find.text('Изменить карточку'), findsNothing);
@@ -713,6 +773,11 @@ void main() {
       ]) {
         expect(tester.widget<DeckButton>(action(id, label)).onPressed, isNull);
       }
+      final logsButton = tester.widget<DeckButton>(
+        find.byKey(ValueKey('software-logs-$id')),
+      );
+      expect(logsButton.onPressed, isNull);
+      expect(logsButton.disabledReason, 'Операция выполняется');
       tester.widget<DeckButton>(action(id, 'Открыть консоль')).onPressed!();
       expect(consoleCalls, 1);
     } finally {

@@ -9,3 +9,10 @@
 5. `lychee "specs/**/*.md"`; независимое ревью пакета до реализации и fresh ревью кода после checks, цикл fixes/checks/review.
 
 Ожидания: [SC-501–505](spec.md#measurable-outcomes), [контракт](contracts/journals.md). Unit результаты не доказывают работу всей связки на чистой ОС. Реальные результаты записываются после запуска проверок.
+
+## Service navigation unit cases
+
+Проверить ensureService reuse/create/concurrent/quota/stale revision на fake store,
+initialService selection/search/error/manual/context lifecycle на JournalView
+с JournalHarness. Существующий paused source остаётся paused, никаких auto-connect
+или discovery. Acceptance — FR-516/AC-516 и008 AC-818.

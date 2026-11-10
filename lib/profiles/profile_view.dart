@@ -51,6 +51,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
   _VerificationLease? _verification;
   final _ownedRoutes = <Route<dynamic>, NavigatorState>{};
   int _section = 0;
+  (String, int, String)? _journalIntent;
   static const _sections = [
     'ПО',
     'Журналы',
@@ -139,6 +140,7 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
   }
 
   void _retireWorkspace() {
+    _journalIntent = null;
     _navigationGeneration++;
     _onboarding = false;
     _verification?.close(
@@ -749,7 +751,10 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 Icons.tune,
               ],
               selected: _section,
-              onSelected: (v) => setState(() => _section = v),
+              onSelected: (v) => setState(() {
+                _journalIntent = null;
+                _section = v;
+              }),
             ),
             const SizedBox(height: 16),
             if (_section == 0 && widget.software != null)
@@ -759,6 +764,24 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 actor: widget.controller.actor,
                 profile: d.profile,
                 newId: widget.controller.newId,
+                onLogs: widget.journals == null
+                    ? null
+                    : (unit) {
+                        final current = widget.controller.details?.profile;
+                        if (!mounted ||
+                            current?.profileId != d.profile.profileId ||
+                            current?.connectionRevision !=
+                                d.profile.connectionRevision)
+                          return;
+                        setState(() {
+                          _journalIntent = (
+                            d.profile.profileId,
+                            d.profile.connectionRevision,
+                            unit,
+                          );
+                          _section = 1;
+                        });
+                      },
                 onConsole: widget.consoles == null
                     ? null
                     : () => setState(() => _section = 4),
@@ -771,6 +794,11 @@ class _ProfileViewPanelState extends State<ProfileViewPanel> {
                 owner: widget.journals!,
                 profileId: d.profile.profileId,
                 connectionRevision: d.profile.connectionRevision,
+                initialService:
+                    _journalIntent?.$1 == d.profile.profileId &&
+                        _journalIntent?.$2 == d.profile.connectionRevision
+                    ? _journalIntent?.$3
+                    : null,
               )
             else if (_section == 4 && widget.consoles != null)
               ConsoleView(

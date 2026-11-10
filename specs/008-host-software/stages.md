@@ -456,3 +456,20 @@ passed в unit-логе и выполнил scope diff-check exit0; осталь
 Все применимые этапы цели завершены в unit/static scope. Рабочие изменения этого
 задания не коммитились и не публиковались; релиз0.3.3 остаётся предыдущим выпуском.
 Реальная связка продукта на чистой ОС этим заключением не доказана.
+
+## Три колонки ПО и переход «Логи» — 2026-11-10
+
+По запросу пользователя колонка Хост убрана; адрес сохраняется в подробностях,
+предупреждение другой цели — у имени. Новые008 FR-815/AC-818 и005 FR-516/AC-516
+задают C02 Логи → вкладка Журналы того же профиля и точной systemd-службы.
+Shared add path атомарно reuse/create, current connectionRevision, прежняя пауза,
+caps, trust/SSH lifecycle и отсутствие auto-connect соблюдены. Async UI intent
+защищён epoch/profile/revision/owner, manual interaction отменяет поздний выбор.
+
+T039–T041008 и T049–T051005 выполнены, история предыдущих задач сохранена.
+Preimpl review /root/review_service_logs_specs и fresh code/spec review
+/root/review_service_logs_implementation завершены: findings0 в обоих.
+Root checks: format508files/0changes, analyze0, unit961 passed, boundaries118,
+lychee401/0 перед code review, diff-check0. Только unit/static, без product/
+real SSH/Isar/integration/layout/release проверок. После review код не менялся.
+Полный scope, сценарии и ограничения: [evidence](reviews/service-logs.md).

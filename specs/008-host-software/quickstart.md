@@ -52,3 +52,12 @@ owner/domain/SSH эффектов; refresh сохраняет оставшиес
 сбрасывают; фильтр списка ПО не сбрасывает события. История по-прежнему paging25,
 latest-first и сохраняется после удаления карточки в рамках retention.
 Команды и fresh review — обязательный gate выше; только unit/static scope.
+
+## Логи службы — AC-818
+
+На fakes выбрать строку текущего ПО с valid .service, нажать «Логи» и проверить
+callback/вкладку/initialService. В005 проверить существующий paused источник,
+создание отсутствующего без discovery/auto-connect, повтор/concurrent intent,
+quota/write failure, invalid unit, stale profile/revision/owner и manual selection.
+Три колонки ПО; исходный адрес в details, другая цель заметна у имени и не открывает
+журнал текущего профиля. Полные записи/пауза/ошибки/offline принадлежат005.

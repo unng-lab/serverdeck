@@ -273,15 +273,52 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
     JournalKind kind,
     String target,
     String name,
-  ) async {
+  ) => _add(profileId, kind, target, name);
+
+  Future<String> ensureService(
+    String profileId,
+    String unit, {
+    required int connectionRevision,
+  }) => _add(
+    profileId,
+    JournalKind.journal,
+    unit,
+    String.fromCharCodes(unit.runes.take(80)),
+    expectedRevision: connectionRevision,
+    reuse: true,
+  );
+
+  Future<String> _add(
+    String profileId,
+    JournalKind kind,
+    String target,
+    String name, {
+    int? expectedRevision,
+    bool reuse = false,
+  }) async {
     _ensureOpen();
     validateJournalTarget(kind, target);
-    final label = validateJournalName(name), id = newId();
+    final label = validateJournalName(name);
+    late String id;
     await repository.write((r) {
       _ensureOpen();
       final profile = r.profile(profileId);
       if (profile == null) throw StateError('Сервер больше не существует');
+      if (expectedRevision != null &&
+          profile.connectionRevision != expectedRevision) {
+        throw StateError('Контекст сервера изменился');
+      }
       final all = r.journalSources();
+      if (reuse) {
+        for (final source in all) {
+          if (source.profileId == profileId &&
+              source.kind == kind.name &&
+              source.target == target) {
+            id = source.sourceId;
+            return;
+          }
+        }
+      }
       if (all.length >= 1024 ||
           all.where((s) => s.profileId == profileId).length >= 16)
         throw StateError('Достигнут предел источников журналов');
@@ -292,6 +329,7 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
             s.target == target,
       ))
         throw ArgumentError('Источник уже добавлен');
+      id = newId();
       r.putJournalSource(
         JournalSource()
           ..sourceId = id

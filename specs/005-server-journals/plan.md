@@ -55,3 +55,13 @@ Search refinement FR-515 (user correction) reuses C05 in lib/journals/journal_vi
 Нет исключений. Per-source JSON — bounded transaction unit; глобальная очистка в каждой записи. UI не владеет SSH/Isar.
 
 Уточнение 2026-11-10: FR-506/507 реализуются общим retainedJournalEntries для projection/prune; expiry timer учитывает только записи вне хвоста200 и файловый prefix. Новый сеанс заново читает journal tail200 без --since, затем cursor200. Wire/schema v1 и prerequisites не меняются.
+
+## Service navigation from008
+
+JournalView optional initialService задаёт поиск и async selection; request epoch
+и profile/revision/owner guards запрещают поздний выбор после смены контекста
+или ручного выбора/поиска. JournalsOwner.ensureService(profileId,unit,
+connectionRevision) использует общий add path с atomic expected revision/reuse.
+Существующий источник возвращается до quota проверки, не меняя enabled/payload;
+параллельные запросы переиспользуют одну запись. Подробный UI/lifecycle/failure
+контракт — [008](../008-host-software/contracts/service-logs.md). Только fake unit tests.

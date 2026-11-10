@@ -7,6 +7,7 @@ import '../domain/actor.dart';
 import '../domain/models.dart';
 import '../domain/error_presentation.dart';
 import '../ui/deck_components.dart';
+import '../journals/journal_models.dart';
 import 'software_models.dart';
 import 'software_owner.dart';
 import 'software_analysis.dart';
@@ -21,6 +22,7 @@ class SoftwareView extends StatefulWidget {
     required this.profile,
     required this.newId,
     this.onConsole,
+    this.onLogs,
     this.copyText,
   });
   final SoftwareOwner owner;
@@ -28,6 +30,7 @@ class SoftwareView extends StatefulWidget {
   final ProfileView profile;
   final String Function() newId;
   final VoidCallback? onConsole;
+  final ValueChanged<String>? onLogs;
   final Future<void> Function(String)? copyText;
   @override
   State<SoftwareView> createState() => _SoftwareViewState();
@@ -388,6 +391,14 @@ class _SoftwareViewState extends State<SoftwareView> {
             id: 'name',
             label: 'Название',
             value: (card) => card.card.name,
+            builder: (context, card) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(card.card.name),
+                if (!card.currentTarget)
+                  const DeckStatus(label: 'Другой хост профиля'),
+              ],
+            ),
           ),
           DeckColumn(
             id: 'version',
@@ -399,27 +410,36 @@ class _SoftwareViewState extends State<SoftwareView> {
             label: 'Служба',
             value: (card) => card.card.service ?? 'Не указана',
           ),
-          DeckColumn(
-            id: 'host',
-            label: 'Хост',
-            value: (card) => '${card.username}@${card.host}:${card.port}',
-            builder: (context, card) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${card.username}@${card.host}:${card.port}'),
-                if (!card.currentTarget)
-                  const DeckStatus(label: 'Другой хост профиля'),
-              ],
-            ),
-          ),
         ],
         actions: (card) => [
           DeckButton(
             onPressed: () => _selectSoftware(card.softwareId),
             child: const Text('Подробности'),
           ),
+          DeckButton(
+            key: ValueKey('software-logs-${card.softwareId}'),
+            onPressed: _logsReason(card) == null
+                ? () => widget.onLogs!(card.card.service!)
+                : null,
+            disabledReason: _logsReason(card),
+            child: const Text('Логи'),
+          ),
         ],
       );
+
+  String? _logsReason(SoftwareCardView card) {
+    if (!card.currentTarget) return 'Карточка относится к другому хосту';
+    if (_pending) return 'Операция выполняется';
+    if (card.card.service == null || card.card.service!.isEmpty) {
+      return 'Служба не указана';
+    }
+    try {
+      validateJournalTarget(JournalKind.journal, card.card.service!);
+    } on ArgumentError {
+      return 'Укажите systemd unit с расширением .service';
+    }
+    return widget.onLogs == null ? 'Журналы недоступны' : null;
+  }
 
   Widget _softwareDetails(SoftwareCardView card) => DeckSurface(
     key: ValueKey('software-details-${card.softwareId}'),

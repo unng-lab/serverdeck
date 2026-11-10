@@ -20,10 +20,12 @@ class JournalView extends StatefulWidget {
     required this.owner,
     required this.profileId,
     required this.connectionRevision,
+    this.initialService,
   });
   final JournalsOwner owner;
   final String profileId;
   final int connectionRevision;
+  final String? initialService;
   @override
   State<JournalView> createState() => _JournalViewState();
 }
@@ -33,12 +35,52 @@ class _JournalViewState extends State<JournalView> {
   final _search = TextEditingController();
   String _query = '';
   int _limit = 200;
+  int _serviceEpoch = 0;
+  @override
+  void initState() {
+    super.initState();
+    _openInitialService();
+  }
+
+  void _openInitialService() {
+    final epoch = ++_serviceEpoch,
+        owner = widget.owner,
+        profile = widget.profileId,
+        revision = widget.connectionRevision,
+        unit = widget.initialService;
+    if (unit == null) return;
+    _selected = null;
+    _error = null;
+    _search.text = unit;
+    _query = unit.toLowerCase();
+    bool current() =>
+        mounted &&
+        epoch == _serviceEpoch &&
+        identical(widget.owner, owner) &&
+        widget.profileId == profile &&
+        widget.connectionRevision == revision;
+    unawaited(() async {
+      try {
+        final id = await owner.ensureService(
+          profile,
+          unit,
+          connectionRevision: revision,
+        );
+        if (current()) setState(() => _selectSource(id));
+      } catch (e) {
+        if (current()) setState(() => _error = _failure(e));
+      }
+    }());
+  }
+
   void _selectSource(String id) {
+    _serviceEpoch++;
     _selected = id;
     _limit = 200;
   }
 
   void _changeSearch(String value) => setState(() {
+    _serviceEpoch++;
     _query = value.trim().toLowerCase();
   });
   final _routes = <(DialogRoute<void>, NavigatorState)>{};
@@ -66,9 +108,12 @@ class _JournalViewState extends State<JournalView> {
   @override
   void didUpdateWidget(covariant JournalView old) {
     super.didUpdateWidget(old);
-    if (old.profileId != widget.profileId ||
+    final contextChanged =
+        old.profileId != widget.profileId ||
         old.owner != widget.owner ||
-        old.connectionRevision != widget.connectionRevision) {
+        old.connectionRevision != widget.connectionRevision;
+    if (contextChanged) {
+      _serviceEpoch++;
       _closeRoutes();
       _selected = null;
       _search.clear();
@@ -76,10 +121,14 @@ class _JournalViewState extends State<JournalView> {
       _error = null;
       _limit = 200;
     }
+    if (contextChanged || old.initialService != widget.initialService) {
+      _openInitialService();
+    }
   }
 
   @override
   void dispose() {
+    _serviceEpoch++;
     _closeRoutes();
     _search.dispose();
     super.dispose();

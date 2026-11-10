@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serverdeck/journals/journal_models.dart';
@@ -9,12 +11,17 @@ import 'package:serverdeck/ui/deck_components.dart';
 
 import 'journal_owner_test.dart' show JournalHarness;
 
-Widget screen(JournalHarness h, {String profile = 'a'}) => MaterialApp(
+Widget screen(
+  JournalHarness h, {
+  String profile = 'a',
+  String? initialService,
+}) => MaterialApp(
   theme: BrandTheme.dark,
   home: Scaffold(
     body: SingleChildScrollView(
       child: JournalView(
         owner: h.owner,
+        initialService: initialService,
         profileId: profile,
         connectionRevision:
             h.repository.state.profiles[profile]?.connectionRevision ?? 0,
@@ -68,6 +75,100 @@ Future<String> prepareDetail(
 }
 
 void main() {
+  testWidgets('late service response cannot select logs after profile switch', (
+    tester,
+  ) async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    final wait = Completer<void>();
+    h.repository.beforeWrite = () => wait.future;
+    await tester.pumpWidget(screen(h, initialService: 'old.service'));
+    await tester.pumpWidget(screen(h, profile: 'b'));
+    h.repository.beforeWrite = null;
+    wait.complete();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Источник: old.service'), findsNothing);
+    expect(find.text('Действие не выполнено'), findsNothing);
+    expect(
+      tester.widget<DeckSearch>(find.byType(DeckSearch)).controller.text,
+      isEmpty,
+    );
+  });
+  testWidgets('service intent selects paused source and fills service search', (
+    tester,
+  ) async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    final id = await prepareDetail(tester, h);
+    await tester.pumpWidget(screen(h, initialService: 'a.service'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Источник: A'), findsOneWidget);
+    expect(h.repository.state.journalSources[id]!.enabled, isFalse);
+    expect(
+      tester.widget<DeckSearch>(find.byType(DeckSearch)).controller.text,
+      'a.service',
+    );
+    expect(h.owner.sources('a').length, 1);
+  });
+
+  testWidgets(
+    'new service intent creates one source without discovery and reports invalid unit',
+    (tester) async {
+      final h = JournalHarness();
+      addTearDown(h.dispose);
+      await tester.pumpWidget(screen(h, initialService: 'new.service'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Источник: new.service'), findsOneWidget);
+      expect(h.owner.sources('a').single.target, 'new.service');
+      expect(h.connection.requests, isEmpty);
+      await tester.pumpWidget(screen(h, initialService: 'bad;command'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Действие не выполнено'), findsOneWidget);
+      expect(find.text('Источник: new.service'), findsNothing);
+      expect(h.owner.sources('a').length, 1);
+    },
+  );
+
+  testWidgets('manual search supersedes a delayed service selection', (
+    tester,
+  ) async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    final wait = Completer<void>();
+    h.repository.beforeWrite = () => wait.future;
+    await tester.pumpWidget(screen(h, initialService: 'late.service'));
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(DeckSearch),
+        matching: find.byType(TextField),
+      ),
+      'manual',
+    );
+    h.repository.beforeWrite = null;
+    wait.complete();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Источник: late.service'), findsNothing);
+    expect(
+      tester.widget<DeckSearch>(find.byType(DeckSearch)).controller.text,
+      'manual',
+    );
+  });
+
   testWidgets(
     'open detail keeps quiet source payload after the hour boundary',
     (tester) async {
