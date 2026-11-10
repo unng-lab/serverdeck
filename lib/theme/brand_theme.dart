@@ -134,6 +134,23 @@ abstract final class BrandTheme {
   static final light = _create(Brightness.light, BrandColors.light);
   static final dark = _create(Brightness.dark, BrandColors.dark);
 
+  /// Override only appearance so the caller's theme retains motion and geometry.
+  static ButtonStyle dangerButtonStyle(BuildContext context) {
+    final colors = Theme.of(context).extension<BrandColors>()!;
+    return ButtonStyle(
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            colors[states.contains(WidgetState.disabled)
+                ? 'disabled'
+                : 'error'],
+      ),
+      backgroundBuilder: (context, states, child) => CustomPaint(
+        painter: _ButtonPainter(colors, _ButtonKind.danger, states),
+        child: child,
+      ),
+    );
+  }
+
   static ThemeData _create(Brightness brightness, BrandColors colors) {
     final text = TextTheme(
       displayLarge: BrandTypography.title,
@@ -209,7 +226,7 @@ abstract final class BrandTheme {
         ),
       ),
       menuButtonTheme: MenuButtonThemeData(
-        style: _button(colors, _ButtonKind.text),
+        style: _button(colors, _ButtonKind.plain),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith(
@@ -324,7 +341,7 @@ abstract final class BrandTheme {
       iconButtonTheme: IconButtonThemeData(
         style: _button(
           colors,
-          _ButtonKind.text,
+          _ButtonKind.plain,
         ).copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.all(12))),
       ),
       cardTheme: CardThemeData(
@@ -445,9 +462,11 @@ abstract final class BrandTheme {
           if (states.contains(WidgetState.disabled)) return colors['disabled'];
           if (states.contains(WidgetState.error)) return colors['text'];
           if (states.contains(WidgetState.selected)) return colors['text'];
-          return kind == _ButtonKind.filled
-              ? colors['onAccent']
-              : colors['text'];
+          return switch (kind) {
+            _ButtonKind.filled => colors['onAccent'],
+            _ButtonKind.text => colors['accent'],
+            _ => colors['text'],
+          };
         }),
         backgroundBuilder: (context, states, child) => CustomPaint(
           painter: _ButtonPainter(colors, kind, states),
@@ -456,7 +475,7 @@ abstract final class BrandTheme {
       );
 }
 
-enum _ButtonKind { filled, outlined, text }
+enum _ButtonKind { filled, outlined, text, plain, danger }
 
 /// Reserves four pixels inside the hit area. The transparent gap exposes the
 /// actual adjacent surface, including when a button is placed on a card.
@@ -476,35 +495,48 @@ class _ButtonPainter extends CustomPainter {
     final disabled = states.contains(WidgetState.disabled);
     final selected = states.contains(WidgetState.selected);
     final error = states.contains(WidgetState.error);
-    final hovered =
-        states.contains(WidgetState.hovered) ||
-        states.contains(WidgetState.pressed);
+    final pressed = states.contains(WidgetState.pressed) && !disabled;
+    final hovered = states.contains(WidgetState.hovered);
     final Color fill;
     if (selected) {
       fill = colors['selected'];
     } else if (disabled || error) {
       fill = colors['raised'];
+    } else if (pressed && kind != _ButtonKind.plain) {
+      fill = colors[kind == _ButtonKind.filled ? 'accentHover' : 'selected'];
     } else if (kind == _ButtonKind.filled) {
       fill = colors[hovered ? 'accentHover' : 'accent'];
+    } else if (kind == _ButtonKind.danger) {
+      fill = colors['surface'];
+    } else if (kind == _ButtonKind.outlined) {
+      fill = colors[hovered ? 'hover' : 'surface'];
+    } else if (kind == _ButtonKind.text) {
+      fill = Colors.transparent;
     } else {
-      fill = hovered ? colors['hover'] : Colors.transparent;
+      fill = hovered || pressed ? colors['hover'] : Colors.transparent;
     }
     canvas.drawRRect(control, Paint()..color = fill);
-    if (kind == _ButtonKind.outlined || disabled || error || selected) {
+    if (kind == _ButtonKind.outlined ||
+        kind == _ButtonKind.danger ||
+        disabled ||
+        error ||
+        selected ||
+        (pressed && kind != _ButtonKind.plain)) {
+      final borderColor = disabled
+          ? colors['border']
+          : error || kind == _ButtonKind.danger
+          ? colors['error']
+          : pressed && kind == _ButtonKind.filled
+          ? colors['onAccent']
+          : kind == _ButtonKind.text && !selected
+          ? Colors.transparent
+          : colors['control'];
+      final borderWidth = pressed && kind != _ButtonKind.plain ? 2.0 : 1.0;
       final paint = Paint()
-        ..color = colors[error ? 'error' : 'control']
+        ..color = borderColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1;
-      if (disabled) {
-        final path = Path()..addRRect(control.deflate(0.5));
-        for (final metric in path.computeMetrics()) {
-          for (double offset = 0; offset < metric.length; offset += 7) {
-            canvas.drawPath(metric.extractPath(offset, offset + 4), paint);
-          }
-        }
-      } else {
-        canvas.drawRRect(control.deflate(0.5), paint);
-      }
+        ..strokeWidth = borderWidth;
+      canvas.drawRRect(control.deflate(borderWidth / 2), paint);
     }
     if (states.contains(WidgetState.focused)) {
       canvas.drawRRect(

@@ -61,3 +61,8 @@
 ## C26 terminal extension
 
 - [x] R020 Добавить lib/ui/deck_terminal.dart терминальный вариант C26 на готовом engine по ../007-server-console/contracts/terminal.md; update docs/design/components/registry.json,tool/component_catalog/examples.dart,synthetic test_design/components/terminal_test.dart. Связано007/T002/T015; shared design checks только001,mandatoryformat/analyze/unit/links иindependentreview вместе007; никакихfeaturelayout/captures.
+
+## C02 — соответствие текущему HTML-каталогу, 2026-11-10
+
+- [x] R021 Устранить двойную рамку danger в общем DeckButton: единственный painter рисует error-рамку, native side остаётся none; сохранить callbacks, guard, inherited motion/geometry и отдельное focus-кольцо. Текстовый вариант использует accent, icon/menu сохраняют нейтральный foreground.
+- [x] R022 Закрыть замечания независимого ревью C02: источник оформления — текущие [правила HTML-каталога](../../docs/design/source/components.css) вместе с [базовыми стилями](../../docs/design/source/style.css), с учётом порядка CSS. Secondary default/focus — surface; hover secondary — hover, danger — surface, text — transparent. Pressed — selected и рамка 2 px, кроме primary (accentHover/onAccent); у text рамка прозрачная. Disabled/pending — raised/disabled и одна сплошная рамка border согласно текущему HTML, без прежнего пунктира. Проверить четыре варианта в обеих темах и шести состояниях в test_design/components/button_appearance_test.dart; никаких feature-screen layout/captures.

@@ -84,10 +84,7 @@ class _DeckButtonState extends State<DeckButton> {
         autofocus: widget.autofocus,
         onPressed: callback,
         style: widget.kind == DeckButtonKind.danger
-            ? OutlinedButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-                side: BorderSide(color: Theme.of(context).colorScheme.error),
-              ).merge(widget.style)
+            ? BrandTheme.dangerButtonStyle(context).merge(widget.style)
             : widget.style,
         child: child,
       ),
