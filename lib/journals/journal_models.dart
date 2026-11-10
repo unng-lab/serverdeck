@@ -1,5 +1,23 @@
 import 'dart:convert';
 
+const journalTailLines = 200;
+
+int compareJournalEntries(JournalEntry a, JournalEntry b) {
+  final c = b.receivedAt.compareTo(a.receivedAt);
+  return c == 0 ? b.id.compareTo(a.id) : c;
+}
+
+/// Keep the recent hour plus a tail for quiet sources. Storage caps still apply.
+List<JournalEntry> retainedJournalEntries(List<JournalEntry> entries, int now) {
+  final sorted = entries.where((e) => e.receivedAt <= now).toList()
+    ..sort(compareJournalEntries);
+  return [
+    for (var i = 0; i < sorted.length; i++)
+      if (i < journalTailLines || sorted[i].receivedAt > now - 3600000)
+        sorted[i],
+  ];
+}
+
 enum JournalKind { journal, file }
 
 enum JournalStatus {

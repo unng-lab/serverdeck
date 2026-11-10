@@ -69,7 +69,7 @@ Future<String> prepareDetail(
 
 void main() {
   testWidgets(
-    'open detail and list remove payload at exact expiry between polling ticks',
+    'open detail keeps quiet source payload after the hour boundary',
     (tester) async {
       final h = JournalHarness();
       addTearDown(h.dispose);
@@ -77,9 +77,9 @@ void main() {
       h.clock.advance(const Duration(seconds: 1));
       await h.owner.drain();
       await tester.pumpAndSettle();
-      expect(find.byType(DeckLogMessage), findsNothing);
-      expect(find.text('private detail payload'), findsNothing);
-      expect(find.text('Запись больше недоступна'), findsOneWidget);
+      expect(find.byType(DeckLogMessage), findsOneWidget);
+      expect(find.text('private detail payload'), findsWidgets);
+      expect(find.text('Запись больше недоступна'), findsNothing);
     },
   );
   testWidgets('open detail cannot retain source-deleted payload', (

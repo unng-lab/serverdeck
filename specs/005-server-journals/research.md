@@ -6,13 +6,13 @@ Decision: existing bounded exec with opt-in stderr/nonzero result. Same single s
 
 ## Journal
 
-Decision: finite `journalctl --no-pager --output=json --output-fields=__CURSOR,__REALTIME_TIMESTAMP,MESSAGE,PRIORITY,_SYSTEMD_UNIT --unit=<unit> --lines=128 --since=-1h`, optional `--after-cursor=<cursor>`. No `--all`: large/nonstring/null MESSAGE is explicitly unavailable. Tail128 may skip older entries, marked partial when128 returned. Reconnect/vacuum always possible gap. On output cap, next tick metadata-only newest cursor (`--lines=1`, no MESSAGE), persist skip+partial then resume. Opaque cursors, no gapless promise.
+Decision: finite `journalctl --no-pager --output=json --output-fields=__CURSOR,__REALTIME_TIMESTAMP,MESSAGE,PRIORITY,_SYSTEMD_UNIT --unit=<unit> --lines=200`, optional `--after-cursor=<cursor>`. No `--all`: large/nonstring/null MESSAGE is explicitly unavailable. Tail200 may skip older entries, marked partial when200 returned. Reconnect/vacuum always possible gap. On output cap, next tick metadata-only newest cursor (`--lines=1`, no MESSAGE), persist skip+partial then resume. Opaque cursors, no gapless promise.
 
 Discovery: `LC_ALL=C SYSTEMD_COLORS=0 systemctl --no-pager --no-legend --plain --full list-units --all --type=service`. Currently loaded system services only, not all installed files/uninstantiated templates.
 
 Primary docs consulted by read-only research agent: [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [cursor semantics](https://www.freedesktop.org/software/systemd/man/latest/sd_journal_seek_cursor.html), [systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html). JSON types vary; `--output-fields` requires236.
 
-Review closure: failed cursor read transitions to no-cursor last-hour fallback on next5s tick; successful fallback atomically persists cursor/entries/partial, empty fallback clears cursor, failed fallback keeps retrying without old cursor. Successful seek still does not prove continuity; all journal sources explicitly show bounded best-effort coverage. Independent total source cap1024 is an admission policy, not derived from live sessions64 or profiles1000.
+Review closure: failed cursor read transitions to no-cursor tail200 fallback on next5s tick; successful fallback atomically persists cursor/entries/partial, empty fallback clears cursor, failed fallback keeps retrying without old cursor. Successful seek still does not prove continuity; all journal sources explicitly show bounded best-effort coverage. Independent total source cap1024 is an admission policy, not derived from live sessions64 or profiles1000.
 
 ## Files
 

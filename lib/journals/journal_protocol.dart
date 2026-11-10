@@ -69,7 +69,7 @@ String journalCommand(JournalRequest request) {
     final fields = request.metadataRecovery
         ? '__CURSOR,__REALTIME_TIMESTAMP'
         : '__CURSOR,__REALTIME_TIMESTAMP,MESSAGE,PRIORITY,_SYSTEMD_UNIT';
-    return 'LC_ALL=C SYSTEMD_COLORS=0 journalctl --no-pager --output=json --output-fields=$fields --unit=${shellQuote(request.target)} --lines=${request.metadataRecovery ? 1 : 128} --since=-1h${cursor == null || request.metadataRecovery ? '' : ' --after-cursor=${shellQuote(cursor)}'}';
+    return 'LC_ALL=C SYSTEMD_COLORS=0 journalctl --no-pager --output=json --output-fields=$fields --unit=${shellQuote(request.target)} --lines=${request.metadataRecovery ? 1 : journalTailLines}${cursor == null || request.metadataRecovery ? '' : ' --after-cursor=${shellQuote(cursor)}'}';
   }
   if (request.offset < 0 ||
       request.offset > 9007199254740991 ||
@@ -149,7 +149,7 @@ JournalReply parseJournalReply(
         partial: partial || units.length >= 500,
       );
     }
-    if (lines.length > (request.metadataRecovery ? 1 : 128))
+    if (lines.length > (request.metadataRecovery ? 1 : journalTailLines))
       throw const FormatException();
     final events = <JournalEntry>[];
     String? cursor;
@@ -187,7 +187,10 @@ JournalReply parseJournalReply(
     return JournalReply(
       events: events,
       cursor: cursor,
-      partial: partial || lines.length >= 128 || request.metadataRecovery,
+      partial:
+          partial ||
+          lines.length >= journalTailLines ||
+          request.metadataRecovery,
     );
   } catch (_) {
     return JournalReply(failure: JournalStatus.invalidResponse);

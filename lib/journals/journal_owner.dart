@@ -158,7 +158,7 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
     });
   }
 
-  /// Notify at the nearest receipt expiry, independently of the polling phase.
+  /// Notify at the nearest expiry outside the retained tail or file fragment.
   /// UI reads filter before asynchronous physical pruning completes.
   void _armExpiry() {
     _cancelExpiry?.call();
@@ -179,7 +179,10 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
             continue;
           }
           for (final receipt in [
-            for (final e in p.entries) e.receivedAt,
+            for (final e in (List<JournalEntry>.of(
+              p.entries,
+            )..sort(compareJournalEntries)).skip(journalTailLines))
+              e.receivedAt,
             if (p.checkpoint['fragmentAt'] is int)
               p.checkpoint['fragmentAt'] as int,
           ]) {
@@ -235,13 +238,7 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
   List<JournalEntry> entries(String id) {
     try {
       final p = payload(id), at = now;
-      return p.entries
-          .where((e) => e.receivedAt > at - 3600000 && e.receivedAt <= at)
-          .toList()
-        ..sort((a, b) {
-          final c = b.receivedAt.compareTo(a.receivedAt);
-          return c == 0 ? b.id.compareTo(a.id) : c;
-        });
+      return retainedJournalEntries(p.entries, at);
     } catch (_) {
       _status[id] = JournalStatus.storageError;
       return [];
@@ -513,7 +510,7 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
             )
           : JournalRequest.journal(
               source.target,
-              cursor: _resetCursor.contains(id)
+              cursor: fresh || _resetCursor.contains(id)
                   ? null
                   : payload.checkpoint['cursor'] as String?,
               metadataRecovery: _metadataRecovery.contains(id),
@@ -672,9 +669,10 @@ final class JournalsOwner implements Listenable, RuntimeCapability {
         item.$2.checkpoint['discard'] = true;
         item.$2.partial = true;
       }
-      item.$2.entries.removeWhere(
-        (e) => e.receivedAt <= at - 3600000 || e.receivedAt > at,
-      );
+      final retained = retainedJournalEntries(item.$2.entries, at);
+      item.$2.entries
+        ..clear()
+        ..addAll(retained);
       for (final event in item.$2.entries) {
         all.add(
           _PruneEntry(item.$1, item.$2, event, utf8.encode(event.text).length),

@@ -82,6 +82,41 @@ class JournalHarness {
 }
 
 void main() {
+  test('new session reloads old server tail despite a saved cursor', () async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    await h.owner.start();
+    final id = await h.owner.add('a', JournalKind.journal, 'a.service', 'A');
+    await h.repository.write((r) {
+      final s = r.journalSource(id)!;
+      s.payload = JournalPayload(checkpoint: {'cursor': 'saved'}).encode();
+      r.putJournalSource(s);
+    });
+    h.connection.respond = (r) async {
+      expect(r.cursor, isNull);
+      return JournalReply(
+        cursor: 'old',
+        events: [
+          JournalEntry(
+            id: 'old',
+            receivedAt: 0,
+            sourceAt: h.clock.utc - 86400000,
+            text: 'yesterday',
+          ),
+        ],
+      );
+    };
+    await h.tick();
+    expect(h.owner.entries(id).single.text, 'yesterday');
+    expect(h.owner.entries(id).single.sourceAt, h.clock.utc - 86400000);
+    h.connection.respond = (r) async {
+      expect(r.cursor, 'old');
+      return JournalReply();
+    };
+    await h.tick();
+    expect(h.owner.entries(id), hasLength(1));
+  });
+
   test(
     'previously successful sources show waiting when due behind another source',
     () async {
@@ -142,34 +177,31 @@ void main() {
       expect(h.owner.payload(id).partial, isTrue);
     },
   );
-  test(
-    'disabled history expires at exact hour and survives owner restart',
-    () async {
-      final h = JournalHarness();
-      addTearDown(h.dispose);
-      await h.owner.start();
-      final id = await h.owner.add('a', JournalKind.journal, 'a.service', 'A');
-      await h.repository.write((r) {
-        final s = r.journalSource(id)!;
-        s.enabled = false;
-        s.payload = JournalPayload(
-          entries: [
-            JournalEntry(id: 'x', receivedAt: h.clock.utc, text: 'saved'),
-          ],
-        ).encode();
-        r.putJournalSource(s);
-      });
-      expect(h.owner.entries(id).single.text, 'saved');
-      h.clock.utc += 3600000;
-      expect(h.owner.entries(id), isEmpty);
-      await h.owner.reconcile();
-      expect(
-        JournalPayload.decode(h.repository.state.journalSources[id]!.payload)
-            .entries,
-        isEmpty,
-      );
-    },
-  );
+  test('disabled quiet source keeps its tail after an hour', () async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    await h.owner.start();
+    final id = await h.owner.add('a', JournalKind.journal, 'a.service', 'A');
+    await h.repository.write((r) {
+      final s = r.journalSource(id)!;
+      s.enabled = false;
+      s.payload = JournalPayload(
+        entries: [
+          JournalEntry(id: 'x', receivedAt: h.clock.utc, text: 'saved'),
+        ],
+      ).encode();
+      r.putJournalSource(s);
+    });
+    expect(h.owner.entries(id).single.text, 'saved');
+    h.clock.utc += 3600000;
+    expect(h.owner.entries(id).single.text, 'saved');
+    await h.owner.reconcile();
+    expect(
+      JournalPayload.decode(h.repository.state.journalSources[id]!.payload)
+          .entries,
+      hasLength(1),
+    );
+  });
   test(
     'failed storage leaves checkpoint and late disabled batch cannot commit',
     () async {

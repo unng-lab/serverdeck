@@ -99,3 +99,12 @@ T038–T040 document the completed but rejected message-search interpretation. P
 - [x] T041 Уточнить FR-515/AC-515, plan/contract под подтверждённый поиск systemd-сервиса/названия источника, lychee и независимое readiness review.
 - [x] T042 Заменить message filter на фильтр обнаруженных units и configured source name/target в lib/journals/journal_view.dart; обновить test/journals/journal_search_test.dart для AC-515, сохранения selected logs/paging и context lifecycle.
 - [x] T043 Выполнить format/analyze/flutter test/boundary/lychee и независимое code/spec review; записать действующее поведение и реальные результаты в specs/005-server-journals/reviews/search.md.
+
+## Phase 14: Quiet source tail (2026-11-10)
+
+- [x] T044 Обновить FR-506/507, SC-503, plan/data-model/contract: initial/new-session/recovery tail200 без временного фильтра, hourly+tail200 локально с приоритетом caps; file EOF и prefix TTL без изменений.
+- [x] T045 Реализовать command/parser200, fresh-session reload, общий projection/prune и expiry вне хвоста; убрать часовое empty-сообщение в UI.
+- [x] T046 Unit/fake: старые server timestamps, saved cursor reload и последующий cursor, JSONL200/201, quiet/disabled хвост, expiry201→200 и сохранение detail на часовой границе; сохранить проверки caps и lifecycle.
+- [x] T047 Выполнить обязательные format/analyze/test/boundaries/lychee и независимое review с fix loop.
+
+- [x] T048 Закрыть P2 первого независимого review: согласовать lifecycle FR-512 с FR-506/507 (initial tail200 и offline hour+tail200 после отзыва доверия). Выполнить до завершения T047.

@@ -7,6 +7,47 @@ import 'package:serverdeck/journals/journal_protocol.dart';
 
 Uint8List bytes(String value) => Uint8List.fromList(utf8.encode(value));
 void main() {
+  test(
+    'journal reads latest 200 regardless of timestamp with bounded recovery',
+    () {
+      for (final cursor in [null, 'saved']) {
+        final command = journalCommand(
+          JournalRequest.journal('a.service', cursor: cursor),
+        );
+        expect(command, contains('--lines=200'));
+        expect(command, isNot(contains('--since')));
+        expect(command.contains('--after-cursor'), cursor != null);
+      }
+      final recovery = journalCommand(
+        const JournalRequest.journal('a.service', metadataRecovery: true),
+      );
+      expect(recovery, contains('--lines=1'));
+      expect(recovery, isNot(contains('--since')));
+      String row(int i) => jsonEncode({
+        '__CURSOR': 'c$i',
+        '__REALTIME_TIMESTAMP': '1000000',
+        'MESSAGE': 'old',
+      });
+      final reply = parseJournalReply(
+        const JournalRequest.journal('a.service'),
+        bytes(List.generate(200, row).join('\n')),
+        bytes(''),
+        0,
+      );
+      expect(reply.events, hasLength(200));
+      expect(reply.partial, isTrue);
+      expect(
+        parseJournalReply(
+          const JournalRequest.journal('a.service'),
+          bytes(List.generate(201, row).join('\n')),
+          bytes(''),
+          0,
+        ).failure,
+        JournalStatus.invalidResponse,
+      );
+    },
+  );
+
   test('malformed control cursor is rejected before persisting incompatible checkpoint', () {
     for (final cursor in ['\u0080bad', '\u202ebad', '\n']) {
       final data = jsonEncode({

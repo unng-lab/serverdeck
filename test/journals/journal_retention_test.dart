@@ -36,19 +36,31 @@ void seed(
 }
 
 void main() {
-  test(
-    'monotonic progress expires history even when UTC rolls backwards',
-    () async {
-      final h = JournalHarness();
-      addTearDown(h.dispose);
-      seed(h, 1, 1, 'saved');
-      await h.owner.start();
-      expect(h.owner.entries('p1'), hasLength(1));
-      h.clock.utc -= 7200000;
-      h.clock.elapsed += const Duration(hours: 1);
-      expect(h.owner.entries('p1'), isEmpty);
-    },
-  );
+  test('hour expiry removes only records outside the latest 200', () async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    seed(h, 1, 201, 'saved', offset: -3599000);
+    await h.owner.start();
+    expect(h.owner.entries('p1'), hasLength(201));
+    h.clock.advance(const Duration(seconds: 1));
+    await h.owner.drain();
+    expect(h.owner.entries('p1'), hasLength(200));
+    expect(h.owner.entries('p1').any((e) => e.id == 'p1/0'), isFalse);
+    h.clock.advance(const Duration(days: 2));
+    await h.owner.reconcile();
+    expect(h.owner.entries('p1'), hasLength(200));
+  });
+
+  test('quiet tail survives monotonic progress and UTC rollback', () async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    seed(h, 1, 1, 'saved');
+    await h.owner.start();
+    expect(h.owner.entries('p1'), hasLength(1));
+    h.clock.utc -= 7200000;
+    h.clock.elapsed += const Duration(hours: 1);
+    expect(h.owner.entries('p1'), hasLength(1));
+  });
   test(
     'global record cap removes oldest across profiles without losing configs',
     () async {
@@ -87,26 +99,24 @@ void main() {
       expect(total, lessThanOrEqualTo(32 * 1024 * 1024));
     },
   );
-  test(
-    'restart keeps fresh history, backwards clock cannot resurrect expiry',
-    () async {
-      final h = JournalHarness();
-      addTearDown(h.dispose);
-      seed(h, 1, 1, 'persisted');
-      await h.owner.start();
-      expect(h.owner.entries('p1').single.text, 'persisted');
-      h.clock.utc += 3600000;
-      expect(h.owner.entries('p1'), isEmpty);
-      h.clock.utc -= 3600000;
-      expect(h.owner.entries('p1'), isEmpty);
-      await h.owner.reconcile();
-      expect(
-        JournalPayload.decode(h.repository.state.journalSources['p1']!.payload)
-            .entries,
-        isEmpty,
-      );
-    },
-  );
+  test('restart keeps an old quiet tail despite clock changes', () async {
+    final h = JournalHarness();
+    addTearDown(h.dispose);
+    seed(h, 1, 1, 'persisted');
+    h.clock.utc += 86400000;
+    await h.owner.start();
+    expect(h.owner.entries('p1').single.text, 'persisted');
+    h.clock.utc += 3600000;
+    expect(h.owner.entries('p1'), hasLength(1));
+    h.clock.utc -= 3600000;
+    expect(h.owner.entries('p1'), hasLength(1));
+    await h.owner.reconcile();
+    expect(
+      JournalPayload.decode(h.repository.state.journalSources['p1']!.payload)
+          .entries,
+      hasLength(1),
+    );
+  });
   test('atomic global1024 admission includes disabled and serializes concurrent adds', () async {
     final h = JournalHarness();
     addTearDown(h.dispose);

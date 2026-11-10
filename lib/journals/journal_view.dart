@@ -273,7 +273,9 @@ class _JournalViewState extends State<JournalView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Журналы · локальная история за последний час'),
+          const Text(
+            'Журналы · последние 200 записей и история за последний час',
+          ),
           const Text(
             'Сбор работает при подключённом сервере, в том числе в трее. Ограниченная история; возможны пропуски. Файлы читаются с момента включения, время строк — время получения.',
           ),
@@ -463,7 +465,7 @@ class _JournalViewState extends State<JournalView> {
                 ),
               ],
               state: entries.isEmpty ? DeckDataState.empty : DeckDataState.data,
-              message: 'Записей за последний час нет',
+              message: 'В источнике пока нет доступных записей',
               onOpen: (e) {
                 if (current()) _record(source, e);
               },
